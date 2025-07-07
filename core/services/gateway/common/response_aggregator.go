@@ -22,7 +22,9 @@ type NodeResponseAggregator interface {
 // NOT thread-safe.
 type identicalNodeResponseAggregator struct {
 	responses map[string]stringSet
-	threshold int
+	// nodeToResponse tracks which response key each node address is currently associated with
+	nodeToResponse map[string]string
+	threshold      int
 }
 
 func NewIdenticalNodeResponseAggregator(threshold int) (NodeResponseAggregator, error) {
@@ -30,8 +32,9 @@ func NewIdenticalNodeResponseAggregator(threshold int) (NodeResponseAggregator, 
 		return nil, fmt.Errorf("threshold must be greater than 0, got %d", threshold)
 	}
 	return &identicalNodeResponseAggregator{
-		responses: make(map[string]stringSet),
-		threshold: threshold,
+		responses:      make(map[string]stringSet),
+		nodeToResponse: make(map[string]string),
+		threshold:      threshold,
 	}, nil
 }
 
@@ -76,6 +79,8 @@ func digest(r *jsonrpc.Response) (string, error) {
 // CollectAndAggregate tracks responses by response content (hash) and node address.
 // If the number of identical responses reaches the threshold, it returns the response.
 // Otherwise, returns nil and no error.
+// If a node provides a new response that differs from its previous one, the node is
+// removed from its previous response group and added to the new one.
 func (agg *identicalNodeResponseAggregator) CollectAndAggregate(resp *jsonrpc.Response, nodeAddress string) (*jsonrpc.Response, error) {
 	if resp == nil {
 		return nil, fmt.Errorf("response cannot be nil")
@@ -83,16 +88,32 @@ func (agg *identicalNodeResponseAggregator) CollectAndAggregate(resp *jsonrpc.Re
 	if nodeAddress == "" {
 		return nil, fmt.Errorf("node address cannot be empty")
 	}
+
 	key, err := digest(resp)
 	if err != nil {
 		return nil, fmt.Errorf("error generating digest for response: %w", err)
 	}
+
+	// Check if the node already submitted a different response
+	if oldKey, exists := agg.nodeToResponse[nodeAddress]; exists && oldKey != key {
+		if nodes, ok := agg.responses[oldKey]; ok {
+			nodes.Remove(nodeAddress)
+			// Clean up empty response groups
+			if len(nodes) == 0 {
+				delete(agg.responses, oldKey)
+			}
+		}
+	}
+
 	if _, ok := agg.responses[key]; !ok {
 		agg.responses[key] = make(stringSet)
 	}
 	agg.responses[key].Add(nodeAddress)
-	if len(agg.responses[key]) < agg.threshold {
-		return nil, nil
+	agg.nodeToResponse[nodeAddress] = key
+
+	if len(agg.responses[key]) >= agg.threshold {
+		return resp, nil
 	}
-	return resp, nil
+
+	return nil, nil
 }

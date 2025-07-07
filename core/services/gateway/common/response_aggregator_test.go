@@ -287,3 +287,61 @@ func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestIdenticalNodeResponseAggregator_NodeChangesResponse(t *testing.T) {
+	t.Run("node changes response and reaches threshold", func(t *testing.T) {
+		agg, err := NewIdenticalNodeResponseAggregator(2)
+		require.NoError(t, err)
+
+		// Create two different responses
+		resp1 := &jsonrpc.Response{
+			ID:     "test",
+			Result: []byte(`{"key":"value1"}`),
+		}
+
+		resp2 := &jsonrpc.Response{
+			ID:     "test",
+			Result: []byte(`{"key":"value2"}`),
+		}
+
+		// Node1 submits response1
+		result, err := agg.CollectAndAggregate(resp1, "node1")
+		require.NoError(t, err)
+		require.Nil(t, result) // Not enough nodes yet
+
+		// Node2 submits response2
+		result, err = agg.CollectAndAggregate(resp2, "node2")
+		require.NoError(t, err)
+		require.Nil(t, result) // Different responses, threshold not reached
+
+		// Node1 changes to response2 - this should reach threshold
+		result, err = agg.CollectAndAggregate(resp2, "node1")
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.JSONEq(t, string(resp2.Result), string(result.Result))
+
+		// Verify internal state
+		aggregator := agg.(*identicalNodeResponseAggregator)
+
+		// Generate keys
+		key1, err := digest(resp1)
+		require.NoError(t, err)
+		key2, err := digest(resp2)
+		require.NoError(t, err)
+
+		// Both nodes should be associated with key2
+		require.Equal(t, key2, aggregator.nodeToResponse["node1"])
+		require.Equal(t, key2, aggregator.nodeToResponse["node2"])
+
+		// No nodes should be in resp1 group
+		if nodes, exists := aggregator.responses[key1]; exists {
+			require.Empty(t, nodes)
+		}
+
+		// Both nodes should be in resp2 group
+		nodes, exists := aggregator.responses[key2]
+		require.True(t, exists)
+		require.True(t, nodes.Contains("node1"))
+		require.True(t, nodes.Contains("node2"))
+	})
+}
