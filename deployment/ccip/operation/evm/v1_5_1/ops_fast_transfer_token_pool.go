@@ -8,9 +8,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings"
 	burn_mint_external "github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/burn_mint_with_external_minter_fast_transfer_token_pool"
+	hybrid_external "github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/hybrid_with_external_minter_fast_transfer_token_pool"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/opsutil"
+	opsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
 )
 
 // UpdateDestChainConfigInput defines the input for updating destination chain configuration
@@ -80,6 +81,37 @@ var (
 		shared.BurnMintWithExternalMinterFastTransferTokenPool,
 		func(address common.Address, backend bind.ContractBackend) (interface{}, error) {
 			return bindings.NewFastTransferTokenPoolWrapper(address, backend, shared.BurnMintWithExternalMinterFastTransferTokenPool)
+		},
+		func(pool interface{}, opts *bind.TransactOpts, input UpdateFillerAllowlistInput) (*types.Transaction, error) {
+			wrapper := pool.(*bindings.FastTransferTokenPoolWrapper)
+			return wrapper.UpdateFillerAllowList(opts, input.AddFillers, input.RemoveFillers)
+		},
+	)
+
+	// HybridWithExternalMinter Fast Transfer Token Pool Operations
+	HybridWithExternalMinterFastTransferTokenPoolUpdateDestChainConfigOp = opsutil.NewEVMCallOperation(
+		"HybridWithExternalMinterFastTransferTokenPoolUpdateDestChainConfigOp",
+		semver.MustParse("1.0.0"),
+		"Update destination chain configurations on HybridWithExternalMinter fast transfer token pool contract",
+		hybrid_external.HybridWithExternalMinterFastTransferTokenPoolABI,
+		shared.HybridWithExternalMinterFastTransferTokenPool,
+		func(address common.Address, backend bind.ContractBackend) (interface{}, error) {
+			return bindings.NewFastTransferTokenPoolWrapper(address, backend, shared.HybridWithExternalMinterFastTransferTokenPool)
+		},
+		func(pool interface{}, opts *bind.TransactOpts, input UpdateDestChainConfigInput) (*types.Transaction, error) {
+			wrapper := pool.(*bindings.FastTransferTokenPoolWrapper)
+			return wrapper.UpdateDestChainConfig(opts, input.Updates)
+		},
+	)
+
+	HybridWithExternalMinterFastTransferTokenPoolUpdateFillerAllowlistOp = opsutil.NewEVMCallOperation(
+		"HybridWithExternalMinterFastTransferTokenPoolUpdateFillerAllowlistOp",
+		semver.MustParse("1.0.0"),
+		"Update filler allowlist on HybridWithExternalMinter fast transfer token pool contract",
+		hybrid_external.HybridWithExternalMinterFastTransferTokenPoolABI,
+		shared.HybridWithExternalMinterFastTransferTokenPool,
+		func(address common.Address, backend bind.ContractBackend) (interface{}, error) {
+			return bindings.NewFastTransferTokenPoolWrapper(address, backend, shared.HybridWithExternalMinterFastTransferTokenPool)
 		},
 		func(pool interface{}, opts *bind.TransactOpts, input UpdateFillerAllowlistInput) (*types.Transaction, error) {
 			wrapper := pool.(*bindings.FastTransferTokenPoolWrapper)
