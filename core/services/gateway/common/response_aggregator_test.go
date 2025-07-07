@@ -72,7 +72,7 @@ func TestStringSet(t *testing.T) {
 func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 	t.Run("single node response below threshold", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg := json.RawMessage(`{"result": "success"}`)
 		resp := &jsonrpc.Response[json.RawMessage]{
@@ -87,7 +87,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("threshold reached with identical responses", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg := json.RawMessage(`{"result": "success"}`)
 		resp := &jsonrpc.Response[json.RawMessage]{
@@ -110,7 +110,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("threshold reached with same node sending multiple times", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg := json.RawMessage(`{"result": "success"}`)
 		resp := &jsonrpc.Response[json.RawMessage]{
@@ -134,7 +134,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("different responses do not aggregate", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg1 := json.RawMessage(`{"result": "success"}`)
 		resp1 := &jsonrpc.Response[json.RawMessage]{
@@ -160,7 +160,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("threshold 1 immediately returns response", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg := json.RawMessage(`{"result": "success"}`)
 		resp := &jsonrpc.Response[json.RawMessage]{
@@ -177,7 +177,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("higher threshold requires more nodes", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg := json.RawMessage(`{"result": "success"}`)
 		resp := &jsonrpc.Response[json.RawMessage]{
@@ -200,7 +200,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("mixed responses with different digests", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg1 := json.RawMessage(`{"result": "success"}`)
 		resp1 := &jsonrpc.Response[json.RawMessage]{
@@ -236,7 +236,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 
 	t.Run("error responses are handled correctly", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		resp := &jsonrpc.Response[json.RawMessage]{
 			ID:    "test-id",
@@ -258,7 +258,7 @@ func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
 	t.Run("empty response", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		resp := &jsonrpc.Response[json.RawMessage]{
 			ID: "test-id",
@@ -277,7 +277,7 @@ func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
 
 	t.Run("nil response", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		_, err = agg.CollectAndAggregate(nil, "node1")
 		require.Error(t, err)
@@ -285,7 +285,7 @@ func TestIdenticalNodeResponseAggregator_EdgeCases(t *testing.T) {
 
 	t.Run("empty node address", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rawMsg := json.RawMessage(`{"result": "success"}`)
 		resp := &jsonrpc.Response[json.RawMessage]{

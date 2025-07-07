@@ -14,7 +14,6 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -119,13 +118,13 @@ func TestHandleNodeMessage(t *testing.T) {
 		mockHTTPClient := handler.httpClient.(*httpmocks.HTTPClient)
 
 		// Prepare outbound request
-		outboundReq := gateway.OutboundHTTPRequest{
+		outboundReq := gateway_common.OutboundHTTPRequest{
 			Method:        "GET",
 			URL:           "https://example.com/api",
 			TimeoutMs:     5000,
 			Headers:       map[string]string{"Content-Type": "application/json"},
 			Body:          []byte(`{"test": "data"}`),
-			CacheSettings: gateway.CacheSettings{},
+			CacheSettings: gateway_common.CacheSettings{},
 		}
 		reqBytes, err := json.Marshal(outboundReq)
 		require.NoError(t, err)
@@ -156,11 +155,11 @@ func TestHandleNodeMessage(t *testing.T) {
 	})
 
 	t.Run("returns cached response if available", func(t *testing.T) {
-		outboundReq := gateway.OutboundHTTPRequest{
+		outboundReq := gateway_common.OutboundHTTPRequest{
 			Method:    "GET",
 			URL:       "https://return-cached.com/api",
 			TimeoutMs: 5000,
-			CacheSettings: gateway.CacheSettings{
+			CacheSettings: gateway_common.CacheSettings{
 				StoreInCache:  true,
 				ReadFromCache: true,
 				TTLMs:         600000, // 10 minute TTL
@@ -192,7 +191,7 @@ func TestHandleNodeMessage(t *testing.T) {
 
 		// Second call: should return cached response (no HTTP client call)
 		mockDon.EXPECT().SendToNode(mock.Anything, "node1", mock.MatchedBy(func(req *jsonrpc.Request[json.RawMessage]) bool {
-			var cached gateway.OutboundHTTPResponse
+			var cached gateway_common.OutboundHTTPResponse
 			err2 := json.Unmarshal(*req.Params, &cached)
 			return err2 == nil && string(cached.Body) == string(httpResp.Body)
 		})).Return(nil)
@@ -203,11 +202,11 @@ func TestHandleNodeMessage(t *testing.T) {
 	})
 
 	t.Run("status code 500 is not cached if StoreInCache is false", func(t *testing.T) {
-		outboundReq := gateway.OutboundHTTPRequest{
+		outboundReq := gateway_common.OutboundHTTPRequest{
 			Method:    "GET",
 			URL:       "https://status-500.com/api",
 			TimeoutMs: 5000,
-			CacheSettings: gateway.CacheSettings{
+			CacheSettings: gateway_common.CacheSettings{
 				StoreInCache:  true,
 				ReadFromCache: true,
 				TTLMs:         600000,
@@ -379,10 +378,10 @@ func newMockResponseCache() *mockResponseCache {
 	}
 }
 
-func (m *mockResponseCache) Set(gateway.OutboundHTTPRequest, gateway.OutboundHTTPResponse, time.Duration) {
+func (m *mockResponseCache) Set(gateway_common.OutboundHTTPRequest, gateway_common.OutboundHTTPResponse, time.Duration) {
 }
 
-func (m *mockResponseCache) Get(gateway.OutboundHTTPRequest) *gateway.OutboundHTTPResponse {
+func (m *mockResponseCache) Get(gateway_common.OutboundHTTPRequest) *gateway_common.OutboundHTTPResponse {
 	return nil
 }
 

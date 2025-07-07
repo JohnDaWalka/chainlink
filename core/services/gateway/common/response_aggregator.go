@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
@@ -85,10 +86,10 @@ func (agg *identicalNodeResponseAggregator) CollectAndAggregate(
 	resp *jsonrpc.Response[json.RawMessage],
 	nodeAddress string) (*jsonrpc.Response[json.RawMessage], error) {
 	if resp == nil {
-		return nil, fmt.Errorf("response cannot be nil")
+		return nil, errors.New("response cannot be nil")
 	}
 	if nodeAddress == "" {
-		return nil, fmt.Errorf("node address cannot be empty")
+		return nil, errors.New("node address cannot be empty")
 	}
 
 	key, err := digest(resp)

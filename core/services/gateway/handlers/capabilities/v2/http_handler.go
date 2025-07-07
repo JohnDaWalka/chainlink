@@ -135,7 +135,7 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		case gateway_common.MethodHTTPAction:
 			return h.makeOutgoingRequest(ctx, resp, nodeAddr)
 		default:
-			return fmt.Errorf("Unsupported method %s in node message ID %s", methodName, resp.ID)
+			return fmt.Errorf("unsupported method %s in node message ID %s", methodName, resp.ID)
 		}
 	}
 	return h.triggerHandler.HandleNodeTriggerResponse(ctx, resp, nodeAddr)
