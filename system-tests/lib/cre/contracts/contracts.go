@@ -310,6 +310,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		}
 		configDONs = append(configDONs, don)
 	}
+	// TODO: also configure Solana forwarders
 	_, err = operations.ExecuteSequence(
 		input.CldEnv.OperationsBundle,
 		ks_contracts_op.ConfigureForwardersSeq,

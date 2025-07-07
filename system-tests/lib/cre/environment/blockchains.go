@@ -32,10 +32,11 @@ type BlockchainsInput struct {
 }
 
 type BlockchainOutput struct {
-	ChainSelector      uint64
-	ChainID            uint64
-	BlockchainOutput   *blockchain.Output
-	SethClient         *seth.Client
+	ChainSelector    uint64
+	ChainID          uint64
+	BlockchainOutput *blockchain.Output
+	SethClient       *seth.Client
+	// TODO: add solana-go-client
 	DeployerPrivateKey string
 
 	// private data depending crib vs docker
@@ -84,6 +85,8 @@ func CreateBlockchains(
 			return nil, pkgerrors.New("PRIVATE_KEY env var must be set")
 		}
 
+		// TODO: this part is EVM-specific
+		// add an if and only execute if EVM
 		sethClient, err := seth.NewClientBuilder().
 			WithRpcUrl(bcOut.Nodes[0].ExternalWSUrl).
 			WithPrivateKeys([]string{pkey}).
@@ -93,6 +96,8 @@ func CreateBlockchains(
 		if err != nil {
 			return nil, pkgerrors.Wrap(err, "failed to create seth client")
 		}
+
+		// TODO create solana-go-client
 
 		chainSelector, err := chainselectors.SelectorFromChainId(sethClient.Cfg.Network.ChainID)
 		if err != nil {
@@ -104,9 +109,10 @@ func CreateBlockchains(
 		}
 
 		blockchainOutput = append(blockchainOutput, &BlockchainOutput{
-			ChainSelector:      chainSelector,
-			ChainID:            chainID,
-			BlockchainOutput:   bcOut,
+			ChainSelector:    chainSelector,
+			ChainID:          chainID,
+			BlockchainOutput: bcOut,
+			// TODO: add solana-go-client
 			SethClient:         sethClient,
 			DeployerPrivateKey: pkey,
 			c:                  bcOut,
@@ -134,6 +140,7 @@ func StartBlockchains(loggers BlockchainLoggers, input BlockchainsInput) (StartB
 
 	chainsConfigs := make([]devenv.ChainConfig, 0)
 
+	// TODO: add solana blockchains
 	for _, bcOut := range blockchainsOutput {
 		chainsConfigs = append(chainsConfigs, devenv.ChainConfig{
 			ChainID:   strconv.FormatUint(bcOut.SethClient.Cfg.Network.ChainID, 10),

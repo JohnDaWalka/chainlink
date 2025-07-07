@@ -230,3 +230,18 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress common.Address, nodeEthAddr
 		),
 	}
 }
+
+func WorkerSolana(nodeID string, extraArgs ...string) *jobv1.ProposeJobRequest {
+	uuid := uuid.NewString()
+
+	return &jobv1.ProposeJobRequest{
+		NodeId: nodeID,
+		Spec: fmt.Sprintf(`
+	// fill this correctly
+	`,
+			uuid,
+			types.WriteSolanaCapability,
+			strings.Join(extraArgs, " "),
+		),
+	}
+}

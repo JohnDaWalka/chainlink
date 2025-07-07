@@ -22,6 +22,7 @@ const (
 	NodeIDKey              = "node_id"
 	NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
 	NodeP2PIDKey           = "p2p_id"
+	NodeSolanaAddressKey   = "solana_address"
 )
 
 func AddressKeyFromSelector(chainSelector uint64) string {

@@ -166,6 +166,7 @@ func SetupTestEnvironment(
 		GetContext: func() context.Context {
 			return ctx
 		},
+		// TODO: pass solana blockchains?
 		BlockChains: chain.NewBlockChains(blockChains),
 	}
 	allChainsCLDEnvironment.OperationsBundle = operations.NewBundle(allChainsCLDEnvironment.GetContext, singleFileLogger, operations.NewMemoryReporter())
@@ -176,6 +177,7 @@ func SetupTestEnvironment(
 
 	forwardersSelectors := make([]uint64, 0)
 	for _, bcOut := range blockchainOutputs {
+		// add solana chain selectors here
 		forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
 	}
 
@@ -185,6 +187,7 @@ func SetupTestEnvironment(
 		ks_contracts_op.DeployKeystoneContractsSequenceDeps{
 			Env: allChainsCLDEnvironment,
 		},
+		// TODO: deploy Solana Forwader contracts, if solana blockchain is present
 		ks_contracts_op.DeployKeystoneContractsSequenceInput{
 			RegistryChainSelector: homeChainOutput.ChainSelector,
 			ForwardersSelectors:   forwardersSelectors,
@@ -356,6 +359,8 @@ func SetupTestEnvironment(
 			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(fundErr, "failed to fund CL nodes")}
 			return
 		}
+
+		// TODO: funds nodes on Solana, so they can submit reports
 
 		backgroundStagesCh <- backgroundStageResult{successMessage: libformat.PurpleText("\n<--- [BACKGROUND 2/3] Chainlink nodes funded in %.2f seconds\033[0m\n", time.Since(startTime).Seconds())}
 	}()

@@ -50,13 +50,16 @@ import (
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
+	writesolanacap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writesolana"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
+	writesolanaconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/writesolana"
 	crecompute "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/compute"
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
+	writesolanajob "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/writesolana"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -169,8 +172,9 @@ func init() {
 // When test runs in CI hardcoded versions will be downloaded before the test starts
 // Command that downloads them is part of "test_cmd" in .github/e2e-tests.yml file
 type DependenciesConfig struct {
-	CronCapabilityBinaryPath string `toml:"cron_capability_binary_path"`
-	CRECLIBinaryPath         string `toml:"cre_cli_binary_path" validate:"required"`
+	CronCapabilityBinaryPath   string `toml:"cron_capability_binary_path"`
+	SolanaCapabilityBinaryPath string `toml:"solana_capability_binary_path"`
+	CRECLIBinaryPath           string `toml:"cre_cli_binary_path" validate:"required"`
 }
 
 const (
@@ -469,6 +473,16 @@ func setupPoRTestEnvironment(
 		// assume that if cron binary is already in the image it is in the default location and has default name
 		cronBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
 	}
+	var solanaBinaryPathInTheContainer string
+	if in.DependenciesConfig.SolanaCapabilityBinaryPath != "" {
+		// where cron binary is located in the container
+		solanaBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.SolanaCapabilityBinaryPath))
+		// where cron binary is located on the host
+		customBinariesPaths[types.WriteSolanaCapability] = in.DependenciesConfig.SolanaCapabilityBinaryPath
+	} else {
+		// assume that if cron binary is already in the image it is in the default location and has default name
+		solanaBinaryPathInTheContainer = filepath.Join(containerPath, "solana")
+	}
 
 	firstBlockchain := in.Blockchains[0]
 
@@ -488,9 +502,11 @@ func setupPoRTestEnvironment(
 			crecron.CronJobSpecFactoryFn(cronBinaryPathInTheContainer),
 			cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 			crecompute.ComputeJobSpecFactoryFn,
+			writesolanajob.WriteSolanaJobSpecFactoryFn(solanaBinaryPathInTheContainer), // TODO: probably not needed
 		},
 		ConfigFactoryFunctions: []types.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
+			writesolanaconfig.GenerateConfig,
 		},
 	}
 
@@ -660,6 +676,72 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
+	}
+
+	for _, bc := range in.Blockchains {
+		chainID, chainErr := strconv.Atoi(bc.ChainID)
+		require.NoError(t, chainErr, "failed to convert chain ID to int")
+		capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainID))))
+	}
+
+	setupOutput := setupPoRTestEnvironment(
+		t,
+		testLogger,
+		in,
+		priceProvider,
+		mustSetCapabilitiesFn,
+		capabilityFactoryFns,
+	)
+
+	// Log extra information that might help debugging
+	t.Cleanup(func() {
+		debugTest(t, testLogger, setupOutput, in)
+	})
+
+	waitForFeedUpdate(t, testLogger, priceProvider, setupOutput, 5*time.Minute)
+}
+
+// config file to use: environment-one-don-solana.toml
+func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice_Solana(t *testing.T) {
+	// TODO: use correct config file
+	configErr := setCICtfConfigIfMissing("environment-one-don-solana-ci.toml")
+	require.NoError(t, configErr, "failed to set CTF config")
+	testLogger := framework.L
+
+	// Load and validate test configuration
+	in, err := framework.Load[TestConfig](t)
+	require.NoError(t, err, "couldn't load test config")
+	validateEnvVars(t, in)
+	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
+
+	// Assign all capabilities to the single node set
+	mustSetCapabilitiesFn := func(input []*ns.Input) []*types.CapabilitiesAwareNodeSet {
+		return []*types.CapabilitiesAwareNodeSet{
+			{
+				Input:              input[0],
+				Capabilities:       []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteSolanaCapability},
+				DONTypes:           []string{types.WorkflowDON, types.GatewayDON},
+				BootstrapNodeIndex: 0, // not required, but set to make the configuration explicit
+				GatewayNodeIndex:   0, // not required, but set to make the configuration explicit
+			},
+		}
+	}
+
+	feedIDs := make([]string, 0, len(in.WorkflowConfigs))
+	for _, wc := range in.WorkflowConfigs {
+		feedIDs = append(feedIDs, wc.FeedID)
+	}
+
+	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake, AuthorizationKey, feedIDs)
+	require.NoError(t, priceErr, "failed to create fake price provider")
+
+	capabilityFactoryFns := []types.DONCapabilityWithConfigFactoryFn{
+		webapicap.WebAPITriggerCapabilityFactoryFn,
+		webapicap.WebAPITargetCapabilityFactoryFn,
+		computecap.ComputeCapabilityFactoryFn,
+		consensuscap.OCR3CapabilityFactoryFn,
+		croncap.CronCapabilityFactoryFn,
+		writesolanacap.WriteSolanaCapabilityFactory(libc.MustSafeUint64(int64(1337))),
 	}
 
 	for _, bc := range in.Blockchains {

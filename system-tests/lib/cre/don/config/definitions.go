@@ -80,6 +80,21 @@ type WorkerEVMInput struct {
 	ForwarderAddress string
 }
 
+// TODO: implement this correctly
+func WorkerSolana(chains []any) string {
+	solanaChainsConfig := ""
+	for _, chain := range chains {
+		_ = chain
+		solanaChainsConfig += fmt.Sprintf(`
+	[[Solana]]
+	ChainID = '%s'
+	AutoCreateKey = false
+	`)
+	}
+
+	return solanaChainsConfig
+}
+
 func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData types.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*WorkerEVMInput) string {
 	evmChainsConfig := ""
 	for _, chain := range chains {

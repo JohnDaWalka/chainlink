@@ -143,6 +143,8 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *type
 				Key:   libnode.NodeOCR2KeyBundleIDKey,
 				Value: don.Nodes[j].Ocr2KeyBundleID,
 			})
+
+			// TODO: add Solana address to node labels
 		}
 	}
 
