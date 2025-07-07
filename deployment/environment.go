@@ -377,6 +377,10 @@ func ChainConfigsToOCRConfig(chainConfigs []*nodev1.ChainConfig) (map[chain_sele
 			pubkey = common.Hex2Bytes(chainConfig.Ocr2Config.OcrKeyBundle.OnchainSigningAddress)
 		}
 
+		if chainConfig.Chain.Type == nodev1.ChainType_CHAIN_TYPE_UNSPECIFIED {
+			chainConfig.Chain.Type = nodev1.ChainType_CHAIN_TYPE_SUI
+		}
+
 		details, err := chainToDetails(chainConfig.Chain)
 		if err != nil {
 			return nil, err

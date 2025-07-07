@@ -20,6 +20,16 @@ type DeployLinkTokenConfig struct {
 	ChainSelector uint64
 }
 
+type UpdateSuiPriceConfig struct {
+	ChainSelector       uint64
+	DestChainSelector   uint64
+	CCIPPackageId       string
+	CCIPObjectRef       string
+	SourceTokenMetadata string
+	SourceUsdPerToken   uint64
+	GasUsdPerUnitGas    uint64
+}
+
 // ChainContractParams stores configuration to call initialize in CCIP contracts
 type ChainContractParams struct {
 	DestChainSelector uint64

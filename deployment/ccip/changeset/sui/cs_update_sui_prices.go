@@ -1,0 +1,77 @@
+package sui
+
+import (
+	"fmt"
+
+	"github.com/holiman/uint256"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+)
+
+var _ cldf.ChangeSetV2[UpdateSuiPriceConfig] = UpdateSuiFeeQuoterPrice{}
+
+// DeployAptosChain deploys Aptos chain packages and modules
+type UpdateSuiFeeQuoterPrice struct{}
+
+// Apply implements deployment.ChangeSetV2.
+func (d UpdateSuiFeeQuoterPrice) Apply(e cldf.Environment, config UpdateSuiPriceConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
+	}
+
+	ab := cldf.NewMemoryAddressBook()
+	seqReports := make([]operations.Report[any, any], 0)
+
+	suiChains := e.BlockChains.SuiChains()
+
+	suiChain := suiChains[config.ChainSelector]
+	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+
+	deps := SuiDeps{
+		AB: ab,
+		SuiChain: sui_ops.OpTxDeps{
+			Client: *suiChain.Client,
+			Signer: suiSigner,
+			GetTxOpts: func() bind.TxOpts {
+				b := uint64(400_000_000)
+				return bind.TxOpts{
+					GasBudget: &b,
+				}
+			},
+		},
+		CCIPOnChainState: state,
+	}
+
+	// Run UpdateTokenPrices Operation
+	updateTokenPrices, err := operations.ExecuteOperation(e.OperationsBundle, ccipops.FeeQuoterUpdateTokenPricesOp, deps.SuiChain,
+		ccipops.FeeQuoterUpdateTokenPricesInput{
+			CCIPPackageId: config.CCIPPackageId,
+			CCIPObjectRef: config.CCIPObjectRef,
+			// FeeQuoterCapId:        feeQuoterCapId,
+			SourceTokens:          []string{config.SourceTokenMetadata},
+			SourceUsdPerToken:     []uint256.Int{{config.SourceUsdPerToken}},
+			GasDestChainSelectors: []uint64{config.DestChainSelector},
+			GasUsdPerUnitGas:      []uint256.Int{{config.GasUsdPerUnitGas}},
+		})
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to updatePrice for Sui chain %d: %w", config.ChainSelector, err)
+	}
+
+	seqReports = append(seqReports, updateTokenPrices.ToGenericReport())
+
+	return cldf.ChangesetOutput{
+		AddressBook: ab,
+		Reports:     seqReports,
+	}, nil
+}
+
+// VerifyPreconditions implements deployment.ChangeSetV2.
+func (d UpdateSuiFeeQuoterPrice) VerifyPreconditions(e cldf.Environment, config UpdateSuiPriceConfig) error {
+	return nil
+}

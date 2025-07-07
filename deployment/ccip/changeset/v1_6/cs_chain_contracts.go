@@ -58,12 +58,15 @@ const (
 					bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
 					// bytes4(keccak256("CCIP ChainFamilySelector SVM"));
 		  		bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
+					// bytes4(keccak256("CCIP ChainFamilySelector Sui"))
+				bytes4(keccak256("CCIP ChainFamilySelector Sui")) = 0xc880fcfa
 				```
 	*/
 	EVMFamilySelector   = "2812d52c"
 	SVMFamilySelector   = "1e10bdc4"
 	AptosFamilySelector = "ac77ffec"
 	TVMFamilySelector   = "647e2ba9"
+	SuiFamilySelector   = "c880fcfa"
 )
 
 var (
@@ -1714,6 +1717,8 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...ui
 			familySelector, _ = hex.DecodeString(AptosFamilySelector) // aptos
 		} else if destFamily == chain_selectors.FamilyTon {
 			familySelector, _ = hex.DecodeString(TVMFamilySelector) // ton
+		} else if destFamily == chain_selectors.FamilySui {
+			familySelector, _ = hex.DecodeString(SuiFamilySelector) // Sui
 		}
 	}
 	return fee_quoter.FeeQuoterDestChainConfig{
