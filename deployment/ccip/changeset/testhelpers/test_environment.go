@@ -139,6 +139,11 @@ type TestConfigs struct {
 	// RoleDONTopology is the chain-node topology of the role DON.
 	// Only used in memory mode.
 	RoleDONTopology cciptesthelpertypes.RoleDONTopology
+
+	// SkipDONConfigurations allows you to skip the configuration of DONs in the test environment.
+	// i.e. AddDONAndSetCandidate, SetCandidate, PromoteCandidate, and SetOCR3.
+	// This is useful for tests that need to initialize DONs using different changesets.
+	SkipDONConfiguration bool
 }
 
 func (tc *TestConfigs) Validate() error {
@@ -222,6 +227,12 @@ func WithMultiCall3() TestOps {
 func WithStaticLink() TestOps {
 	return func(testCfg *TestConfigs) {
 		testCfg.IsStaticLink = true
+	}
+}
+
+func WithDONConfigurationSkipped() TestOps {
+	return func(testCfg *TestConfigs) {
+		testCfg.SkipDONConfiguration = true
 	}
 }
 
@@ -1202,7 +1213,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				MCMS:              mcmsConfig,
 			},
 		),
-		commonchangeset.Configure(
+	}
+	if !tc.SkipDONConfiguration {
+		apps = append(apps, commonchangeset.Configure(
 			// Add the DONs and candidate commit OCR instances for the chain.
 			cldf.CreateLegacyChangeSet(v1_6.AddDonAndSetCandidateChangeset),
 			v1_6.AddDonAndSetCandidateChangesetConfig{
@@ -1217,8 +1230,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 					PluginType:                      types.PluginTypeCCIPCommit,
 				},
 			},
-		),
-		commonchangeset.Configure(
+		))
+		apps = append(apps, commonchangeset.Configure(
 			// Add the exec OCR instances for the new chains.
 			cldf.CreateLegacyChangeSet(v1_6.SetCandidateChangeset),
 			v1_6.SetCandidateChangesetConfig{
@@ -1235,8 +1248,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 					},
 				},
 			},
-		),
-		commonchangeset.Configure(
+		))
+		apps = append(apps, commonchangeset.Configure(
 			// Promote everything
 			cldf.CreateLegacyChangeSet(v1_6.PromoteCandidateChangeset),
 			v1_6.PromoteCandidateChangesetConfig{
@@ -1253,8 +1266,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				},
 				MCMS: mcmsConfig,
 			},
-		),
-		commonchangeset.Configure(
+		))
+		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
 			sui.SetOCR3Offramp{},
 			v1_6.SetOCR3OffRampConfig{
@@ -1263,16 +1276,16 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				CCIPHomeConfigType: globals.ConfigTypeActive,
 			},
 		),
-		commonchangeset.Configure(
-			// Enable the OCR config on the remote chains.
-			cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
-			v1_6.SetOCR3OffRampConfig{
-				HomeChainSel:       e.HomeChainSel,
-				RemoteChainSels:    evmChains,
-				CCIPHomeConfigType: globals.ConfigTypeActive,
-			},
-		),
-		commonchangeset.Configure(
+			commonchangeset.Configure(
+				// Enable the OCR config on the remote chains.
+				cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
+				v1_6.SetOCR3OffRampConfig{
+					HomeChainSel:       e.HomeChainSel,
+					RemoteChainSels:    evmChains,
+					CCIPHomeConfigType: globals.ConfigTypeActive,
+				},
+			))
+		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
 			aptoscs.SetOCR3Offramp{},
 			v1_6.SetOCR3OffRampConfig{
@@ -1285,8 +1298,8 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 					OverrideRoot: false,
 				},
 			},
-		),
-		commonchangeset.Configure(
+		))
+		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
 			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.SetOCR3ConfigSolana),
 			v1_6.SetOCR3OffRampConfig{
@@ -1294,10 +1307,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				RemoteChainSels:    solChains,
 				CCIPHomeConfigType: globals.ConfigTypeActive,
 			},
-		),
-
+		))
 		// TODO(ton): We need OCR3OffRamp Changeset for Ton, https://smartcontract-it.atlassian.net/browse/NONEVM-1938
-		// commonchangeset.Configure(
+		// apps = append(apps, commonchangeset.Configure(
 		// 	// Enable the OCR config on the remote chains.
 		// 	cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
 		// 	v1_6.SetOCR3OffRampConfig{
@@ -1305,12 +1317,12 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		// 		RemoteChainSels:    tonChains,
 		// 		CCIPHomeConfigType: globals.ConfigTypeActive,
 		// 	},
-		// ),
-		commonchangeset.Configure(
-			cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
-			nil, // Changeset ignores any config
-		),
+		// ))
 	}
+	apps = append(apps, commonchangeset.Configure(
+		cldf.CreateLegacyChangeSet(v1_6.CCIPCapabilityJobspecChangeset),
+		nil, // Changeset ignores any config
+	))
 	e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, apps)
 	require.NoError(t, err)
 
