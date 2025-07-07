@@ -84,7 +84,6 @@ jobs:
     name: Check Paths That Require Tests To Run
     runs-on: ubuntu-latest
     outputs:
-      # Don't run core E2E tests on PR, unless it's tagged with "run-e2e-tests"
       should-run-core-tests: >-
         ${{
           github.event_name == 'workflow_dispatch' ||
@@ -100,14 +99,12 @@ jobs:
             github.event_name == 'merge_group'
           )
         }}
-      # Run CRE tests on PR always, when there are changes to CRE code
-      # but still require the "run-e2e-tests" label to be present for CI changes
       should-run-cre-tests: >-
         ${{
           steps.changes.outputs.cre_changes == 'true' ||
+          steps.changes.outputs.github_ci_changes == 'true' ||
           github.event_name == 'workflow_dispatch' ||
           github.ref_type == 'tag' ||
-          (steps.changes.outputs.github_ci_changes == 'true' && contains(join(github.event.pull_request.labels.*.name, ' '), 'run-e2e-tests')) ||
           (
             (steps.changes.outputs.github_ci_changes == 'true' ||
             steps.changes.outputs.cre_changes == 'true') &&
@@ -130,7 +127,6 @@ jobs:
             github.event_name == 'merge_group'
           )
         }}
-      # Don't run Solana E2E tests on PR, unless it's tagged with "run-e2e-tests"
       should-run-solana-tests: >-
         ${{
           github.event_name == 'workflow_dispatch' ||
