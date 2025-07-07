@@ -17,7 +17,7 @@ import (
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common/aggregation"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -28,7 +28,7 @@ var _ HTTPTriggerHandler = (*httpTriggerHandler)(nil)
 type savedCallback struct {
 	callbackCh         chan<- handlers.UserCallbackPayload
 	createdAt          time.Time
-	responseAggregator common.NodeResponseAggregator
+	responseAggregator aggregation.NodeResponseAggregator
 }
 
 type httpTriggerHandler struct {
@@ -81,7 +81,7 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 	}
 
 	// 2f + 1 is chosen to ensure that majority of honest nodes are executing the request
-	agg, err := common.NewIdenticalNodeResponseAggregator(2*h.donConfig.F + 1)
+	agg, err := aggregation.NewIdenticalNodeResponseAggregator(2*h.donConfig.F + 1)
 	if err != nil {
 		return errors.New("failed to create response aggregator: " + err.Error())
 	}

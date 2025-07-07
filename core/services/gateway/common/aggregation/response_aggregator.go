@@ -1,4 +1,4 @@
-package common
+package aggregation
 
 import (
 	"crypto/sha256"

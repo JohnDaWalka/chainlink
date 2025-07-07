@@ -351,7 +351,7 @@ func TestHandleNodeMessage_UnsupportedMethod(t *testing.T) {
 
 	err := handler.HandleNodeMessage(testutils.Context(t), resp, nodeAddr)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Unsupported method unsupportedMethod")
+	require.Contains(t, err.Error(), "unsupported method unsupportedMethod")
 }
 
 func TestHandleNodeMessage_EmptyID(t *testing.T) {
