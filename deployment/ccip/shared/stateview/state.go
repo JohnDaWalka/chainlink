@@ -9,9 +9,10 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aptos-labs/aptos-go-sdk"
-	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
@@ -722,6 +723,25 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 		return fmt.Errorf("unknown chain family %s", family)
 	}
 	return nil
+}
+func (c CCIPOnChainState) GetEVMChainState(env cldf.Environment, chainSelector uint64) (cldf_evm.Chain, evm.CCIPChainState, error) {
+	err := cldf.IsValidChainSelector(chainSelector)
+	if err != nil {
+		return cldf_evm.Chain{}, evm.CCIPChainState{}, fmt.Errorf("failed to validate chain selector %d: %w", chainSelector, err)
+	}
+	chain, ok := env.BlockChains.EVMChains()[chainSelector]
+	if !ok {
+		return cldf_evm.Chain{}, evm.CCIPChainState{}, fmt.Errorf("chain with selector %d does not exist in environment", chainSelector)
+	}
+	chainState, ok := c.Chains[chainSelector]
+	if !ok {
+		return cldf_evm.Chain{}, evm.CCIPChainState{}, fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
+	}
+	if chainState.RMNProxy == nil {
+		return cldf_evm.Chain{}, evm.CCIPChainState{}, fmt.Errorf("missing rmnProxy on %s", chain)
+	}
+
+	return chain, chainState, nil
 }
 
 func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {

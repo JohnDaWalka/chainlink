@@ -110,17 +110,9 @@ func deployUSDCTokenPoolContractsPrecondition(env cldf.Environment, c DeployUSDC
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
 	for chainSelector, poolConfig := range c.USDCPools {
-		err := cldf.IsValidChainSelector(chainSelector)
+		chain, chainState, err := state.GetEVMChainState(env, chainSelector)
 		if err != nil {
-			return fmt.Errorf("failed to validate chain selector %d: %w", chainSelector, err)
-		}
-		chain, ok := env.BlockChains.EVMChains()[chainSelector]
-		if !ok {
-			return fmt.Errorf("chain with selector %d does not exist in environment", chainSelector)
-		}
-		chainState, ok := state.Chains[chainSelector]
-		if !ok {
-			return fmt.Errorf("chain with selector %d does not exist in state", chainSelector)
+			return fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", chainSelector, err)
 		}
 		if !c.IsTestRouter && chainState.Router == nil {
 			return fmt.Errorf("missing router on %s", chain)
@@ -128,14 +120,10 @@ func deployUSDCTokenPoolContractsPrecondition(env cldf.Environment, c DeployUSDC
 		if c.IsTestRouter && chainState.TestRouter == nil {
 			return fmt.Errorf("missing test router on %s", chain)
 		}
-		if chainState.RMNProxy == nil {
-			return fmt.Errorf("missing rmnProxy on %s", chain)
-		}
 		err = poolConfig.Validate(env.GetContext(), chain, chainState)
 		if err != nil {
 			return fmt.Errorf("failed to validate USDC token pool config for chain selector %d: %w", chainSelector, err)
 		}
-		// TODO: Verify if PreviousPoolAddress is required.
 	}
 	return nil
 }
@@ -153,13 +141,15 @@ func deployUSDCTokenPoolContractsLogic(env cldf.Environment, c DeployUSDCTokenPo
 	}
 
 	for chainSelector, poolConfig := range c.USDCPools {
-		chain := env.BlockChains.EVMChains()[chainSelector]
-		chainState := state.Chains[chainSelector]
+		chain, chainState, err := state.GetEVMChainState(env, chainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", chainSelector, err)
+		}
 		router := chainState.Router
 		if c.IsTestRouter {
 			router = chainState.TestRouter
 		}
-		_, err := cldf.DeployContract(env.Logger, chain, newAddresses,
+		_, err = cldf.DeployContract(env.Logger, chain, newAddresses,
 			func(chain cldf_evm.Chain) cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool] {
 				poolAddress, tx, usdcTokenPool, err := usdc_token_pool.DeployUSDCTokenPool(chain.DeployerKey,
 					chain.Client, poolConfig.TokenMessenger, poolConfig.CCTPMessageTransmitterProxy,
