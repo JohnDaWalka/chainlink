@@ -31,7 +31,7 @@ func (i DeployCCTPMessageTransmitterProxyInput) Validate(ctx context.Context, ch
 	return nil
 }
 
-// DeployCCTPMessageTransmitterProxyContractConfig
+// DeployCCTPMessageTransmitterProxyContractConfig defines the configuration for deploying CCTP message transmitter proxy contracts.
 type DeployCCTPMessageTransmitterProxyContractConfig struct {
 	USDCProxies map[uint64]DeployCCTPMessageTransmitterProxyInput
 }
