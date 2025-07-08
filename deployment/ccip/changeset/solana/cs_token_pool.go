@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
 	"github.com/smartcontractkit/mcms"
@@ -445,15 +446,9 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	tokenPubKey := cfg.TokenPubKey
 	tokenPool, contractType := solChainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
-
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		solBurnMintTokenPool.SetProgramID(tokenPool)
-	case solTestTokenPool.LockAndRelease_PoolType:
-		solLockReleaseTokenPool.SetProgramID(tokenPool)
-	default:
-		panic("unhandled default case")
-	}
+	chainState := state.SolChains[cfg.ChainSelector]
+	routerProgramAddress, _, _ := chainState.GetRouterInfo()
+	rmnRemoteAddress := chainState.RMNRemote
 
 	var configPDA solana.PublicKey
 	// Global Configuration
@@ -465,11 +460,18 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool program data: %w", err)
 	}
-	chainState := state.SolChains[cfg.ChainSelector]
-	routerProgramAddress, _, _ := chainState.GetRouterInfo()
-	rmnRemoteAddress := chainState.RMNRemote
 
-	initGlobalConfigIx, err := solBurnMintTokenPool.NewInitGlobalConfigInstruction(routerProgramAddress, rmnRemoteAddress, configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
+	var initGlobalConfigIx solana.Instruction
+	switch *cfg.PoolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
+		solBurnMintTokenPool.SetProgramID(tokenPool)
+		initGlobalConfigIx, err = solBurnMintTokenPool.NewInitGlobalConfigInstruction(routerProgramAddress, rmnRemoteAddress, configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
+	case solTestTokenPool.LockAndRelease_PoolType:
+		solLockReleaseTokenPool.SetProgramID(tokenPool)
+		initGlobalConfigIx, err = solLockReleaseTokenPool.NewInitGlobalConfigInstruction(routerProgramAddress, rmnRemoteAddress, configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
+	default:
+		panic("unhandled default case")
+	}
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to build ix to init global config: %w", err)
 	}
@@ -480,7 +482,7 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 		&e,
 		chain,
 		solChainState,
-		shared.BurnMintTokenPool,
+		contractType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
@@ -1829,24 +1831,26 @@ func InitializeStateVersion(e cldf.Environment, cfg TokenPoolConfigWithMCM) (cld
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	tokenPubKey := cfg.TokenPubKey
 	tokenPool, contractType := solChainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
-
-	switch *cfg.PoolType {
-	case solTestTokenPool.BurnAndMint_PoolType:
-		solBurnMintTokenPool.SetProgramID(tokenPool)
-	case solTestTokenPool.LockAndRelease_PoolType:
-		solLockReleaseTokenPool.SetProgramID(tokenPool)
-	default:
-		panic("unhandled default case")
-	}
-
 	poolConfig, err := tokens.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate the pool configg: %w", err)
 	}
 
-	initGlobalConfigIx, err := solBurnMintTokenPool.NewInitializeStateVersionInstruction(
-		tokenPubKey,
-		poolConfig).ValidateAndBuild()
+	var initGlobalConfigIx solana.Instruction
+	switch *cfg.PoolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
+		solBurnMintTokenPool.SetProgramID(tokenPool)
+		initGlobalConfigIx, err = solBurnMintTokenPool.NewInitializeStateVersionInstruction(
+			tokenPubKey,
+			poolConfig).ValidateAndBuild()
+	case solTestTokenPool.LockAndRelease_PoolType:
+		solLockReleaseTokenPool.SetProgramID(tokenPool)
+		initGlobalConfigIx, err = solLockReleaseTokenPool.NewInitializeStateVersionInstruction(
+			tokenPubKey,
+			poolConfig).ValidateAndBuild()
+	default:
+		panic("unhandled default case")
+	}
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to build ix to init global config: %w", err)
 	}
@@ -1857,7 +1861,7 @@ func InitializeStateVersion(e cldf.Environment, cfg TokenPoolConfigWithMCM) (cld
 		&e,
 		chain,
 		solChainState,
-		shared.BurnMintTokenPool,
+		contractType,
 		tokenPubKey,
 		cfg.Metadata,
 	)
