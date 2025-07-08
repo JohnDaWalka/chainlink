@@ -456,6 +456,13 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool global config PDA: %w", err)
 	}
+
+	// If configPDA already exists, we assume the global config is already initialized
+	if _, err := chain.Client.GetAccountInfo(context.Background(), configPDA); err == nil {
+		e.Logger.Infow("Global config already initialized", "configPDA", configPDA.String())
+		return cldf.ChangesetOutput{}, nil
+	}
+
 	programData, err := getSolProgramData(e, chain, tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool program data: %w", err)
