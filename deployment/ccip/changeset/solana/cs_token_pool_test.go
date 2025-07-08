@@ -506,6 +506,15 @@ func TestAddTokenPoolE2EWitMcms(t *testing.T) {
 		commonchangeset.Configure(
 			cldf.CreateLegacyChangeSet(ccipChangesetSolana.E2ETokenPool),
 			ccipChangesetSolana.E2ETokenPoolConfig{
+				InitializeGlobalTokenPoolConfig: []ccipChangesetSolana.TokenPoolConfigWithMCM{
+					{
+						ChainSelector: solChain,
+						PoolType:      &poolType,
+						TokenPubKey:   newTokenAddress,
+						Metadata:      shared.CLLMetadata,
+						MCMS:          mcmsConfig,
+					},
+				},
 				AddTokenPoolAndLookupTable: []ccipChangesetSolana.AddTokenPoolAndLookupTableConfig{
 					{
 						ChainSelector: solChain,
