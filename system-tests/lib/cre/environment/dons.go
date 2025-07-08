@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"fmt"
 	"time"
 
 	pkgerrors "github.com/pkg/errors"
@@ -11,12 +12,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
+	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
 func StartDONs(
 	lggr zerolog.Logger,
+	stageGen *StageGen,
 	nixShell *nix.Shell,
 	topology *cretypes.Topology,
 	infraType libtypes.InfraType,
@@ -58,7 +61,7 @@ func StartDONs(
 		})
 	}
 
-	lggr.Info().Msgf("DONs started in %.2f seconds", time.Since(startTime).Seconds())
+	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("DONs started in %.2f seconds", time.Since(startTime).Seconds())))
 
 	return nodeSetOutput, nil
 }

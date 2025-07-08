@@ -15,11 +15,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
+	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 )
 
-func StartJD(lggr zerolog.Logger, nixShell *nix.Shell, jdInput jd.Input, infraType libtypes.InfraType) (*jd.Output, error) {
+func StartJD(lggr zerolog.Logger, stageGen *StageGen, nixShell *nix.Shell, jdInput jd.Input, infraType libtypes.InfraType) (*jd.Output, error) {
 	startTime := time.Now()
 	lggr.Info().Msg("Starting Jod Distributor")
 
@@ -50,13 +51,14 @@ func StartJD(lggr zerolog.Logger, nixShell *nix.Shell, jdInput jd.Input, infraTy
 		return nil, jdErr
 	}
 
-	lggr.Info().Msgf("Job Distributor started in %.2f seconds", time.Since(startTime).Seconds())
+	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Job Distributor started in %.2f seconds", time.Since(startTime).Seconds())))
 
 	return jdOutput, nil
 }
 
 func SetupJobs(
 	lggr zerolog.Logger,
+	stageGen *StageGen,
 	jdInput jd.Input,
 	nixShell *nix.Shell,
 	registryChainBlockchainOutput *blockchain.Output,
@@ -69,7 +71,7 @@ func SetupJobs(
 
 	jdAndDonsErrGroup.Go(func() error {
 		var startJDErr error
-		jdOutput, startJDErr = StartJD(lggr, nixShell, jdInput, infraType)
+		jdOutput, startJDErr = StartJD(lggr, stageGen, nixShell, jdInput, infraType)
 		if startJDErr != nil {
 			return pkgerrors.Wrap(startJDErr, "failed to start Job Distributor")
 		}
@@ -81,7 +83,7 @@ func SetupJobs(
 
 	jdAndDonsErrGroup.Go(func() error {
 		var startDonsErr error
-		nodeSetOutput, startDonsErr = StartDONs(lggr, nixShell, topology, infraType, registryChainBlockchainOutput, capabilitiesAwareNodeSets)
+		nodeSetOutput, startDonsErr = StartDONs(lggr, stageGen, nixShell, topology, infraType, registryChainBlockchainOutput, capabilitiesAwareNodeSets)
 		if startDonsErr != nil {
 			return pkgerrors.Wrap(startDonsErr, "failed to start DONs")
 		}

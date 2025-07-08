@@ -122,21 +122,25 @@ func SetupTestEnvironment(
 		}
 	}()
 
-	stageGen := NewStageGen(7, "STAGE")
+	stageCount := 7
+	if input.S3ProviderInput != nil {
+		stageCount += 1
+	}
 
-	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting MinIO")))
+	stageGen := NewStageGen(stageCount, "STAGE")
 
 	var s3ProviderOutput *s3provider.Output
 	if input.S3ProviderInput != nil {
+		fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting MinIO")))
+
 		var s3ProviderErr error
 		s3ProviderOutput, s3ProviderErr = s3provider.NewMinioFactory().NewFrom(input.S3ProviderInput)
 		if s3ProviderErr != nil {
 			return nil, pkgerrors.Wrap(s3ProviderErr, "minio provider creation failed")
 		}
+		testLogger.Debug().Msgf("S3Provider.Output value: %#v", s3ProviderOutput)
+		fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("MinIO started in %.2f seconds", stageGen.Elapsed().Seconds())))
 	}
-	testLogger.Debug().Msgf("S3Provider.Output value: %#v", s3ProviderOutput)
-
-	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("MinIO started in %.2f seconds", stageGen.Elapsed().Seconds())))
 
 	bi := BlockchainsInput{
 		infra:    &input.InfraInput,
@@ -281,6 +285,7 @@ func SetupTestEnvironment(
 
 	jdOutput, nodeSetOutput, jobsSeqErr := SetupJobs(
 		testLogger,
+		stageGen,
 		input.JdInput,
 		nixShell,
 		homeChainOutput.BlockchainOutput,
