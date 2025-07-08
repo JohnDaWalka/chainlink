@@ -138,8 +138,6 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	tokenprogramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
 	poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
-	routerProgramAddress, _, _ := chainState.GetRouterInfo()
-	rmnRemoteAddress := chainState.RMNRemote
 	configPDA, _, _ := solState.FindConfigPDA(tokenPool)
 	// ata for token pool
 	createI, tokenPoolATA, err := solTokenUtil.CreateAssociatedTokenAccount(
@@ -162,8 +160,6 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	case solTestTokenPool.BurnAndMint_PoolType:
 		// initialize token pool for token
 		poolInitI, err = solBurnMintTokenPool.NewInitializeInstruction(
-			routerProgramAddress,
-			rmnRemoteAddress,
 			poolConfigPDA,
 			tokenPubKey,
 			chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
@@ -175,8 +171,6 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg TokenPoolConfig) (cldf.C
 	case solTestTokenPool.LockAndRelease_PoolType:
 		// initialize token pool for token
 		poolInitI, err = solLockReleaseTokenPool.NewInitializeInstruction(
-			routerProgramAddress,
-			rmnRemoteAddress,
 			poolConfigPDA,
 			tokenPubKey,
 			chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
@@ -1465,6 +1459,10 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 		tokenPubKey,
 		cfg.Metadata,
 	)
+	programData, err := getSolProgramData(e, chain, tokenPool)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool program data: %w", err)
+	}
 	switch *cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
 		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
@@ -1497,6 +1495,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 				poolConfigPDA,
 				tokenPubKey,
 				authority,
+				tokenPool,
+				programData.Address,
 			).ValidateAndBuild()
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
@@ -1534,6 +1534,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 				poolConfigPDA,
 				tokenPubKey,
 				authority,
+				tokenPool,
+				programData.Address,
 			).ValidateAndBuild()
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
