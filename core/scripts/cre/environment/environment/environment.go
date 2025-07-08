@@ -40,6 +40,7 @@ import (
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
+	httpactionjobspec "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/httpaction"
 	crelogevent "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/logevent"
 	crereadcontract "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/readcontract"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/webapi"
@@ -162,6 +163,7 @@ type ExtraCapabilitiesConfig struct {
 	CronCapabilityBinaryPath  string `toml:"cron_capability_binary_path"`
 	LogEventTriggerBinaryPath string `toml:"log_event_trigger_binary_path"`
 	ReadContractBinaryPath    string `toml:"read_contract_capability_binary_path"`
+	HttpActionBinaryPath      string `toml:"http_action_capability_binary_path"`
 }
 
 // DX tracking
@@ -503,6 +505,11 @@ func StartCLIEnvironment(
 			capabilitiesBinaryPaths[cretypes.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
 		}
 
+		if in.ExtraCapabilities.HttpActionBinaryPath != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.HttpActionCapability)
+			capabilitiesBinaryPaths[cretypes.HttpActionCapability] = in.ExtraCapabilities.HttpActionBinaryPath
+		}
+
 		for capabilityName, binaryPath := range extraBinaries {
 			if binaryPath != "" || withPluginsDockerImageFlag != "" {
 				workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
@@ -534,6 +541,13 @@ func StartCLIEnvironment(
 		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
 			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.LogTriggerCapability)
 			capabilitiesBinaryPaths[cretypes.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
+		}
+
+		// added to workflon DON on purpose, because without updating capabilities syncer and capabilities registry to v2
+		// we cannot use this capability remotely, because it's using a new capability type, which is not supported in v1
+		if in.ExtraCapabilities.HttpActionBinaryPath != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.HttpActionCapability)
+			capabilitiesBinaryPaths[cretypes.HttpActionCapability] = in.ExtraCapabilities.HttpActionBinaryPath
 		}
 
 		for capabilityName, binaryPath := range extraBinaries {
@@ -602,6 +616,7 @@ func StartCLIEnvironment(
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
+		// httpactioncap.HttpActionCapabilityFactoryFn, // TODO: uncomment once we have capability registry v2 support, since this capability has Combined type, which is not supported in v1
 	}
 
 	containerPath, pathErr := crecapabilities.DefaultContainerDirectory(in.Infra.InfraType)
@@ -629,6 +644,11 @@ func StartCLIEnvironment(
 		readContractBinaryName = "readcontract"
 	}
 
+	httpActionBinaryName := filepath.Base(in.ExtraCapabilities.HttpActionBinaryPath)
+	if withPluginsDockerImageFlag != "" {
+		httpActionBinaryName = "http-action"
+	}
+
 	jobSpecFactoryFunctions := []cretypes.JobSpecFactoryFn{
 		// add support for more job spec factory functions if needed
 		webapi.WebAPITriggerJobSpecFactoryFn,
@@ -637,6 +657,7 @@ func StartCLIEnvironment(
 		crecron.CronJobSpecFactoryFn(filepath.Join(containerPath, cronBinaryName)),
 		cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 		crecompute.ComputeJobSpecFactoryFn,
+		httpactionjobspec.HttpActionJobSpecFactoryFn(filepath.Join(containerPath, httpActionBinaryName)),
 	}
 
 	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, extraJobFactoryFns...)
