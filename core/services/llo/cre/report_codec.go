@@ -132,7 +132,7 @@ func (r ReportCodecCapabilityTrigger) Verify(cd llotypes.ChannelDefinition) erro
 		return fmt.Errorf("invalid Opts, got: %q; %w", cd.Opts, err)
 	}
 	if len(opts.Multipliers) != len(cd.Streams) {
-		return fmt.Errorf("multipliers length %d != StreamValues length %d", len(opts.Multipliers), len(cd.Streams))
+		return fmt.Errorf("cd: %#v, multipliers length %d != StreamValues length %d", cd, len(opts.Multipliers), len(cd.Streams))
 	}
 
 	for i, stream := range cd.Streams {
