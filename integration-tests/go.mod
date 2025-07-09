@@ -44,7 +44,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/slack-go/slack v0.15.0
-	github.com/smartcontractkit/chain-selectors v1.0.62-0.20250630182638-8bd9c28cf772
+	github.com/smartcontractkit/chain-selectors v1.0.62
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250709012223-72a25eca7c17
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
@@ -61,7 +61,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.0
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
-	github.com/smartcontractkit/mcms v0.19.2
+	github.com/smartcontractkit/mcms v0.20.2
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	github.com/subosito/gotenv v1.6.0

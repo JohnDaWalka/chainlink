@@ -23,10 +23,10 @@ require (
 	github.com/prometheus/common v0.63.0
 	github.com/rs/zerolog v1.33.0
 	github.com/shopspring/decimal v1.4.0
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250707183758-0325e478c7f0
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250708173959-fbb435dd18c8
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250707133321-27faefc9ce45
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
-	github.com/smartcontractkit/chainlink-deployments-framework v0.17.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.17.1
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250707140145-45280ea11f19
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7
@@ -437,7 +437,7 @@ require (
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.62-0.20250630182638-8bd9c28cf772 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.62 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250709012223-72a25eca7c17 // indirect
@@ -460,7 +460,7 @@ require (
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250701132001-f8be142155b6 // indirect
 	github.com/smartcontractkit/freeport v0.1.1 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
-	github.com/smartcontractkit/mcms v0.19.2 // indirect
+	github.com/smartcontractkit/mcms v0.20.2 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
