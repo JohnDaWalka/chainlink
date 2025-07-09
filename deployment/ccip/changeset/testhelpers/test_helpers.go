@@ -2754,6 +2754,11 @@ func SavePreloadedSolAddresses(e cldf.Environment, solChainSelector uint64) erro
 	if err != nil {
 		return err
 	}
+	tv = cldf.NewTypeAndVersion(shared.CCTPTokenPool, deployment.Version1_0_0)
+	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["cctp_token_pool"], tv)
+	if err != nil {
+		return err
+	}
 	tv = cldf.NewTypeAndVersion(commontypes.ManyChainMultisigProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["mcm"], tv)
 	if err != nil {
