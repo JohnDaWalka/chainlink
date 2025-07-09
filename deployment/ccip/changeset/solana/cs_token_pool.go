@@ -183,7 +183,6 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		tokenprogramID, _ := chainState.TokenToTokenProgram(tokenPubKey)
 		poolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 		poolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
-		configPDA, _, _ := solState.FindConfigPDA(tokenPool)
 
 		// ata for token pool
 		createI, tokenPoolATA, err := solTokenUtil.CreateAssociatedTokenAccount(
@@ -197,10 +196,8 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		}
 		instructions := []solana.Instruction{createI}
 
-		var configPDA solana.PublicKey
-
 		// Global Configuration
-		configPDA, err = tokens.TokenPoolGlobalConfigPDA(tokenPool)
+		configPDA, err := tokens.TokenPoolGlobalConfigPDA(tokenPool)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool global config PDA: %w", err)
 		}
