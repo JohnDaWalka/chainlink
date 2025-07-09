@@ -111,9 +111,6 @@ func (cfg TokenPoolConfig) Validate(e cldf.Environment, chainState solanastatevi
 	if err := chainState.CommonValidation(e, cfg.ChainSelector, cfg.TokenPubKey); err != nil {
 		return err
 	}
-	if cfg.PoolType == "" {
-		return errors.New("pool type must be defined")
-	}
 
 	return chainState.ValidatePoolDeployment(&e, cfg.PoolType, cfg.ChainSelector, cfg.TokenPubKey, false, cfg.Metadata)
 }

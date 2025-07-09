@@ -162,7 +162,7 @@ func (s CCIPChainState) ValidatePoolDeployment(
 		if err != nil {
 			return fmt.Errorf("failed to get token pool config address (mint: %s, pool: %s): %w", tokenPubKey.String(), tokenPool.String(), err)
 		}
-		if err := chain.GetAccountDataBorshInto(context.Background(), poolConfigPDA, &poolConfigAccount); err != nil {
+		if err := chain.GetAccountDataBorshInto(e.GetContext(), poolConfigPDA, &poolConfigAccount); err != nil {
 			return fmt.Errorf("token pool config not found (mint: %s, pool: %s, type: %s): %w", tokenPubKey.String(), tokenPool.String(), poolType, err)
 		}
 	}

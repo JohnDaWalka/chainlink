@@ -57,6 +57,7 @@ func getTypeToProgramDeployName() map[cldf.ContractType]string {
 		types.ManyChainMultisigProgram: deployment.McmProgramName,
 		types.RBACTimelockProgram:      deployment.TimelockProgramName,
 		shared.Receiver:                deployment.ReceiverProgramName,
+		shared.CCTPTokenPool:           deployment.CCTPTokenPoolProgramName,
 	}
 }
 
@@ -96,6 +97,7 @@ type UpgradeConfig struct {
 	NewRMNRemoteVersion            *semver.Version
 	NewBurnMintTokenPoolVersion    *semver.Version
 	NewLockReleaseTokenPoolVersion *semver.Version
+	NewCCTPTokenPoolVersion        *semver.Version
 	NewAccessControllerVersion     *semver.Version
 	NewMCMVersion                  *semver.Version
 	NewTimelockVersion             *semver.Version
@@ -511,7 +513,7 @@ func deployChainContractsSolana(
 		}
 	} else if config.UpgradeConfig.NewBurnMintTokenPoolVersion != nil {
 		burnMintTokenPool = chainState.BurnMintTokenPools[metadata]
-		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewBurnMintTokenPoolVersion, chainState.BurnMintTokenPools[metadata], shared.BurnMintTokenPool)
+		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewBurnMintTokenPoolVersion, burnMintTokenPool, shared.BurnMintTokenPool)
 		if err != nil {
 			return batches, fmt.Errorf("failed to generate upgrade txns: %w", err)
 		}
@@ -540,7 +542,7 @@ func deployChainContractsSolana(
 		}
 	} else if config.UpgradeConfig.NewLockReleaseTokenPoolVersion != nil {
 		lockReleaseTokenPool = chainState.LockReleaseTokenPools[metadata]
-		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewLockReleaseTokenPoolVersion, chainState.LockReleaseTokenPools[metadata], shared.LockReleaseTokenPool)
+		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewLockReleaseTokenPoolVersion, lockReleaseTokenPool, shared.LockReleaseTokenPool)
 		if err != nil {
 			return batches, fmt.Errorf("failed to generate upgrade txns: %w", err)
 		}
@@ -554,6 +556,30 @@ func deployChainContractsSolana(
 	} else {
 		e.Logger.Infow("Using existing lock release token pool", "addr", chainState.LockReleaseTokenPools[metadata].String())
 		lockReleaseTokenPool = chainState.LockReleaseTokenPools[metadata]
+	}
+
+	var cctpTokenPool solana.PublicKey
+	if chainState.CCTPTokenPool.IsZero() {
+		cctpTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, shared.CCTPTokenPool, deployment.Version1_0_0, false, metadata)
+		if err != nil {
+			return batches, fmt.Errorf("failed to deploy program: %w", err)
+		}
+	} else if config.UpgradeConfig.NewCCTPTokenPoolVersion != nil {
+		cctpTokenPool = chainState.CCTPTokenPool
+		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewCCTPTokenPoolVersion, cctpTokenPool, shared.CCTPTokenPool)
+		if err != nil {
+			return batches, fmt.Errorf("failed to generate upgrade txns: %w", err)
+		}
+		// create proposals for txns
+		if len(newTxns) > 0 {
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chain.Selector),
+				Transactions:  newTxns,
+			})
+		}
+	} else {
+		e.Logger.Infow("Using existing CCTP token pool", "addr", chainState.CCTPTokenPool.String())
+		cctpTokenPool = chainState.CCTPTokenPool
 	}
 
 	// MCMS
@@ -658,6 +684,8 @@ func deployChainContractsSolana(
 		rmnRemoteAddress,
 		rmnRemoteConfigPDA,
 		rmnRemoteCursePDA,
+		// cctp token pool
+		cctpTokenPool,
 	}
 
 	if err := extendLookupTable(e, chain, offRampAddress, lookupTableKeys); err != nil {
