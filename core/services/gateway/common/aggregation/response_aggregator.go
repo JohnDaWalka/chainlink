@@ -1,8 +1,6 @@
 package aggregation
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -56,20 +54,6 @@ func (s stringSet) Values() []string {
 	return values
 }
 
-// TODO: use logic from chainlink-common
-func digest(r *jsonrpc.Response[json.RawMessage]) (string, error) {
-	canonicalJSONBytes, err := json.Marshal(r)
-	if err != nil {
-		return "", fmt.Errorf("error marshaling JSON: %w", err)
-	}
-
-	hasher := sha256.New()
-	hasher.Write(canonicalJSONBytes)
-	digestBytes := hasher.Sum(nil)
-
-	return hex.EncodeToString(digestBytes), nil
-}
-
 // CollectAndAggregate tracks responses by response content (hash) and node address.
 // If the number of identical responses reaches the threshold, it returns the response.
 // Otherwise, returns nil and no error.
@@ -85,7 +69,7 @@ func (agg *IdenticalNodeResponseAggregator) CollectAndAggregate(
 		return nil, errors.New("node address cannot be empty")
 	}
 
-	key, err := digest(resp)
+	key, err := resp.Digest()
 	if err != nil {
 		return nil, fmt.Errorf("error generating digest for response: %w", err)
 	}
