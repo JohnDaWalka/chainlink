@@ -253,6 +253,7 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 	}
 	poolsByType := transferPoolToTimelockConfig.ContractsByChain[cfg.ChainSelector]
 
+	var uniquePoolTypeConfigs []E2ETokenConfig
 	for _, tokenCfg := range cfg.E2ETokens {
 		if err := tokenCfg.Validate(); err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to validate token config: %w, token cfg: %+v", err, tokenCfg)
@@ -310,7 +311,19 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 				)
 			}
 		}
-		_, err = InitGlobalConfigTokenPoolProgram(e, TokenPoolConfigWithMCM{
+		isUniquePoolType := true
+		for _, uniqueCfg := range uniquePoolTypeConfigs {
+			if *uniqueCfg.PoolType == *tokenCfg.PoolType {
+				isUniquePoolType = false
+			}
+		}
+		if isUniquePoolType {
+			uniquePoolTypeConfigs = append(uniquePoolTypeConfigs, tokenCfg)
+		}
+	}
+	// Initialize global configs once for each unique token pool
+	for _, tokenCfg := range uniquePoolTypeConfigs {
+		output, err := InitGlobalConfigTokenPoolProgram(e, TokenPoolConfigWithMCM{
 			ChainSelector: cfg.ChainSelector,
 			PoolType:      tokenCfg.PoolType,
 			TokenPubKey:   tokenCfg.TokenPubKey,
@@ -319,6 +332,9 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 		})
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize global config for token pool: %w", err)
+		}
+		if err = cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after running InitGlobalConfigTokenPoolProgram: %w", err)
 		}
 	}
 	output, err := AddTokenPoolAndLookupTable(e, tokenPoolAndLookupTableCfg)
