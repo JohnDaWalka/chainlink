@@ -303,10 +303,10 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 					},
 				},
 			},
-			"onramp": map[string]any{
+			"OnRamp": map[string]any{
 				"Name": "onramp",
 				"Functions": map[string]*chainreader.ChainReaderFunction{
-					"get_dynamic_config": {
+					"OnRampGetDynamicConfig": {
 						Name:          "get_dynamic_config",
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
@@ -318,7 +318,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							},
 						},
 					},
-					"get_static_config": {
+					"OnRampGetStaticConfig": {
 						Name:          "get_static_config",
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
@@ -330,7 +330,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							},
 						},
 					},
-					"get_dest_chain_config": {
+					"OnRampGetDestChainConfig": {
 						Name:          "get_dest_chain_config",
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
@@ -348,7 +348,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 						ResultTupleToStruct: []string{"isEnabled", "sequenceNumber", "allowlistEnabled", "allowedSenders"},
 					},
-					"get_expected_next_sequence_number": {
+					"GetExpectedNextSequenceNumber": {
 						Name:          "get_expected_next_sequence_number",
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
