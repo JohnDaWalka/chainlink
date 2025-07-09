@@ -10,7 +10,7 @@ defaults:
 plugins:
   sui:
     - moduleURI: "github.com/smartcontractkit/chainlink-sui"
-      gitRef: "b03495fed434c5d2af94746c74a02d14b292d6d2"
+      gitRef: "0105e51d1073c2613ae3a994a4e61ffac65138ba"
       installPath: "github.com/smartcontractkit/chainlink-sui/relayer/cmd/chainlink-sui"
   cron:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
