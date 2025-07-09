@@ -4,72 +4,165 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	utp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/usdc_token_pool"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
+	opsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
 )
 
 var (
-	ConfigUSDCTokenPool = cldf.CreateChangeSet(configUSDCTokenPoolLogic, configUSDCTokenPoolPrecondition)
+	ConfigUSDCTokenPoolChangeSet = cldf.CreateChangeSet(configUSDCTokenPoolLogic, configUSDCTokenPoolPrecondition)
+
+	USDCTokenPoolConfigOp = opsutil.NewEVMCallOperation(
+		"USDCTokenPoolConfigOp",
+		semver.MustParse("1.0.0"),
+		"Setting USDC Token Pool config across multiple EVM chains",
+		utp.USDCTokenPoolABI,
+		shared.USDCTokenPool,
+		utp.NewUSDCTokenPool,
+		func(tokenPool *utp.USDCTokenPool, opts *bind.TransactOpts, input []utp.USDCTokenPoolDomainUpdate) (*types.Transaction, error) {
+			return tokenPool.SetDomains(opts, input)
+		})
+
+	USDCTokenPoolConfigSequence = operations.NewSequence(
+		"USDCTokenPoolConfigSequence",
+		semver.MustParse("1.0.0"),
+		"Setting USDC Token Pool config across multiple EVM chains",
+		func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, inputs map[uint64]opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate]) (map[uint64][]opsutil.EVMCallOutput, error) {
+			out := make(map[uint64][]opsutil.EVMCallOutput, len(inputs))
+
+			for chainSelector, input := range inputs {
+				if _, ok := chains[chainSelector]; !ok {
+					return nil, fmt.Errorf("chain with selector %d not defined in dependencies", chainSelector)
+				}
+
+				report, err := operations.ExecuteOperation(b, USDCTokenPoolConfigOp, chains[chainSelector], input)
+				if err != nil {
+					return map[uint64][]opsutil.EVMCallOutput{}, fmt.Errorf("failed to set RMNRemoteConfig for chain %d: %w", chainSelector, err)
+				}
+				out[chainSelector] = []opsutil.EVMCallOutput{report.Output}
+			}
+
+			return out, nil
+		})
 )
 
-// ConfigCCTPMessageTransmitterProxyInput defines all information required of the user to deploy a new CCTP message transmitter proxy contract.
-type ConfigCCTPMessageTransmitterProxyInput struct {
+type DomainUpdateInput struct {
+	AllowedCaller    common.Address
+	MintRecipient    common.Address
+	DomainIdentifier uint32
+	Enabled          bool
+}
+type ConfigUSDCTokenPoolInput struct {
+	USDCTokenPoolAddress common.Address
+	UpdatesByChain       map[uint64]DomainUpdateInput
 }
 
-func (i ConfigCCTPMessageTransmitterProxyInput) Validate(ctx context.Context, chain cldf_evm.Chain, state evm.CCIPChainState) error {
+func (i ConfigUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.Chain, state evm.CCIPChainState) error {
+	if i.USDCTokenPoolAddress == utils.ZeroAddress {
+		return fmt.Errorf("USDCTokenPoolAddress must be defined")
+	}
+	for destSelector, update := range i.UpdatesByChain {
+		err := cldf.IsValidChainSelector(destSelector)
+		if err != nil {
+			return fmt.Errorf("invalid destination chain selector %d: %w", destSelector, err)
+		}
 
+		str, err := chain_selectors.GetSelectorFamily(destSelector)
+		if err != nil {
+			return fmt.Errorf("failed to get selector family for destination chain selector %d: %w", destSelector, err)
+		}
+		switch str {
+		case chain_selectors.FamilySolana:
+			if update.MintRecipient == utils.ZeroAddress {
+				return fmt.Errorf("mint recipient must be defined for Solana destination chain selector %d", destSelector)
+			}
+		}
+
+		// TODO: Other validations? Domain's are defined in chainlink-deployments...
+	}
 	return nil
 }
 
-// ConfigUSDCTokenPoolConfig defines the configuration for deploying CCTP message transmitter proxy contracts.
 type ConfigUSDCTokenPoolConfig struct {
+	USDCPools map[uint64]ConfigUSDCTokenPoolInput
 }
 
 func configUSDCTokenPoolPrecondition(env cldf.Environment, c ConfigUSDCTokenPoolConfig) error {
+	state, err := stateview.LoadOnchainState(env)
+	if err != nil {
+		return fmt.Errorf("failed to load onchain state: %w", err)
+	}
+	for chainSelector, poolConfig := range c.USDCPools {
+		chain, chainState, err := state.GetEVMChainState(env, chainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", chainSelector, err)
+		}
+
+		err = poolConfig.Validate(env.GetContext(), chain, chainState)
+		if err != nil {
+			return fmt.Errorf("failed to validate USDC token pool config for chain selector %d: %w", chainSelector, err)
+		}
+	}
 	return nil
 }
 
-// ConfigUSDCTokenPoolChangeset deploys new USDC pools across multiple chains.
 func configUSDCTokenPoolLogic(env cldf.Environment, c ConfigUSDCTokenPoolConfig) (cldf.ChangesetOutput, error) {
 	if err := configUSDCTokenPoolPrecondition(env, c); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid ConfigUSDCTokenPoolConfig: %w", err)
 	}
-	newAddresses := cldf.NewMemoryAddressBook()
-
 	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
-	fmt.Println(state)
-	/*
-		for chainSelector, proxyConfig := range c.USDCProxies {
-			chain, _, err := state.GetEVMChainState(env, chainSelector)
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", chainSelector, err)
-			}
-			_, err = cldf.DeployContract(env.Logger, chain, newAddresses,
-				func(chain cldf_evm.Chain) cldf.ContractDeploy[*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy] {
-					proxyAddress, tx, proxy, err := cctp_message_transmitter_proxy.DeployCCTPMessageTransmitterProxy(
-						chain.DeployerKey,          // auth
-						chain.Client,               // backend
-						proxyConfig.TokenMessenger, // tokenMessenger
-					)
-					return cldf.ContractDeploy[*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy]{
-						Address:  proxyAddress,
-						Contract: proxy,
-						Tv:       cldf.NewTypeAndVersion("TODO: The proxy contract has a name", deployment.Version1_6_0),
-						Tx:       tx,
-						Err:      err,
-					}
-				},
-			)
-		}
-	*/
+	// Convert CLD/migrations inputs to onchain inputs.
+	input := make(map[uint64]opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate], len(c.USDCPools))
+	for chainSelector, poolConfig := range c.USDCPools {
+		var domainUpdates []utp.USDCTokenPoolDomainUpdate
 
-	return cldf.ChangesetOutput{
-		AddressBook: newAddresses, // TODO: this is deprecated, how do I use the DataStore instead?
-	}, nil
+		for destSelector, update := range poolConfig.UpdatesByChain {
+			domainUpdates = append(domainUpdates, utp.USDCTokenPoolDomainUpdate{
+				AllowedCaller:     [32]byte(common.LeftPadBytes(update.AllowedCaller.Bytes(), 32)),
+				MintRecipient:     [32]byte(common.LeftPadBytes(update.MintRecipient.Bytes(), 32)),
+				DomainIdentifier:  update.DomainIdentifier,
+				DestChainSelector: destSelector,
+				Enabled:           update.Enabled,
+			})
+		}
+		input[chainSelector] = opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate]{
+			ChainSelector: chainSelector,
+			NoSend:        false, // TODO: MCMS?
+			Address:       poolConfig.USDCTokenPoolAddress,
+			CallInput:     domainUpdates,
+		}
+	}
+
+	// Configure sequence.
+	seqReport, err := operations.ExecuteSequence(
+		env.OperationsBundle,
+		USDCTokenPoolConfigSequence,
+		env.BlockChains.EVMChains(),
+		input,
+	)
+	return opsutil.AddEVMCallSequenceToCSOutput(
+		env,
+		cldf.ChangesetOutput{},
+		seqReport,
+		err,
+		state.EVMMCMSStateByChain(),
+		nil, // TODO: MCMS?
+		USDCTokenPoolConfigSequence.Description(),
+	)
 }

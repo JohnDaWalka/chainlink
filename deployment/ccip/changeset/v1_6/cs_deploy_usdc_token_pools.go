@@ -73,9 +73,8 @@ func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.C
 	}
 
 	// Check if a USDC token pool with the given version already exists
-	fmt.Println(state.USDCTokenPools[deployment.Version1_5_1])
-	if _, ok := state.USDCTokenPools[deployment.Version1_5_1]; ok {
-		return fmt.Errorf("USDC token pool with version %s already exists on %s", deployment.Version1_5_1, chain)
+	if _, ok := state.USDCTokenPools[deployment.Version1_6_0]; ok {
+		return fmt.Errorf("USDC token pool with version %s already exists on %s", deployment.Version1_6_0, chain)
 	}
 
 	// Perform USDC checks (i.e. make sure we can call the required functions)
@@ -158,7 +157,7 @@ func deployUSDCTokenPoolContractsLogic(env cldf.Environment, c DeployUSDCTokenPo
 				return cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 					Address:  poolAddress,
 					Contract: usdcTokenPool,
-					Tv:       cldf.NewTypeAndVersion(shared.USDCTokenPool, deployment.Version1_5_1),
+					Tv:       cldf.NewTypeAndVersion(shared.USDCTokenPool, deployment.Version1_6_0),
 					Tx:       tx,
 					Err:      err,
 				}
