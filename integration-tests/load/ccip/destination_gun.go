@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
@@ -288,6 +289,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			AllowOutOfOrderExecution: true, // OOO is always true for Solana
 			ComputeUnits:             150000,
 		}
+	case selectors.FamilyAptos:
+		rcv = common.LeftPadBytes(m.receiver, 32)
 	}
 
 	message := router.ClientEVM2AnyMessage{
@@ -477,10 +480,77 @@ func (m *DestinationGun) getSolanaMessage(src uint64) (ccip_router.SVM2AnyMessag
 }
 
 func (m *DestinationGun) sendAptosSourceMessage(src uint64) error {
+	msg, err := m.getAptosMessage(src)
+	if err != nil {
+		return fmt.Errorf("failed to build Aptos message: %w", err)
+	}
+
+	cfg := &testhelpers.CCIPSendReqConfig{
+		SourceChain:  src,
+		DestChain:    m.chainSelector,
+		IsTestRouter: false,
+		Message:      msg,
+	}
+
+	_, err = testhelpers.SendRequestAptos(m.env, *m.state, cfg)
+	if err != nil {
+		m.l.Errorw("execution reverted",
+			"sourceChain", src,
+			"destChain", m.chainSelector,
+			"err", cldf.MaybeDataErr(err))
+		return fmt.Errorf("failed to send CCIP message on Aptos: %w", err)
+	}
 
 	return nil
 }
 
-func (m *DestinationGun) getAptosMessage(src uint64) (ccip_router.SVM2AnyMessage, error) {
-	return ccip_router.SVM2AnyMessage{}, nil
+func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendRequest, error) {
+	randomValue := mathrand.Intn(100)
+	accumulatedRatio := 0
+	var selectedMsg *ccip.MsgDetails
+	for _, md := range *m.testConfig.MessageDetails {
+		accumulatedRatio += *md.Ratio
+		if randomValue < accumulatedRatio {
+			selectedMsg = &md
+			break
+		}
+	}
+	if selectedMsg == nil {
+		return testhelpers.AptosSendRequest{}, errors.New("failed to select message type")
+	}
+	m.l.Infow("Selected message type for Aptos", "msgType", *selectedMsg.MsgType)
+
+	receiver := common.LeftPadBytes(m.receiver, 32)
+	var feeToken aptos.AccountAddress
+	err := feeToken.ParseStringRelaxed(shared.AptosAPTAddress)
+	if err != nil {
+		return testhelpers.AptosSendRequest{}, err
+	}
+
+	extraArgs := []byte{}
+
+	var data []byte
+	if selectedMsg.IsDataTransfer() {
+		data = make([]byte, *selectedMsg.DataLengthBytes)
+		if _, err := rand.Read(data); err != nil {
+			return testhelpers.AptosSendRequest{}, fmt.Errorf("generating random data: %w", err)
+		}
+	}
+
+	var tokenAmounts []testhelpers.AptosTokenAmount
+	if selectedMsg.IsTokenTransfer() {
+		srcState := m.state.AptosChains[src]
+		tokenAmounts = []testhelpers.AptosTokenAmount{{
+			Token:  srcState.LinkTokenAddress,
+			Amount: 1,
+		}}
+	}
+
+	return testhelpers.AptosSendRequest{
+		Receiver:     receiver,
+		Data:         data,
+		ExtraArgs:    extraArgs,
+		FeeToken:     feeToken,
+		TokenAmounts: tokenAmounts,
+	}, nil
 }
