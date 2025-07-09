@@ -466,7 +466,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250708220600-853616d583f4 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250709201508-b074042402b4 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250709211123-89f6ddaea4f6 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250701132001-f8be142155b6 // indirect
 	github.com/smartcontractkit/freeport v0.1.1 // indirect
