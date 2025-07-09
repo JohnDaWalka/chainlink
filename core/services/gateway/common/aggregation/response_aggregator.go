@@ -1,8 +1,6 @@
 package aggregation
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,12 +8,10 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 )
 
-var _ NodeResponseAggregator = (*identicalNodeResponseAggregator)(nil)
-
-// identicalNodeResponseAggregator collects node responses and aggregates identical responses.
+// IdenticalNodeResponseAggregator collects node responses and aggregates identical responses.
 // (Usually 2f+1, where f is the number of faulty nodes).
 // NOT thread-safe.
-type identicalNodeResponseAggregator struct {
+type IdenticalNodeResponseAggregator struct {
 	// responses is a map from response digest to a set of node addresses
 	responses map[string]stringSet
 	// nodeToResponse tracks which response key each node address is currently associated with
@@ -23,29 +19,15 @@ type identicalNodeResponseAggregator struct {
 	threshold      int
 }
 
-func NewIdenticalNodeResponseAggregator(threshold int) (NodeResponseAggregator, error) {
+func NewIdenticalNodeResponseAggregator(threshold int) (*IdenticalNodeResponseAggregator, error) {
 	if threshold <= 0 {
 		return nil, fmt.Errorf("threshold must be greater than 0, got %d", threshold)
 	}
-	return &identicalNodeResponseAggregator{
+	return &IdenticalNodeResponseAggregator{
 		responses:      make(map[string]stringSet),
 		nodeToResponse: make(map[string]string),
 		threshold:      threshold,
 	}, nil
-}
-
-// TODO: use logic from chainlink-common
-func digest(r *jsonrpc.Response[json.RawMessage]) (string, error) {
-	canonicalJSONBytes, err := json.Marshal(r)
-	if err != nil {
-		return "", fmt.Errorf("error marshaling JSON: %w", err)
-	}
-
-	hasher := sha256.New()
-	hasher.Write(canonicalJSONBytes)
-	digestBytes := hasher.Sum(nil)
-
-	return hex.EncodeToString(digestBytes), nil
 }
 
 // CollectAndAggregate tracks responses by response content (hash) and node address.
@@ -53,18 +35,23 @@ func digest(r *jsonrpc.Response[json.RawMessage]) (string, error) {
 // Otherwise, returns nil and no error.
 // If a node provides a new response that differs from its previous one, the node is
 // removed from its previous response group and added to the new one.
-func (agg *identicalNodeResponseAggregator) CollectAndAggregate(
-	resp string,
-	nodeAddress string) (string, error) {
-	if resp == "" {
-		return "", errors.New("response cannot be nil")
+func (agg *IdenticalNodeResponseAggregator) CollectAndAggregate(
+	resp *jsonrpc.Response[json.RawMessage],
+	nodeAddress string) (*jsonrpc.Response[json.RawMessage], error) {
+	if resp == nil {
+		return nil, errors.New("response cannot be nil")
 	}
 	if nodeAddress == "" {
-		return "", errors.New("node address cannot be empty")
+		return nil, errors.New("node address cannot be empty")
+	}
+
+	digest, err := resp.Digest()
+	if err != nil {
+		return nil, fmt.Errorf("error generating digest for response: %w", err)
 	}
 
 	// Check if the node already submitted a different response
-	if oldKey, exists := agg.nodeToResponse[nodeAddress]; exists && oldKey != resp {
+	if oldKey, exists := agg.nodeToResponse[nodeAddress]; exists && oldKey != digest {
 		if nodes, ok := agg.responses[oldKey]; ok {
 			nodes.Remove(nodeAddress)
 			// Clean up empty response groups
@@ -74,15 +61,15 @@ func (agg *identicalNodeResponseAggregator) CollectAndAggregate(
 		}
 	}
 
-	if _, ok := agg.responses[resp]; !ok {
-		agg.responses[resp] = make(stringSet)
+	if _, ok := agg.responses[digest]; !ok {
+		agg.responses[digest] = make(stringSet)
 	}
-	agg.responses[resp].Add(nodeAddress)
-	agg.nodeToResponse[nodeAddress] = resp
+	agg.responses[digest].Add(nodeAddress)
+	agg.nodeToResponse[nodeAddress] = digest
 
-	if len(agg.responses[resp]) >= agg.threshold {
+	if len(agg.responses[digest]) >= agg.threshold {
 		return resp, nil
 	}
 
-	return "", nil
+	return nil, nil
 }

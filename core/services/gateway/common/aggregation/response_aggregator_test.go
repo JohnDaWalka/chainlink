@@ -9,66 +9,6 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 )
 
-func TestStringSet(t *testing.T) {
-	t.Run("add and contains", func(t *testing.T) {
-		s := make(stringSet)
-
-		require.False(t, s.Contains("test"))
-
-		s.Add("test")
-		require.True(t, s.Contains("test"))
-		require.False(t, s.Contains("other"))
-
-		s.Add("other")
-		require.True(t, s.Contains("test"))
-		require.True(t, s.Contains("other"))
-
-		// Adding duplicate should not change anything
-		s.Add("test")
-		require.True(t, s.Contains("test"))
-
-		require.Len(t, s.Values(), 2)
-	})
-
-	t.Run("remove", func(t *testing.T) {
-		s := make(stringSet)
-		s.Add("test")
-		s.Add("other")
-
-		require.True(t, s.Contains("test"))
-		require.True(t, s.Contains("other"))
-
-		s.Remove("test")
-		require.False(t, s.Contains("test"))
-		require.True(t, s.Contains("other"))
-
-		// Removing non-existent element should not panic
-		s.Remove("nonexistent")
-		require.True(t, s.Contains("other"))
-
-		require.Len(t, s.Values(), 1)
-	})
-
-	t.Run("values", func(t *testing.T) {
-		s := make(stringSet)
-
-		// Empty set
-		values := s.Values()
-		require.Empty(t, values)
-
-		// Add elements
-		s.Add("test")
-		s.Add("other")
-		s.Add("third")
-
-		values = s.Values()
-		require.Len(t, values, 3)
-		require.Contains(t, values, "test")
-		require.Contains(t, values, "other")
-		require.Contains(t, values, "third")
-	})
-}
-
 func TestIdenticalNodeResponseAggregator_CollectAndAggregate(t *testing.T) {
 	t.Run("single node response below threshold", func(t *testing.T) {
 		agg, err := NewIdenticalNodeResponseAggregator(2)
@@ -333,26 +273,23 @@ func TestIdenticalNodeResponseAggregator_NodeChangesResponse(t *testing.T) {
 		require.NotNil(t, result)
 		require.JSONEq(t, string(*resp2.Result), string(*result.Result))
 
-		// Verify internal state
-		aggregator := agg.(*identicalNodeResponseAggregator)
-
 		// Generate keys
-		key1, err := digest(resp1)
+		key1, err := resp1.Digest()
 		require.NoError(t, err)
-		key2, err := digest(resp2)
+		key2, err := resp2.Digest()
 		require.NoError(t, err)
 
 		// Both nodes should be associated with key2
-		require.Equal(t, key2, aggregator.nodeToResponse["node1"])
-		require.Equal(t, key2, aggregator.nodeToResponse["node2"])
+		require.Equal(t, key2, agg.nodeToResponse["node1"])
+		require.Equal(t, key2, agg.nodeToResponse["node2"])
 
 		// No nodes should be in resp1 group
-		if nodes, exists := aggregator.responses[key1]; exists {
+		if nodes, exists := agg.responses[key1]; exists {
 			require.Empty(t, nodes)
 		}
 
 		// Both nodes should be in resp2 group
-		nodes, exists := aggregator.responses[key2]
+		nodes, exists := agg.responses[key2]
 		require.True(t, exists)
 		require.True(t, nodes.Contains("node1"))
 		require.True(t, nodes.Contains("node2"))
