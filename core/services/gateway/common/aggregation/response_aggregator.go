@@ -10,18 +10,10 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 )
 
-var _ NodeResponseAggregator = (*identicalNodeResponseAggregator)(nil)
-
-type NodeResponseAggregator interface {
-	// CollectAndAggregate appends a node response to existing list of responses if exists
-	// and tries to aggregate them into a single response.
-	CollectAndAggregate(resp *jsonrpc.Response[json.RawMessage], nodeAddress string) (*jsonrpc.Response[json.RawMessage], error)
-}
-
-// identicalNodeResponseAggregator collects node responses and aggregates identical responses.
+// IdenticalNodeResponseAggregator collects node responses and aggregates identical responses.
 // (Usually 2f+1, where f is the number of faulty nodes).
 // NOT thread-safe.
-type identicalNodeResponseAggregator struct {
+type IdenticalNodeResponseAggregator struct {
 	// responses is a map from response digest to a set of node addresses
 	responses map[string]stringSet
 	// nodeToResponse tracks which response key each node address is currently associated with
@@ -29,11 +21,11 @@ type identicalNodeResponseAggregator struct {
 	threshold      int
 }
 
-func NewIdenticalNodeResponseAggregator(threshold int) (NodeResponseAggregator, error) {
+func NewIdenticalNodeResponseAggregator(threshold int) (*IdenticalNodeResponseAggregator, error) {
 	if threshold <= 0 {
 		return nil, fmt.Errorf("threshold must be greater than 0, got %d", threshold)
 	}
-	return &identicalNodeResponseAggregator{
+	return &IdenticalNodeResponseAggregator{
 		responses:      make(map[string]stringSet),
 		nodeToResponse: make(map[string]string),
 		threshold:      threshold,
@@ -83,7 +75,7 @@ func digest(r *jsonrpc.Response[json.RawMessage]) (string, error) {
 // Otherwise, returns nil and no error.
 // If a node provides a new response that differs from its previous one, the node is
 // removed from its previous response group and added to the new one.
-func (agg *identicalNodeResponseAggregator) CollectAndAggregate(
+func (agg *IdenticalNodeResponseAggregator) CollectAndAggregate(
 	resp *jsonrpc.Response[json.RawMessage],
 	nodeAddress string) (*jsonrpc.Response[json.RawMessage], error) {
 	if resp == nil {

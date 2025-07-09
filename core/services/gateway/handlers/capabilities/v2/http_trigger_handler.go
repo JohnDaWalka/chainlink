@@ -28,7 +28,7 @@ var _ HTTPTriggerHandler = (*httpTriggerHandler)(nil)
 type savedCallback struct {
 	callbackCh         chan<- handlers.UserCallbackPayload
 	createdAt          time.Time
-	responseAggregator aggregation.NodeResponseAggregator
+	responseAggregator *aggregation.IdenticalNodeResponseAggregator
 }
 
 type httpTriggerHandler struct {

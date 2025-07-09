@@ -333,9 +333,6 @@ func TestIdenticalNodeResponseAggregator_NodeChangesResponse(t *testing.T) {
 		require.NotNil(t, result)
 		require.JSONEq(t, string(*resp2.Result), string(*result.Result))
 
-		// Verify internal state
-		aggregator := agg.(*identicalNodeResponseAggregator)
-
 		// Generate keys
 		key1, err := digest(resp1)
 		require.NoError(t, err)
@@ -343,16 +340,16 @@ func TestIdenticalNodeResponseAggregator_NodeChangesResponse(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both nodes should be associated with key2
-		require.Equal(t, key2, aggregator.nodeToResponse["node1"])
-		require.Equal(t, key2, aggregator.nodeToResponse["node2"])
+		require.Equal(t, key2, agg.nodeToResponse["node1"])
+		require.Equal(t, key2, agg.nodeToResponse["node2"])
 
 		// No nodes should be in resp1 group
-		if nodes, exists := aggregator.responses[key1]; exists {
+		if nodes, exists := agg.responses[key1]; exists {
 			require.Empty(t, nodes)
 		}
 
 		// Both nodes should be in resp2 group
-		nodes, exists := aggregator.responses[key2]
+		nodes, exists := agg.responses[key2]
 		require.True(t, exists)
 		require.True(t, nodes.Contains("node1"))
 		require.True(t, nodes.Contains("node2"))
