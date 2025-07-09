@@ -29,7 +29,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/slack-go/slack v0.15.0
 	github.com/smartcontractkit/chain-selectors v1.0.62
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250709203018-57c3e8032dd1
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250703172708-3dacb811e668
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250704143810-ee587a6c0562
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250708173959-fbb435dd18c8
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.1
@@ -466,7 +466,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250708220600-853616d583f4 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250709211123-89f6ddaea4f6 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250709233304-0be435f69fc1 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/sentinel v0.1.2 // indirect

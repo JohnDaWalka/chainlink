@@ -374,6 +374,11 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							Module: "onramp",
 							Event:  "CCIPMessageSent",
 						},
+						EventFilterRenames: map[string]string{
+							"SequenceNumber": "sequenceNumber",
+							"DestChain":      "destChainSelector",
+							"SourceChain":    "sourceChainSelector",
+						},
 					},
 				},
 			},
