@@ -53,6 +53,7 @@ type IDLConfig struct {
 	BurnMintTokenPoolMetadata    []string                      // whether to upload the IDL for the token pool (keyed my client identifier (metadata))
 	LockReleaseTokenPoolMetadata []string                      // metadata for the lock release token pool (keyed my client identifier (metadata))
 	MCMS                         *proposalutils.TimelockConfig // timelock config for mcms
+	CCTPTokenPool                bool
 }
 
 // parse anchor version from running anchor --version
@@ -408,6 +409,12 @@ func UploadIDL(e cldf.Environment, c IDLConfig) (cldf.ChangesetOutput, error) {
 	for _, lrMetadata := range c.LockReleaseTokenPoolMetadata {
 		tokenPool := chainState.GetActiveTokenPool(shared.LockReleaseTokenPool, lrMetadata)
 		err := idlInit(e, chain.ProgramsPath, tokenPool.String(), deployment.LockReleaseTokenPoolProgramName)
+		if err != nil {
+			return cldf.ChangesetOutput{}, nil
+		}
+	}
+	if c.CCTPTokenPool {
+		err := idlInit(e, chain.ProgramsPath, chainState.CCTPTokenPool.String(), deployment.CCTPTokenPoolProgramName)
 		if err != nil {
 			return cldf.ChangesetOutput{}, nil
 		}

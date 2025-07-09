@@ -140,6 +140,10 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, mcms bool, tokenMetadata 
 			poolType:    shared.LockReleaseTokenPool,
 			poolAddress: state.SolChains[solChain].LockReleaseTokenPools[tokenMetadata],
 		},
+		{
+			poolType:    shared.CCTPTokenPool,
+			poolAddress: state.SolChains[solChain].CCTPTokenPool,
+		},
 	}
 
 	// evm deployment
@@ -149,6 +153,12 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, mcms bool, tokenMetadata 
 	tokenAddress := newTokenAddress
 
 	for _, testCase := range testCases {
+		var cctpMessengerMinter, cctpMessageTransmitter solana.PublicKey
+		// only set for CCTP token pool migrations
+		if testCase.poolType == shared.CCTPTokenPool {
+			cctpMessengerMinter = getRandomPubKey(t) // using mock minter
+			cctpMessageTransmitter = getRandomPubKey(t) // using mock transmitter
+		}
 		e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
@@ -168,11 +178,15 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, mcms bool, tokenMetadata 
 							TokenPubKey: tokenAddress,
 							PoolType:    testCase.poolType,
 							Metadata:    tokenMetadata,
+							CCTPTokenMessengerMinter: cctpMessengerMinter,
+							CCTPMessageTransmitter: cctpMessageTransmitter,
 						},
 						{
 							TokenPubKey: newTokenAddress2,
 							PoolType:    testCase.poolType,
 							Metadata:    tokenMetadata,
+							CCTPTokenMessengerMinter: cctpMessengerMinter,
+							CCTPMessageTransmitter: cctpMessageTransmitter,
 						},
 					},
 				},
@@ -251,6 +265,12 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, mcms bool, tokenMetadata 
 						LockReleaseTokenPools: map[string][]solana.PublicKey{
 							tokenMetadata: {tokenAddress},
 						},
+					})
+			case shared.CCTPTokenPool:
+				_, _ = testhelpers.TransferOwnershipSolana(
+					t, &e, solChain, false,
+					ccipChangesetSolana.CCIPContractsToTransfer{
+						CCTPTokenPoolMints: []solana.PublicKey{tokenAddress},
 					})
 			default:
 				panic("unhandled default case")
@@ -744,4 +764,11 @@ func TestPartnerTokenPools(t *testing.T) {
 	doTestTokenPool(t, e, false, metadata)
 	doTestPoolLookupTable(t, e, false, metadata)
 	doTestTokenPool(t, e, true, metadata)
+}
+
+func getRandomPubKey(t *testing.T) solana.PublicKey {
+	t.Helper()
+	privKey, err := solana.NewRandomPrivateKey()
+	require.NoError(t, err)
+	return privKey.PublicKey()
 }

@@ -152,6 +152,14 @@ func (cfg AddTokenPoolAndLookupTableConfig) Validate(e cldf.Environment, chainSt
 		if tokenPoolCfg.PoolType == "" {
 			return errors.New("pool type must be defined")
 		}
+		if tokenPoolCfg.PoolType == shared.CCTPTokenPool {
+			if tokenPoolCfg.CCTPMessageTransmitter.IsZero() {
+				return errors.New("cctp message transmitter is empty")
+			}
+			if tokenPoolCfg.CCTPTokenMessengerMinter.IsZero() {
+				return errors.New("cctp messenger minter is empty")
+			}
+		}
 		if err := chainState.ValidatePoolDeployment(&e, tokenPoolCfg.PoolType, cfg.ChainSelector, tokenPoolCfg.TokenPubKey, false, tokenPoolCfg.Metadata); err != nil {
 			return err
 		}

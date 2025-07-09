@@ -35,8 +35,8 @@ import (
 
 // For remote fetching, we need to use the short sha
 const (
-	OldSha = "cb02e90f9d6d1dd65f534c60a77bb1e3384a42cb"
-	NewSha = "ee587a6c056204009310019b790ed6d474825316"
+	OldSha = "ee587a6c056204009310019b790ed6d474825316"
+	NewSha = "d1f5f0be212a94abe514fd3bb1baf13af25c3b61"
 )
 
 func verifyProgramSizes(t *testing.T, e cldf.Environment) {
@@ -57,6 +57,7 @@ func verifyProgramSizes(t *testing.T, e cldf.Environment) {
 		deployment.TimelockProgramName:             chainState.TimelockProgram,
 		deployment.McmProgramName:                  chainState.McmProgram,
 		deployment.RMNRemoteProgramName:            state.SolChains[solChainSelectors[0]].RMNRemote,
+		deployment.CCTPTokenPoolProgramName:        state.SolChains[solChainSelectors[0]].CCTPTokenPool,
 	}
 	for program, sizeBytes := range deployment.SolanaProgramBytes {
 		t.Logf("Verifying program %s size is at least %d bytes", program, sizeBytes)
@@ -249,6 +250,7 @@ func TestUpgrade(t *testing.T) {
 					NewMCMVersion:                  &deployment.Version1_1_0,
 					NewBurnMintTokenPoolVersion:    &deployment.Version1_1_0,
 					NewLockReleaseTokenPoolVersion: &deployment.Version1_1_0,
+					NewCCTPTokenPoolVersion:        &deployment.Version1_1_0,
 					NewRMNRemoteVersion:            &deployment.Version1_1_0,
 					NewAccessControllerVersion:     &deployment.Version1_1_0,
 					NewTimelockVersion:             &deployment.Version1_1_0,
@@ -276,6 +278,7 @@ func TestUpgrade(t *testing.T) {
 							types.RBACTimelockProgram:      chainState.TimelockProgram.String(),
 							types.ManyChainMultisigProgram: chainState.McmProgram.String(),
 							shared.RMNRemote:               state.SolChains[solChainSelectors[0]].RMNRemote.String(),
+							shared.CCTPTokenPool:           state.SolChains[solChainSelectors[0]].CCTPTokenPool.String(),
 						},
 					},
 				},
@@ -378,6 +381,7 @@ func TestIDL(t *testing.T) {
 				LockReleaseTokenPoolMetadata: []string{
 					shared.CLLMetadata,
 				},
+				CCTPTokenPool:    true,
 				AccessController: true,
 				Timelock:         true,
 				MCM:              true,
@@ -431,6 +435,7 @@ func TestIDL(t *testing.T) {
 				LockReleaseTokenPoolMetadata: []string{
 					shared.CLLMetadata,
 				},
+				CCTPTokenPool:    true,
 				AccessController: true,
 				Timelock:         true,
 				MCM:              true,
