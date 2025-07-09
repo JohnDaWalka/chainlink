@@ -53,11 +53,11 @@ type RouterConfig struct {
 }
 
 func (cfg *AddRemoteChainToRouterConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
-	chainState := state.SolChains[cfg.ChainSelector]
 	chain, ok := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	if !ok {
 		return fmt.Errorf("chain %d not found in environment", cfg.ChainSelector)
 	}
+	chainState := state.SolChains[cfg.ChainSelector]
 	if err := chainState.ValidateRouterConfig(chain); err != nil {
 		return err
 	}
@@ -274,12 +274,11 @@ type FeeQuoterConfig struct {
 }
 
 func (cfg *AddRemoteChainToFeeQuoterConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
-	chainState := state.SolChains[cfg.ChainSelector]
 	chain, ok := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	if !ok {
 		return fmt.Errorf("chain %d not found in environment", cfg.ChainSelector)
 	}
-
+	chainState := state.SolChains[cfg.ChainSelector]
 	if err := chainState.ValidateFeeQuoterConfig(chain); err != nil {
 		return err
 	}
@@ -444,12 +443,11 @@ type OffRampConfig struct {
 }
 
 func (cfg *AddRemoteChainToOffRampConfig) Validate(e cldf.Environment, state stateview.CCIPOnChainState) error {
-	chainState := state.SolChains[cfg.ChainSelector]
 	chain, ok := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	if !ok {
 		return fmt.Errorf("chain %d not found in environment", cfg.ChainSelector)
 	}
-
+	chainState := state.SolChains[cfg.ChainSelector]
 	if err := chainState.ValidateOffRampConfig(chain); err != nil {
 		return err
 	}

@@ -50,7 +50,6 @@ import (
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose/chip_ingress_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
@@ -85,7 +84,7 @@ func init() {
 	EnvironmentCmd.AddCommand(createKafkaTopicsCmd)
 	EnvironmentCmd.AddCommand(fetchAndRegisterProtosCmd)
 
-	startCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simiplified or full)")
+	startCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simplified or full)")
 	startCmd.Flags().StringVarP(&waitOnErrorTimeoutFlag, "wait-on-error-timeout", "w", "", "Wait on error timeout (e.g. 10s, 1m, 1h)")
 	startCmd.Flags().IntSliceVarP(&extraAllowedGatewayPortsFlag, "extra-allowed-gateway-ports", "e", []int{}, "Extra allowed ports for outgoing connections from the Gateway DON (e.g. 8080,8081)")
 	startCmd.Flags().BoolVarP(&withExampleFlag, "with-example", "x", false, "Deploy and register example workflow")
@@ -102,7 +101,7 @@ func init() {
 	deployAndVerifyExampleWorkflowCmd.Flags().StringVarP(&exampleWorkflowTimeoutFlag, "example-workflow-timeout", "u", "5m", "Time to wait until example workflow succeeds")
 	deployAndVerifyExampleWorkflowCmd.Flags().StringVarP(&gatewayURLFlag, "gateway-url", "g", "http://localhost:5002", "Gateway URL (only for web API trigger-based workflow)")
 
-	startBeholderCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simiplified or full)")
+	startBeholderCmd.Flags().StringVarP(&topologyFlag, "topology", "t", "simplified", "Topology to use for the environment (simplified or full)")
 	startBeholderCmd.Flags().StringArrayVarP(&protoConfigsFlag, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 	startBeholderCmd.Flags().StringVarP(&waitOnErrorTimeoutFlag, "wait-on-error-timeout", "w", "", "Wait on error timeout (e.g. 10s, 1m, 1h)")
 	startBeholderCmd.Flags().StringVarP(&stateFilePathFlag, "state-file-path", "s", "", "Path to the environment state file (if empty state.toml will be used)")
@@ -143,12 +142,12 @@ const (
 )
 
 type Config struct {
-	Blockchains       []*blockchain.Input     `toml:"blockchains" validate:"required"`
-	NodeSets          []*ns.Input             `toml:"nodesets" validate:"required"`
-	JD                *jd.Input               `toml:"jd" validate:"required"`
-	Infra             *libtypes.InfraInput    `toml:"infra" validate:"required"`
-	ExtraCapabilities ExtraCapabilitiesConfig `toml:"extra_capabilities"`
-	S3ProviderInput   *s3provider.Input       `toml:"s3provider"`
+	Blockchains       []*cretypes.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
+	NodeSets          []*ns.Input                        `toml:"nodesets" validate:"required"`
+	JD                *jd.Input                          `toml:"jd" validate:"required"`
+	Infra             *libtypes.InfraInput               `toml:"infra" validate:"required"`
+	ExtraCapabilities ExtraCapabilitiesConfig            `toml:"extra_capabilities"`
+	S3ProviderInput   *s3provider.Input                  `toml:"s3provider"`
 }
 
 func (c Config) Validate() error {
@@ -236,7 +235,7 @@ var StartCmdRecoverHandlerFunc = func(p interface{}, waitOnErrorTimeoutFlag stri
 	}
 }
 
-var StartCmdGenerateSettingsFile = func(homeChainOut *creenv.BlockchainOutput, output *creenv.SetupOutput) error {
+var StartCmdGenerateSettingsFile = func(homeChainOut *cretypes.WrappedBlockchainOutput, output *creenv.SetupOutput) error {
 	rpcs := map[uint64]string{}
 	for _, bcOut := range output.BlockchainOutput {
 		rpcs[bcOut.ChainSelector] = bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl
@@ -272,7 +271,7 @@ var StartCmdGenerateSettingsFile = func(homeChainOut *creenv.BlockchainOutput, o
 		return err
 	}
 
-	fmt.Printf("CRE CLI settings file created: %s\n", targetPath)
+	fmt.Printf("CRE CLI settings file created: %s\n\n", targetPath)
 
 	return nil
 }
@@ -334,7 +333,7 @@ var startCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "Error: %s\n", startErr)
 			fmt.Fprintf(os.Stderr, "Stack trace: %s\n", string(debug.Stack()))
 
-			dxErr := trackStartup(false, hasBuiltDockerImage(in), in.Infra.InfraType, ptr.Ptr(strings.SplitN(startErr.Error(), "\n", 1)[0]), ptr.Ptr(false))
+			dxErr := trackStartup(false, hasBuiltDockerImage(in, withPluginsDockerImageFlag), in.Infra.InfraType, ptr.Ptr(strings.SplitN(startErr.Error(), "\n", 1)[0]), ptr.Ptr(false))
 			if dxErr != nil {
 				fmt.Fprintf(os.Stderr, "failed to track startup: %s\n", dxErr)
 			}
@@ -356,7 +355,7 @@ var startCmd = &cobra.Command{
 			fmt.Fprintf(os.Stderr, "failed to create CRE CLI settings file: %s. You need to create it manually.", sErr)
 		}
 
-		dxErr := trackStartup(true, hasBuiltDockerImage(in), output.InfraInput.InfraType, nil, nil)
+		dxErr := trackStartup(true, hasBuiltDockerImage(in, withPluginsDockerImageFlag), output.InfraInput.InfraType, nil, nil)
 		if dxErr != nil {
 			fmt.Fprintf(os.Stderr, "failed to track startup: %s\n", dxErr)
 		}
@@ -459,20 +458,6 @@ func removeAllContainers() error {
 	}
 
 	return nil
-}
-
-var deployAndVerifyExampleWorkflowCmd = &cobra.Command{
-	Use:   "deploy-verify-example",
-	Short: "Deploys and verifies example (optionally)",
-	Long:  `Deploys a simple Proof-of-Reserve workflow and, optionally, wait until it succeeds`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		timeout, timeoutErr := time.ParseDuration(exampleWorkflowTimeoutFlag)
-		if timeoutErr != nil {
-			return errors.Wrapf(timeoutErr, "failed to parse %s to time.Duration", exampleWorkflowTimeoutFlag)
-		}
-
-		return deployAndVerifyExampleWorkflow(cmd.Context(), rpcURLFlag, gatewayURLFlag, chainIDFlag, timeout, exampleWorkflowTriggerFlag)
-	},
 }
 
 func StartCLIEnvironment(
@@ -660,7 +645,10 @@ func StartCLIEnvironment(
 		if chainErr != nil {
 			return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
 		}
-		capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))))
+
+		if !blockchain.ReadOnly {
+			capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))))
+		}
 		capabilityFactoryFns = append(capabilityFactoryFns, readcontractcap.ReadContractCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 		capabilityFactoryFns = append(capabilityFactoryFns, logeventtriggercap.LogEventTriggerCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 
@@ -845,7 +833,11 @@ func defaultCtfConfigs(topologyFlag string) error {
 	return nil
 }
 
-func hasBuiltDockerImage(in *Config) bool {
+func hasBuiltDockerImage(in *Config, withPluginsDockerImageFlag string) bool {
+	if withPluginsDockerImageFlag != "" {
+		return false
+	}
+
 	hasBuilt := false
 
 	for _, nodeset := range in.NodeSets {

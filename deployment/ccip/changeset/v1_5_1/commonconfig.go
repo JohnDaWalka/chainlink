@@ -197,6 +197,12 @@ func GetTokenPoolAddressFromSymbolTypeAndVersion(
 				return tokenPool.Address(), true
 			}
 		}
+	case shared.HybridWithExternalMinterFastTransferTokenPool:
+		if tokenPools, ok := chainState.HybridWithExternalMinterFastTransferTokenPools[symbol]; ok {
+			if tokenPool, ok := tokenPools[version]; ok {
+				return tokenPool.Address(), true
+			}
+		}
 	case shared.BurnFromMintTokenPool:
 		if tokenPools, ok := chainState.BurnFromMintTokenPools[symbol]; ok {
 			if tokenPool, ok := tokenPools[version]; ok {
