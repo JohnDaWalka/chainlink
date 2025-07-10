@@ -488,21 +488,34 @@ func (e *Engine) heartbeatLoop(ctx context.Context) {
 }
 
 func (e *Engine) deductStandardBalances(meteringReport *metering.Report) {
+	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-285 get max spend per step from SDK.
+	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-284 parse user max spend for step
+	userSpendLimit := decimal.NewNullDecimal(decimal.Zero)
+	userSpendLimit.Valid = false
+
+	spendLimit, err := meteringReport.GetMaxSpendForInvocation(userSpendLimit, 1)
+	if err != nil {
+		e.lggr.Errorw("could not reserve for capability request", "capReq", "standard-deduction", "err", err)
+	}
+
+	computeUnit := billing.ResourceType_RESOURCE_TYPE_COMPUTE.String()
+
+	if spendLimit.Valid {
+		if err = meteringReport.Deduct(computeUnit, spendLimit.Decimal); err != nil {
+			e.lggr.Errorw("could not deduct balance for capability request", "capReq", "standard-deduction", "err", err)
+		}
+	}
+
 	// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
 	// Add an extra second of metering padding for context cancel propagation
 	ctxCancelPadding := (time.Millisecond * 1000).Milliseconds()
 	compMs := decimal.NewFromInt(int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs) + ctxCancelPadding)
-	computeUnit := billing.ResourceType_name[int32(billing.ResourceType_RESOURCE_TYPE_COMPUTE)]
-	computeAmount, mrErr := meteringReport.ConvertToBalance(computeUnit, compMs)
-	if mrErr != nil {
-		e.lggr.Errorw("could not determine compute amount to meter", "err", mrErr)
-	}
 
-	if mrErr = meteringReport.Deduct(
-		computeUnit,
-		computeAmount,
-	); mrErr != nil {
-		e.lggr.Errorw("could not meter compute", "err", mrErr)
+	if err = meteringReport.Settle(computeUnit, []capabilities.MeteringNodeDetail{
+		// TODO: maybe need a p2pID
+		{Peer2PeerID: "", SpendUnit: computeUnit, SpendValue: compMs.String()},
+	}); err != nil {
+		e.lggr.Errorw("could not meter compute", "err", err)
 	}
 }
 
