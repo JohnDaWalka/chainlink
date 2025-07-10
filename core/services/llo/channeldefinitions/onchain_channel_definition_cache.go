@@ -171,6 +171,7 @@ func (c *channelDefinitionCache) Start(ctx context.Context) error {
 			return err
 		} else if pd != nil {
 			c.definitions = pd.Definitions
+			fmt.Printf("Loaded channel definition: #%+v\n", c.definitions)
 			c.definitionsVersion = uint32(pd.Version)
 			if pd.BlockNum+1 > c.initialBlockNum {
 				c.initialBlockNum = pd.BlockNum + 1
