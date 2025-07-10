@@ -285,8 +285,10 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	)
 	// TODO: how to do MintAndAllow on Solana?
 	tokenReceiver := state.SolChains[destChain].Receiver
+	t.Logf("Token receiver: %s\n", tokenReceiver.String())
 	tokenReceiverATA, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, state.SolChains[destChain].Receiver)
 	require.NoError(t, ferr)
+	t.Logf("Token receiver ATA: %s\n", tokenReceiverATA.String())
 
 	extraArgs, err := ccipevm.SerializeClientSVMExtraArgsV1(message_hasher.ClientSVMExtraArgsV1{
 		TokenReceiver: tokenReceiver,
