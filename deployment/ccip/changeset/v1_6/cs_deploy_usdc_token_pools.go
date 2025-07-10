@@ -30,8 +30,6 @@ var (
 
 // DeployUSDCTokenPoolInput defines all information required of the user to deploy a new USDC token pool contract.
 type DeployUSDCTokenPoolInput struct {
-	// CCTPMessageTransmitterProxy is the address of the CCTP message transmitter proxy contract.
-	CCTPMessageTransmitterProxy common.Address
 	// PreviousPoolAddress is the address of the previous USDC token pool contract, inflight messages
 	// are redirected to the previous pool when needed.
 	PreviousPoolAddress common.Address
@@ -52,8 +50,9 @@ func (i DeployUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.C
 	if i.TokenMessenger == utils.ZeroAddress {
 		return errors.New("token messenger must be defined")
 	}
-	if i.CCTPMessageTransmitterProxy == utils.ZeroAddress {
-		return errors.New("message transmitter proxy must be defined")
+	if _, ok := state.CCTPMessageTransmitterProxies[deployment.Version1_6_0]; !ok {
+		// TODO: Could this be deployed automatically if it doesn't exist?
+		return fmt.Errorf("CCTP message transmitter proxy for version %s not found on %s", deployment.Version1_6_0, chain)
 	}
 	if i.PreviousPoolAddress == utils.ZeroAddress {
 		return errors.New("previous pool address must be defined")
@@ -151,7 +150,8 @@ func deployUSDCTokenPoolContractsLogic(env cldf.Environment, c DeployUSDCTokenPo
 		_, err = cldf.DeployContract(env.Logger, chain, newAddresses,
 			func(chain cldf_evm.Chain) cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool] {
 				poolAddress, tx, usdcTokenPool, err := usdc_token_pool.DeployUSDCTokenPool(chain.DeployerKey,
-					chain.Client, poolConfig.TokenMessenger, poolConfig.CCTPMessageTransmitterProxy,
+					chain.Client, poolConfig.TokenMessenger,
+					chainState.CCTPMessageTransmitterProxies[deployment.Version1_6_0].Address(),
 					poolConfig.TokenAddress, poolConfig.AllowList, chainState.RMNProxy.Address(), router.Address(),
 					poolConfig.PreviousPoolAddress)
 				return cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool]{

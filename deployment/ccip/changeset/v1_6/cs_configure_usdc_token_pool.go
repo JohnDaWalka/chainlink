@@ -15,6 +15,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
@@ -65,15 +66,14 @@ type DomainUpdateInput struct {
 	Enabled          bool
 }
 type ConfigUSDCTokenPoolInput struct {
-	USDCTokenPoolAddress common.Address
-	UpdatesByChain       map[uint64]DomainUpdateInput
+	DestinationUpdates map[uint64]DomainUpdateInput
 }
 
 func (i ConfigUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.Chain, state evm.CCIPChainState) error {
-	if i.USDCTokenPoolAddress == utils.ZeroAddress {
-		return fmt.Errorf("USDCTokenPoolAddress must be defined")
+	if _, ok := state.USDCTokenPools_v1_6[deployment.Version1_6_0]; !ok {
+		return fmt.Errorf("no USDC token pool with version %s found on %s", deployment.Version1_6_0, chain.Name)
 	}
-	for destSelector, update := range i.UpdatesByChain {
+	for destSelector, update := range i.DestinationUpdates {
 		err := cldf.IsValidChainSelector(destSelector)
 		if err != nil {
 			return fmt.Errorf("invalid destination chain selector %d: %w", destSelector, err)
@@ -96,7 +96,8 @@ func (i ConfigUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.C
 }
 
 type ConfigUSDCTokenPoolConfig struct {
-	USDCPools map[uint64]ConfigUSDCTokenPoolInput
+	ChainSelector uint64
+	USDCPools     map[uint64]ConfigUSDCTokenPoolInput
 }
 
 func configUSDCTokenPoolPrecondition(env cldf.Environment, c ConfigUSDCTokenPoolConfig) error {
@@ -104,6 +105,15 @@ func configUSDCTokenPoolPrecondition(env cldf.Environment, c ConfigUSDCTokenPool
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
+
+	_, chainState, err := state.GetEVMChainState(env, c.ChainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", c.ChainSelector, err)
+	}
+	if _, ok := chainState.USDCTokenPools_v1_6[deployment.Version1_6_0]; !ok {
+		return fmt.Errorf("no USDC token pool with version %s found on %d", deployment.Version1_6_0, c.ChainSelector)
+	}
+
 	for chainSelector, poolConfig := range c.USDCPools {
 		chain, chainState, err := state.GetEVMChainState(env, chainSelector)
 		if err != nil {
@@ -127,12 +137,18 @@ func configUSDCTokenPoolLogic(env cldf.Environment, c ConfigUSDCTokenPoolConfig)
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
+	_, chainState, err := state.GetEVMChainState(env, c.ChainSelector)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w",
+			c.ChainSelector, err)
+	}
+
 	// Convert CLD/migrations inputs to onchain inputs.
 	input := make(map[uint64]opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate], len(c.USDCPools))
 	for chainSelector, poolConfig := range c.USDCPools {
 		var domainUpdates []utp.USDCTokenPoolDomainUpdate
 
-		for destSelector, update := range poolConfig.UpdatesByChain {
+		for destSelector, update := range poolConfig.DestinationUpdates {
 			domainUpdates = append(domainUpdates, utp.USDCTokenPoolDomainUpdate{
 				AllowedCaller:     [32]byte(common.LeftPadBytes(update.AllowedCaller.Bytes(), 32)),
 				MintRecipient:     [32]byte(common.LeftPadBytes(update.MintRecipient.Bytes(), 32)),
@@ -144,7 +160,7 @@ func configUSDCTokenPoolLogic(env cldf.Environment, c ConfigUSDCTokenPoolConfig)
 		input[chainSelector] = opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate]{
 			ChainSelector: chainSelector,
 			NoSend:        false, // TODO: MCMS?
-			Address:       poolConfig.USDCTokenPoolAddress,
+			Address:       chainState.USDCTokenPools_v1_6[deployment.Version1_6_0].Address(),
 			CallInput:     domainUpdates,
 		}
 	}

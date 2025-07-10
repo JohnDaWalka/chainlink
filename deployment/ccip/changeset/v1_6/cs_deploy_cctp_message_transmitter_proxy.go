@@ -7,10 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	// TODO: New token pool contract should be imported from the latest version
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
+	cmtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
@@ -27,6 +29,10 @@ type DeployCCTPMessageTransmitterProxyInput struct {
 }
 
 func (i DeployCCTPMessageTransmitterProxyInput) Validate(ctx context.Context, chain cldf_evm.Chain, state evm.CCIPChainState) error {
+	// The message transmitter consts are defined in the chainlink-deployments project so we can't validate them here.
+	if i.TokenMessenger == utils.ZeroAddress {
+		return fmt.Errorf("token messenger must be defined for chain %s", chain.Name)
+	}
 
 	return nil
 }
@@ -72,17 +78,17 @@ func deployCCTPMessageTransmitterProxyContractLogic(env cldf.Environment, c Depl
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", chainSelector, err)
 		}
 		_, err = cldf.DeployContract(env.Logger, chain, newAddresses,
-			func(chain cldf_evm.Chain) cldf.ContractDeploy[*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy] {
-				proxyAddress, tx, proxy, err := cctp_message_transmitter_proxy.DeployCCTPMessageTransmitterProxy(
+			func(chain cldf_evm.Chain) cldf.ContractDeploy[*cmtp.CCTPMessageTransmitterProxy] {
+				proxyAddress, tx, proxy, err := cmtp.DeployCCTPMessageTransmitterProxy(
 					chain.DeployerKey,          // auth
 					chain.Client,               // backend
 					proxyConfig.TokenMessenger, // tokenMessenger
 				)
-				return cldf.ContractDeploy[*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy]{
+				return cldf.ContractDeploy[*cmtp.CCTPMessageTransmitterProxy]{
 					Address:  proxyAddress,
 					Contract: proxy,
 					// TODO: make this a constant.
-					Tv:  cldf.NewTypeAndVersion("CCTPMessageTransmitterProxy", deployment.Version1_6_0),
+					Tv:  cldf.NewTypeAndVersion(shared.CCTPMessageTransmitterProxy, deployment.Version1_6_0),
 					Tx:  tx,
 					Err: err,
 				}
