@@ -365,9 +365,13 @@ func (c *channelDefinitionCache) fetchAndSetChannelDefinitions(ctx context.Conte
 	c.definitionsMu.RUnlock()
 
 	cd, err := c.fetchChannelDefinitions(ctx, log.Url, log.Sha)
+
+	fmt.Printf("Fetched channel definition: #%+v\n", cd)
+
 	if err != nil {
 		return err
 	}
+
 	c.definitionsMu.Lock()
 	if log.Version <= c.definitionsVersion {
 		c.definitionsMu.Unlock()
