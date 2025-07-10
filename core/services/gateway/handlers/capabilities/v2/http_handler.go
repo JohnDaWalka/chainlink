@@ -45,6 +45,7 @@ type gatewayHandler struct {
 	stopCh          services.StopChan
 	responseCache   ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
 	triggerHandler  HTTPTriggerHandler
+	authHandler     AuthHandler // Handles authorization for HTTP trigger requests
 }
 
 type ResponseCache interface {
@@ -58,7 +59,9 @@ type ServiceConfig struct {
 	UserRateLimiter             ratelimit.RateLimiterConfig `json:"userRateLimiter"`
 	MaxTriggerRequestDurationMs int                         `json:"maxTriggerRequestDurationMs"`
 	RetryConfig                 RetryConfig                 `json:"retryConfig"`
-	CleanUpPeriodMs             int                         `json:"cacheCleanUpPeriodMs"`
+	CleanUpPeriodMs             int                         `json:"cleanUpPeriodMs"`
+	AuthPullIntervalMs          int                         `json:"authPullIntervalMs"`
+	AuthAggregationIntervalMs   int                         `json:"authAggregationIntervalMs"`
 }
 
 type RetryConfig struct {
@@ -121,7 +124,7 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
 	}
 	if resp.Result == nil {
-		return fmt.Errorf("received response with nil result from node %s", nodeAddr)
+		return fmt.Errorf("received response with nil result from node %s, error: %v", nodeAddr, resp.Error)
 	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
 	// Node messages follow the format "<methodName>/<workflowID>/<uuid>" or
@@ -134,6 +137,10 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		switch methodName {
 		case gateway_common.MethodHTTPAction:
 			return h.makeOutgoingRequest(ctx, resp, nodeAddr)
+		case gateway_common.MethodWorkflowPushAuthMetadata:
+			return h.authHandler.OnAuthMetadataPush(ctx, resp, nodeAddr)
+		case gateway_common.MethodWorkflowPullAuthMetadata:
+			return h.authHandler.OnAuthMetadataPullResponse(ctx, resp, nodeAddr)
 		default:
 			return fmt.Errorf("unsupported method %s in node message ID %s", methodName, resp.ID)
 		}

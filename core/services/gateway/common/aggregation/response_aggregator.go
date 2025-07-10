@@ -13,7 +13,7 @@ import (
 // NOT thread-safe.
 type IdenticalNodeResponseAggregator struct {
 	// responses is a map from response digest to a set of node addresses
-	responses map[string]stringSet
+	responses map[string]StringSet
 	// nodeToResponse tracks which response key each node address is currently associated with
 	nodeToResponse map[string]string
 	threshold      int
@@ -24,7 +24,7 @@ func NewIdenticalNodeResponseAggregator(threshold int) (*IdenticalNodeResponseAg
 		return nil, fmt.Errorf("threshold must be greater than 0, got %d", threshold)
 	}
 	return &IdenticalNodeResponseAggregator{
-		responses:      make(map[string]stringSet),
+		responses:      make(map[string]StringSet),
 		nodeToResponse: make(map[string]string),
 		threshold:      threshold,
 	}, nil
@@ -62,7 +62,7 @@ func (agg *IdenticalNodeResponseAggregator) CollectAndAggregate(
 	}
 
 	if _, ok := agg.responses[digest]; !ok {
-		agg.responses[digest] = make(stringSet)
+		agg.responses[digest] = make(StringSet)
 	}
 	agg.responses[digest].Add(nodeAddress)
 	agg.nodeToResponse[nodeAddress] = digest

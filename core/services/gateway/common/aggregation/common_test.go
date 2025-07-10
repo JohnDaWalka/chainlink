@@ -8,7 +8,7 @@ import (
 
 func TestStringSet(t *testing.T) {
 	t.Run("add and contains", func(t *testing.T) {
-		s := make(stringSet)
+		s := make(StringSet)
 
 		require.False(t, s.Contains("test"))
 
@@ -28,7 +28,7 @@ func TestStringSet(t *testing.T) {
 	})
 
 	t.Run("remove", func(t *testing.T) {
-		s := make(stringSet)
+		s := make(StringSet)
 		s.Add("test")
 		s.Add("other")
 
@@ -47,7 +47,7 @@ func TestStringSet(t *testing.T) {
 	})
 
 	t.Run("values", func(t *testing.T) {
-		s := make(stringSet)
+		s := make(StringSet)
 
 		// Empty set
 		values := s.Values()
