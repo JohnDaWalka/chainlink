@@ -124,13 +124,13 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 		if err != nil {
 			return nil, fmt.Errorf("external peer wrapper does not pertain to a valid P2P key %x: %w", d.externalPeerWrapper.GetPeer().ID(), err)
 		}
-		keystore, err = core.NewSingleAccountSigner(&core.P2PAccountKey, key)
+		keystore, err = core.NewPrefixedSingleAccountSigner(&core.P2PAccountKey, key, core.StandardCapabilitiesPrefix)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create single account signer for P2P key: %w", err)
 		}
 	} else {
 		var err error
-		keystore, err = core.NewSingleAccountSigner(nil, nil)
+		keystore, err = core.NewPrefixedSingleAccountSigner(nil, nil, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create empty single account signer: %w", err)
 		}
