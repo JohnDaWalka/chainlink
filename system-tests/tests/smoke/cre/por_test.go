@@ -336,6 +336,7 @@ func registerPoRWorkflow(ctx context.Context, input managePoRWorkflowInput) erro
 			input.CompiledWorkflowConfig.BinaryURL,
 			&input.CompiledWorkflowConfig.ConfigURL,
 			&input.CompiledWorkflowConfig.SecretsURL,
+			nil,
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to register workflow")

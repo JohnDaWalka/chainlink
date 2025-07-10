@@ -6,10 +6,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
-func Download(ctx context.Context, url string) ([]byte, error) {
+func readFile(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	return io.ReadAll(file)
+}
+
+func downloadFile(ctx context.Context, url string) ([]byte, error) {
 	requestCtx, cancelFn := context.WithTimeout(ctx, 120*time.Second)
 	defer cancelFn()
 
@@ -34,6 +46,17 @@ func Download(ctx context.Context, url string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func Download(ctx context.Context, url string) ([]byte, error) {
+	switch {
+	case strings.HasPrefix(url, "file://"):
+		return readFile(url[7:])
+	case strings.HasPrefix(url, "http://"), strings.HasPrefix(url, "https://"):
+		return downloadFile(ctx, url)
+	default:
+		return nil, fmt.Errorf("unsupported URL: %s", url)
+	}
 }
 
 func DownloadAndDecodeBase64(ctx context.Context, url string) ([]byte, error) {
