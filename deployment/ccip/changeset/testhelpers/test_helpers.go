@@ -2433,7 +2433,7 @@ type TestTransferRequest struct {
 	Name                   string
 	SourceChain, DestChain uint64
 	Receiver               []byte
-	TokenReceiver          []byte
+	TokenReceiverATA       []byte
 	ExpectedStatus         int
 	// optional
 	Tokens                []router.ClientEVMTokenAmount
@@ -2488,7 +2488,7 @@ func TransferMultiple(
 				require.NoError(t, err)
 				if destFamily == chainsel.FamilySolana {
 					// for EVM2Solana token transfer we need to use tokenReceiver instead logical receiver
-					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiver, tt.ExpectedTokenBalances)
+					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiverATA, tt.ExpectedTokenBalances)
 				} else {
 					expectedTokenBalances.add(tt.DestChain, tt.Receiver, tt.ExpectedTokenBalances)
 				}

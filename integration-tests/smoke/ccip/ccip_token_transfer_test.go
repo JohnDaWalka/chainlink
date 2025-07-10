@@ -254,7 +254,6 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	allSolChainSelectors := e.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySolana))
 	sourceChain, destChain := allChainSelectors[0], allSolChainSelectors[0]
 	ownerSourceChain := evmChains[sourceChain].DeployerKey
-	// ownerDestChain := e.BlockChains.SolanaChains()[destChain].DeployerKey
 
 	require.GreaterOrEqual(t, len(tenv.Users[sourceChain]), 2) // TODO: ???
 
@@ -282,23 +281,19 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 			sourceChain: {
 				testhelpers.NewMintTokenInfo(ownerSourceChain, srcToken),
 			},
-			// destChain: {
-			// 	testhelpers.NewMintTokenInfo(ownerDestChain, destToken),
-			// },
 		},
 	)
 	// TODO: how to do MintAndAllow on Solana?
-	tokenReceiver, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, state.SolChains[destChain].Receiver)
+	tokenReceiver := state.SolChains[destChain].Receiver
+	tokenReceiverATA, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, state.SolChains[destChain].Receiver)
 	require.NoError(t, ferr)
 
 	extraArgs, err := ccipevm.SerializeClientSVMExtraArgsV1(message_hasher.ClientSVMExtraArgsV1{
 		TokenReceiver: tokenReceiver,
-		// Accounts: accounts,
 	})
 	require.NoError(t, err)
 
 	// TODO: test both with ATA pre-initialized and not
-
 	tcs := []testhelpers.TestTransferRequest{
 		{
 			Name:        "Send token to contract",
@@ -310,7 +305,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 					Amount: oneE9,
 				},
 			},
-			TokenReceiver: tokenReceiver.Bytes(),
+			TokenReceiverATA: tokenReceiverATA.Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				// due to the differences in decimals, 1e9 on EVM results to 1 on SVM
 				{Token: destToken.Bytes(), Amount: big.NewInt(1)},
@@ -318,32 +313,6 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 			ExtraArgs:      extraArgs,
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 		},
-		// {
-		// 	Name:        "Send N tokens to contract",
-		// 	SourceChain: destChain,
-		// 	DestChain:   sourceChain,
-		// 	Tokens: []router.ClientEVMTokenAmount{
-		// 		{
-		// 			Token:  selfServeDestToken.Address(),
-		// 			Amount: oneE9,
-		// 		},
-		// 		{
-		// 			Token:  destToken.Address(),
-		// 			Amount: oneE9,
-		// 		},
-		// 		{
-		// 			Token:  selfServeDestToken.Address(),
-		// 			Amount: oneE9,
-		// 		},
-		// 	},
-		// 	Receiver:  state.Chains[sourceChain].Receiver.Address().Bytes(),
-		// 	ExtraArgs: testhelpers.MakeEVMExtraArgsV2(300_000, false),
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{selfServeSrcToken.Address().Bytes(), new(big.Int).Add(oneE18, oneE18)},
-		// 		{srcToken.Address().Bytes(), oneE18},
-		// 	},
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// },
 	}
 
 	// Wait for filter registration for CCIPMessageSent (onramp), CommitReportAccepted (offramp), and ExecutionStateChanged (offramp)
