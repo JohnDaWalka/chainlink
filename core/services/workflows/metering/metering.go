@@ -186,28 +186,6 @@ func (r *Report) Reserve(ctx context.Context) error {
 	return nil
 }
 
-// ConvertToBalance converts a resource dimensions amount to a credit amount.
-func (r *Report) ConvertToBalance(fromUnit string, amount decimal.Decimal) (decimal.Decimal, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if !r.ready {
-		return decimal.Zero, ErrNoReserve
-	}
-
-	if r.meteringMode {
-		return amount, nil
-	}
-
-	bal, err := r.balance.ConvertToBalance(fromUnit, amount)
-	if err != nil {
-		// Fail open, continue optimistically
-		r.switchToMeteringMode(fmt.Errorf("failed to convert to balance [%s]: %w", fromUnit, err))
-	}
-
-	return bal, nil
-}
-
 // Deduct earmarks an amount of local universal credit balance. We expect to only set this value once - an error is
 // returned if a step would be overwritten.
 func (r *Report) Deduct(ref string, amount decimal.Decimal) error {

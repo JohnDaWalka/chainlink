@@ -137,52 +137,6 @@ func Test_Report_MeteringMode(t *testing.T) {
 		})
 	})
 
-	t.Run("ConvertToBalance falls back to 1:1 when rate is not found and switches to metering mode", func(t *testing.T) {
-		t.Parallel()
-
-		billingClient := mocks.NewBillingClient(t)
-		lggr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
-		report := newTestReport(t, lggr, billingClient)
-
-		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).
-			Return(&billing.ReserveCreditsResponse{Success: true, Entries: []*billing.RateCardEntry{
-				{ResourceType: billing.ResourceType_RESOURCE_TYPE_UNSPECIFIED, MeasurementUnit: billing.MeasurementUnit_MEASUREMENT_UNIT_MILLISECONDS, UnitsPerCredit: "10"},
-			}}, nil)
-		require.NoError(t, report.Reserve(t.Context()))
-
-		amount, err := report.ConvertToBalance(testUnitA, decimal.NewFromInt(1))
-		require.NoError(t, err)
-		assert.True(t, amount.Equal(decimal.NewFromInt(1)))
-		require.True(t, report.meteringMode)
-		assert.Len(t, logs.All(), 1)
-		billingClient.AssertExpectations(t)
-	})
-
-	t.Run("ConvertToBalance returns amount and nil error in metering mode", func(t *testing.T) {
-		t.Parallel()
-
-		billingClient := mocks.NewBillingClient(t)
-		lggr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
-		report := newTestReport(t, lggr, billingClient)
-
-		// use error from billing service to trigger metering mode
-		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).Return(nil, errors.New("billing error"))
-		require.NoError(t, report.Reserve(t.Context()))
-
-		amount, err := report.ConvertToBalance(testUnitA, decimal.NewFromInt(2))
-		require.NoError(t, err)
-		assert.True(t, amount.Equal(decimal.NewFromInt(2)))
-
-		// ensure metering mode is logged only once
-		amount, err = report.ConvertToBalance(testUnitA, decimal.NewFromInt(3))
-		require.NoError(t, err)
-		assert.True(t, amount.Equal(decimal.NewFromInt(3)))
-
-		require.True(t, report.meteringMode)
-		assert.Len(t, logs.All(), 1)
-		billingClient.AssertExpectations(t)
-	})
-
 	t.Run("GetMaxSpendForInvocation returns null decimal in metering mode", func(t *testing.T) {
 		t.Parallel()
 
@@ -441,40 +395,6 @@ func Test_Report_Reserve(t *testing.T) {
 		require.NoError(t, report.Reserve(t.Context()))
 		assert.False(t, report.meteringMode)
 		assert.Empty(t, logs.All())
-		billingClient.AssertExpectations(t)
-	})
-}
-
-func Test_Report_ConvertToBalance(t *testing.T) {
-	t.Parallel()
-
-	one, two := decimal.NewFromInt(1), decimal.NewFromInt(2)
-
-	t.Run("error if reserve is not called first", func(t *testing.T) {
-		t.Parallel()
-
-		report := newTestReport(t, logger.Nop(), nil)
-		_, err := report.ConvertToBalance("ref1", one)
-
-		require.ErrorIs(t, err, ErrNoReserve)
-	})
-
-	t.Run("happy path", func(t *testing.T) {
-		t.Parallel()
-
-		billingClient := mocks.NewBillingClient(t)
-		report := newTestReport(t, logger.Nop(), billingClient)
-
-		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).
-			Return(&billing.ReserveCreditsResponse{Success: true, Entries: []*billing.RateCardEntry{
-				{ResourceType: billing.ResourceType_RESOURCE_TYPE_COMPUTE, MeasurementUnit: billing.MeasurementUnit_MEASUREMENT_UNIT_MILLISECONDS, UnitsPerCredit: "2"},
-			}}, nil)
-
-		require.NoError(t, report.Reserve(t.Context()))
-
-		amount, err := report.ConvertToBalance(testUnitA, one)
-		require.NoError(t, err)
-		assert.True(t, amount.Equal(two))
 		billingClient.AssertExpectations(t)
 	})
 }
