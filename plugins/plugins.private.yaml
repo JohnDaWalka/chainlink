@@ -12,6 +12,10 @@ plugins:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
       gitRef: "fed08e9ef44646e515c6ce002867abac53740949"
       installPath: "github.com/smartcontractkit/capabilities/cron"
+  consensus:
+    - moduleURI: "github.com/smartcontractkit/capabilities/consensus"
+      gitRef: "e4eb54235838da4ecca2ec641040f92e17ca8e26"
+      installPath: "github.com/smartcontractkit/capabilities/consensus"
   kvstore:
     - enabled: false
       moduleURI: "github.com/smartcontractkit/capabilities/kvstore"
