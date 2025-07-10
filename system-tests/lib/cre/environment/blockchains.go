@@ -80,7 +80,7 @@ func CreateBlockchains(
 		if pkey == "" {
 			return nil, pkgerrors.New("PRIVATE_KEY env var must be set")
 		}
-
+		// create client based on chainID
 		sethClient, err := seth.NewClientBuilder().
 			WithRpcUrl(bcOut.Nodes[0].ExternalWSUrl).
 			WithPrivateKeys([]string{pkey}).

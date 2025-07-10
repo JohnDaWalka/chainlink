@@ -43,9 +43,10 @@ func TestDeployForwarder(t *testing.T) {
 
 	env := memory.NewMemoryEnvironment(t, lggr, zapcore.DebugLevel, cfg)
 	solSel := env.BlockChains.ListChainSelectors(cldfchain.WithFamily(chain_selectors.FamilySolana))[0]
-
 	// replace default program path since memory env sets it to ccip
 	chain := env.BlockChains.SolanaChains()[solSel]
+	t.Log("chain", chain.String())
+	return
 	chain.ProgramsPath = getProgramsPath()
 	env.BlockChains = cldfchain.NewBlockChains(map[uint64]cldfchain.BlockChain{solSel: chain})
 

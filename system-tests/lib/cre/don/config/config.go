@@ -50,6 +50,7 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 
 	// prepare chains, we need chainIDs, URLs and selectors to get contracts from AddressBook
 	workerEVMInputs := make([]*WorkerEVMInput, 0)
+	workerSolanaInputs := make([]*WorkerSolanaInput, 0)
 	for chainSelector, bcOut := range input.BlockchainOutput {
 		// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
 		if len(input.DonMetadata.SupportedChains) > 0 && !slices.Contains(input.DonMetadata.SupportedChains, bcOut.ChainID) {
@@ -67,6 +68,10 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 			HTTPRPC:              bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
 			WSRPC:                bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
 			HasForwarderContract: !bcOut.ReadOnly,
+		})
+
+		workerSolanaInputs = append(workerSolanaInputs, &WorkerSolanaInput{
+			// TODO add solana inputs?
 		})
 	}
 

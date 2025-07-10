@@ -50,6 +50,7 @@ import (
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
+	writesolcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writesolana"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
@@ -491,11 +492,13 @@ func setupPoRTestEnvironment(
 		},
 		ConfigFactoryFunctions: []types.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
+			//	solwriteconfig.GetGenerateConfig(solwriteconfig.Config{}),
 		},
 	}
 
 	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, cldlogger.NewSingleFileLogger(t), universalSetupInput)
 	require.NoError(t, setupErr, "failed to setup test environment")
+	t.Log("solchains:", universalSetupOutput.CldEnvironment.BlockChains.SolanaChains())
 	homeChainOutput := universalSetupOutput.BlockchainOutput[0]
 
 	if in.CustomAnvilMiner != nil {
@@ -669,6 +672,69 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_MockedPrice(t *testing.
 		chainID, chainErr := strconv.Atoi(bc.ChainID)
 		require.NoError(t, chainErr, "failed to convert chain ID to int")
 		capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainID))))
+	}
+
+	setupOutput := setupPoRTestEnvironment(
+		t,
+		testLogger,
+		in,
+		priceProvider,
+		mustSetCapabilitiesFn,
+		capabilityFactoryFns,
+	)
+
+	// Log extra information that might help debugging
+	t.Cleanup(func() {
+		debugTest(t, testLogger, setupOutput, in)
+	})
+
+	waitForFeedUpdate(t, testLogger, priceProvider, setupOutput, 5*time.Minute)
+}
+
+// config file to use: environment-one-don-multichain-solana.toml
+func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_Solana_MockedPrice(t *testing.T) {
+	configErr := setCICtfConfigIfMissing("environment-one-don-multichain-solana-ci.toml")
+	require.NoError(t, configErr, "failed to set CTF config")
+	testLogger := framework.L
+
+	// Load and validate test configuration
+	in, err := framework.Load[TestConfig](t)
+	require.NoError(t, err, "couldn't load test config")
+	validateEnvVars(t, in)
+	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
+	require.NotEmpty(t, in.NodeSets[0].NodeSpecs[0].Node.EnvVars["CL_SOLANA_CMD"])
+
+	// Assign all capabilities to the single node set
+	mustSetCapabilitiesFn := func(input []*ns.Input) []*types.CapabilitiesAwareNodeSet {
+		return []*types.CapabilitiesAwareNodeSet{
+			{
+				Input:              input[0],
+				Capabilities:       SinglePoRDonCapabilitiesFlags,
+				DONTypes:           []string{types.WorkflowDON, types.GatewayDON},
+				BootstrapNodeIndex: 0, // not required, but set to make the configuration explicit
+				GatewayNodeIndex:   0, // not required, but set to make the configuration explicit
+			},
+		}
+	}
+
+	feedIDs := make([]string, 0, len(in.WorkflowConfigs))
+	for _, wc := range in.WorkflowConfigs {
+		feedIDs = append(feedIDs, wc.FeedID)
+	}
+
+	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake, AuthorizationKey, feedIDs)
+	require.NoError(t, priceErr, "failed to create fake price provider")
+
+	capabilityFactoryFns := []types.DONCapabilityWithConfigFactoryFn{
+		webapicap.WebAPITriggerCapabilityFactoryFn,
+		webapicap.WebAPITargetCapabilityFactoryFn,
+		computecap.ComputeCapabilityFactoryFn,
+		consensuscap.OCR3CapabilityFactoryFn,
+		croncap.CronCapabilityFactoryFn,
+	}
+
+	for _, bc := range in.Blockchains {
+		capabilityFactoryFns = append(capabilityFactoryFns, writesolcap.WriteSolanaCapabilityFactory(bc.ChainID))
 	}
 
 	setupOutput := setupPoRTestEnvironment(

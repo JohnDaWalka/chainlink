@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
@@ -158,6 +159,33 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 		capabilitiesRegistryAddress,
 		homeChainID,
 	)
+}
+
+type WorkerSolanaInput struct {
+	Name                 string
+	ChainID              uint64
+	ChainSelector        uint64
+	NodeURL              string
+	FromAddress          solana.PublicKey
+	ForwarderAddress     string
+	ForwarderState       string
+	HasForwarderContract bool
+}
+
+func WorkerSolana(chains []*WorkerSolanaInput) string {
+	var ret string
+	//TODO populate cfg from solana
+	for _, chain := range chains {
+		ret += fmt.Sprintf(`
+		[[Solana]]
+		ChainID = '%s'
+		[[Solana.Nodes]]
+		Name = '%s'
+		URL = '%s'
+		`, chain.ChainID, chain.Name, chain.NodeURL)
+	}
+
+	return ret
 }
 
 func WorkerWorkflowRegistry(workflowRegistryAddr common.Address, homeChainID uint64) string {
