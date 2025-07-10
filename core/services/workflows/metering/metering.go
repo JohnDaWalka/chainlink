@@ -92,8 +92,9 @@ type Report struct {
 	// In meteringMode, no accounting wrt universal credits is required;
 	// only gathering resource types and spends from capabilities.
 	// note: meteringMode == true allows negative balances.
-	meteringMode bool
-	steps        map[string]ReportStep
+	meteringMode    bool
+	meteringModeErr error
+	steps           map[string]ReportStep
 }
 
 func NewReport(
@@ -187,8 +188,15 @@ func (r *Report) Reserve(ctx context.Context) error {
 
 // ConvertToBalance converts a resource dimensions amount to a credit amount.
 func (r *Report) ConvertToBalance(fromUnit string, amount decimal.Decimal) (decimal.Decimal, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if !r.ready {
 		return decimal.Zero, ErrNoReserve
+	}
+
+	if r.meteringMode {
+		return amount, nil
 	}
 
 	bal, err := r.balance.ConvertToBalance(fromUnit, amount)
@@ -396,8 +404,13 @@ func (r *Report) Settle(ref string, spendsByNode []capabilities.MeteringNodeDeta
 
 func (r *Report) FormatReport() *protoEvents.MeteringReport {
 	protoReport := &protoEvents.MeteringReport{
-		Steps:    map[string]*protoEvents.MeteringReportStep{},
-		Metadata: &protoEvents.WorkflowMetadata{},
+		Steps:        map[string]*protoEvents.MeteringReportStep{},
+		Metadata:     &protoEvents.WorkflowMetadata{},
+		MeteringMode: r.meteringMode,
+	}
+
+	if r.meteringModeErr != nil {
+		protoReport.Message = r.meteringModeErr.Error()
 	}
 
 	for ref, step := range r.steps {
@@ -465,6 +478,7 @@ func (r *Report) switchToMeteringMode(err error) {
 	r.lggr.Errorf("switching to metering mode: %s", err)
 
 	r.meteringMode = true
+	r.meteringModeErr = err
 	r.ready = true
 }
 

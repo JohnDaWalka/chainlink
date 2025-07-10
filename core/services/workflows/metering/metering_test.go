@@ -158,6 +158,31 @@ func Test_Report_MeteringMode(t *testing.T) {
 		billingClient.AssertExpectations(t)
 	})
 
+	t.Run("ConvertToBalance returns amount and nil error in metering mode", func(t *testing.T) {
+		t.Parallel()
+
+		billingClient := mocks.NewBillingClient(t)
+		lggr, logs := logger.TestObserved(t, zapcore.ErrorLevel)
+		report := newTestReport(t, lggr, billingClient)
+
+		// use error from billing service to trigger metering mode
+		billingClient.EXPECT().ReserveCredits(mock.Anything, mock.Anything).Return(nil, errors.New("billing error"))
+		require.NoError(t, report.Reserve(t.Context()))
+
+		amount, err := report.ConvertToBalance(testUnitA, decimal.NewFromInt(2))
+		require.NoError(t, err)
+		assert.True(t, amount.Equal(decimal.NewFromInt(2)))
+
+		// ensure metering mode is logged only once
+		amount, err = report.ConvertToBalance(testUnitA, decimal.NewFromInt(3))
+		require.NoError(t, err)
+		assert.True(t, amount.Equal(decimal.NewFromInt(3)))
+
+		require.True(t, report.meteringMode)
+		assert.Len(t, logs.All(), 1)
+		billingClient.AssertExpectations(t)
+	})
+
 	t.Run("GetMaxSpendForInvocation returns null decimal in metering mode", func(t *testing.T) {
 		t.Parallel()
 
