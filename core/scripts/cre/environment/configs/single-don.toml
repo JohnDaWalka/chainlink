@@ -16,10 +16,10 @@
   csa_encryption_key = "d1093c0060d50a3c89c189b2e485da5a3ce57f3dcb38ab7e2c0d5f0bb2314a44" # any random 32 byte hex string
   image = "job-distributor:0.12.7"
 
-[s3provider]
-  # use all defaults
-  port = 9000
-  console_port = 9001
+#[s3provider]
+#  # use all defaults
+#  port = 9000
+#  console_port = 9001
 
 [infra]
   # either "docker" or "crib"
@@ -33,9 +33,10 @@
 [extra_capabilities]
 # uncomment as needed and adjust paths to enable these capabilities and have them copied to containers/pods
 # these default paths assume that binaries are placed in core/scripts/cre/environment/ folder
-# cron_capability_binary_path = "./cron"
+  cron_capability_binary_path = "/Users/bartektofel/Desktop/repos/capabilities/cron/cron_event"
 # log_event_trigger_binary_path = "./logtrigger"
 # read_contract_capability_binary_path = "./readcontract"
+# http_action_capability_binary_path = "./http-action"
 
 [[nodesets]]
   nodes = 5
@@ -49,9 +50,9 @@
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
+      #docker_ctx = "../../../.."
+      #docker_file = "core/chainlink.Dockerfile"
+      image = "chainlink:develop"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
       custom_ports = ["5002:5002"]
@@ -66,15 +67,18 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
+      #docker_ctx = "../../../.."
+      #docker_file = "core/chainlink.Dockerfile"
+      image = "chainlink:develop"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
       user_config_overrides = """
@@ -88,15 +92,18 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
+      #docker_ctx = "../../../.."
+      #docker_file = "core/chainlink.Dockerfile"
+      image = "chainlink:develop"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
       user_config_overrides = """
@@ -110,15 +117,18 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
+      #docker_ctx = "../../../.."
+      #docker_file = "core/chainlink.Dockerfile"
+      image = "chainlink:develop"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
       user_config_overrides = """
@@ -132,15 +142,18 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
+      #docker_ctx = "../../../.."
+      #docker_file = "core/chainlink.Dockerfile"
+      image = "chainlink:develop"
       # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
       # capabilities = ['./cron']
       user_config_overrides = """
@@ -154,6 +167,9 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""

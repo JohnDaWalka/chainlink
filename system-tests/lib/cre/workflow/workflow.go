@@ -149,7 +149,8 @@ func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistry
 
 	var binaryURLToUse string
 	if localDirectory != nil {
-		binaryURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(binaryURL))
+		// binaryURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(binaryURL))
+		binaryURLToUse = filepath.Base(binaryURL)
 	} else {
 		binaryURLToUse = binaryURL
 	}
@@ -162,7 +163,8 @@ func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistry
 			return errors.Wrap(err, "failed to download workflow config")
 		}
 		if localDirectory != nil {
-			configURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(*configURL))
+			// configURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(*configURL))
+			configURLToUse = filepath.Base(*configURL)
 		} else {
 			configURLToUse = *configURL
 		}
@@ -171,7 +173,8 @@ func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistry
 	secretsURLToUse := ""
 	if secretsURL != nil {
 		if localDirectory != nil {
-			secretsURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(*secretsURL))
+			// secretsURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(*secretsURL))
+			secretsURLToUse = filepath.Base(*secretsURL)
 		} else {
 			secretsURLToUse = *secretsURL
 		}

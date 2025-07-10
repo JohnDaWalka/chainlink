@@ -33,7 +33,6 @@ require (
 	github.com/manyminds/api2go v0.0.0-20171030193247-e7b693844a6f
 	github.com/montanaflynn/stats v0.7.1
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/ory/dockertest v3.3.5+incompatible
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
@@ -42,7 +41,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.62
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250707220619-84bd6c292469
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250710001137-e3576b0815e2
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250710150636-302d4d5df5c3
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250709160835-3dbd1ee373a2
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.1
