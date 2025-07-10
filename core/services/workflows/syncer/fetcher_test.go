@@ -373,6 +373,20 @@ func TestNewFetcherFunc(t *testing.T) {
 		})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not within the basePath")
+
+		// Test fetching full path
+		resp, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
+			URL: testFilePath,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, testContent, resp)
+
+		// Test full path with file:// prefix
+		resp, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
+			URL: "file://" + testFilePath,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, testContent, resp)
 	})
 
 	t.Run("http fetcher", func(t *testing.T) {

@@ -169,11 +169,12 @@ func newFileFetcher(basePath string, lggr logger.Logger) artifacts.FetcherFunc {
 		if req.URL == "" {
 			return nil, errors.New("request URL cannot be empty")
 		}
-		fullPath := filepath.Clean(req.URL)
-		// the url should start with file://, so we remove that part
-		if strings.HasPrefix(fullPath, "file://") {
-			fullPath = strings.TrimPrefix(req.URL, "file://")
+		u, err := url.Parse(req.URL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid URL: %w", err)
 		}
+		fullPath := filepath.Clean(u.Path)
+
 		// ensure that the incoming request URL is either relative or absolute but within the basePath
 		if !filepath.IsAbs(fullPath) {
 			// If it's not absolute, we assume it's relative to the basePath
