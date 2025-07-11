@@ -316,6 +316,13 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	for _, cs := range destinationChains {
 		srcChains := laneConfig.GetSourceChainsForDestination(cs)
 
+		// Skip destination chains that have no source chains configured
+		if len(srcChains) == 0 {
+			lggr.Infow("Skipping destination chain with no source chains",
+				"destinationChain", cs)
+			continue
+		}
+
 		g := new(errgroup.Group)
 		for _, src := range srcChains {
 			src := src

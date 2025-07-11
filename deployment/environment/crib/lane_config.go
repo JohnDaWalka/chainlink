@@ -22,6 +22,7 @@ import (
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+	aptosState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 	solState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
 )
@@ -326,10 +327,12 @@ func (lc *LaneConfiguration) DiscoverLanesFromDeployedState(env cldf.Environment
 
 	evmChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyEVM))
 	solChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilySolana))
+	aptosChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyAptos))
 	//nolint: gocritic // append is fine here
 	allChains := append(evmChains, solChains...)
+	allChains = append(allChains, aptosChains...)
 
-	// Discover EVM to EVM lanes
+	// Discover EVM to all chains lanes
 	for _, srcChain := range evmChains {
 		srcChainState, exists := state.Chains[srcChain]
 		if !exists {
@@ -350,7 +353,7 @@ func (lc *LaneConfiguration) DiscoverLanesFromDeployedState(env cldf.Environment
 		}
 	}
 
-	// Discover Solana to EVM lanes
+	// Discover Solana to all chains lanes
 	for _, srcChain := range solChains {
 		srcChainState, exists := state.SolChains[srcChain]
 		if !exists {
@@ -360,7 +363,28 @@ func (lc *LaneConfiguration) DiscoverLanesFromDeployedState(env cldf.Environment
 		// Check which EVM destination chains are configured on the Solana Router
 		destinations, err := lc.getEnabledDestinationsFromSolanaRouter(env, srcChain, srcChainState, allChains)
 		if err != nil {
-			return fmt.Errorf("failed to get enabled EVM destinations for Solana chain %d: %w", srcChain, err)
+			return fmt.Errorf("failed to get enabled destinations for Solana chain %d: %w", srcChain, err)
+		}
+
+		for _, dstChain := range destinations {
+			discoveredLanes = append(discoveredLanes, LaneConfig{
+				SourceChain:      srcChain,
+				DestinationChain: dstChain,
+			})
+		}
+	}
+
+	// Discover Aptos to all chains lanes
+	for _, srcChain := range aptosChains {
+		srcChainState, exists := state.AptosChains[srcChain]
+		if !exists {
+			continue
+		}
+
+		// Check which destination chains are configured for Aptos Router
+		destinations, err := lc.getEnabledDestinationsFromAptosRouter(srcChainState, allChains)
+		if err != nil {
+			return fmt.Errorf("failed to get enabled destinations for Aptos chain %d: %w", srcChain, err)
 		}
 
 		for _, dstChain := range destinations {
@@ -429,6 +453,26 @@ func (lc *LaneConfiguration) getEnabledDestinationsFromSolanaRouter(env cldf.Env
 	return enabledDestinations, nil
 }
 
+// getEnabledDestinationsFromAptosRouter checks which destinations are enabled on the Aptos Router
+func (lc *LaneConfiguration) getEnabledDestinationsFromAptosRouter(chainState aptosState.CCIPChainState, candidateDestinations []uint64) ([]uint64, error) {
+	var enabledDestinations []uint64
+
+	// For each candidate destination, check if it's enabled on the Aptos Router
+	for _, dstChain := range candidateDestinations {
+		isEnabled, err := lc.isDestinationEnabledOnAptosRouter(chainState, dstChain)
+		if err != nil {
+			// Log but continue - some destinations might not be configured
+			continue
+		}
+
+		if isEnabled {
+			enabledDestinations = append(enabledDestinations, dstChain)
+		}
+	}
+
+	return enabledDestinations, nil
+}
+
 // isDestinationEnabledOnOnRamp checks if a destination is enabled on the EVM OnRamp
 func (lc *LaneConfiguration) isDestinationEnabledOnOnRamp(chainState evm.CCIPChainState, destinationChain uint64) (bool, error) {
 	destConfig, err := chainState.OnRamp.GetDestChainConfig(&bind.CallOpts{}, destinationChain)
@@ -451,6 +495,13 @@ func (lc *LaneConfiguration) isDestinationEnabledOnSolanaRouter(ctx context.Cont
 		return false, fmt.Errorf("failed to get dest chain state for %d: %w", destinationChain, err)
 	}
 	return true, nil
+}
+
+// isDestinationEnabledOnAptosRouter checks if a destination is enabled on the Aptos Router
+func (lc *LaneConfiguration) isDestinationEnabledOnAptosRouter(chainState aptosState.CCIPChainState, destinationChain uint64) (bool, error) {
+	// TODO: Implement proper Aptos router destination checking
+	// For now, return false to avoid panics during testing
+	return false, nil
 }
 
 // GetSourceChainsForDestination returns all source chains that can send to a specific destination

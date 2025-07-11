@@ -291,6 +291,12 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 		}
 	case selectors.FamilyAptos:
 		rcv = common.LeftPadBytes(m.receiver, 32)
+		// Aptos destinations require out-of-order execution to be enabled
+		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(0), true)
+		if err != nil {
+			m.l.Error("Error encoding extra args for aptos dest")
+			return router.ClientEVM2AnyMessage{}, 0, err
+		}
 	}
 
 	message := router.ClientEVM2AnyMessage{
@@ -547,10 +553,11 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 	}
 
 	return testhelpers.AptosSendRequest{
-		Receiver:     receiver,
-		Data:         data,
-		ExtraArgs:    extraArgs,
-		FeeToken:     feeToken,
-		TokenAmounts: tokenAmounts,
+		Receiver:      receiver,
+		Data:          data,
+		ExtraArgs:     extraArgs,
+		FeeToken:      feeToken,
+		FeeTokenStore: aptos.AccountAddress{}, // Add missing FeeTokenStore field (zero address)
+		TokenAmounts:  tokenAmounts,
 	}, nil
 }
