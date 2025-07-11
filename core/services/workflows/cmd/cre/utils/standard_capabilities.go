@@ -17,7 +17,7 @@ import (
 type standardCapConfig struct {
 	Config string
 
-	// Set enabled to true to run the loop plugin.  Requires the plugin be installed.
+	// Set enabled to true to run the loop plugin.  Requires the plugin to be installed.
 	// Config will be passed to Initialise method of plugin.
 	Enabled bool
 }
