@@ -72,7 +72,7 @@ func TestEmptyCREConfig(t *testing.T) {
 
 	// Test empty WorkflowFetcher
 	fetcher := cfg.WorkflowFetcher()
-	assert.NotNil(t, fetcher, "WorkflowFetcher should not be nil even when empty")
+	assert.Empty(t, fetcher)
 	assert.Equal(t, "", fetcher.URL(), "Empty WorkflowFetcher should have empty URL")
 }
 

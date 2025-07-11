@@ -350,7 +350,7 @@ WsURL = 'streams.url'
 RestURL = 'streams.url'
 
 [CRE.WorkflowFetcher]
-URL = 'http://localhost:8080/workflows'
+URL = 'https://workflow.fetcher.url'
 
 [Billing]
 URL = 'localhost:4319'

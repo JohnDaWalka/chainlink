@@ -333,7 +333,7 @@ func TestNewFetcherFunc(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				_, err := NewFetcherFunc(tc.baseURL, lggr)
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errMsg)
 			})
 		}
@@ -345,7 +345,7 @@ func TestNewFetcherFunc(t *testing.T) {
 		testFilePath := filepath.Join(tempDir, "test.txt")
 
 		// Write test content to file
-		err := os.WriteFile(testFilePath, testContent, 0644)
+		err := os.WriteFile(testFilePath, testContent, 0600)
 		require.NoError(t, err)
 
 		baseURL := "file://" + tempDir
@@ -364,28 +364,28 @@ func TestNewFetcherFunc(t *testing.T) {
 		_, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
 			URL: "nonexistent.txt",
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read file")
 
 		// Test path traversal attempt
 		_, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
 			URL: "../../../etc/passwd",
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "is not within the basePath")
 
 		// Test fetching full path
 		resp, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
 			URL: testFilePath,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, testContent, resp)
 
 		// Test full path with file:// prefix
 		resp, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
 			URL: "file://" + testFilePath,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, testContent, resp)
 	})
 
@@ -394,7 +394,8 @@ func TestNewFetcherFunc(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/workflows/test.json" {
 				w.WriteHeader(http.StatusOK)
-				w.Write(testContent)
+				_, err := w.Write(testContent)
+				require.NoError(t, err)
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -417,7 +418,7 @@ func TestNewFetcherFunc(t *testing.T) {
 		_, err = fetcher(ctx, "test-msg-id", ghcapabilities.Request{
 			URL: "nonexistent.json",
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "HTTP request failed with status code: 404")
 	})
 
@@ -436,7 +437,7 @@ func TestNewFetcherFunc(t *testing.T) {
 		_, err = fetcher(canceledCtx, "test-msg-id", ghcapabilities.Request{
 			URL: "anything.txt",
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, context.Canceled, err)
 	})
 
@@ -445,7 +446,8 @@ func TestNewFetcherFunc(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(200 * time.Millisecond) // Delay response
 			w.WriteHeader(http.StatusOK)
-			w.Write(testContent)
+			_, err := w.Write(testContent)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -461,7 +463,7 @@ func TestNewFetcherFunc(t *testing.T) {
 		_, err = fetcher(timeoutCtx, "test-msg-id", ghcapabilities.Request{
 			URL: "anything",
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "context deadline exceeded")
 	})
 }
