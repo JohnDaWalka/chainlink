@@ -258,10 +258,9 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 				}
 
 				ac, err := aptos.NewClient(aptos.NetworkConfig{
-					Name:      chainCfg.ChainName,
-					NodeUrl:   chainCfg.HTTPRPCs[0].External,
-					FaucetUrl: chainCfg.HTTPRPCs[1].External,
-					ChainId:   uint8(cID),
+					Name:    chainCfg.ChainName,
+					NodeUrl: chainCfg.HTTPRPCs[0].External,
+					ChainId: uint8(cID),
 				})
 
 				if err != nil {

@@ -243,12 +243,22 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				finalSeqNrExecChannels)
 		case selectors.FamilyAptos:
 			client := env.BlockChains.AptosChains()[cs].Client
-			info, err := client.Info()
-			require.NoError(t, err)
-			block := info.BlockHeight()
-			startBlocks[cs] = &block
-			// TODO - Add subscription event
-			// go subscribeAptosTransmitEvents()
+			var version uint64 = 0 // tx version
+			startBlocks[cs] = &version
+			go subscribeAptosTransmitEvents(
+				ctx,
+				t,
+				lggr,
+				state.AptosChains[cs].CCIPAddress,
+				destChains,
+				startBlocks[cs],
+				cs,
+				loadFinished,
+				client,
+				&wg,
+				mm.InputChan,
+				finalSeqNrCommitChannels,
+				finalSeqNrExecChannels)
 		}
 	}
 
@@ -389,12 +399,14 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				state.Chains[cs].OffRamp,
 				lggr)
 		case selectors.FamilyAptos:
+			receiverAddress := state.AptosChains[cs].ReceiverAddress
+			receiver := receiverAddress[:]
 			gunMap[cs], err = NewDestinationGun(
 				env.Logger,
 				cs,
 				*env,
 				&state,
-				state.Chains[cs].Receiver.Address().Bytes(),
+				receiver,
 				userOverrides,
 				evmSourceKeys[cs],
 				aptosSourceKeys,
@@ -407,11 +419,31 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				t.Fatal(err)
 			}
 			wg.Add(2)
-			// go subscribeCommitEvents()
-			// go subscribeExecutionEvents()
-			// error watchers
-			// go subscribeSkippedIncorrectNonce()
-			// go subscribeAlreadyExecuted()
+			go subscribeAptosCommitEvents(
+				ctx,
+				t,
+				lggr,
+				state.AptosChains[cs].CCIPAddress,
+				srcChains,
+				startBlocks[cs],
+				cs,
+				env.BlockChains.AptosChains()[cs].Client,
+				finalSeqNrCommitChannels[cs],
+				&wg,
+				mm.InputChan)
+
+			go subscribeAptosExecutionEvents(
+				ctx,
+				t,
+				lggr,
+				state.AptosChains[cs].CCIPAddress,
+				srcChains,
+				startBlocks[cs],
+				cs,
+				env.BlockChains.AptosChains()[cs].Client,
+				finalSeqNrExecChannels[cs],
+				&wg,
+				mm.InputChan)
 		case selectors.FamilySolana:
 
 			gunMap[cs], err = NewDestinationGun(
