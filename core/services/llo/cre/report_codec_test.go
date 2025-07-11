@@ -206,7 +206,7 @@ func Test_ReportCodec(t *testing.T) {
 		)
 		require.EqualError(t, err, "LLO StreamID 2 mismatched with Multiplier StreamID 3")
 	})
-	t.Run("Encode: Multiplier isn't an integer FAIL", func(t *testing.T) {
+	t.Run("Verify: Multiplier isn't an integer FAIL", func(t *testing.T) {
 		donID := uint32(1)
 		c := NewReportCodecCapabilityTrigger(logger.Test(t), donID)
 

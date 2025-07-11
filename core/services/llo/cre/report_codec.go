@@ -133,7 +133,7 @@ func (r ReportCodecCapabilityTrigger) Verify(cd llotypes.ChannelDefinition) erro
 	}
 	if opts != nil && opts.Multipliers != nil {
 		if len(opts.Multipliers) != len(cd.Streams) {
-			return fmt.Errorf("opts: %#v cd: %#v, multipliers length %d != StreamValues length %d", opts, cd, len(opts.Multipliers), len(cd.Streams))
+			return fmt.Errorf("multipliers length %d != StreamValues length %d", opts, cd, len(opts.Multipliers), len(cd.Streams))
 		}
 
 		for i, stream := range cd.Streams {
