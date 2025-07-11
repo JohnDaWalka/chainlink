@@ -131,12 +131,6 @@ func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) ch
 			{
 				Location:      destTokenAddress,
 				WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: tokenReceiverAddress}},
-				TokenProgram: chainwriter.Lookup{
-					AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
-						LookupTableName: "PoolLookupTable",
-						IncludeIndexes:  []int{6},
-					},
-				},
 				MintAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: destTokenAddress}},
 				Optional:    true, // ATA lookup is optional if DestTokenAddress is not present in report
 			},
