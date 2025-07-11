@@ -25,10 +25,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
-	monitor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/beholder"
 	relayevmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
@@ -131,7 +131,7 @@ func NewWriteTarget(ctx context.Context, relayer *Relayer, chain legacyevm.Chain
 			PollPeriod:        config.PollPeriod(),
 			AcceptanceTimeout: config.AcceptanceTimeout(),
 		},
-		ChainInfo: monitor.ChainInfo{
+		ChainInfo: commontypes.ChainInfo{
 			FamilyName:      chainInfo.FamilyName,
 			ChainID:         chainInfo.ChainID,
 			NetworkName:     chainInfo.NetworkName,

@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	evmprimitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives/evm"
+	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 	evmtxmgr "github.com/smartcontractkit/chainlink-evm/pkg/txmgr"
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
@@ -27,13 +28,17 @@ import (
 	txmgrtypes "github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 )
 
-// Direct RPC
-func (r *Relayer) CallContract(ctx context.Context, msg *evmtypes.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	return r.chain.Client().CallContract(ctx, toEthMsg(msg), blockNumber)
+type evmService struct {
+	chain legacyevm.Chain
 }
 
-func (r *Relayer) FilterLogs(ctx context.Context, filterQuery evmtypes.FilterQuery) ([]*evmtypes.Log, error) {
-	logs, err := r.chain.Client().FilterLogs(ctx, convertEthFilter(filterQuery))
+// Direct RPC
+func (e *evmService) CallContract(ctx context.Context, msg *evmtypes.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	return e.chain.Client().CallContract(ctx, toEthMsg(msg), blockNumber)
+}
+
+func (e *evmService) FilterLogs(ctx context.Context, filterQuery evmtypes.FilterQuery) ([]*evmtypes.Log, error) {
+	logs, err := e.chain.Client().FilterLogs(ctx, convertEthFilter(filterQuery))
 	if err != nil {
 		return nil, err
 	}
@@ -47,16 +52,16 @@ func (r *Relayer) FilterLogs(ctx context.Context, filterQuery evmtypes.FilterQue
 	return ret, nil
 }
 
-func (r *Relayer) BalanceAt(ctx context.Context, account evmtypes.Address, blockNumber *big.Int) (*big.Int, error) {
-	return r.chain.Client().BalanceAt(ctx, account, blockNumber)
+func (e *evmService) BalanceAt(ctx context.Context, account evmtypes.Address, blockNumber *big.Int) (*big.Int, error) {
+	return e.chain.Client().BalanceAt(ctx, account, blockNumber)
 }
 
-func (r *Relayer) EstimateGas(ctx context.Context, call *evmtypes.CallMsg) (uint64, error) {
-	return r.chain.Client().EstimateGas(ctx, toEthMsg(call))
+func (e *evmService) EstimateGas(ctx context.Context, call *evmtypes.CallMsg) (uint64, error) {
+	return e.chain.Client().EstimateGas(ctx, toEthMsg(call))
 }
 
-func (r *Relayer) GetTransactionByHash(ctx context.Context, hash evmtypes.Hash) (*evmtypes.Transaction, error) {
-	tx, err := r.chain.Client().TransactionByHash(ctx, hash)
+func (e *evmService) GetTransactionByHash(ctx context.Context, hash evmtypes.Hash) (*evmtypes.Transaction, error) {
+	tx, err := e.chain.Client().TransactionByHash(ctx, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +69,8 @@ func (r *Relayer) GetTransactionByHash(ctx context.Context, hash evmtypes.Hash) 
 	return convertTransaction(tx), nil
 }
 
-func (r *Relayer) GetTransactionReceipt(ctx context.Context, txHash evmtypes.Hash) (*evmtypes.Receipt, error) {
-	receipt, err := r.chain.Client().TransactionReceipt(ctx, txHash)
+func (e *evmService) GetTransactionReceipt(ctx context.Context, txHash evmtypes.Hash) (*evmtypes.Receipt, error) {
+	receipt, err := e.chain.Client().TransactionReceipt(ctx, txHash)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +79,12 @@ func (r *Relayer) GetTransactionReceipt(ctx context.Context, txHash evmtypes.Has
 }
 
 // ChainService
-func (r *Relayer) GetTransactionFee(ctx context.Context, transactionID commontypes.IdempotencyKey) (*evmtypes.TransactionFee, error) {
-	return r.chain.TxManager().GetTransactionFee(ctx, transactionID)
+func (e *evmService) GetTransactionFee(ctx context.Context, transactionID commontypes.IdempotencyKey) (*evmtypes.TransactionFee, error) {
+	return e.chain.TxManager().GetTransactionFee(ctx, transactionID)
 }
 
-func (r *Relayer) LatestAndFinalizedHead(ctx context.Context) (evmtypes.Head, evmtypes.Head, error) {
-	latest, finalized, err := r.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
+func (e *evmService) LatestAndFinalizedHead(ctx context.Context) (evmtypes.Head, evmtypes.Head, error) {
+	latest, finalized, err := e.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
 	if err != nil {
 		return evmtypes.Head{}, evmtypes.Head{}, err
 	}
@@ -88,13 +93,13 @@ func (r *Relayer) LatestAndFinalizedHead(ctx context.Context) (evmtypes.Head, ev
 }
 
 // TODO introduce parameters validation PLEX-1437
-func (r *Relayer) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
+func (e *evmService) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expression,
 	limitAndSort query.LimitAndSort, confidenceLevel primitives.ConfidenceLevel,
 ) ([]*evmtypes.Log, error) {
 	conformations := confidenceToConformations(confidenceLevel)
 	filterQuery = append(filterQuery, logpoller.NewConfirmationsFilter(conformations))
 	queryName := queryNameFromFilter(filterQuery)
-	logs, err := r.chain.LogPoller().FilteredLogs(ctx, filterQuery, limitAndSort, queryName)
+	logs, err := e.chain.LogPoller().FilteredLogs(ctx, filterQuery, limitAndSort, queryName)
 	if err != nil {
 		return nil, err
 	}
@@ -102,31 +107,31 @@ func (r *Relayer) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expr
 	return convertLPLogs(logs), nil
 }
 
-func (r *Relayer) RegisterLogTracking(ctx context.Context, filter evmtypes.LPFilterQuery) error {
+func (e *evmService) RegisterLogTracking(ctx context.Context, filter evmtypes.LPFilterQuery) error {
 	lpfilter, err := convertLPFilter(filter)
 	if err != nil {
 		return err
 	}
-	if r.chain.LogPoller().HasFilter(lpfilter.Name) {
+	if e.chain.LogPoller().HasFilter(lpfilter.Name) {
 		return nil
 	}
 
-	return r.chain.LogPoller().RegisterFilter(ctx, lpfilter)
+	return e.chain.LogPoller().RegisterFilter(ctx, lpfilter)
 }
 
-func (r *Relayer) UnregisterLogTracking(ctx context.Context, filterName string) error {
+func (e *evmService) UnregisterLogTracking(ctx context.Context, filterName string) error {
 	if filterName == "" {
 		return errEmptyFilterName
 	}
-	if !r.chain.LogPoller().HasFilter(filterName) {
+	if !e.chain.LogPoller().HasFilter(filterName) {
 		return nil
 	}
 
-	return r.chain.LogPoller().UnregisterFilter(ctx, filterName)
+	return e.chain.LogPoller().UnregisterFilter(ctx, filterName)
 }
 
-func (r *Relayer) GetTransactionStatus(ctx context.Context, transactionID commontypes.IdempotencyKey) (commontypes.TransactionStatus, error) {
-	status, err := r.chain.TxManager().GetTransactionStatus(ctx, transactionID)
+func (e *evmService) GetTransactionStatus(ctx context.Context, transactionID commontypes.IdempotencyKey) (commontypes.TransactionStatus, error) {
+	status, err := e.chain.TxManager().GetTransactionStatus(ctx, transactionID)
 	if err != nil {
 		return commontypes.Unknown, err
 	}
@@ -134,8 +139,8 @@ func (r *Relayer) GetTransactionStatus(ctx context.Context, transactionID common
 	return status, nil
 }
 
-func (r *Relayer) SubmitTransaction(ctx context.Context, txRequest evmtypes.SubmitTransactionRequest) (*evmtypes.TransactionResult, error) {
-	config := r.chain.Config()
+func (e *evmService) SubmitTransaction(ctx context.Context, txRequest evmtypes.SubmitTransactionRequest) (*evmtypes.TransactionResult, error) {
+	config := e.chain.Config()
 
 	fromAddress := config.EVM().Workflow().FromAddress().Address()
 	var gasLimit uint64
@@ -143,15 +148,11 @@ func (r *Relayer) SubmitTransaction(ctx context.Context, txRequest evmtypes.Subm
 		gasLimit = *txRequest.GasConfig.GasLimit
 	}
 
-	uuid, err := uuid.NewUUID()
+	id, err := uuid.NewUUID()
 	if err != nil {
 		return nil, err
 	}
-	txID := uuid.String()
-
-	// PLEX-1524 - review which transmitter checker we should use
-	var checker evmtxmgr.TransmitCheckerSpec
-	checker.CheckerType = evmtxmgr.TransmitCheckerTypeSimulate
+	txID := id.String()
 	value := big.NewInt(0)
 
 	// PLEX-1524 - Define how we should properly get the workflow execution ID into the meta without making the API CRE specific.
@@ -165,49 +166,59 @@ func (r *Relayer) SubmitTransaction(ctx context.Context, txRequest evmtypes.Subm
 		IdempotencyKey: &txID,
 		// PLEX-1524 - Review strategy to be used.
 		Strategy: txmgr.NewSendEveryStrategy(),
-		Checker:  checker,
-		Value:    *value,
+		// Checker:  checker,
+		Value: *value,
 	}
 
-	_, err = r.chain.TxManager().CreateTransaction(ctx, txmReq)
+	_, err = e.chain.TxManager().CreateTransaction(ctx, txmReq)
 	if err != nil {
 		return nil, fmt.Errorf("%w; failed to create tx", err)
 	}
 
 	maximumWaitTimeForConfirmation := config.EVM().ConfirmationTimeout()
 	start := time.Now()
-StatusCheckingLoop:
-	for {
-		txStatus, txStatusErr := r.chain.TxManager().GetTransactionStatus(ctx, txID)
+
+	timeBetweenRetries := 100 * time.Millisecond
+	txStatus, err := withRetry(ctx, maximumWaitTimeForConfirmation, timeBetweenRetries, func() (evm.TransactionStatus, error) {
+		txStatus, txStatusErr := e.chain.TxManager().GetTransactionStatus(ctx, txID)
 		if txStatusErr != nil {
-			return nil, txStatusErr
+			return evm.TxFatal, txStatusErr
 		}
 		switch txStatus {
 		case commontypes.Fatal, commontypes.Failed:
-			return &evmtypes.TransactionResult{
-				TxStatus: evm.TxFatal,
-				TxHash:   evmtypes.Hash{},
-			}, nil
-
+			return evm.TxFatal, nil
 		case commontypes.Unconfirmed, commontypes.Finalized:
-			break StatusCheckingLoop
+			return evm.TxSuccess, nil
 		case commontypes.Pending, commontypes.Unknown:
+			return evm.TxFatal, fmt.Errorf("tx still in state pending or unknown, tx status is %d for tx with ID %s", txStatus, txID)
 		default:
-			return nil, fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
+			return evm.TxFatal, fmt.Errorf("unexpected transaction status %d for tx with ID %s", txStatus, txID)
 		}
-		if time.Since(start) > maximumWaitTimeForConfirmation {
-			return nil, errors.Errorf("Wait time for Tx %s to get confirmed was greater than maximum wait time %d", txID, maximumWaitTimeForConfirmation)
-		}
-		// PLEX-1524 - Use ticker instead of time.Sleep and make the time configurable
-		time.Sleep(100 * time.Millisecond)
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	receipt, err := r.chain.TxManager().GetTransactionReceipt(ctx, txID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get TX receipt for tx with ID %s: %w", txID, err)
+	if txStatus == evm.TxFatal {
+		return &evmtypes.TransactionResult{TxStatus: txStatus}, nil
 	}
-	if receipt == nil {
-		return nil, fmt.Errorf("receipt was nil for TX with ID %s: %w", txID, err)
+
+	remainingTime := maximumWaitTimeForConfirmation - time.Since(start)
+
+	receipt, err := withRetry(ctx, remainingTime, timeBetweenRetries, func() (*evmtxmgr.ChainReceipt, error) {
+		receipt, receiptErr := e.chain.TxManager().GetTransactionReceipt(ctx, txID)
+		if receiptErr != nil {
+			return nil, fmt.Errorf("failed to get TX receipt for tx with ID %s: %w", txID, receiptErr)
+		}
+		if receipt == nil {
+			return nil, fmt.Errorf("receipt was nil for TX with ID %s", txID)
+		}
+		return receipt, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return &evmtypes.TransactionResult{
@@ -216,8 +227,8 @@ StatusCheckingLoop:
 	}, nil
 }
 
-func (r *Relayer) CalculateTransactionFee(ctx context.Context, receipt evm.ReceiptGasInfo) (*evm.TransactionFee, error) {
-	txFee := r.chain.TxManager().CalculateFee(txmgr.FeeParts{
+func (e *evmService) CalculateTransactionFee(ctx context.Context, receipt evm.ReceiptGasInfo) (*evm.TransactionFee, error) {
+	txFee := e.chain.TxManager().CalculateFee(txmgr.FeeParts{
 		GasUsed:           receipt.GasUsed,
 		EffectiveGasPrice: receipt.EffectiveGasPrice,
 	})
@@ -423,4 +434,31 @@ func confidenceToConformations(conf primitives.ConfidenceLevel) types.Confirmati
 func bytesToHash(b []byte) (h evm.Hash) {
 	copy(h[:], b)
 	return
+}
+
+// Retry retries fn until success or timeout. If ctx times out, it returns nil and an error.
+// Use this only if T is a type that can be nil (e.g., pointer, slice, map).
+func withRetry[T any](ctx context.Context, totalTimeout, retryInterval time.Duration, fn func() (T, error)) (T, error) {
+	ctx, cancel := context.WithTimeout(ctx, totalTimeout)
+	defer cancel()
+
+	var zero T
+	var lastErr error
+
+	for {
+		result, err := fn()
+		if err == nil {
+			return result, nil
+		}
+
+		lastErr = err
+
+		select {
+		case <-ctx.Done():
+			// If T can be nil, then zero is nil.
+			return zero, fmt.Errorf("retry failed: timeout exceeded, last error: %w", lastErr)
+		case <-time.After(retryInterval):
+			// retry
+		}
+	}
 }
