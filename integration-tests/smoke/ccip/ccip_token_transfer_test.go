@@ -252,10 +252,12 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 
 	allChainSelectors := e.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyEVM))
 	allSolChainSelectors := e.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySolana))
-	sourceChain, destChain := allChainSelectors[0], allSolChainSelectors[0]
-	ownerSourceChain := evmChains[sourceChain].DeployerKey
+	sourceChainSel, destChainSel := allChainSelectors[0], allSolChainSelectors[0]
+	ownerSourceChain := evmChains[sourceChainSel].DeployerKey
+	destChain := e.BlockChains.SolanaChains()[destChainSel]
+	ownerDestChain := destChain.DeployerKey
 
-	require.GreaterOrEqual(t, len(tenv.Users[sourceChain]), 2) // TODO: ???
+	require.GreaterOrEqual(t, len(tenv.Users[sourceChainSel]), 2) // TODO: ???
 
 	oneE9 := new(big.Int).SetUint64(1e9)
 
@@ -263,32 +265,37 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	srcToken, _, destToken, err := testhelpers.DeployTransferableTokenSolana(
 		lggr,
 		e,
-		sourceChain,
-		destChain,
+		sourceChainSel,
+		destChainSel,
 		ownerSourceChain,
 		"OWNER_TOKEN",
 	)
 	require.NoError(t, err)
 
 	// testhelpers.AddLanesForAll(t, &tenv, state) TODO:, fixed for Solana now
-	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &tenv, state, sourceChain, destChain, false)
+	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &tenv, state, sourceChainSel, destChainSel, false)
 
 	testhelpers.MintAndAllow(
 		t,
 		e,
 		state,
 		map[uint64][]testhelpers.MintTokenInfo{
-			sourceChain: {
+			sourceChainSel: {
 				testhelpers.NewMintTokenInfo(ownerSourceChain, srcToken),
 			},
 		},
 	)
 	// TODO: how to do MintAndAllow on Solana?
-	tokenReceiver := state.SolChains[destChain].Receiver
+	tokenReceiver := state.SolChains[destChainSel].Receiver
 	t.Logf("Token receiver: %s\n", tokenReceiver.String())
-	tokenReceiverATA, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, state.SolChains[destChain].Receiver)
+	tokenReceiverATA, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, tokenReceiver)
 	require.NoError(t, ferr)
 	t.Logf("Token receiver ATA: %s\n", tokenReceiverATA.String())
+
+	ataIx, _, err := soltokens.CreateAssociatedTokenAccount(solana.Token2022ProgramID, destToken, tokenReceiver, ownerDestChain.PublicKey())
+	require.NoError(t, err)
+
+	soltestutils.SendAndConfirm(ctx, t, destChain.Client, []solana.Instruction{ataIx}, *ownerDestChain, solconfig.DefaultCommitment)
 
 	extraArgs, err := ccipevm.SerializeClientSVMExtraArgsV1(message_hasher.ClientSVMExtraArgsV1{
 		TokenReceiver: tokenReceiver,
@@ -299,8 +306,8 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	tcs := []testhelpers.TestTransferRequest{
 		{
 			Name:        "Send token to contract",
-			SourceChain: sourceChain,
-			DestChain:   destChain,
+			SourceChain: sourceChainSel,
+			DestChain:   destChainSel,
 			Tokens: []router.ClientEVMTokenAmount{
 				{
 					Token:  srcToken.Address(),
@@ -318,7 +325,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	}
 
 	// Wait for filter registration for CCIPMessageSent (onramp), CommitReportAccepted (offramp), and ExecutionStateChanged (offramp)
-	testhelpers.WaitForEventFilterRegistrationOnLane(t, state, e.Offchain, sourceChain, destChain)
+	testhelpers.WaitForEventFilterRegistrationOnLane(t, state, e.Offchain, sourceChainSel, destChainSel)
 
 	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances :=
 		testhelpers.TransferMultiple(ctx, t, e, state, tcs)
