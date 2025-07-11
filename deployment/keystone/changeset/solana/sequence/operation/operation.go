@@ -161,7 +161,7 @@ func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutp
 			return out, fmt.Errorf("failed to create random admin keys: %w", err)
 		}
 
-    instruction, err := ks_cache.NewInitializeInstruction([]solana.PublicKey{adminStateKey.PublicKey()}, stateKey.PublicKey(), deps.Chain.DeployerKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+    instruction, err := ks_cache.NewInitializeInstruction([]solana.PublicKey{adminStateKey.PublicKey()}, deps.Chain.DeployerKey.PublicKey(), stateKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
     if err != nil {
         return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
     }

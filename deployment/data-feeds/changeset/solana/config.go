@@ -15,7 +15,7 @@ const (
 	replaceKeysCmd = "docker_update_contracts"
 )
 
-var keystoneBuildParams = helpers.DomainParams{
+var cacheBuildParams = helpers.DomainParams{
 	RepoURL:          repoURL,
 	CloneDir:         cloneDir,
 	AnchorDir:        anchorDir,
@@ -25,9 +25,7 @@ var keystoneBuildParams = helpers.DomainParams{
 	ReplaceKeysCmd:   replaceKeysCmd,
 }
 
-// Map program names to their Rust file paths (relative to the Anchor project root)
-// Needed for upgrades in place
-var keystoneForwarder = cldf.ContractType("keystone_forwarder")
+var dataFeedsCache = cldf.ContractType("data_feeds_cache")
 var programToFileMap = map[cldf.ContractType]string{
-	keystoneForwarder: "programs/keystone-forwarder/src/lib.rs",
+	dataFeedsCache: "programs/data_feeds_cache/src/lib.rs",
 }
