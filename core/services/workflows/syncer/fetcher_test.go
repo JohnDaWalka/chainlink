@@ -395,7 +395,7 @@ func TestNewFetcherFunc(t *testing.T) {
 			if r.URL.Path == "/workflows/test.json" {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write(testContent)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -447,7 +447,7 @@ func TestNewFetcherFunc(t *testing.T) {
 			time.Sleep(200 * time.Millisecond) // Delay response
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write(testContent)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
