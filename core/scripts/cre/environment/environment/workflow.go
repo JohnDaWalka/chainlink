@@ -344,10 +344,9 @@ var useWorkflowCmd = &cobra.Command{
 			return errors.Wrap(scErr, "failed to create Seth client")
 		}
 
-		var configPath *string
+		var configURL *string
 		if configFilePathFlag != "" {
-			configFilePathWithPrefix := "file://" + configFilePathFlag
-			configPath = &configFilePathWithPrefix
+			configURL = &configFilePathFlag
 		}
 
 		fmt.Printf("\nDeleting all workflows from the workflow registry\n\n")
@@ -359,10 +358,14 @@ var useWorkflowCmd = &cobra.Command{
 
 		fmt.Printf("\nRegistering workflow %s with the workflow registry\n\n", workflowNameFlag)
 
-		registerErr := creworkflow.RegisterWithContract(cmd.Context(), sethClient, common.HexToAddress(workflowRegistryAddressFlag), 1, workflowNameFlag, "file://"+compressedWorkflowWasmPath, configPath, nil, &containerTargetDirFlag)
+		registerErr := creworkflow.RegisterWithContract(cmd.Context(), sethClient, common.HexToAddress(workflowRegistryAddressFlag), 1, workflowNameFlag, "file://"+compressedWorkflowWasmPath, configURL, nil, &containerTargetDirFlag)
 		if registerErr != nil {
 			return errors.Wrapf(registerErr, "❌ failed to register workflow %s", workflowNameFlag)
 		}
+
+		defer func() {
+			_ = os.Remove(compressedWorkflowWasmPath)
+		}()
 
 		fmt.Printf("\n✅ Workflow registered successfully\n\n")
 

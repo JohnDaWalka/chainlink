@@ -141,30 +141,30 @@ func ActivateWithCRECLI(input cretypes.ManageWorkflowWithCRECLIInput) error {
 	return nil
 }
 
-func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistryAddr common.Address, donID uint32, workflowName, binaryURL string, configURL, secretsURL *string, localDirectory *string) error {
-	workFlowData, err := libnet.DownloadAndDecodeBase64(ctx, binaryURL)
-	if err != nil {
-		return errors.Wrap(err, "failed to download and decode workflow binary")
+func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistryAddr common.Address, donID uint32, workflowName, binaryURL string, configURL, secretsURL *string, artifactsDirInContainer *string) error {
+	workFlowData, workFlowErr := libnet.DownloadAndDecodeBase64(ctx, binaryURL)
+	if workFlowErr != nil {
+		return errors.Wrap(workFlowErr, "failed to download and decode workflow binary")
 	}
 
 	var binaryURLToUse string
-	if localDirectory != nil {
-		// binaryURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(binaryURL))
-		binaryURLToUse = filepath.Base(binaryURL)
+	if artifactsDirInContainer != nil {
+		binaryURLToUse = fmt.Sprintf("file://%s/%s", *artifactsDirInContainer, filepath.Base(binaryURL))
 	} else {
 		binaryURLToUse = binaryURL
 	}
 
 	var configData []byte
+	var configErr error
 	configURLToUse := ""
 	if configURL != nil {
-		configData, err = libnet.Download(ctx, *configURL)
-		if err != nil {
-			return errors.Wrap(err, "failed to download workflow config")
+		configData, configErr = libnet.Download(ctx, configURLToUse)
+		if configErr != nil {
+			return errors.Wrap(configErr, "failed to download workflow config")
 		}
-		if localDirectory != nil {
-			// configURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(*configURL))
-			configURLToUse = filepath.Base(*configURL)
+
+		if artifactsDirInContainer != nil {
+			configURLToUse = fmt.Sprintf("file://%s/%s", *artifactsDirInContainer, filepath.Base(*configURL))
 		} else {
 			configURLToUse = *configURL
 		}
@@ -172,9 +172,8 @@ func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistry
 
 	secretsURLToUse := ""
 	if secretsURL != nil {
-		if localDirectory != nil {
-			// secretsURLToUse = fmt.Sprintf("file://%s/%s", *localDirectory, filepath.Base(*secretsURL))
-			secretsURLToUse = filepath.Base(*secretsURL)
+		if artifactsDirInContainer != nil {
+			secretsURLToUse = fmt.Sprintf("file://%s/%s", *artifactsDirInContainer, filepath.Base(*secretsURL))
 		} else {
 			secretsURLToUse = *secretsURL
 		}
@@ -186,9 +185,9 @@ func RegisterWithContract(ctx context.Context, sc *seth.Client, workflowRegistry
 		return errors.Wrap(idErr, "failed to generate workflow ID")
 	}
 
-	workflowRegistryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
-	if err != nil {
-		return errors.Wrap(err, "failed to create workflow registry instance")
+	workflowRegistryInstance, instanceErr := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
+	if instanceErr != nil {
+		return errors.Wrap(instanceErr, "failed to create workflow registry instance")
 	}
 
 	// use non-encoded workflow name
