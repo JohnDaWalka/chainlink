@@ -951,7 +951,7 @@ func newCREServices(
 				opts.CapabilitiesRegistry,
 				workflowDonNotifier,
 			)
-			registrySyncer.AddLauncher(wfLauncher)
+			registrySyncer.AddListener(wfLauncher)
 
 			srvcs = append(srvcs, wfLauncher, registrySyncer)
 
