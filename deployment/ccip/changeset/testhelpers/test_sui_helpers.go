@@ -48,7 +48,7 @@ type Sui2AnyRampMessage struct {
 
 type CCIPMessageSent struct {
 	DestChainSelector uint64
-	SequenceNumber    uint64 `json:"seqNum"`
+	SequenceNumber    uint64 `json:"sequenceNumber"`
 	Message           Sui2AnyRampMessage
 }
 
@@ -67,24 +67,27 @@ func NewSuiCtx(e cldf.Environment, src uint64) (*suiCtx, error) {
 
 	deps := suideps.SuiDeps{
 		SuiChain: sui_ops.OpTxDeps{
-			Client: *sc.Client,
+			Client: sc.Client,
 			Signer: signer,
-			GetTxOpts: func() sui_bind.TxOpts {
+			GetCallOpts: func() *sui_bind.CallOpts {
 				b := uint64(400_000_000)
-				return sui_bind.TxOpts{GasBudget: &b}
+				return &sui_bind.CallOpts{
+					WaitForExecution: true,
+					GasBudget:        &b,
+				}
 			},
 		},
 	}
 
 	return &suiCtx{
 		Deps:                deps,
-		CCIPObjectRefID:     st.SuiChains[src].CCIPObjectRef.String(),
-		CCIPPackageID:       st.SuiChains[src].CCIPAddress.String(),
-		OnRampPackageID:     st.SuiChains[src].OnRampAddress.String(),
-		OnRampStateObjectID: st.SuiChains[src].OnRampStateObjectId.String(),
-		LinkTokenPkgID:      st.SuiChains[src].LinkTokenAddress.String(),
-		LinkTokenMetaID:     st.SuiChains[src].LinkTokenCoinMetadataId.String(),
-		LinkTokenCapID:      st.SuiChains[src].LinkTokenTreasuryCapId.String(),
+		CCIPObjectRefID:     st.SuiChains[src].CCIPObjectRef,
+		CCIPPackageID:       st.SuiChains[src].CCIPAddress,
+		OnRampPackageID:     st.SuiChains[src].OnRampAddress,
+		OnRampStateObjectID: st.SuiChains[src].OnRampStateObjectId,
+		LinkTokenPkgID:      st.SuiChains[src].LinkTokenAddress,
+		LinkTokenMetaID:     st.SuiChains[src].LinkTokenCoinMetadataId,
+		LinkTokenCapID:      st.SuiChains[src].LinkTokenTreasuryCapId,
 		SignerAddr:          addr,
 		PubKeyBytes:         []byte(pub),
 	}, nil

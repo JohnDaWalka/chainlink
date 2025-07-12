@@ -650,7 +650,7 @@ func CreateKeys(t *testing.T,
 			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 
 			lggr := logger.NewSingleFileLogger(t)
-			err = sui_testutils.FundWithFaucet(lggr, "local", "0x"+transmitter.Account())
+			err = sui_testutils.FundWithFaucet(lggr, "localnet", "0x"+transmitter.Account())
 			require.NoError(t, err)
 
 		}

@@ -3,6 +3,7 @@ package suiconfig
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
@@ -36,6 +37,14 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 
 	return map[string]any{
 		"IsLoopPlugin": true,
+		"EventsIndexer": map[string]any{
+			"PollingInterval": 10 * time.Second,
+			"SyncTimeout":     10 * time.Second,
+		},
+		"TransactionsIndexer": map[string]any{
+			"PollingInterval": 10 * time.Second,
+			"SyncTimeout":     10 * time.Second,
+		},
 		"Modules": map[string]any{
 			// TODO: more offramp config and other modules
 			consts.ContractNameRMNRemote: map[string]any{
@@ -383,5 +392,9 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 				},
 			},
 		},
+		"EventSyncInterval": 12 * time.Second,
+		"EventSyncTimeout":  10 * time.Second,
+		"TxSyncInterval":    12 * time.Second,
+		"TxSyncTimeout":     10 * time.Second,
 	}, nil
 }

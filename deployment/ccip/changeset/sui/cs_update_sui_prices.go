@@ -3,7 +3,6 @@ package sui
 import (
 	"fmt"
 
-	"github.com/holiman/uint256"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
@@ -36,12 +35,13 @@ func (d UpdateSuiFeeQuoterPrice) Apply(e cldf.Environment, config UpdateSuiPrice
 	deps := SuiDeps{
 		AB: ab,
 		SuiChain: sui_ops.OpTxDeps{
-			Client: *suiChain.Client,
+			Client: suiChain.Client,
 			Signer: suiSigner,
-			GetTxOpts: func() bind.TxOpts {
+			GetCallOpts: func() *bind.CallOpts {
 				b := uint64(400_000_000)
-				return bind.TxOpts{
-					GasBudget: &b,
+				return &bind.CallOpts{
+					WaitForExecution: true,
+					GasBudget:        &b,
 				}
 			},
 		},
@@ -54,10 +54,10 @@ func (d UpdateSuiFeeQuoterPrice) Apply(e cldf.Environment, config UpdateSuiPrice
 			CCIPPackageId: config.CCIPPackageId,
 			CCIPObjectRef: config.CCIPObjectRef,
 			// FeeQuoterCapId:        feeQuoterCapId,
-			SourceTokens:          []string{config.SourceTokenMetadata},
-			SourceUsdPerToken:     []uint256.Int{{config.SourceUsdPerToken}},
-			GasDestChainSelectors: []uint64{config.DestChainSelector},
-			GasUsdPerUnitGas:      []uint256.Int{{config.GasUsdPerUnitGas}},
+			SourceTokens:          config.SourceTokenMetadata,
+			SourceUsdPerToken:     config.SourceUsdPerToken,
+			GasDestChainSelectors: config.DestChainSelector,
+			GasUsdPerUnitGas:      config.GasUsdPerUnitGas,
 		})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to updatePrice for Sui chain %d: %w", config.ChainSelector, err)

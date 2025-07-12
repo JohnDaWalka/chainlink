@@ -1,7 +1,8 @@
 package sui
 
 import (
-	"github.com/pattonkan/sui-go/sui"
+	"math/big"
+
 	ccip_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 )
 
@@ -22,12 +23,12 @@ type DeployLinkTokenConfig struct {
 
 type UpdateSuiPriceConfig struct {
 	ChainSelector       uint64
-	DestChainSelector   uint64
+	DestChainSelector   []uint64
 	CCIPPackageId       string
 	CCIPObjectRef       string
-	SourceTokenMetadata string
-	SourceUsdPerToken   uint64
-	GasUsdPerUnitGas    uint64
+	SourceTokenMetadata []string
+	SourceUsdPerToken   []*big.Int
+	GasUsdPerUnitGas    []*big.Int
 }
 
 // ChainContractParams stores configuration to call initialize in CCIP contracts
@@ -49,6 +50,6 @@ type OffRampParams struct {
 
 type OnRampParams struct {
 	ChainSelector  uint64
-	AllowlistAdmin sui.Address
-	FeeAggregator  sui.Address
+	AllowlistAdmin string
+	FeeAggregator  string
 }

@@ -1137,7 +1137,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	for _, chain := range suiChains {
 		// TODO(sui): update this for token transfers
 		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
-		tokenInfo[cciptypes.UnknownEncodedAddress(state.SuiChains[chain].LinkTokenAddress.String())] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
+		tokenInfo[cciptypes.UnknownEncodedAddress(state.SuiChains[chain].LinkTokenAddress)] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
 		ocrOverride := tc.OCRConfigOverride
 		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
 		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)

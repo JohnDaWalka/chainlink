@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pattonkan/sui-go/suiclient"
-	"github.com/pattonkan/sui-go/suisigner"
+	suisigner "github.com/block-vision/sui-go-sdk/signer"
+	"github.com/block-vision/sui-go-sdk/sui"
 
 	"github.com/smartcontractkit/freeport"
 
@@ -59,7 +59,7 @@ func GenerateChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	return chains
 }
 
-func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey, *suiclient.ClientImpl) {
+func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey, sui.ISuiAPI) {
 	t.Helper()
 
 	// initialize the docker network used by CTF
@@ -99,16 +99,17 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 		break
 	}
 
-	suiSigner, err := suisigner.NewSignerWithMnemonic(mnemonic, suisigner.KeySchemeFlagEd25519)
+	suiSigner, err := suisigner.NewSignertWithMnemonic(mnemonic)
 	require.NoError(t, err)
-	suiPrivateKey := suiSigner.PrivateKey()
 
-	client := suiclient.NewClient(url)
+	suiPrivateKey := suiSigner.PriKey
+
+	client := sui.NewSuiClient(url)
 
 	var ready bool
 	for i := 0; i < 30; i++ {
 		time.Sleep(time.Second)
-		receivedChainID, err := client.GetChainIdentifier(context.Background())
+		receivedChainID, err := client.SuiGetChainIdentifier(context.Background())
 		if err != nil {
 			t.Logf("API server not ready yet (attempt %d): %+v\n", i+1, err)
 			continue

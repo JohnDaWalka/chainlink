@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pattonkan/sui-go/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	ccip_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -20,13 +19,13 @@ const (
 )
 
 func GetMockChainContractParams(t *testing.T, e cldf.Environment, chainSelector uint64) (ChainContractParams, error) {
-	mockParsedAddress := sui.MustAddressFromHex(mockAddress)
+
 	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return ChainContractParams{}, err
 	}
 
-	linkTokenObjectMetadataId := state.SuiChains[chainSelector].LinkTokenCoinMetadataId.String()
+	linkTokenObjectMetadataId := state.SuiChains[chainSelector].LinkTokenCoinMetadataId
 
 	return ChainContractParams{
 		DestChainSelector: 909606746561742123,
@@ -46,8 +45,8 @@ func GetMockChainContractParams(t *testing.T, e cldf.Environment, chainSelector 
 		},
 		OnRampParams: OnRampParams{
 			ChainSelector:  chainSelector,
-			AllowlistAdmin: *mockParsedAddress,
-			FeeAggregator:  *mockParsedAddress,
+			AllowlistAdmin: mockAddress,
+			FeeAggregator:  mockAddress,
 		},
 	}, nil
 }

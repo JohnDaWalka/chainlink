@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/pattonkan/sui-go/sui"
 	aptos_ccip_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
@@ -1235,7 +1234,7 @@ func ConfirmCommitWithExpectedSeqNumRangeSui(
 	t *testing.T,
 	srcSelector uint64,
 	dest cldf_sui.Chain,
-	offRampAddress sui.Address,
+	offRampAddress string,
 	startVersion *uint64,
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,

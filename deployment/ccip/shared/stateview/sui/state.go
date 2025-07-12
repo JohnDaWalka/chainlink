@@ -4,28 +4,27 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/pattonkan/sui-go/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 )
 
 type CCIPChainState struct {
-	CCIPRouterAddress       sui.Address
-	CCIPAddress             sui.Address
-	CCIPObjectRef           sui.Address
-	MCMsAddress             sui.Address
-	TokenPoolAddress        sui.Address
-	LockReleaseAddress      sui.Address
-	LockReleaseStateId      sui.Address
-	FeeQuoterCapId          sui.Address
-	OnRampAddress           sui.Address
-	OnRampStateObjectId     sui.Address
-	OffRampAddress          sui.Address
-	OffRampOwnerCapId       sui.Address
-	OffRampStateObjectId    sui.Address
-	LinkTokenAddress        sui.Address
-	LinkTokenCoinMetadataId sui.Address
-	LinkTokenTreasuryCapId  sui.Address
+	CCIPRouterAddress       string
+	CCIPAddress             string
+	CCIPObjectRef           string
+	MCMsAddress             string
+	TokenPoolAddress        string
+	LockReleaseAddress      string
+	LockReleaseStateId      string
+	FeeQuoterCapId          string
+	OnRampAddress           string
+	OnRampStateObjectId     string
+	OffRampAddress          string
+	OffRampOwnerCapId       string
+	OffRampStateObjectId    string
+	LinkTokenAddress        string
+	LinkTokenCoinMetadataId string
+	LinkTokenTreasuryCapId  string
 }
 
 // LoadOnchainStatesui loads chain state for sui chains from env
@@ -57,57 +56,56 @@ func LoadOnchainStatesui(env cldf.Environment) (map[uint64]CCIPChainState, error
 func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (CCIPChainState, error) {
 	chainState := CCIPChainState{}
 	for addr, typeAndVersion := range addresses {
-		// Parse address
-		suiAddr := sui.MustAddressFromHex(addr)
-		switch typeAndVersion.Type {
+		// Parse addresss
 
+		switch typeAndVersion.Type {
 		case shared.SuiCCIPRouterType:
-			chainState.CCIPRouterAddress = *suiAddr
+			chainState.CCIPRouterAddress = addr
 
 		case shared.SuiCCIPType:
-			chainState.CCIPAddress = *suiAddr
+			chainState.CCIPAddress = addr
 
 		case shared.SuiLockReleaseTPType:
-			chainState.LockReleaseAddress = *suiAddr
+			chainState.LockReleaseAddress = addr
 
 		case shared.SuiLockReleaseTPStateType:
-			chainState.LockReleaseStateId = *suiAddr
+			chainState.LockReleaseStateId = addr
 
 		case shared.SuiMCMSType:
-			chainState.MCMsAddress = *suiAddr
+			chainState.MCMsAddress = addr
 
 		case shared.SuiTokenPoolType:
-			chainState.TokenPoolAddress = *suiAddr
+			chainState.TokenPoolAddress = addr
 
 		case shared.SuiCCIPObjectRefType:
-			chainState.CCIPObjectRef = *suiAddr
+			chainState.CCIPObjectRef = addr
 
 		case shared.SuiFeeQuoterCapType:
-			chainState.FeeQuoterCapId = *suiAddr
+			chainState.FeeQuoterCapId = addr
 
 		case shared.SuiOnRampType:
-			chainState.OnRampAddress = *suiAddr
+			chainState.OnRampAddress = addr
 
 		case shared.SuiOnRampStateObjectIdType:
-			chainState.OnRampStateObjectId = *suiAddr
+			chainState.OnRampStateObjectId = addr
 
 		case shared.SuiOffRampType:
-			chainState.OffRampAddress = *suiAddr
+			chainState.OffRampAddress = addr
 
 		case shared.SuiOffRampStateObjectIdType:
-			chainState.OffRampStateObjectId = *suiAddr
+			chainState.OffRampStateObjectId = addr
 
 		case shared.SuiOffRampOwnerCapObjectIdType:
-			chainState.OffRampOwnerCapId = *suiAddr
+			chainState.OffRampOwnerCapId = addr
 
 		case shared.SuiLinkTokenType:
-			chainState.LinkTokenAddress = *suiAddr
+			chainState.LinkTokenAddress = addr
 
 		case shared.SuiLinkTokenObjectMetadataId:
-			chainState.LinkTokenCoinMetadataId = *suiAddr
+			chainState.LinkTokenCoinMetadataId = addr
 
 		case shared.SuiLinkTokenTreasuryCapId:
-			chainState.LinkTokenTreasuryCapId = *suiAddr
+			chainState.LinkTokenTreasuryCapId = addr
 		}
 		// Set address based on type
 

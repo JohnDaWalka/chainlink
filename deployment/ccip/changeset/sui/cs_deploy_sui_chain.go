@@ -42,7 +42,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		suiChain := suiChains[chainSel]
 		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
 
-		suiSignerAddr, err := suiSigner.GetAddress()
+		signerAddr, err := suiSigner.GetAddress()
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
@@ -50,30 +50,17 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		deps := SuiDeps{
 			AB: ab,
 			SuiChain: sui_ops.OpTxDeps{
-				Client: *suiChain.Client,
+				Client: suiChain.Client,
 				Signer: suiSigner,
-				GetTxOpts: func() bind.TxOpts {
+				GetCallOpts: func() *bind.CallOpts {
 					b := uint64(400_000_000)
-					return bind.TxOpts{
-						GasBudget: &b,
+					return &bind.CallOpts{
+						WaitForExecution: true,
+						GasBudget:        &b,
 					}
 				},
 			},
 			CCIPOnChainState: state,
-		}
-
-		// Deploy Router
-		// TODO: Maybe make this part of CCIP sequence
-		routerReport, err := operations.ExecuteOperation(e.OperationsBundle, routerops.DeployCCIPRouterOp, deps.SuiChain, cld_ops.EmptyInput{})
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP Router for Sui chain %d: %w", chainSel, err)
-		}
-
-		// save Router address to the addressbook
-		typeAndVersionRouter := cldf.NewTypeAndVersion(shared.SuiCCIPRouterType, deployment.Version1_6_0)
-		err = deps.AB.Save(chainSel, routerReport.Output.PackageId, typeAndVersionRouter)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save Router address %s for Sui chain %d: %w", routerReport.Output.PackageId, chainSel, err)
 		}
 
 		// Deploy MCMS
@@ -90,6 +77,23 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save MCMS address %s for Sui chain %d: %w", mcmsSeqReport.Output.PackageId, chainSel, err)
 		}
 
+		// Deploy Router
+		// TODO: Maybe make this part of CCIP sequence
+		routerReport, err := operations.ExecuteOperation(e.OperationsBundle, routerops.DeployCCIPRouterOp, deps.SuiChain, routerops.DeployCCIPRouterInput{
+			McmsPackageId: mcmsSeqReport.Output.PackageId,
+			McmsOwner:     signerAddr,
+		})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP Router for Sui chain %d: %w", chainSel, err)
+		}
+
+		// save Router address to the addressbook
+		typeAndVersionRouter := cldf.NewTypeAndVersion(shared.SuiCCIPRouterType, deployment.Version1_6_0)
+		err = deps.AB.Save(chainSel, routerReport.Output.PackageId, typeAndVersionRouter)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save Router address %s for Sui chain %d: %w", routerReport.Output.PackageId, chainSel, err)
+		}
+
 		// Run DeployAndInitCCIpSequence
 		ccipSeqInput := ccipops.DeployAndInitCCIPSeqInput{
 			LinkTokenCoinMetadataObjectId: config.ContractParamsPerChain[chainSel].FeeQuoterParams.LinkTokenCoinMetadataObjectId,
@@ -99,7 +103,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			TokenPriceStalenessThreshold:  config.ContractParamsPerChain[chainSel].FeeQuoterParams.TokenPriceStalenessThreshold,
 			DeployCCIPInput: ccipops.DeployCCIPInput{
 				McmsPackageId: mcmsSeqReport.Output.PackageId,
-				McmsOwner:     "0x2",
+				McmsOwner:     signerAddr,
 			},
 			// Fee Quoter destination chain configuration
 			// values retried from here: https://github.com/smartcontractkit/chainlink-sui/pull/277/files#diff-5088e21cdbdb4efead9c1142c365a8717bcfe1a912cb0f2b54d0c0b7aad7e3c1R496
@@ -155,7 +159,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		}
 
 		// No need to store rn
-		// // save CCIP TransferCapId address to the addressbook
+		// save CCIP TransferCapId address to the addressbook
 		// typeAndVersionTransferCapId := cldf.NewTypeAndVersion(shared.SuiCCIPTransferCapIdType, deployment.Version1_6_0)
 		// err = deps.AB.Save(chainSel, ccipSeqReport.Output.Objects.SourceTransferCapObjectId, typeAndVersionTransferCapId)
 		// if err != nil {
@@ -174,14 +178,14 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			DeployCCIPOnRampInput: onrampops.DeployCCIPOnRampInput{
 				CCIPPackageId:      ccipSeqReport.Output.CCIPPackageId,
 				MCMSPackageId:      mcmsSeqReport.Output.PackageId,
-				MCMSOwnerPackageId: "0x2",
+				MCMSOwnerPackageId: signerAddr,
 			},
 			OnRampInitializeInput: onrampops.OnRampInitializeInput{
 				NonceManagerCapId:         ccipSeqReport.Output.Objects.NonceManagerCapObjectId,   // this is from NonceManager init Op
 				SourceTransferCapId:       ccipSeqReport.Output.Objects.SourceTransferCapObjectId, // this is from CCIP package publish
 				ChainSelector:             suiChain.Selector,
-				FeeAggregator:             suiSignerAddr,
-				AllowListAdmin:            suiSignerAddr,
+				FeeAggregator:             signerAddr,
+				AllowListAdmin:            signerAddr,
 				DestChainSelectors:        []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector}, // TODOD add this in input instead of hardcoding
 				DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{true},
@@ -265,14 +269,14 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
 
-		// // NOT NEEDED FOR ARBITRARY MSG PASSING
-		// // TODO abstract this into a different function
+		// NOT NEEDED FOR ARBITRARY MSG PASSING
+		// TODO abstract this into a different function
 		// Deploy CCIP TokenPool
 		deployTp, err := operations.ExecuteOperation(e.OperationsBundle, tokenpoolops.DeployCCIPTokenPoolOp, deps.SuiChain,
 			tokenpoolops.TokenPoolDeployInput{
-				CCIPPackageId:     ccipSeqReport.Output.CCIPPackageId,
-				CCIPRouterAddress: routerReport.Output.PackageId,
-				MCMSAddress:       mcmsSeqReport.Output.PackageId,
+				CCIPPackageId:    ccipSeqReport.Output.CCIPPackageId,
+				MCMSAddress:      mcmsSeqReport.Output.PackageId,
+				MCMSOwnerAddress: signerAddr,
 			})
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy TokenPool for Sui chain %d: %w", chainSel, err)
@@ -284,8 +288,9 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", deployTp.Output.PackageId, chainSel, err)
 		}
-
 	}
+
+	fmt.Println("RAN CS_DEPLOY_SUI_CHAIN")
 	return cldf.ChangesetOutput{
 		AddressBook: ab,
 		Reports:     seqReports,

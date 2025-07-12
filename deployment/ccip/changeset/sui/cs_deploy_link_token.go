@@ -38,12 +38,13 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 	deps := SuiDeps{
 		AB: ab,
 		SuiChain: sui_ops.OpTxDeps{
-			Client: *suiChain.Client,
+			Client: suiChain.Client,
 			Signer: suiSigner,
-			GetTxOpts: func() bind.TxOpts {
+			GetCallOpts: func() *bind.CallOpts {
 				b := uint64(400_000_000)
-				return bind.TxOpts{
-					GasBudget: &b,
+				return &bind.CallOpts{
+					WaitForExecution: true,
+					GasBudget:        &b,
 				}
 			},
 		},

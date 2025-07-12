@@ -37,12 +37,13 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		deps := SuiDeps{
 			AB: ab,
 			SuiChain: sui_ops.OpTxDeps{
-				Client: *suiChain.Client,
+				Client: suiChain.Client,
 				Signer: suiSigner,
-				GetTxOpts: func() bind.TxOpts {
-					b := uint64(300_000_000)
-					return bind.TxOpts{
-						GasBudget: &b,
+				GetCallOpts: func() *bind.CallOpts {
+					b := uint64(400_000_000)
+					return &bind.CallOpts{
+						WaitForExecution: true,
+						GasBudget:        &b,
 					}
 				},
 			},
@@ -81,9 +82,9 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		}
 
 		setOCR3ConfigCommitInput := offrampops.SetOCR3ConfigInput{
-			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress.String(),
-			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId.String(),
-			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId.String(),
+			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
+			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
+			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
 			// commit plugin config
 			ConfigDigest:                   commitArgs.ConfigDigest[:],
 			OCRPluginType:                  commitArgs.OcrPluginType,
@@ -99,9 +100,9 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		}
 
 		setOCR3ConfigExecInput := offrampops.SetOCR3ConfigInput{
-			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress.String(),
-			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId.String(),
-			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId.String(),
+			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
+			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
+			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
 			// exec plugin config
 			ConfigDigest:                   execArgs.ConfigDigest[:],
 			OCRPluginType:                  execArgs.OcrPluginType,

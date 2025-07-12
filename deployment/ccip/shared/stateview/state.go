@@ -9,7 +9,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/aptos-labs/aptos-go-sdk"
-	"github.com/pattonkan/sui-go/sui"
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
@@ -65,6 +64,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 
@@ -633,8 +633,14 @@ func (c CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 		ccipAddress := c.AptosChains[chainSelector].CCIPAddress
 		offRampAddress = ccipAddress[:]
 	case chain_selectors.FamilySui:
-		ccipAddress := c.SuiChains[chainSelector].OffRampAddress
-		offRampAddress = ccipAddress[:]
+		offRampAddr := c.SuiChains[chainSelector].OffRampAddress
+
+		normalizedAddr, err := suiutil.ConvertStringToAddressBytes(offRampAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		offRampAddress = normalizedAddr[:]
 	case chain_selectors.FamilyTon:
 		or := c.TonChains[chainSelector].OffRamp
 		offRampAddress = or.Data()
@@ -672,10 +678,16 @@ func (c CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, e
 		onRampAddressBytes = ccipAddress[:]
 	case chain_selectors.FamilySui:
 		onRampAddress := c.SuiChains[chainSelector].OnRampAddress
-		if onRampAddress == (sui.Address{}) {
+		if onRampAddress == "" {
 			return nil, fmt.Errorf("no ccip address found in the state for Aptos chain %d", chainSelector)
 		}
-		onRampAddressBytes = onRampAddress[:]
+
+		normalizedAddr, err := suiutil.ConvertStringToAddressBytes(onRampAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		onRampAddressBytes = normalizedAddr[:]
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}

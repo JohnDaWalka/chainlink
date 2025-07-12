@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pattonkan/sui-go/sui"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
@@ -47,15 +47,18 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 	suiSenderAddr, err := rel.NewPrivateKeySigner(e.Env.BlockChains.SuiChains()[sourceChain].DeployerKey).GetAddress()
 	require.NoError(t, err)
 
-	suiSenderByte := sui.MustAddressFromHex(suiSenderAddr)
+	normalizedAddr, err := suiutil.ConvertStringToAddressBytes(suiSenderAddr)
+	require.NoError(t, err)
+
+	suiSenderByte := normalizedAddr[:]
 
 	// SUI FeeToken
 	// mint link token to use as feeToken
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
 			ChainSelector:  sourceChain,
-			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress.String(),
-			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId.String(),
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
 			Amount:         1099999999999999984,
 		}),
 	})
