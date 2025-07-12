@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/stretchr/testify/require"
 	"github.com/subosito/gotenv"
 	"go.uber.org/zap/zapcore"
