@@ -26,6 +26,7 @@ import (
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	evmclient "github.com/smartcontractkit/chainlink-evm/pkg/client"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
@@ -191,10 +192,25 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 	fee, err := r.GetFee(
 		&bind.CallOpts{Context: context.Background()}, m.chainSelector, msg)
 	if err != nil {
-		m.l.Errorw("could not get fee",
-			"dstChainSelector", m.chainSelector,
-			"fee", fee,
-			"err", cldf.MaybeDataErr(err))
+		// Try to extract detailed revert reason
+		rpcError, extractErr := evmclient.ExtractRPCError(err)
+		if extractErr == nil && rpcError.Data != nil {
+			decodedReason := decodeRevertReason(rpcError.Data)
+			m.l.Errorw("fee calculation failed with detailed revert data",
+				"dstChainSelector", m.chainSelector,
+				"srcChainSelector", src,
+				"rpcErrorCode", rpcError.Code,
+				"rpcErrorMessage", rpcError.Message,
+				"revertData", rpcError.Data,
+				"decodedReason", decodedReason,
+				"originalErr", cldf.MaybeDataErr(err))
+		} else {
+			m.l.Errorw("could not get fee",
+				"dstChainSelector", m.chainSelector,
+				"srcChainSelector", src,
+				"fee", fee,
+				"err", cldf.MaybeDataErr(err))
+		}
 		return fmt.Errorf("failed to get fee: %w", err)
 	}
 
@@ -213,10 +229,24 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 
 	tx, err := r.CcipSend(acc, m.chainSelector, msg)
 	if err != nil {
-		m.l.Errorw("execution reverted",
-			"sourceChain", src,
-			"destChain", m.chainSelector,
-			"err", cldf.MaybeDataErr(err))
+		// Try to extract detailed revert reason for transaction submission failure
+		rpcError, extractErr := evmclient.ExtractRPCError(err)
+		if extractErr == nil && rpcError.Data != nil {
+			decodedReason := decodeRevertReason(rpcError.Data)
+			m.l.Errorw("transaction submission failed with detailed revert data",
+				"sourceChain", src,
+				"destChain", m.chainSelector,
+				"rpcErrorCode", rpcError.Code,
+				"rpcErrorMessage", rpcError.Message,
+				"revertData", rpcError.Data,
+				"decodedReason", decodedReason,
+				"originalErr", cldf.MaybeDataErr(err))
+		} else {
+			m.l.Errorw("execution reverted",
+				"sourceChain", src,
+				"destChain", m.chainSelector,
+				"err", cldf.MaybeDataErr(err))
+		}
 		return fmt.Errorf("failed to send CCIP message: %w", err)
 	}
 
@@ -560,4 +590,20 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 		FeeTokenStore: aptos.AccountAddress{}, // Add missing FeeTokenStore field (zero address)
 		TokenAmounts:  tokenAmounts,
 	}, nil
+}
+
+// decodeRevertReason attempts to decode revert data using the CCIP contract ABIs
+func decodeRevertReason(revertData interface{}) string {
+	if revertData == nil {
+		return ""
+	}
+
+	revertDataStr, ok := revertData.(string)
+	if !ok {
+		return ""
+	}
+
+	// This would require importing the revert-reason handler, but for now just return the hex data
+	// You can use the core/scripts/ccip/ccip-revert-reason tool with this data
+	return fmt.Sprintf("Revert data: %s (use ccip-revert-reason tool to decode)", revertDataStr)
 }
