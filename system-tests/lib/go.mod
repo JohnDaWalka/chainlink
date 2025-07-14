@@ -21,7 +21,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/smartcontractkit/chain-selectors v1.0.62
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250714152354-d398d1454f22
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250714181736-674a6a44b5df
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250709160835-3dbd1ee373a2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.2
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250707140145-45280ea11f19
