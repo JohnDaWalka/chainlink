@@ -45,13 +45,13 @@ func (agg *IdenticalNodeResponseAggregator) CollectAndAggregate(
 		return nil, errors.New("node address cannot be empty")
 	}
 
-	digest, err := resp.Digest()
+	key, err := resp.Digest()
 	if err != nil {
 		return nil, fmt.Errorf("error generating digest for response: %w", err)
 	}
 
 	// Check if the node already submitted a different response
-	if oldKey, exists := agg.nodeToResponse[nodeAddress]; exists && oldKey != digest {
+	if oldKey, exists := agg.nodeToResponse[nodeAddress]; exists && oldKey != key {
 		if nodes, ok := agg.responses[oldKey]; ok {
 			nodes.Remove(nodeAddress)
 			// Clean up empty response groups
@@ -61,13 +61,13 @@ func (agg *IdenticalNodeResponseAggregator) CollectAndAggregate(
 		}
 	}
 
-	if _, ok := agg.responses[digest]; !ok {
-		agg.responses[digest] = make(StringSet)
+	if _, ok := agg.responses[key]; !ok {
+		agg.responses[key] = make(StringSet)
 	}
-	agg.responses[digest].Add(nodeAddress)
-	agg.nodeToResponse[nodeAddress] = digest
+	agg.responses[key].Add(nodeAddress)
+	agg.nodeToResponse[nodeAddress] = key
 
-	if len(agg.responses[digest]) >= agg.threshold {
+	if len(agg.responses[key]) >= agg.threshold {
 		return resp, nil
 	}
 
