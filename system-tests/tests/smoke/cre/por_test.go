@@ -71,13 +71,9 @@ var (
 	SinglePoRDonCapabilitiesFlags = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteEVMCapability}
 )
 
-type CustomAnvilMiner struct {
-	BlockSpeedSeconds int `toml:"block_speed_seconds"`
-}
-
 type TestConfig struct {
 	Blockchains                   []*types.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
-	CustomAnvilMiner              *CustomAnvilMiner               `toml:"custom_anvil_miner"`
+	CustomAnvilMiner              *types.CustomAnvilMiner         `toml:"custom_anvil_miner"`
 	NodeSets                      []*ns.Input                     `toml:"nodesets" validate:"required"`
 	WorkflowConfigs               []WorkflowConfig                `toml:"workflow_configs" validate:"required"`
 	JD                            *jd.Input                       `toml:"jd" validate:"required"`
