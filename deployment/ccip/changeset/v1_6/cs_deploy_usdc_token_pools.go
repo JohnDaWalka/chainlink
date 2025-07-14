@@ -180,7 +180,7 @@ func deployUSDCTokenPoolContractsLogic(env cldf.Environment, c DeployUSDCTokenPo
 					chain.Client, poolConfig.TokenMessenger,
 					chainState.CCTPMessageTransmitterProxies[deployment.Version1_6_0].Address(),
 					poolConfig.TokenAddress, poolConfig.AllowList, chainState.RMNProxy.Address(), router.Address(),
-					poolConfig.PreviousPoolAddress)
+					previousPoolAddress)
 				return cldf.ContractDeploy[*usdc_token_pool.USDCTokenPool]{
 					Address:  poolAddress,
 					Contract: usdcTokenPool,
