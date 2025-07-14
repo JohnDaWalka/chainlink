@@ -90,28 +90,19 @@ func (i ConfigUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.C
 			}
 		}
 
-		// TODO: Other validations? Domain's are defined in chainlink-deployments...
+		// TODO: Other validations? Domain's are defined in chainlink-deployments so they can't be verified here...
 	}
 	return nil
 }
 
 type ConfigUSDCTokenPoolConfig struct {
-	ChainSelector uint64
-	USDCPools     map[uint64]ConfigUSDCTokenPoolInput
+	USDCPools map[uint64]ConfigUSDCTokenPoolInput
 }
 
 func configUSDCTokenPoolPrecondition(env cldf.Environment, c ConfigUSDCTokenPoolConfig) error {
 	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
-	}
-
-	_, chainState, err := state.GetEVMChainState(env, c.ChainSelector)
-	if err != nil {
-		return fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", c.ChainSelector, err)
-	}
-	if _, ok := chainState.USDCTokenPools_v1_6[deployment.Version1_6_0]; !ok {
-		return fmt.Errorf("no USDC token pool with version %s found on %d", deployment.Version1_6_0, c.ChainSelector)
 	}
 
 	for chainSelector, poolConfig := range c.USDCPools {
@@ -137,17 +128,16 @@ func configUSDCTokenPoolLogic(env cldf.Environment, c ConfigUSDCTokenPoolConfig)
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
-	_, chainState, err := state.GetEVMChainState(env, c.ChainSelector)
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w",
-			c.ChainSelector, err)
-	}
-
 	// Convert CLD/migrations inputs to onchain inputs.
 	input := make(map[uint64]opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate], len(c.USDCPools))
-	for chainSelector, poolConfig := range c.USDCPools {
-		var domainUpdates []utp.USDCTokenPoolDomainUpdate
+	for sourceChainSelector, poolConfig := range c.USDCPools {
+		_, chainState, err := state.GetEVMChainState(env, sourceChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w",
+				sourceChainSelector, err)
+		}
 
+		var domainUpdates []utp.USDCTokenPoolDomainUpdate
 		for destSelector, update := range poolConfig.DestinationUpdates {
 			domainUpdates = append(domainUpdates, utp.USDCTokenPoolDomainUpdate{
 				AllowedCaller:     [32]byte(common.LeftPadBytes(update.AllowedCaller.Bytes(), 32)),
@@ -157,8 +147,9 @@ func configUSDCTokenPoolLogic(env cldf.Environment, c ConfigUSDCTokenPoolConfig)
 				Enabled:           update.Enabled,
 			})
 		}
-		input[chainSelector] = opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate]{
-			ChainSelector: chainSelector,
+
+		input[sourceChainSelector] = opsutil.EVMCallInput[[]utp.USDCTokenPoolDomainUpdate]{
+			ChainSelector: sourceChainSelector,
 			NoSend:        false, // TODO: MCMS?
 			Address:       chainState.USDCTokenPools_v1_6[deployment.Version1_6_0].Address(),
 			CallInput:     domainUpdates,
