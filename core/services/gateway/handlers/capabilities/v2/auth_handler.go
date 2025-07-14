@@ -54,9 +54,9 @@ func (h *AuthHandler) syncAuthorizedKeys() {
 	authData := h.agg.Aggregate()
 	authorizedKeys := make(map[string]aggregation.StringSet)
 	for _, data := range authData {
-		h.authorizedKeys[data.WorkflowID] = make(aggregation.StringSet)
+		authorizedKeys[data.WorkflowID] = make(aggregation.StringSet)
 		for _, key := range data.AuthorizedKeys {
-			h.authorizedKeys[data.WorkflowID].Add(key.PublicKey)
+			authorizedKeys[data.WorkflowID].Add(key.PublicKey)
 		}
 	}
 	h.authorizedKeysMu.Lock()
