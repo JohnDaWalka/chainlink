@@ -16,7 +16,7 @@ do
     exit 1
   fi
   echo "🔁 Retrying ($count/$max_retries)..." >&2
-  sleep 1
+  sleep 30
 done
 
 echo "✅ Download succeeded." >&2
