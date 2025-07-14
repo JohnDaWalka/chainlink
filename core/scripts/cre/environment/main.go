@@ -12,7 +12,6 @@ import (
 func init() {
 	root.RootCmd.AddCommand(environment.EnvironmentCmd)
 	root.RootCmd.AddCommand(examples.ExamplesCmd)
-	root.RootCmd.AddCommand(environment.WorkflowCmd)
 }
 
 func main() {

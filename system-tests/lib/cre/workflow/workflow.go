@@ -213,7 +213,9 @@ func DeleteAllWithContract(ctx context.Context, sc *seth.Client, workflowRegistr
 	var computeHashKey = func(owner common.Address, workflowName string) [32]byte {
 		ownerBytes := owner.Bytes()
 		nameBytes := []byte(workflowName)
-		data := append(ownerBytes, nameBytes...)
+		data := make([]byte, len(ownerBytes)+len(nameBytes))
+		copy(data, ownerBytes)
+		copy(data[len(ownerBytes):], nameBytes)
 
 		return crypto.Keccak256Hash(data)
 	}
@@ -222,7 +224,7 @@ func DeleteAllWithContract(ctx context.Context, sc *seth.Client, workflowRegistr
 		workflowHashKey := computeHashKey(sc.MustGetRootKeyAddress(), metadata.WorkflowName)
 		_, deleteErr := sc.Decode(workflowRegistryInstance.DeleteWorkflow(sc.NewTXOpts(), workflowHashKey))
 		if deleteErr != nil {
-			return errors.Wrap(deleteErr, fmt.Sprintf("failed to delete workflow named %s", metadata.WorkflowName))
+			return errors.Wrap(deleteErr, "failed to delete workflow named "+metadata.WorkflowName)
 		}
 	}
 
