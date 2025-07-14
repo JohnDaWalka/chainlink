@@ -6,7 +6,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
+	cwConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	suicodec "github.com/smartcontractkit/chainlink-sui/relayer/codec"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink-sui/relayer/testutils"
@@ -96,10 +96,10 @@ func NewSuiCtx(e cldf.Environment, src uint64) (*suiCtx, error) {
 func baseCCIPConfig(
 	ccipPkg string,
 	pubKey []byte,
-	extra []chainwriter.ChainWriterPTBCommand,
-) chainwriter.ChainWriterConfig {
+	extra []cwConfig.ChainWriterPTBCommand,
+) cwConfig.ChainWriterConfig {
 	// common PTB command 0: create_token_params
-	cmds := []chainwriter.ChainWriterPTBCommand{{
+	cmds := []cwConfig.ChainWriterPTBCommand{{
 		Type:      suicodec.SuiPTBCommandMoveCall,
 		PackageId: strPtr(ccipPkg),
 		ModuleId:  strPtr("dynamic_dispatcher"),
@@ -113,12 +113,12 @@ func baseCCIPConfig(
 	// append the variant commands
 	cmds = append(cmds, extra...)
 
-	return chainwriter.ChainWriterConfig{
-		Modules: map[string]*chainwriter.ChainWriterModule{
-			chainwriter.PTBChainWriterModuleName: {
-				Name:     chainwriter.PTBChainWriterModuleName,
+	return cwConfig.ChainWriterConfig{
+		Modules: map[string]*cwConfig.ChainWriterModule{
+			cwConfig.PTBChainWriterModuleName: {
+				Name:     cwConfig.PTBChainWriterModuleName,
 				ModuleID: "0x123",
-				Functions: map[string]*chainwriter.ChainWriterFunction{
+				Functions: map[string]*cwConfig.ChainWriterFunction{
 					"ccip_send": {
 						Name:        "ccip_send",
 						PublicKey:   pubKey,
@@ -135,8 +135,8 @@ func baseCCIPConfig(
 func configureChainWriterForMsg(
 	ccipPkg, onRampPkg string,
 	pubKey []byte,
-) chainwriter.ChainWriterConfig {
-	extra := []chainwriter.ChainWriterPTBCommand{{
+) cwConfig.ChainWriterConfig {
+	extra := []cwConfig.ChainWriterPTBCommand{{
 		Type:      suicodec.SuiPTBCommandMoveCall,
 		PackageId: strPtr(onRampPkg),
 		ModuleId:  strPtr("onramp"),
@@ -162,8 +162,8 @@ func configureChainWriterForMultipleTokens(
 	ccipPkg, onRampPkg string,
 	pubKey []byte,
 	lockReleaseTokenPool string,
-) chainwriter.ChainWriterConfig {
-	extra := []chainwriter.ChainWriterPTBCommand{
+) cwConfig.ChainWriterConfig {
+	extra := []cwConfig.ChainWriterPTBCommand{
 		// lock-or-burn command
 		{
 			Type:      suicodec.SuiPTBCommandMoveCall,
@@ -202,7 +202,7 @@ func configureChainWriterForMultipleTokens(
 	return baseCCIPConfig(ccipPkg, pubKey, extra)
 }
 
-func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) chainwriter.Arguments {
+func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) cwConfig.Arguments {
 	args := make(map[string]any, len(baseArgs)+len(extraArgs))
 	for k, v := range baseArgs {
 		args[k] = v
@@ -218,7 +218,7 @@ func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string
 		argTypes["c"] = coinType
 	}
 
-	return chainwriter.Arguments{
+	return cwConfig.Arguments{
 		Args:     args,
 		ArgTypes: argTypes,
 	}

@@ -91,12 +91,13 @@ import (
 
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
+	chainwriter "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
+	cwConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
 	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
 
 	chain_reader_types "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -1064,7 +1065,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	var (
 		LockReleaseTP    string
 		LockReleaseState string
-		ptbArgs          chainwriter.Arguments
+		ptbArgs          cwConfig.Arguments
 	)
 	if len(msg.TokenAmounts) > 0 {
 		// Build PTB for token transfer
@@ -1110,7 +1111,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("Failed to create SuiTxm: %v", err)
 	}
 
-	var chainWriterConfig chainwriter.ChainWriterConfig
+	var chainWriterConfig cwConfig.ChainWriterConfig
 	if LockReleaseTP != "" {
 		chainWriterConfig = configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, LockReleaseTP)
 	} else {
@@ -1133,7 +1134,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	txId := "ccip_send_test_arb_msg"
 	err = chainWriter.SubmitTransaction(ctx,
-		chainwriter.PTBChainWriterModuleName,
+		cwConfig.PTBChainWriterModuleName,
 		"ccip_send",
 		&ptbArgs,
 		txId,
