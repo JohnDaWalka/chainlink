@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,9 +32,11 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -81,6 +84,7 @@ type SetupInput struct {
 	CustomBinariesPaths                  map[cretypes.CapabilityFlag]string
 	OCR3Config                           *keystone_changeset.OracleConfig
 	S3ProviderInput                      *s3provider.Input
+	CustomAnvilMiner                     *cretypes.CustomAnvilMiner
 }
 
 type backgroundStageResult struct {
@@ -490,6 +494,22 @@ func SetupTestEnvironment(
 			return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
 		}
 		configureKeystoneInput.OCR3Config = *ocr3Config
+	}
+
+	if input.CustomAnvilMiner != nil {
+		for _, bi := range input.BlockchainsInput {
+			if bi.Type == blockchain.TypeAnvil {
+				if slices.Contains(bi.DockerCmdParamsOverrides, "-b") {
+					return nil, pkgerrors.New("custom_anvil_miner was specified but Anvil has '-b' key set, remove that parameter from 'docker_cmd_params' to run deployments instantly or remove custom_anvil_miner key from TOML config")
+				}
+			}
+		}
+		for _, bo := range blockchainOutputs {
+			if bo.BlockchainOutput.Type == blockchain.TypeAnvil {
+				miner := rpc.NewRemoteAnvilMiner(bo.BlockchainOutput.Nodes[0].ExternalHTTPUrl, nil)
+				miner.MinePeriodically(time.Duration(input.CustomAnvilMiner.BlockSpeedSeconds) * time.Second)
+			}
+		}
 	}
 
 	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)

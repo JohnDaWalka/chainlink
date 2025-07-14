@@ -646,3 +646,7 @@ func (w *ManageWorkflowWithCRECLIInput) Validate() error {
 
 	return nil
 }
+
+type CustomAnvilMiner struct {
+	BlockSpeedSeconds int `toml:"block_speed_seconds"`
+}
