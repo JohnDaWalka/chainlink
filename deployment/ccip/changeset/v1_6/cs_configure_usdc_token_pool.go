@@ -8,13 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/gagliardetto/solana-go"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	utp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/usdc_token_pool"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -61,7 +61,7 @@ var (
 
 type DomainUpdateInput struct {
 	AllowedCaller    common.Address
-	MintRecipient    common.Address
+	MintRecipient    solana.PublicKey
 	DomainIdentifier uint32
 	Enabled          bool
 }
@@ -85,7 +85,7 @@ func (i ConfigUSDCTokenPoolInput) Validate(ctx context.Context, chain cldf_evm.C
 		}
 		switch str {
 		case chain_selectors.FamilySolana:
-			if update.MintRecipient == utils.ZeroAddress {
+			if update.MintRecipient.IsZero() {
 				return fmt.Errorf("mint recipient must be defined for Solana destination chain selector %d", destSelector)
 			}
 		}
