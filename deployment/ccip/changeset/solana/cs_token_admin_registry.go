@@ -188,7 +188,6 @@ func RegisterTokenAdminRegistry(e cldf.Environment, cfg RegisterTokenAdminRegist
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
 			}
 			mcmsTxs = append(mcmsTxs, *tx)
-
 		} else {
 			// if we want to have a different authority, we will need to add the corresponding signer here
 			// for now we are assuming both token owner and ccip admin will always be deployer key if done without mcms
@@ -547,7 +546,7 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 	}
 	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo()
 	solRouter.SetProgramID(routerProgramAddress)
-	
+
 	routerUsingMCMS := solanastateview.IsSolanaProgramOwnedByTimelock(
 		&e,
 		chain,
@@ -606,5 +605,95 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 		}, nil
 	}
 
+	return cldf.ChangesetOutput{}, nil
+}
+
+// SetTokenPoolSupportAutoDerivationConfig is only used for CCTP token pools
+type SetTokenPoolSupportAutoDerivationConfig struct {
+	SolChainSelector       uint64
+	TokenPubKey            solana.PublicKey
+	SupportsAutoDerivation bool
+	MCMS                   *proposalutils.TimelockConfig
+}
+
+func (cfg SetTokenPoolSupportAutoDerivationConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
+	if cfg.TokenPubKey.IsZero() {
+		return errors.New("provided token pubkey is empty")
+	}
+	if err := chainState.CommonValidation(e, cfg.SolChainSelector, cfg.TokenPubKey); err != nil {
+		return err
+	}
+	if err := chainState.ValidatePoolDeployment(&e, shared.CCTPTokenPool, cfg.SolChainSelector, cfg.TokenPubKey, true, shared.CLLMetadata); err != nil {
+		return err
+	}
+	return nil
+}
+
+func SetTokenPoolSupportAutoDerivation(e cldf.Environment, cfg SetTokenPoolSupportAutoDerivationConfig) (cldf.ChangesetOutput, error) {
+	e.Logger.Infow("Setting auto derivation in token admin registry for token", "autoDerivation", cfg.SupportsAutoDerivation, "tokenPubkey", cfg.TokenPubKey.String())
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+	chainState := state.SolChains[cfg.SolChainSelector]
+	if err := cfg.Validate(e, chainState); err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+
+	chain := e.BlockChains.SolanaChains()[cfg.SolChainSelector]
+
+	var ix solana.Instruction
+	tokenPool := chainState.GetActiveTokenPool(shared.CCTPTokenPool, shared.CLLMetadata)
+	tokenPoolUsingMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
+		&e,
+		chain,
+		chainState,
+		shared.CCTPTokenPool,
+		cfg.TokenPubKey,
+		shared.CLLMetadata,
+	)
+	authority := GetAuthorityForIxn(
+		&e,
+		chain,
+		chainState,
+		shared.CCTPTokenPool,
+		cfg.TokenPubKey,
+		shared.CLLMetadata,
+	)
+
+	routerProgramAddress, routerConfigPDA, err := chainState.GetRouterInfo()
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to fetch router info from state: %w", err)
+	}
+	solRouter.SetProgramID(routerProgramAddress)
+	tokenAdminRegistryPDA, _, err := solState.FindTokenAdminRegistryPDA(cfg.TokenPubKey, routerProgramAddress)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token admin registry PDA: %w", err)
+	}
+
+	ix, err = solRouter.NewSetPoolSupportsAutoDerivationInstruction(cfg.TokenPubKey, cfg.SupportsAutoDerivation, routerConfigPDA, tokenAdminRegistryPDA, authority).ValidateAndBuild()
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+	}
+
+	if tokenPoolUsingMcms {
+		tx, err := BuildMCMSTxn(ix, tokenPool.String(), shared.CCTPTokenPool)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
+		}
+		proposal, err := BuildProposalsForTxns(
+			e, cfg.SolChainSelector, "proposal to ConfigureTokenPoolAllowList in Solana", cfg.MCMS.MinDelay, []mcmsTypes.Transaction{*tx})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
+		}
+		return cldf.ChangesetOutput{
+			MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
+		}, nil
+	}
+
+	if err := chain.Confirm([]solana.Instruction{ix}); err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+	}
+	e.Logger.Infow("Set auto derivation in token admin registry for token", "autoDerivation", cfg.SupportsAutoDerivation, "tokenPubkey", cfg.TokenPubKey.String())
 	return cldf.ChangesetOutput{}, nil
 }

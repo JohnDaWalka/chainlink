@@ -73,7 +73,7 @@ func ValidateMCMSConfigSolana(
 			if err := solanastateview.ValidateOwnershipSolana(&e, chain, mcms != nil, chainState.CCTPTokenPool, shared.CCTPTokenPool, tokenAddress); err != nil {
 				return fmt.Errorf("failed to validate ownership for cctp token pool: %w", err)
 			}
-		} 
+		}
 	}
 
 	return nil

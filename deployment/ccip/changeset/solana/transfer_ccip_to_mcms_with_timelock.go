@@ -282,22 +282,22 @@ func TransferCCIPToMCMSWithTimelockSolana(
 			cctpTokenPool := ccipState.SolChains[chainSelector].CCTPTokenPool
 			tokenPoolConfigPDA, _ := solTokenUtil.TokenPoolConfigAddress(tokenMint, cctpTokenPool)
 			mcmsTxs, err := transferOwnershipCCTPTokenPools(
-					ccipState,
-					tokenPoolConfigPDA,
-					tokenMint,
-					chainSelector,
-					solChain,
-					currentOwner,
-					proposedOwner,
-					timelockSigner,
-				)
-				if err != nil {
-					return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership of burn-mint token pools: %w", err)
-				}
-				batches = append(batches, mcmsTypes.BatchOperation{
-					ChainSelector: mcmsTypes.ChainSelector(chainSelector),
-					Transactions:  mcmsTxs,
-				})
+				ccipState,
+				tokenPoolConfigPDA,
+				tokenMint,
+				chainSelector,
+				solChain,
+				currentOwner,
+				proposedOwner,
+				timelockSigner,
+			)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to transfer ownership of burn-mint token pools: %w", err)
+			}
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chainSelector),
+				Transactions:  mcmsTxs,
+			})
 		}
 
 		if contractsToTransfer.RMNRemote {

@@ -156,7 +156,7 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, mcms bool, tokenMetadata 
 		var cctpMessengerMinter, cctpMessageTransmitter solana.PublicKey
 		// only set for CCTP token pool migrations
 		if testCase.poolType == shared.CCTPTokenPool {
-			cctpMessengerMinter = getRandomPubKey(t) // using mock minter
+			cctpMessengerMinter = getRandomPubKey(t)    // using mock minter
 			cctpMessageTransmitter = getRandomPubKey(t) // using mock transmitter
 		}
 		e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
@@ -175,18 +175,18 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, mcms bool, tokenMetadata 
 					ChainSelector: solChain,
 					TokenPoolConfigs: []ccipChangesetSolana.TokenPoolConfig{
 						{
-							TokenPubKey: tokenAddress,
-							PoolType:    testCase.poolType,
-							Metadata:    tokenMetadata,
+							TokenPubKey:              tokenAddress,
+							PoolType:                 testCase.poolType,
+							Metadata:                 tokenMetadata,
 							CCTPTokenMessengerMinter: cctpMessengerMinter,
-							CCTPMessageTransmitter: cctpMessageTransmitter,
+							CCTPMessageTransmitter:   cctpMessageTransmitter,
 						},
 						{
-							TokenPubKey: newTokenAddress2,
-							PoolType:    testCase.poolType,
-							Metadata:    tokenMetadata,
+							TokenPubKey:              newTokenAddress2,
+							PoolType:                 testCase.poolType,
+							Metadata:                 tokenMetadata,
 							CCTPTokenMessengerMinter: cctpMessengerMinter,
-							CCTPMessageTransmitter: cctpMessageTransmitter,
+							CCTPMessageTransmitter:   cctpMessageTransmitter,
 						},
 					},
 				},

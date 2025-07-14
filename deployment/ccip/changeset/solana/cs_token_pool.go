@@ -99,9 +99,9 @@ func getPoolPDAs(
 
 type TokenPoolConfig struct {
 	// a pool pda is uniquely identified by (solTokenPubKey, poolType, metadata)
-	PoolType    cldf.ContractType
-	TokenPubKey solana.PublicKey
-	Metadata    string // tag to identify which client/cll token pool executable to use'
+	PoolType                 cldf.ContractType
+	TokenPubKey              solana.PublicKey
+	Metadata                 string           // tag to identify which client/cll token pool executable to use'
 	CCTPTokenMessengerMinter solana.PublicKey // required if PoolType is CCTPTokenPool
 	CCTPMessageTransmitter   solana.PublicKey // required if PoolType is CCTPTokenPool
 }
@@ -242,17 +242,17 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 				configPDA,
 			).ValidateAndBuild()
 		case shared.CCTPTokenPool:
-		poolInitI, poolInitErr = cctp_token_pool.NewInitializeInstruction(
-			routerProgramAddress,
-			rmnRemoteAddress,
-			poolConfigPDA,
-			tokenPubKey,
-			chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
-			solana.SystemProgramID,
-			tokenPool,
-			programData.Address,
-			configPDA,
-		).ValidateAndBuild()
+			poolInitI, poolInitErr = cctp_token_pool.NewInitializeInstruction(
+				routerProgramAddress,
+				rmnRemoteAddress,
+				poolConfigPDA,
+				tokenPubKey,
+				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
+				solana.SystemProgramID,
+				tokenPool,
+				programData.Address,
+				configPDA,
+			).ValidateAndBuild()
 		default:
 			return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", tokenPoolCfg.PoolType)
 		}
@@ -290,16 +290,16 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 			PoolType:                 tokenPoolCfg.PoolType,
 			Metadata:                 tokenPoolCfg.Metadata,
 			CCTPTokenMessengerMinter: tokenPoolCfg.CCTPTokenMessengerMinter,
-		    CCTPMessageTransmitter:   tokenPoolCfg.CCTPMessageTransmitter,
+			CCTPMessageTransmitter:   tokenPoolCfg.CCTPMessageTransmitter,
 		})
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to add token pool lookup table: %w", err)
-			}
-			err = addressBook.Merge(csOutput.AddressBook) //nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
-			if err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge address book: %w", err)
-			}
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to add token pool lookup table: %w", err)
 		}
+		err = addressBook.Merge(csOutput.AddressBook) //nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge address book: %w", err)
+		}
+	}
 
 	return cldf.ChangesetOutput{
 		AddressBook: addressBook,
