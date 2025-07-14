@@ -320,6 +320,8 @@ var (
 	workflowNameFlag            string
 	workflowOwnerAddressFlag    string
 	workflowRegistryAddressFlag string
+	chainIDFlag                 uint64
+	rpcURLFlag                  string
 )
 
 func init() {
