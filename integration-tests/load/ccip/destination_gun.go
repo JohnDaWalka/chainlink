@@ -320,7 +320,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			ComputeUnits:             150000,
 		}
 	case selectors.FamilyAptos:
-		rcv = common.LeftPadBytes(m.receiver, 32)
+		// For Aptos destinations, the receiver is already 32 bytes, don't pad it
+		rcv = m.receiver
 		// Aptos destinations require out-of-order execution to be enabled
 		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(0), true)
 		if err != nil {
