@@ -85,17 +85,19 @@ func (r ReportCodecCapabilityTrigger) Encode(report datastreamsllo.Report, cd ll
 		case nil:
 			// Missing observations are nil
 		case *datastreamsllo.Decimal:
-			multipliedStreamValue := v.Decimal()
+			multipliedStreamValue1 := v.Decimal()
+			multipliedStreamValue2 := v.Decimal()
 
 			if len(opts.Multipliers) != 0 {
-				multipliedStreamValue = multipliedStreamValue.Mul(opts.Multipliers[i].Multiplier)
+				multipliedStreamValue2 = multipliedStreamValue1.Mul(opts.Multipliers[i].Multiplier)
 			}
 
 			var err error
-			d, err = multipliedStreamValue.MarshalBinary()
+			d, err = multipliedStreamValue2.MarshalBinary()
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal decimal: %w", err)
 			}
+			return nil, fmt.Errorf("multipliedStreamValue1 %#v multipliedStreamValue2 %#v opts.Multipliers[i].Multiplier %#v", multipliedStreamValue1, multipliedStreamValue2, opts.Multipliers[i].Multiplier)
 		default:
 			return nil, fmt.Errorf("only decimal StreamValues are supported, got: %T", stream)
 		}
