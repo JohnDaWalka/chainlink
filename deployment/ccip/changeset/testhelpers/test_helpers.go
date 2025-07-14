@@ -1976,9 +1976,9 @@ func DeployTransferableTokenSolana(
 								TokenPubKey: solTokenAddress,
 								PoolType:    bnm,
 								Metadata:    shared.CLLMetadata,
+								WritableIndexes: []uint8{3, 4, 7},
 							},
 						},
-						WritableIndexes: []uint8{3, 4, 7},
 					},
 				},
 				RemoteChainTokenPool: []ccipChangeSetSolana.SetupTokenPoolForRemoteChainConfig{
