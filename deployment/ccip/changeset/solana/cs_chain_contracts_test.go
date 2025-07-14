@@ -842,9 +842,9 @@ func doTestPoolLookupTable(t *testing.T, e cldf.Environment, mcms bool, tokenMet
 					TokenPubKey: tokenAddress,
 					PoolType:    pool,
 					Metadata:    tokenMetadata,
+					WritableIndexes: []uint8{3, 4, 7},
 				},
 			},
-			WritableIndexes: []uint8{3, 4, 7},
 			MCMS:            mcmsConfig,
 		},
 	))
