@@ -45,7 +45,7 @@ type gatewayHandler struct {
 	stopCh          services.StopChan
 	responseCache   ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
 	triggerHandler  HTTPTriggerHandler
-	authHandler     AuthHandler // Handles authorization for HTTP trigger requests
+	authHandler     *AuthHandler // Handles authorization for HTTP trigger requests
 }
 
 type ResponseCache interface {
@@ -86,6 +86,7 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		return nil, err
 	}
 	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don)
+	authHandler := NewAuthHandler(lggr, cfg, don, donConfig)
 	return &gatewayHandler{
 		config:          cfg,
 		don:             don,
@@ -97,6 +98,7 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		stopCh:          make(services.StopChan),
 		responseCache:   newResponseCache(lggr),
 		triggerHandler:  triggerHandler,
+		authHandler:     authHandler,
 	}, nil
 }
 
@@ -124,7 +126,7 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
 	}
 	if resp.Result == nil {
-		return fmt.Errorf("received response with nil result from node %s, error: %v", nodeAddr, resp.Error)
+		return fmt.Errorf("received response with nil result from node %s, error: %w", nodeAddr, resp.Error)
 	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
 	// Node messages follow the format "<methodName>/<workflowID>/<uuid>" or
@@ -246,6 +248,10 @@ func (h *gatewayHandler) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to start HTTP trigger handler: %w", err)
 		}
+		err = h.authHandler.Start(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to start HTTP auth handler: %w", err)
+		}
 		go func() {
 			ticker := time.NewTicker(time.Duration(h.config.CleanUpPeriodMs) * time.Millisecond)
 			defer ticker.Stop()
@@ -268,6 +274,10 @@ func (h *gatewayHandler) Close() error {
 		err := h.triggerHandler.Close()
 		if err != nil {
 			h.lggr.Errorw("failed to close HTTP trigger handler", "err", err)
+		}
+		err = h.authHandler.Close()
+		if err != nil {
+			h.lggr.Errorw("failed to close HTTP auth handler", "err", err)
 		}
 		close(h.stopCh)
 		h.wg.Wait()

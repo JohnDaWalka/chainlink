@@ -30,7 +30,7 @@ type AuthHandler struct {
 	stopCh         services.StopChan
 }
 
-// NewHTTPTriggerAuthorizer creates a new HTTPTriggerAuthorizer.
+// NewAuthHandler creates a new AuthHandler.
 func NewAuthHandler(lggr logger.Logger, cfg ServiceConfig, don handlers.DON, donConfig *config.DONConfig) *AuthHandler {
 	// f+1 identical responses from workflow are needed for a authorization key to be registered
 	threshold := donConfig.F + 1
@@ -46,10 +46,12 @@ func NewAuthHandler(lggr logger.Logger, cfg ServiceConfig, don handlers.DON, don
 }
 
 func (h *AuthHandler) Authorize(workflowID, payload, signature string) bool {
-	// TODO: Implement the authorization logic.
+	// TODO: PRODCRE-305 Implement authorization logic
 	return true
 }
 
+// syncAuthorizedKeys aggregates the authorized keys from the AuthAggregator and updates the local cache.
+// Should be called periodically to keep the authorized keys up to date.
 func (h *AuthHandler) syncAuthorizedKeys() {
 	authData := h.agg.Aggregate()
 	authorizedKeys := make(map[string]aggregation.StringSet)
@@ -64,6 +66,8 @@ func (h *AuthHandler) syncAuthorizedKeys() {
 	h.authorizedKeys = authorizedKeys
 }
 
+// sendAuthPullRequest sends a request to all nodes in the DON to pull the latest auth metadata.
+// no retries are performed, as the caller is expected to poll periodically.
 func (h *AuthHandler) sendAuthPullRequest(ctx context.Context) error {
 	req := &jsonrpc.Request[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
@@ -80,6 +84,7 @@ func (h *AuthHandler) sendAuthPullRequest(ctx context.Context) error {
 	return combinedErr
 }
 
+// OnAuthMetadataPush handles the push of auth metadata from a node when a new workflow is registered
 func (h *AuthHandler) OnAuthMetadataPush(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error {
 	var authData gateway.WorkflowAuthMetadata
 	if err := json.Unmarshal(*resp.Result, &authData); err != nil {
@@ -95,6 +100,7 @@ func (h *AuthHandler) OnAuthMetadataPush(ctx context.Context, resp *jsonrpc.Resp
 	return nil
 }
 
+// OnAuthMetadataPullResponse handles the response to the auth metadata pull request.
 func (h *AuthHandler) OnAuthMetadataPullResponse(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error {
 	var authData []gateway.WorkflowAuthMetadata
 	if err := json.Unmarshal(*resp.Result, &authData); err != nil {
@@ -120,20 +126,20 @@ func (h *AuthHandler) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		h.runTicker(ctx, time.Duration(h.config.AuthPullIntervalMs)*time.Millisecond, func() {
+		h.runTicker(time.Duration(h.config.AuthPullIntervalMs)*time.Millisecond, func() {
 			err2 := h.sendAuthPullRequest(ctx)
 			if err2 != nil {
 				h.lggr.Errorw("Failed to send auth pull request", "error", err2)
 			}
 		})
-		h.runTicker(ctx, time.Duration(h.config.AuthAggregationIntervalMs)*time.Millisecond, h.syncAuthorizedKeys)
+		h.runTicker(time.Duration(h.config.AuthAggregationIntervalMs)*time.Millisecond, h.syncAuthorizedKeys)
 		return nil
 	})
 }
 
-func (h *AuthHandler) runTicker(ctx context.Context, periodMs time.Duration, fn func()) {
+func (h *AuthHandler) runTicker(period time.Duration, fn func()) {
 	go func() {
-		ticker := time.NewTicker(periodMs)
+		ticker := time.NewTicker(period)
 		defer ticker.Stop()
 		for {
 			select {

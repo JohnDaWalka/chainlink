@@ -19,9 +19,11 @@ type AuthAggregator struct {
 	stopCh    services.StopChan
 	threshold int
 	mu        sync.RWMutex
-	// observations is a map with observation digest as key
+	// observations is a map that tracks auth data from workflow nodes.
+	// keyed by workflow digest
 	observations map[string]*NodeObservations
 	// observedAt is a map from node address to a map of workflow digest to last observed time
+	// This is used to clean up old observations that are no longer relevant.
 	observedAt      map[string]map[string]time.Time
 	cleanupInterval time.Duration
 }
@@ -64,7 +66,7 @@ func (agg *AuthAggregator) reapObservations() {
 	}
 }
 
-func (agg *AuthAggregator) Start(ctx context.Context) error {
+func (agg *AuthAggregator) Start(context.Context) error {
 	return agg.StartOnce("AuthAggregator", func() error {
 		agg.lggr.Info("Starting AuthAggregator")
 		go func() {
@@ -91,6 +93,7 @@ func (agg *AuthAggregator) Close() error {
 	})
 }
 
+// Collect adds an observation from a workflow node to the aggregator.
 func (agg *AuthAggregator) Collect(o WorkflowAuthObservation, nodeAddress string) {
 	agg.mu.Lock()
 	defer agg.mu.Unlock()
@@ -111,6 +114,7 @@ func (agg *AuthAggregator) Collect(o WorkflowAuthObservation, nodeAddress string
 	agg.observations[digest].nodes.Add(nodeAddress)
 }
 
+// Aggregate returns the aggregated auth metadata for workflows that have reached the threshold.
 func (agg *AuthAggregator) Aggregate() []gateway_common.WorkflowAuthMetadata {
 	agg.mu.RLock()
 	defer agg.mu.RUnlock()
