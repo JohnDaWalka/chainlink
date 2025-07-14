@@ -40,6 +40,7 @@ func NewAuthHandler(lggr logger.Logger, cfg ServiceConfig, don handlers.DON, don
 		agg:            aggregation.NewAuthAggregator(lggr, threshold, time.Duration(cfg.CleanUpPeriodMs)*time.Millisecond),
 		don:            don,
 		donConfig:      donConfig,
+		config:         cfg,
 		stopCh:         make(services.StopChan),
 	}
 }
