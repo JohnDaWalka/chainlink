@@ -1911,7 +1911,7 @@ func DeployTransferableTokenSolana(
 		},
 		solAddresses,
 	)
-	bnm := solTestTokenPool.BurnAndMint_PoolType
+	bnm := shared.BurnMintTokenPool
 
 	// Setup global config
 	e, err = commoncs.Apply(nil, e,
@@ -1920,7 +1920,7 @@ func DeployTransferableTokenSolana(
 			ccipChangeSetSolana.TokenPoolConfigWithMCM{
 				ChainSelector: solChainSel,
 				TokenPubKey:   solTokenAddress,
-				PoolType:      &bnm,
+				PoolType:      bnm,
 				Metadata:      shared.CLLMetadata,
 			}),
 	)
@@ -1940,7 +1940,7 @@ func DeployTransferableTokenSolana(
 						TokenPoolConfigs: []ccipChangeSetSolana.TokenPoolConfig{
 							{
 								TokenPubKey: solTokenAddress,
-								PoolType:    &bnm,
+								PoolType:    bnm,
 								Metadata:    shared.CLLMetadata,
 							},
 						},
@@ -1974,7 +1974,7 @@ func DeployTransferableTokenSolana(
 						SetPoolTokenConfigs: []ccipChangeSetSolana.SetPoolTokenConfig{
 							{
 								TokenPubKey: solTokenAddress,
-								PoolType:    &bnm,
+								PoolType:    bnm,
 								Metadata:    shared.CLLMetadata,
 							},
 						},
@@ -1987,7 +1987,7 @@ func DeployTransferableTokenSolana(
 						RemoteTokenPoolConfigs: []ccipChangeSetSolana.RemoteChainTokenPoolConfig{
 							{
 								SolTokenPubKey: solTokenAddress,
-								SolPoolType:    &bnm,
+								SolPoolType:    bnm,
 								Metadata:       shared.CLLMetadata,
 								EVMRemoteConfigs: map[uint64]ccipChangeSetSolana.EVMRemoteConfig{
 									evmChainSel: {
@@ -2754,6 +2754,11 @@ func SavePreloadedSolAddresses(e cldf.Environment, solChainSelector uint64) erro
 	if err != nil {
 		return err
 	}
+	tv = cldf.NewTypeAndVersion(shared.CCTPTokenPool, deployment.Version1_0_0)
+	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["cctp_token_pool"], tv)
+	if err != nil {
+		return err
+	}
 	tv = cldf.NewTypeAndVersion(commontypes.ManyChainMultisigProgram, deployment.Version1_0_0)
 	err = e.ExistingAddresses.Save(solChainSelector, memory.SolanaProgramIDs["mcm"], tv)
 	if err != nil {
@@ -2816,7 +2821,7 @@ func ValidateSolanaState(e cldf.Environment, solChainSelectors []uint64) error {
 
 		// Get fee quoter config
 		var feeQuoterConfigAccount solFeeQuoter.Config
-		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(context.Background(), chainState.FeeQuoterConfigPDA, &feeQuoterConfigAccount)
+		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(e.GetContext(), chainState.FeeQuoterConfigPDA, &feeQuoterConfigAccount)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize fee quoter config for chain %d: %w", sel, err)
 		}
@@ -2831,13 +2836,10 @@ func ValidateSolanaState(e cldf.Environment, solChainSelectors []uint64) error {
 		if err != nil {
 			return fmt.Errorf("failed to deserialize off-ramp config for chain %d: %w", sel, err)
 		}
-		if err != nil {
-			return fmt.Errorf("failed to deserialize offramp config for chain %d: %w", sel, err)
-		}
 
 		// Get rmn remote config
 		var rmnRemoteConfigAccount solRmnRemote.Config
-		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(context.Background(), chainState.RMNRemoteConfigPDA, &rmnRemoteConfigAccount)
+		err = e.BlockChains.SolanaChains()[sel].GetAccountDataBorshInto(e.GetContext(), chainState.RMNRemoteConfigPDA, &rmnRemoteConfigAccount)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize rmn remote config for chain %d: %w", sel, err)
 		}
