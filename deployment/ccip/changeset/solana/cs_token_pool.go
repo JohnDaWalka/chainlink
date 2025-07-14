@@ -497,6 +497,7 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 		solLockReleaseTokenPool.SetProgramID(tokenPool)
 		initGlobalConfigIx, err = solLockReleaseTokenPool.NewInitGlobalConfigInstruction(routerProgramAddress, rmnRemoteAddress, configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
 	case shared.CCTPTokenPool:
+		// CCTP token pool should not need separate global config initialization in normal use cases. Global config is initialized in the deployment changeset.
 		cctp_token_pool.SetProgramID(tokenPool)
 		initGlobalConfigIx, err = cctp_token_pool.NewInitGlobalConfigInstruction(configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
 	default:

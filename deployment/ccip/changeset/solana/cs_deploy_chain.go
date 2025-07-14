@@ -34,10 +34,12 @@ import (
 
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
 	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	solTokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
 )
@@ -564,17 +566,6 @@ func deployChainContractsSolana(
 		if err != nil {
 			return batches, fmt.Errorf("failed to deploy program: %w", err)
 		}
-		// TODO: Consider bundling global config init with deploy
-		// var cctpTokenPoolConfig cctp_token_pool.PoolConfig
-		// configPDA, _ := solTokens.TokenPoolGlobalConfigPDA(cctpTokenPool)
-		// err = chain.GetAccountDataBorshInto(e.GetContext(), configPDA, &cctpTokenPoolConfig)
-		// if err != nil {
-		// 	if err2 := initializeCCTPTokenPoolGlobalConfig(e, chain, cctpTokenPool); err2 != nil {
-		// 		return batches, err2
-		// 	}
-		// } else {
-		// 	e.Logger.Infow("CCTP token pool global config already initialized, skipping initialization", "chain", chain.String())
-		// }
 	} else if config.UpgradeConfig.NewCCTPTokenPoolVersion != nil {
 		cctpTokenPool = chainState.CCTPTokenPool
 		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewCCTPTokenPoolVersion, cctpTokenPool, shared.CCTPTokenPool)
@@ -591,6 +582,18 @@ func deployChainContractsSolana(
 	} else {
 		e.Logger.Infow("Using existing CCTP token pool", "addr", chainState.CCTPTokenPool.String())
 		cctpTokenPool = chainState.CCTPTokenPool
+	}
+
+	// CCTP token pool initialization
+	var cctpTokenPoolConfig cctp_token_pool.PoolConfig
+	configPDA, _ := solTokens.TokenPoolGlobalConfigPDA(cctpTokenPool)
+	err = chain.GetAccountDataBorshInto(e.GetContext(), configPDA, &cctpTokenPoolConfig)
+	if err != nil {
+		if err2 := initializeCCTPTokenPoolGlobalConfig(e, chain, cctpTokenPool); err2 != nil {
+			return batches, err2
+		}
+	} else {
+		e.Logger.Infow("CCTP token pool global config already initialized, skipping initialization", "chain", chain.String())
 	}
 
 	// MCMS
@@ -884,36 +887,36 @@ func initializeRMNRemote(
 	return nil
 }
 
-// func initializeCCTPTokenPoolGlobalConfig(
-// 	e cldf.Environment,
-// 	chain cldf_solana.Chain,
-// 	cctpTokenPoolProgram solana.PublicKey,
-// ) error {
-// 	e.Logger.Debugw("Initializing CCTP token pool global config", "chain", chain.String(), "cctpTokenPoolProgram", cctpTokenPoolProgram.String())
-// 	programData, err := getSolProgramData(e, chain, cctpTokenPoolProgram)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to get solana router program data: %w", err)
-// 	}
-// 	config, err := solTokens.TokenPoolGlobalConfigPDA(cctpTokenPoolProgram)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to calculate the token pool global config PDA: %w", err)
-// 	}
-// 	instruction, err := cctp_token_pool.NewInitGlobalConfigInstruction(
-// 		config,
-// 		chain.DeployerKey.PublicKey(),
-// 		solana.SystemProgramID,
-// 		cctpTokenPoolProgram,
-// 		programData.Address,
-// 	).ValidateAndBuild()
-// 	if err != nil {
-// 		return fmt.Errorf("failed to build instruction: %w", err)
-// 	}
-// 	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
-// 		return fmt.Errorf("failed to confirm initializeCCTPTokenPoolGlobalConfig: %w", err)
-// 	}
-// 	e.Logger.Infow("Initialized CCTP token pool's global config", "chain", chain.String())
-// 	return nil
-// }
+func initializeCCTPTokenPoolGlobalConfig(
+	e cldf.Environment,
+	chain cldf_solana.Chain,
+	cctpTokenPoolProgram solana.PublicKey,
+) error {
+	e.Logger.Debugw("Initializing CCTP token pool global config", "chain", chain.String(), "cctpTokenPoolProgram", cctpTokenPoolProgram.String())
+	programData, err := getSolProgramData(e, chain, cctpTokenPoolProgram)
+	if err != nil {
+		return fmt.Errorf("failed to get solana router program data: %w", err)
+	}
+	config, err := solTokens.TokenPoolGlobalConfigPDA(cctpTokenPoolProgram)
+	if err != nil {
+		return fmt.Errorf("failed to calculate the token pool global config PDA: %w", err)
+	}
+	instruction, err := cctp_token_pool.NewInitGlobalConfigInstruction(
+		config,
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+		cctpTokenPoolProgram,
+		programData.Address,
+	).ValidateAndBuild()
+	if err != nil {
+		return fmt.Errorf("failed to build instruction: %w", err)
+	}
+	if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+		return fmt.Errorf("failed to confirm initializeCCTPTokenPoolGlobalConfig: %w", err)
+	}
+	e.Logger.Infow("Initialized CCTP token pool's global config", "chain", chain.String())
+	return nil
+}
 
 // UPGRADE FUNCTIONS
 func generateUpgradeTxns(
