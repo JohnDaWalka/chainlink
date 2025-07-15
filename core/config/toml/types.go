@@ -1723,7 +1723,13 @@ type StreamsConfig struct {
 }
 
 type CreConfig struct {
-	Streams *StreamsConfig `toml:",omitempty"`
+	Streams         *StreamsConfig         `toml:",omitempty"`
+	WorkflowFetcher *WorkflowFetcherConfig `toml:",omitempty"`
+}
+
+// WorkflowFetcherConfig holds the configuration for fetching workflow files
+type WorkflowFetcherConfig struct {
+	URL *string `toml:",omitempty"`
 }
 
 func (c *CreConfig) setFrom(f *CreConfig) {
@@ -1738,6 +1744,32 @@ func (c *CreConfig) setFrom(f *CreConfig) {
 			c.Streams.RestURL = v
 		}
 	}
+
+	if f.WorkflowFetcher != nil {
+		if c.WorkflowFetcher == nil {
+			c.WorkflowFetcher = &WorkflowFetcherConfig{}
+		}
+		if v := f.WorkflowFetcher.URL; v != nil {
+			c.WorkflowFetcher.URL = v
+		}
+	}
+}
+
+func (w *WorkflowFetcherConfig) ValidateConfig() error {
+	if w.URL == nil || *w.URL == "" {
+		return nil // URL is optional
+	}
+
+	u, err := url.Parse(*w.URL)
+	if err != nil {
+		return configutils.ErrInvalid{Name: "URL", Value: *w.URL, Msg: "must be a valid URL"}
+	}
+
+	if u.Scheme != "file" && u.Scheme != "http" && u.Scheme != "https" {
+		return configutils.ErrInvalid{Name: "URL", Value: *w.URL, Msg: "scheme must be one of: file, http, https"}
+	}
+
+	return nil
 }
 
 type StreamsSecretConfig struct {
@@ -2115,6 +2147,7 @@ type Telemetry struct {
 	EmitterBatchProcessor *bool
 	EmitterExportTimeout  *commonconfig.Duration
 	ChipIngressEndpoint   *string
+	HeartbeatInterval     *commonconfig.Duration
 }
 
 func (b *Telemetry) setFrom(f *Telemetry) {
@@ -2144,6 +2177,9 @@ func (b *Telemetry) setFrom(f *Telemetry) {
 	}
 	if v := f.ChipIngressEndpoint; v != nil {
 		b.ChipIngressEndpoint = v
+	}
+	if v := f.HeartbeatInterval; v != nil {
+		b.HeartbeatInterval = v
 	}
 }
 

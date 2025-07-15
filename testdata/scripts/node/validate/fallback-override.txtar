@@ -82,7 +82,7 @@ MaxBufferSize = 3
 SamplingInterval = '1s'
 FinalityTagBypass = false
 MaxAllowedFinalityDepth = 10000
-PersistenceEnabled = true
+PersistenceEnabled = false
 
 [NodePool]
 PollFailureThreshold = 5
@@ -477,6 +477,7 @@ TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
 EmitterExportTimeout = '1s'
 ChipIngressEndpoint = ''
+HeartbeatInterval = '1s'
 
 [Workflows]
 [Workflows.Limits]
@@ -487,6 +488,9 @@ PerOwner = 200
 [CRE.Streams]
 WsURL = ''
 RestURL = ''
+
+[CRE.WorkflowFetcher]
+URL = ''
 
 [Billing]
 URL = 'localhost:4319'
@@ -569,7 +573,7 @@ MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000
 FinalityTagBypass = false
-PersistenceEnabled = true
+PersistenceEnabled = false
 
 [EVM.NodePool]
 PollFailureThreshold = 5

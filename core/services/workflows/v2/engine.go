@@ -21,6 +21,7 @@ import (
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	protoevents "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
+
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
@@ -440,6 +441,10 @@ func (e *Engine) close() error {
 
 	e.cfg.Module.Close()
 	e.cfg.GlobalLimits.Decrement(e.cfg.WorkflowOwner)
+
+	// reset metering mode metric so that a positive value does not persist
+	e.metrics.UpdateWorkflowMeteringModeGauge(ctx, false)
+
 	return nil
 }
 

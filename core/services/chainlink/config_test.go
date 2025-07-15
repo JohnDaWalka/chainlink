@@ -583,11 +583,15 @@ func TestConfig_Marshal(t *testing.T) {
 		EmitterBatchProcessor: ptr(true),
 		EmitterExportTimeout:  commoncfg.MustNewDuration(1 * time.Second),
 		ChipIngressEndpoint:   ptr("example.com/chip-ingress"),
+		HeartbeatInterval:     commoncfg.MustNewDuration(1 * time.Second),
 	}
 	full.CRE = toml.CreConfig{
 		Streams: &toml.StreamsConfig{
 			WsURL:   ptr("streams.url"),
 			RestURL: ptr("streams.url"),
+		},
+		WorkflowFetcher: &toml.WorkflowFetcherConfig{
+			URL: ptr("https://workflow.fetcher.url"),
 		},
 	}
 	full.Billing = toml.Billing{
