@@ -177,11 +177,21 @@ func validateUSDCConfig(usdcConfig *pluginconfig.USDCCCTPObserverConfig, state s
 		if !ok {
 			return fmt.Errorf("chain %d does not exist in state but provided in USDCCCTPObserverConfig", sel)
 		}
-		if onchainState.USDCTokenPools == nil || onchainState.USDCTokenPools[deployment.Version1_5_1] == nil {
-			return fmt.Errorf("chain %d does not have USDC token pool deployed with version %s", sel, deployment.Version1_5_1)
+		if onchainState.USDCTokenPools == nil {
+			return fmt.Errorf("chain %d does not have any USDC token pools deployed", sel)
 		}
-		if common.HexToAddress(token.SourcePoolAddress) != onchainState.USDCTokenPools[deployment.Version1_5_1].Address() {
-			return fmt.Errorf("chain %d has USDC token pool deployed at %s, "+
+
+		var sourcePoolAddress common.Address
+		if pool, ok := onchainState.USDCTokenPools_v1_6[deployment.Version1_6_0]; ok {
+			sourcePoolAddress = pool.Address()
+		} else if pool, ok := onchainState.USDCTokenPools[deployment.Version1_5_1]; ok {
+			sourcePoolAddress = pool.Address()
+		} else {
+			return fmt.Errorf("chain %d does not have USDC token pool deployed with version %s or %s", sel, deployment.Version1_5_1, deployment.Version1_6_0)
+		}
+
+		if common.HexToAddress(token.SourcePoolAddress) != sourcePoolAddress {
+			return fmt.Errorf("chain %d has latest USDC token pool deployed at %s, "+
 				"but SourcePoolAddress %s is provided in USDCCCTPObserverConfig",
 				sel, onchainState.USDCTokenPools[deployment.Version1_5_1].Address().String(), token.SourcePoolAddress)
 		}
