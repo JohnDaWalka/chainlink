@@ -334,6 +334,7 @@ TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
 EmitterExportTimeout = '1s'
 ChipIngressEndpoint = 'example.com/chip-ingress'
+HeartbeatInterval = '1s'
 
 [Telemetry.ResourceAttributes]
 Baz = 'test'
@@ -348,6 +349,9 @@ PerOwner = 200
 [CRE.Streams]
 WsURL = 'streams.url'
 RestURL = 'streams.url'
+
+[CRE.WorkflowFetcher]
+URL = 'https://workflow.fetcher.url'
 
 [Billing]
 URL = 'localhost:4319'
