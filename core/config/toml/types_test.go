@@ -638,45 +638,45 @@ func TestEthKeys_SetFrom(t *testing.T) {
 // ptr is a utility function for converting a value to a pointer to the value.
 func ptr[T any](t T) *T { return &t }
 
-func TestEAMetricsReporter_ValidateConfig(t *testing.T) {
+func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 	testCases := []struct {
 		name        string
-		config      *EAMetricsReporter
+		config      *EAStatusReporter
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "disabled with nil fields",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(false),
-				MetricsPath:     nil,
+				StatusPath:      nil,
 				PollingInterval: nil,
 			},
 			expectError: false,
 		},
 		{
 			name: "disabled with empty fields",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(false),
-				MetricsPath:     ptr(""),
+				StatusPath:      ptr(""),
 				PollingInterval: durationPtr(0),
 			},
 			expectError: false,
 		},
 		{
 			name: "disabled with valid fields",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(false),
-				MetricsPath:     ptr("/metrics"),
+				StatusPath:      ptr("/status"),
 				PollingInterval: durationPtr(5 * time.Minute),
 			},
 			expectError: false,
 		},
 		{
 			name: "nil enabled (defaults to disabled)",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         nil,
-				MetricsPath:     ptr("/metrics"),
+				StatusPath:      ptr("/status"),
 				PollingInterval: durationPtr(5 * time.Minute),
 			},
 			expectError: false,
@@ -684,63 +684,63 @@ func TestEAMetricsReporter_ValidateConfig(t *testing.T) {
 		// Enabled valid case
 		{
 			name: "enabled with valid config",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(true),
-				MetricsPath:     ptr("/metrics"),
+				StatusPath:      ptr("/status"),
 				PollingInterval: durationPtr(5 * time.Minute),
 			},
 			expectError: false,
 		},
 		// Enabled invalid cases
 		{
-			name: "enabled with nil metrics path",
-			config: &EAMetricsReporter{
+			name: "enabled with nil status path",
+			config: &EAStatusReporter{
 				Enabled:         ptr(true),
-				MetricsPath:     nil,
+				StatusPath:      nil,
 				PollingInterval: durationPtr(5 * time.Minute),
 			},
 			expectError: true,
-			errorMsg:    "metrics path must be set when EA Metrics Reporter is enabled",
+			errorMsg:    "status path must be set when EA Status Reporter is enabled",
 		},
 		{
-			name: "enabled with empty metrics path",
-			config: &EAMetricsReporter{
+			name: "enabled with empty status path",
+			config: &EAStatusReporter{
 				Enabled:         ptr(true),
-				MetricsPath:     ptr(""),
+				StatusPath:      ptr(""),
 				PollingInterval: durationPtr(5 * time.Minute),
 			},
 			expectError: true,
-			errorMsg:    "metrics path must be set when EA Metrics Reporter is enabled",
+			errorMsg:    "status path must be set when EA Status Reporter is enabled",
 		},
 		{
 			name: "enabled with nil polling interval",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(true),
-				MetricsPath:     ptr("/metrics"),
+				StatusPath:      ptr("/status"),
 				PollingInterval: nil,
 			},
 			expectError: true,
-			errorMsg:    "polling interval must be set when EA Metrics Reporter is enabled",
+			errorMsg:    "polling interval must be set when EA Status Reporter is enabled",
 		},
 		{
 			name: "enabled with zero polling interval",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(true),
-				MetricsPath:     ptr("/metrics"),
+				StatusPath:      ptr("/status"),
 				PollingInterval: durationPtr(0),
 			},
 			expectError: true,
-			errorMsg:    "polling interval must be set when EA Metrics Reporter is enabled",
+			errorMsg:    "polling interval must be set when EA Status Reporter is enabled",
 		},
 		{
 			name: "enabled with both fields invalid",
-			config: &EAMetricsReporter{
+			config: &EAStatusReporter{
 				Enabled:         ptr(true),
-				MetricsPath:     ptr(""),
+				StatusPath:      ptr(""),
 				PollingInterval: durationPtr(0),
 			},
 			expectError: true,
-			errorMsg:    "metrics path must be set when EA Metrics Reporter is enabled",
+			errorMsg:    "status path must be set when EA Status Reporter is enabled",
 		},
 	}
 

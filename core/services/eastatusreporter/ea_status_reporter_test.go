@@ -1,4 +1,4 @@
-package eametricsreporter
+package eastatusreporter
 
 import (
 	"context"
@@ -18,13 +18,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	bridgeMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/eametricsreporter/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 // Test constants and fixtures
 const (
-	testMetricsPath     = "/metrics"
+	testStatusPath      = "/status"
 	testPollingInterval = 5 * time.Minute
 	testBridgeName1     = "bridge1"
 	testBridgeName2     = "bridge2"
@@ -66,11 +66,11 @@ func parseWebURL(s string) models.WebURL {
 // Test fixtures
 var (
 	testBridge1 = bridges.BridgeType{
-		Name: bridges.BridgeName(testBridgeName1),
+		Name: bridges.MustParseBridgeName(testBridgeName1),
 		URL:  parseWebURL(testBridgeURL1),
 	}
 	testBridge2 = bridges.BridgeType{
-		Name: bridges.BridgeName(testBridgeName2),
+		Name: bridges.MustParseBridgeName(testBridgeName2),
 		URL:  parseWebURL(testBridgeURL2),
 	}
 	testBridges = []bridges.BridgeType{testBridge1, testBridge2}
@@ -80,18 +80,18 @@ var (
 func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client) (*Service, *bridgeMocks.ORM, *mocks.MessageEmitter) {
 	t.Helper()
 
-	eaConfig := mocks.NewTestEAMetricsReporterConfig(enabled, testMetricsPath, pollingInterval)
+	eaConfig := mocks.NewTestEAStatusReporterConfig(enabled, testStatusPath, pollingInterval)
 
 	bridgeORM := bridgeMocks.NewORM(t)
 	emitter := mocks.NewMessageEmitter()
 	lggr := logger.TestLogger(t)
 
-	service := NewEaMetricsReporter(eaConfig, bridgeORM, httpClient, emitter, lggr)
+	service := NewEaStatusReporter(eaConfig, bridgeORM, httpClient, emitter, lggr)
 
 	return service, bridgeORM, emitter
 }
 
-func TestNewEaMetricsReporter(t *testing.T) {
+func TestNewEaStatusReporter(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -296,7 +296,7 @@ func TestService_pollBridge_Non200Status(t *testing.T) {
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
 }
 
-func TestService_emitEAMetrics_Success(t *testing.T) {
+func TestService_emitEAStatus_Success(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -305,12 +305,12 @@ func TestService_emitEAMetrics_Success(t *testing.T) {
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
 	ctx := context.Background()
-	service.emitEAMetrics(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
+	service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
 
 	emitter.AssertExpectations(t)
 }
 
-func TestService_emitEAMetrics_EmitError(t *testing.T) {
+func TestService_emitEAStatus_EmitError(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -322,7 +322,7 @@ func TestService_emitEAMetrics_EmitError(t *testing.T) {
 
 	// This should not panic or return an error, even when emitter fails
 	assert.NotPanics(t, func() {
-		service.emitEAMetrics(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
+		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
 	})
 
 	emitter.AssertExpectations(t)
@@ -383,7 +383,7 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	// Verify correct number of emissions (once per bridge)
 	assert.Len(t, emittedMessages, 2, "Should emit telemetry exactly twice")
 	for _, msg := range emittedMessages {
-		assert.Contains(t, msg, "EA Metrics - Bridge:", "Should emit correct message format")
+		assert.Contains(t, msg, "EA Status - Bridge:", "Should emit correct message format")
 		assert.Contains(t, msg, "Adapter: test-adapter", "Should include adapter name")
 		assert.Contains(t, msg, "Version: 1.0.0", "Should include version")
 	}
@@ -391,7 +391,7 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	emitter.AssertExpectations(t)
 }
 
-func TestService_emitEAMetrics_CaptureOutput(t *testing.T) {
+func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	// Create a mock emitter that captures the data
 	emitter := mocks.NewMessageEmitter()
 
@@ -414,20 +414,20 @@ func TestService_emitEAMetrics_CaptureOutput(t *testing.T) {
 	})
 
 	// Create service with mock emitter
-	config := mocks.NewTestEAMetricsReporterConfig(true, "/metrics", 5*time.Minute)
+	config := mocks.NewTestEAStatusReporterConfig(true, "/status", 5*time.Minute)
 	service := &Service{
 		config:  config,
 		emitter: emitter,
 		lggr:    logger.TestLogger(t),
 	}
 
-	// Call emitEAMetrics with test fixture
+	// Call emitEAStatus with test fixture
 	ctx := context.Background()
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_response.json")
-	service.emitEAMetrics(ctx, "test-bridge", status)
+	service.emitEAStatus(ctx, "test-bridge", status)
 
 	// Verify the expected message format (based on fixture data)
-	expectedMessage := "EA Metrics - Bridge: test-bridge, Adapter: test-adapter, Version: 1.0.0"
+	expectedMessage := "EA Status - Bridge: test-bridge, Adapter: test-adapter, Version: 1.0.0"
 	assert.Equal(t, expectedMessage, capturedMessage)
 
 	// Verify key labels are present (based on fixture data)
@@ -479,7 +479,7 @@ func TestService_emitEAMetrics_CaptureOutput(t *testing.T) {
 	emitter.AssertExpectations(t)
 }
 
-func TestService_emitEAMetrics_MissingFields(t *testing.T) {
+func TestService_emitEAStatus_MissingFields(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -514,7 +514,7 @@ func TestService_emitEAMetrics_MissingFields(t *testing.T) {
 	ctx := context.Background()
 
 	// Should emit successfully even with missing field
-	service.emitEAMetrics(ctx, "test-bridge", status)
+	service.emitEAStatus(ctx, "test-bridge", status)
 
 	// Verify adapter_version field is present and empty
 	assert.Contains(t, allFields, "adapter_version", "Missing adapter_version field should be present in emission")
@@ -529,7 +529,7 @@ func TestService_emitEAMetrics_MissingFields(t *testing.T) {
 	emitter.AssertExpectations(t)
 }
 
-func TestService_emitEAMetrics_ExtraFields(t *testing.T) {
+func TestService_emitEAStatus_ExtraFields(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -564,7 +564,7 @@ func TestService_emitEAMetrics_ExtraFields(t *testing.T) {
 	ctx := context.Background()
 
 	// Should emit successfully, ignoring extra field
-	service.emitEAMetrics(ctx, "test-bridge", status)
+	service.emitEAStatus(ctx, "test-bridge", status)
 
 	emitter.AssertExpectations(t)
 }

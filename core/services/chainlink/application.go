@@ -58,7 +58,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/blockheaderfeeder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/cron"
 	"github.com/smartcontractkit/chainlink/v2/core/services/directrequest"
-	"github.com/smartcontractkit/chainlink/v2/core/services/eametricsreporter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/feeds"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
@@ -700,14 +700,14 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		globalLogger.Debug("Off-chain reporting v2 disabled")
 	}
 
-	eaMetricsReporter := eametricsreporter.NewEaMetricsReporter(
-		cfg,
+	eaStatusReporter := eastatusreporter.NewEaStatusReporter(
+		cfg.EAStatusReporter(),
 		bridgeORM,
 		unrestrictedHTTPClient,
 		custmsg.NewLabeler(),
 		globalLogger,
 	)
-	srvcs = append(srvcs, eaMetricsReporter)
+	srvcs = append(srvcs, eaStatusReporter)
 
 	healthChecker := commonservices.NewChecker(static.Version, static.Sha)
 

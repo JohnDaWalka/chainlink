@@ -811,11 +811,11 @@ RestURL = "streams.url" # Example
 # URL is the locator for the Chainlink billing service.
 URL = "localhost:4319" # Default
 
-# EAMetricsReporter holds settings for the External Adapter Metrics Reporter service.
-[EAMetricsReporter]
-# Enabled enables the EA Metrics Reporter service that polls bridge status endpoints.
+# EAStatusReporter holds settings for the External Adapter Status Reporter service.
+[EAStatusReporter]
+# Enabled enables the EA Status Reporter service that polls bridge status endpoints.
 Enabled = true # Default
-# MetricsPath is the path to append to bridge URLs for metrics polling.
-MetricsPath = "/status" # Default
-# PollingInterval is how often to poll bridge status endpoints for metrics.
+# StatusPath is the path to append to bridge URLs for status polling.
+StatusPath = "/status" # Default
+# PollingInterval is how often to poll bridge status endpoints for status.
 PollingInterval = "5m" # Default

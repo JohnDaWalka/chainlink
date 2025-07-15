@@ -61,7 +61,7 @@ type AppConfig interface {
 	Telemetry() Telemetry
 	CRE() CRE
 	Billing() Billing
-	EAMetricsReporter() EAMetricsReporter
+	EAStatusReporter() EAStatusReporter
 }
 
 type DatabaseBackupMode string

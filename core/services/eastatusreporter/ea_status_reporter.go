@@ -1,4 +1,4 @@
-package eametricsreporter
+package eastatusreporter
 
 import (
 	"context"
@@ -53,11 +53,11 @@ type EAStatusResponse struct {
 	} `json:"metrics"`
 }
 
-// Service polls EA metrics and pushes them to Beholder
+// Service polls EA status and pushes them to Beholder
 type Service struct {
 	services.StateMachine
 
-	config     config.EAMetricsReporter
+	config     config.EAStatusReporter
 	bridgeORM  bridges.ORM
 	httpClient *http.Client
 	emitter    custmsg.MessageEmitter
@@ -72,11 +72,11 @@ type Service struct {
 	mu         sync.RWMutex
 }
 
-const ServiceName = "EAMetricsReporter"
+const ServiceName = "EAStatusReporter"
 
-// NewService creates a new EA Metrics Reporter Service
-func NewEaMetricsReporter(
-	config config.EAMetricsReporter,
+// NewService creates a new EA Status Reporter Service
+func NewEaStatusReporter(
+	config config.EAStatusReporter,
 	bridgeORM bridges.ORM,
 	httpClient *http.Client,
 	emitter custmsg.MessageEmitter,
@@ -93,15 +93,15 @@ func NewEaMetricsReporter(
 	}
 }
 
-// Start starts the EA Metrics Reporter Service
+// Start starts the EA Status Reporter Service
 func (s *Service) Start(ctx context.Context) error {
 	return s.StartOnce(ServiceName, func() error {
 		if !s.config.Enabled() {
-			s.lggr.Info("EA Metrics Reporter Service is disabled")
+			s.lggr.Info("EA Status Reporter Service is disabled")
 			return nil
 		}
 
-		s.lggr.Info("Starting EA Metrics Reporter Service")
+		s.lggr.Info("Starting EA Status Reporter Service")
 
 		// Start periodic polling
 		s.wg.Add(1)
@@ -111,7 +111,7 @@ func (s *Service) Start(ctx context.Context) error {
 	})
 }
 
-// Close stops the EA Metrics Reporter Service
+// Close stops the EA Status Reporter Service
 func (s *Service) Close() error {
 	return s.StopOnce(ServiceName, func() error {
 		s.lggr.Info("Stopping " + ServiceName)
@@ -143,7 +143,7 @@ func (s *Service) pollLoop() {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	s.lggr.Infow("Started EA Metrics Reporter polling loop", "interval", interval)
+	s.lggr.Infow("Started EA Status Reporter polling loop", "interval", interval)
 
 	for {
 		select {
@@ -177,7 +177,7 @@ func (s *Service) refreshBridgeURLs(ctx context.Context) error {
 		s.bridgeURLs[string(bridge.Name)] = bridge.URL.String()
 	}
 
-	s.lggr.Infow("Refreshed bridge URLs for EA Metrics Reporter", "count", len(bridges))
+	s.lggr.Infow("Refreshed bridge URLs for EA Status Reporter", "count", len(bridges))
 	return nil
 }
 
@@ -197,11 +197,11 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 	s.mu.RUnlock()
 
 	if len(bridgeURLs) == 0 {
-		s.lggr.Debug("No bridges configured for EA Metrics Reporter polling")
+		s.lggr.Debug("No bridges configured for EA Status Reporter polling")
 		return
 	}
 
-	s.lggr.Debugw("Polling EA Metrics Reporter for all bridges", "count", len(bridgeURLs))
+	s.lggr.Debugw("Polling EA Status Reporter for all bridges", "count", len(bridgeURLs))
 
 	// Poll each bridge concurrently
 	var wg sync.WaitGroup
@@ -225,49 +225,49 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 		return
 	}
 
-	// Construct metrics endpoint URL (bridge::8080/metrics)
+	// Construct status endpoint URL (bridge::8080/status)
 	statusURL := &url.URL{
 		Scheme: parsedURL.Scheme,
 		Host:   parsedURL.Host + ":8080",
-		Path:   s.config.MetricsPath(),
+		Path:   s.config.StatusPath(),
 	}
 
 	// Make HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL.String(), nil)
 	if err != nil {
-		s.lggr.Warnw("Failed to create request for EA Metrics Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.lggr.Warnw("Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		s.lggr.Warnw("Failed to fetch EA Metrics Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.lggr.Warnw("Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		s.lggr.Warnw("EA Metrics Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
+		s.lggr.Warnw("EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
 		return
 	}
 
 	// Parse response
 	var status EAStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		s.lggr.Warnw("Failed to decode EA Metrics Reporter status response", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.lggr.Warnw("Failed to decode EA Status Reporter status response", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
-	s.lggr.Debugw("Successfully fetched EA Metrics Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
+	s.lggr.Debugw("Successfully fetched EA Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
 
 	// Emit telemetry to Beholder
-	s.emitEAMetrics(ctx, bridgeName, status)
+	s.emitEAStatus(ctx, bridgeName, status)
 }
 
-// emitEAMetrics sends EA Metrics Reporter data to Beholder
-func (s *Service) emitEAMetrics(ctx context.Context, bridgeName string, status EAStatusResponse) {
+// emitEAStatus sends EA Status Reporter data to Beholder
+func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse) {
 	// Create human-readable message
-	message := fmt.Sprintf("EA Metrics - Bridge: %s, Adapter: %s, Version: %s",
+	message := fmt.Sprintf("EA Status - Bridge: %s, Adapter: %s, Version: %s",
 		bridgeName,
 		status.Adapter.Name,
 		status.Adapter.Version,
@@ -304,11 +304,11 @@ func (s *Service) emitEAMetrics(ctx context.Context, bridgeName string, status E
 
 	// Emit to Beholder
 	if err := emitter.Emit(ctx, message); err != nil {
-		s.lggr.Warnw("Failed to emit EA Metrics Reporter data to Beholder", "bridge", bridgeName, "error", err)
+		s.lggr.Warnw("Failed to emit EA Status Reporter data to Beholder", "bridge", bridgeName, "error", err)
 		return
 	}
 
-	s.lggr.Debugw("Successfully emitted EA Metrics Reporter data to Beholder",
+	s.lggr.Debugw("Successfully emitted EA Status Reporter data to Beholder",
 		"bridge", bridgeName,
 		"adapter", status.Adapter.Name,
 		"version", status.Adapter.Version,

@@ -2,8 +2,8 @@ package config
 
 import "time"
 
-type EAMetricsReporter interface {
+type EAStatusReporter interface {
 	Enabled() bool
-	MetricsPath() string
+	StatusPath() string
 	PollingInterval() time.Duration
 }
