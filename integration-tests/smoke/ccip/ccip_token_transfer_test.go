@@ -254,7 +254,6 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 	allSolChainSelectors := e.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySolana))
 	sourceChain, destChain := allChainSelectors[0], allSolChainSelectors[0]
 	ownerSourceChain := evmChains[sourceChain].DeployerKey
-	// ownerDestChain := e.BlockChains.SolanaChains()[destChain].DeployerKey
 
 	require.GreaterOrEqual(t, len(tenv.Users[sourceChain]), 2) // TODO: ???
 
@@ -283,23 +282,21 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 			sourceChain: {
 				testhelpers.NewMintTokenInfo(ownerSourceChain, srcToken),
 			},
-			// destChain: {
-			// 	testhelpers.NewMintTokenInfo(ownerDestChain, destToken),
-			// },
 		},
 	)
 	// TODO: how to do MintAndAllow on Solana?
-	tokenReceiver, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, state.SolChains[destChain].Receiver)
+	tokenReceiver := state.SolChains[destChain].Receiver
+	t.Logf("Token receiver: %s\n", tokenReceiver.String())
+	tokenReceiverATA, _, ferr := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, destToken, tokenReceiver)
 	require.NoError(t, ferr)
+	t.Logf("Token receiver ATA: %s\n", tokenReceiverATA.String())
 
 	extraArgs, err := ccipevm.SerializeClientSVMExtraArgsV1(message_hasher.ClientSVMExtraArgsV1{
 		TokenReceiver: tokenReceiver,
-		// Accounts: accounts,
 	})
 	require.NoError(t, err)
 
 	// TODO: test both with ATA pre-initialized and not
-
 	tcs := []testhelpers.TestTransferRequest{
 		{
 			Name:        "Send token to contract",
@@ -311,7 +308,7 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 					Amount: new(big.Int).Mul(big.NewInt(20), oneE18),
 				},
 			},
-			TokenReceiver: tokenReceiver.Bytes(),
+			TokenReceiverATA: tokenReceiverATA.Bytes(),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				// due to the differences in decimals, 20e18 on EVM results to 20e9 on SVM
 				{Token: destToken.Bytes(), Amount: new(big.Int).Mul(big.NewInt(20), oneE9)},
@@ -319,32 +316,6 @@ func TestTokenTransfer_EVM2Solana(t *testing.T) {
 			ExtraArgs:      extraArgs,
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 		},
-		// {
-		// 	Name:        "Send N tokens to contract",
-		// 	SourceChain: destChain,
-		// 	DestChain:   sourceChain,
-		// 	Tokens: []router.ClientEVMTokenAmount{
-		// 		{
-		// 			Token:  selfServeDestToken.Address(),
-		// 			Amount: oneE9,
-		// 		},
-		// 		{
-		// 			Token:  destToken.Address(),
-		// 			Amount: oneE9,
-		// 		},
-		// 		{
-		// 			Token:  selfServeDestToken.Address(),
-		// 			Amount: oneE9,
-		// 		},
-		// 	},
-		// 	Receiver:  state.Chains[sourceChain].Receiver.Address().Bytes(),
-		// 	ExtraArgs: testhelpers.MakeEVMExtraArgsV2(300_000, false),
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{selfServeSrcToken.Address().Bytes(), new(big.Int).Add(oneE18, oneE18)},
-		// 		{srcToken.Address().Bytes(), oneE18},
-		// 	},
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// },
 	}
 
 	// Wait for filter registration for CCIPMessageSent (onramp), CommitReportAccepted (offramp), and ExecutionStateChanged (offramp)
@@ -435,7 +406,7 @@ func TestTokenTransfer_Solana2EVM(t *testing.T) {
 
 	// fund user WSOL (transfer SOL + syncNative)
 	transferAmount := 1.0 * solana.LAMPORTS_PER_SOL
-	ixTransfer, err := soltokens.NativeTransfer(tokenProgram, transferAmount, deployer.PublicKey(), deployerWSOL)
+	ixTransfer, err := soltokens.NativeTransfer(transferAmount, deployer.PublicKey(), deployerWSOL)
 	require.NoError(t, err)
 	ixSync, err := soltokens.SyncNative(tokenProgram, deployerWSOL)
 	require.NoError(t, err)

@@ -2433,7 +2433,7 @@ type TestTransferRequest struct {
 	Name                   string
 	SourceChain, DestChain uint64
 	Receiver               []byte
-	TokenReceiver          []byte
+	TokenReceiverATA       []byte
 	ExpectedStatus         int
 	// optional
 	Tokens                []router.ClientEVMTokenAmount
@@ -2488,7 +2488,7 @@ func TransferMultiple(
 				require.NoError(t, err)
 				if destFamily == chainsel.FamilySolana {
 					// for EVM2Solana token transfer we need to use tokenReceiver instead logical receiver
-					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiver, tt.ExpectedTokenBalances)
+					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiverATA, tt.ExpectedTokenBalances)
 				} else {
 					expectedTokenBalances.add(tt.DestChain, tt.Receiver, tt.ExpectedTokenBalances)
 				}
@@ -2617,13 +2617,7 @@ func WaitForTokenBalances(
 					// TODO: need to pass env rather than chains
 					token := solana.PublicKeyFromBytes(id.token)
 					receiver := solana.PublicKeyFromBytes(id.receiver)
-					// TODO: could be spl instead of spl2022
-					// TODO: receiver is actually the receiver's ATA
-					tokenReceiver, _, err := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, token, receiver)
-					if err != nil {
-						return err
-					}
-					WaitForTheTokenBalanceSol(ctx, t, token, tokenReceiver, env.BlockChains.SolanaChains()[chainSelector], expectedBalance)
+					WaitForTheTokenBalanceSol(ctx, t, token, receiver, env.BlockChains.SolanaChains()[chainSelector], expectedBalance)
 				case chainsel.FamilyAptos:
 					expectedBalance := balance.Uint64()
 					fungibleAssetMetadata := aptos.AccountAddress{}
