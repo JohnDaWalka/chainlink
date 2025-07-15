@@ -97,7 +97,8 @@ import (
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	chainreaderConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
+	chainreader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
 
 	chain_reader_types "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -1159,20 +1160,20 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	chainWriter.Close()
 
 	// Query the CCIPSend Event via chainReader
-	chainReaderConfig := chainreader.ChainReaderConfig{
+	chainReaderConfig := chainreaderConfig.ChainReaderConfig{
 		IsLoopPlugin: false,
-		EventsIndexer: chainreader.EventsIndexerConfig{
+		EventsIndexer: chainreaderConfig.EventsIndexerConfig{
 			PollingInterval: 10 * time.Second,
 			SyncTimeout:     10 * time.Second,
 		},
-		TransactionsIndexer: chainreader.TransactionsIndexerConfig{
+		TransactionsIndexer: chainreaderConfig.TransactionsIndexerConfig{
 			PollingInterval: 10 * time.Second,
 			SyncTimeout:     10 * time.Second,
 		},
-		Modules: map[string]*chainreader.ChainReaderModule{
+		Modules: map[string]*chainreaderConfig.ChainReaderModule{
 			"onramp": {
 				Name: "onramp",
-				Events: map[string]*chainreader.ChainReaderEvent{
+				Events: map[string]*chainreaderConfig.ChainReaderEvent{
 					"CCIPMessageSent": {
 						Name:      "CCIPMessageSent",
 						EventType: "CCIPMessageSent",

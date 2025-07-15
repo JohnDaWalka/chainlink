@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	chainreaderConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
 	"github.com/smartcontractkit/chainlink-sui/relayer/client"
 	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
@@ -111,7 +111,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			},
 			"offramp": map[string]any{
 				"Name": "offramp",
-				"Functions": map[string]*chainreader.ChainReaderFunction{
+				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
 					consts.MethodNameOffRampLatestConfigDetails: {
 						Name:          "latest_config_details",
 						SignerAddress: fromAddress,
@@ -314,7 +314,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			},
 			"OnRamp": map[string]any{
 				"Name": "onramp",
-				"Functions": map[string]*chainreader.ChainReaderFunction{
+				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
 					"OnRampGetDynamicConfig": {
 						Name:          "get_dynamic_config",
 						SignerAddress: fromAddress,
@@ -375,7 +375,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 				},
-				"Events": map[string]*chainreader.ChainReaderEvent{
+				"Events": map[string]*chainreaderConfig.ChainReaderEvent{
 					"CCIPMessageSent": {
 						Name:      "CCIPMessageSent",
 						EventType: "CCIPMessageSent",
