@@ -11,7 +11,6 @@ import (
 
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common/aggregation"
@@ -159,7 +158,7 @@ func TestSendAuthPullRequestVerifyPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, jsonrpc.JsonRpcVersion, capturedReq.Version)
-	require.Equal(t, gateway.MethodWorkflowPullAuthMetadata, capturedReq.Method)
+	require.Equal(t, gateway_common.MethodWorkflowPullAuthMetadata, capturedReq.Method)
 	require.NotEmpty(t, capturedReq.ID)
 
 	mockDon.AssertNumberOfCalls(t, "SendToNode", len(donConfig.Members))
@@ -173,7 +172,7 @@ func TestOnAuthMetadataPush(t *testing.T) {
 	require.NoError(t, err)
 	defer handler.agg.Close()
 
-	authData := gateway.WorkflowAuthMetadata{
+	authData := gateway_common.WorkflowAuthMetadata{
 		WorkflowID: "test-workflow",
 		AuthorizedKeys: []gateway_common.AuthorizedKey{
 			{PublicKey: "key1"},
@@ -215,7 +214,7 @@ func TestOnAuthMetadataPullResponse(t *testing.T) {
 	require.NoError(t, err)
 	defer handler.agg.Close()
 
-	authData := []gateway.WorkflowAuthMetadata{
+	authData := []gateway_common.WorkflowAuthMetadata{
 		{
 			WorkflowID: "workflow1",
 			AuthorizedKeys: []gateway_common.AuthorizedKey{
@@ -287,7 +286,7 @@ func TestAuthHandlerIntegration(t *testing.T) {
 	defer handler.Close()
 
 	// Simulate receiving auth metadata push
-	authData := gateway.WorkflowAuthMetadata{
+	authData := gateway_common.WorkflowAuthMetadata{
 		WorkflowID: "integration-workflow",
 		AuthorizedKeys: []gateway_common.AuthorizedKey{
 			{PublicKey: "integration-key1"},
