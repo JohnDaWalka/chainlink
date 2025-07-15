@@ -40,29 +40,30 @@ type Core struct {
 	RootDir             *string
 	ShutdownGracePeriod *commonconfig.Duration
 
-	Feature          Feature          `toml:",omitempty"`
-	Database         Database         `toml:",omitempty"`
-	TelemetryIngress TelemetryIngress `toml:",omitempty"`
-	AuditLogger      AuditLogger      `toml:",omitempty"`
-	Log              Log              `toml:",omitempty"`
-	WebServer        WebServer        `toml:",omitempty"`
-	JobPipeline      JobPipeline      `toml:",omitempty"`
-	FluxMonitor      FluxMonitor      `toml:",omitempty"`
-	OCR2             OCR2             `toml:",omitempty"`
-	OCR              OCR              `toml:",omitempty"`
-	P2P              P2P              `toml:",omitempty"`
-	Keeper           Keeper           `toml:",omitempty"`
-	AutoPprof        AutoPprof        `toml:",omitempty"`
-	Pyroscope        Pyroscope        `toml:",omitempty"`
-	Sentry           Sentry           `toml:",omitempty"`
-	Insecure         Insecure         `toml:",omitempty"`
-	Tracing          Tracing          `toml:",omitempty"`
-	Mercury          Mercury          `toml:",omitempty"`
-	Capabilities     Capabilities     `toml:",omitempty"`
-	Telemetry        Telemetry        `toml:",omitempty"`
-	Workflows        Workflows        `toml:",omitempty"`
-	CRE              CreConfig        `toml:",omitempty"`
-	Billing          Billing          `toml:",omitempty"`
+	Feature           Feature           `toml:",omitempty"`
+	Database          Database          `toml:",omitempty"`
+	TelemetryIngress  TelemetryIngress  `toml:",omitempty"`
+	AuditLogger       AuditLogger       `toml:",omitempty"`
+	Log               Log               `toml:",omitempty"`
+	WebServer         WebServer         `toml:",omitempty"`
+	JobPipeline       JobPipeline       `toml:",omitempty"`
+	FluxMonitor       FluxMonitor       `toml:",omitempty"`
+	OCR2              OCR2              `toml:",omitempty"`
+	OCR               OCR               `toml:",omitempty"`
+	P2P               P2P               `toml:",omitempty"`
+	Keeper            Keeper            `toml:",omitempty"`
+	AutoPprof         AutoPprof         `toml:",omitempty"`
+	Pyroscope         Pyroscope         `toml:",omitempty"`
+	Sentry            Sentry            `toml:",omitempty"`
+	Insecure          Insecure          `toml:",omitempty"`
+	Tracing           Tracing           `toml:",omitempty"`
+	Mercury           Mercury           `toml:",omitempty"`
+	Capabilities      Capabilities      `toml:",omitempty"`
+	Telemetry         Telemetry         `toml:",omitempty"`
+	Workflows         Workflows         `toml:",omitempty"`
+	CRE               CreConfig         `toml:",omitempty"`
+	Billing           Billing           `toml:",omitempty"`
+	EAMetricsReporter EAMetricsReporter `toml:",omitempty"`
 }
 
 // SetFrom updates c with any non-nil values from f. (currently TOML field only!)
@@ -106,6 +107,7 @@ func (c *Core) SetFrom(f *Core) {
 	c.Telemetry.setFrom(&f.Telemetry)
 	c.CRE.setFrom(&f.CRE)
 	c.Billing.setFrom(&f.Billing)
+	c.EAMetricsReporter.setFrom(&f.EAMetricsReporter)
 }
 
 func (c *Core) ValidateConfig() (err error) {
@@ -2221,6 +2223,38 @@ func (b *Billing) setFrom(f *Billing) {
 func (b *Billing) ValidateConfig() error {
 	if b.URL == nil || *b.URL == "" {
 		return configutils.ErrInvalid{Name: "URL", Value: "", Msg: "billing service url must be set"}
+	}
+
+	return nil
+}
+
+type EAMetricsReporter struct {
+	Enabled         *bool
+	MetricsPath     *string
+	PollingInterval *commonconfig.Duration
+}
+
+func (e *EAMetricsReporter) setFrom(f *EAMetricsReporter) {
+	if f.Enabled != nil {
+		e.Enabled = f.Enabled
+	}
+	if f.MetricsPath != nil {
+		e.MetricsPath = f.MetricsPath
+	}
+	if f.PollingInterval != nil {
+		e.PollingInterval = f.PollingInterval
+	}
+}
+
+func (e *EAMetricsReporter) ValidateConfig() error {
+	if e.Enabled == nil || !*e.Enabled {
+		return nil
+	}
+	if e.MetricsPath == nil || *e.MetricsPath == "" {
+		return configutils.ErrInvalid{Name: "MetricsPath", Value: "", Msg: "metrics path must be set when EA Metrics Reporter is enabled"}
+	}
+	if e.PollingInterval == nil || e.PollingInterval.Duration() == 0 {
+		return configutils.ErrInvalid{Name: "PollingInterval", Value: "", Msg: "polling interval must be set when EA Metrics Reporter is enabled"}
 	}
 
 	return nil

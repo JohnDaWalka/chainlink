@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
@@ -636,3 +637,127 @@ func TestEthKeys_SetFrom(t *testing.T) {
 
 // ptr is a utility function for converting a value to a pointer to the value.
 func ptr[T any](t T) *T { return &t }
+
+func TestEAMetricsReporter_ValidateConfig(t *testing.T) {
+	testCases := []struct {
+		name        string
+		config      *EAMetricsReporter
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "disabled with nil fields",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(false),
+				MetricsPath:     nil,
+				PollingInterval: nil,
+			},
+			expectError: false,
+		},
+		{
+			name: "disabled with empty fields",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(false),
+				MetricsPath:     ptr(""),
+				PollingInterval: durationPtr(0),
+			},
+			expectError: false,
+		},
+		{
+			name: "disabled with valid fields",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(false),
+				MetricsPath:     ptr("/metrics"),
+				PollingInterval: durationPtr(5 * time.Minute),
+			},
+			expectError: false,
+		},
+		{
+			name: "nil enabled (defaults to disabled)",
+			config: &EAMetricsReporter{
+				Enabled:         nil,
+				MetricsPath:     ptr("/metrics"),
+				PollingInterval: durationPtr(5 * time.Minute),
+			},
+			expectError: false,
+		},
+		// Enabled valid case
+		{
+			name: "enabled with valid config",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(true),
+				MetricsPath:     ptr("/metrics"),
+				PollingInterval: durationPtr(5 * time.Minute),
+			},
+			expectError: false,
+		},
+		// Enabled invalid cases
+		{
+			name: "enabled with nil metrics path",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(true),
+				MetricsPath:     nil,
+				PollingInterval: durationPtr(5 * time.Minute),
+			},
+			expectError: true,
+			errorMsg:    "metrics path must be set when EA Metrics Reporter is enabled",
+		},
+		{
+			name: "enabled with empty metrics path",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(true),
+				MetricsPath:     ptr(""),
+				PollingInterval: durationPtr(5 * time.Minute),
+			},
+			expectError: true,
+			errorMsg:    "metrics path must be set when EA Metrics Reporter is enabled",
+		},
+		{
+			name: "enabled with nil polling interval",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(true),
+				MetricsPath:     ptr("/metrics"),
+				PollingInterval: nil,
+			},
+			expectError: true,
+			errorMsg:    "polling interval must be set when EA Metrics Reporter is enabled",
+		},
+		{
+			name: "enabled with zero polling interval",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(true),
+				MetricsPath:     ptr("/metrics"),
+				PollingInterval: durationPtr(0),
+			},
+			expectError: true,
+			errorMsg:    "polling interval must be set when EA Metrics Reporter is enabled",
+		},
+		{
+			name: "enabled with both fields invalid",
+			config: &EAMetricsReporter{
+				Enabled:         ptr(true),
+				MetricsPath:     ptr(""),
+				PollingInterval: durationPtr(0),
+			},
+			expectError: true,
+			errorMsg:    "metrics path must be set when EA Metrics Reporter is enabled",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.config.ValidateConfig()
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func durationPtr(d time.Duration) *commonconfig.Duration {
+	cd := *commonconfig.MustNewDuration(d)
+	return &cd
+}

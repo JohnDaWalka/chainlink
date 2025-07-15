@@ -58,6 +58,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/blockheaderfeeder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/cron"
 	"github.com/smartcontractkit/chainlink/v2/core/services/directrequest"
+	"github.com/smartcontractkit/chainlink/v2/core/services/eametricsreporter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/feeds"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
@@ -699,6 +700,15 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		globalLogger.Debug("Off-chain reporting v2 disabled")
 	}
 
+	eaMetricsReporter := eametricsreporter.NewEaMetricsReporter(
+		cfg,
+		bridgeORM,
+		unrestrictedHTTPClient,
+		custmsg.NewLabeler(),
+		globalLogger,
+	)
+	srvcs = append(srvcs, eaMetricsReporter)
+
 	healthChecker := commonservices.NewChecker(static.Version, static.Sha)
 
 	var lbs []utils.DependentAwaiter
@@ -1264,7 +1274,7 @@ func (app *ChainlinkApplication) RunJobV2(
 					common.BigToHash(big.NewInt(42)).Bytes(), // seed
 					evmutils.NewHash().Bytes(),               // sender
 					evmutils.NewHash().Bytes(),               // fee
-					evmutils.NewHash().Bytes()}, // requestID
+					evmutils.NewHash().Bytes()},              // requestID
 					[]byte{}),
 				Topics:      []common.Hash{{}, jb.ExternalIDEncodeBytesToTopic()}, // jobID BYTES
 				TxHash:      evmutils.NewHash(),
