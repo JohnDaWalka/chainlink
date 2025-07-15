@@ -60,7 +60,7 @@ var (
 )
 
 type DomainUpdateInput struct {
-	AllowedCaller    common.Address
+	AllowedCaller    solana.PublicKey
 	MintRecipient    solana.PublicKey
 	DomainIdentifier uint32
 	Enabled          bool
