@@ -404,7 +404,7 @@ PersistenceEnabled = true # Default
 # If the head tracker crashes before the batch size is reached (i.e it fails to write the current batch to the db).
 # Then it will have to load that batch of heads from the rpc on startup.
 # To limit that initial fetch while also improving db usage, 100 is the default for now
-PersistenceBatchSize = 0 # Default
+PersistenceBatchSize = 100 # Default
 
 [[EVM.KeySpecific]]
 # Key is the account to apply these settings to
