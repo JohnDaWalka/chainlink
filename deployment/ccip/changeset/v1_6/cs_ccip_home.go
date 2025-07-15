@@ -9,12 +9,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/gagliardetto/solana-go"
-	"golang.org/x/exp/maps"
-
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"golang.org/x/exp/maps"
 
 	mcmslib "github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
@@ -22,12 +18,13 @@ import (
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/don_id_claimer"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -35,17 +32,19 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
-	ccipseqs "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/deployergroup"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
-	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	opsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
+
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
+	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
-
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+
+	ccipseqs "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 )
 
 var (
@@ -174,43 +173,17 @@ func validateCommitOffchainConfig(c *pluginconfig.CommitOffchainConfig, selector
 
 func validateUSDCConfig(usdcConfig *pluginconfig.USDCCCTPObserverConfig, state stateview.CCIPOnChainState) error {
 	for sel, token := range usdcConfig.Tokens {
-		family, err := chain_selectors.GetSelectorFamily(uint64(sel))
-		if err != nil {
-			return fmt.Errorf("failed to find family for selector %d: %w", sel, err)
+		onchainState, ok := state.Chains[uint64(sel)]
+		if !ok {
+			return fmt.Errorf("chain %d does not exist in state but provided in USDCCCTPObserverConfig", sel)
 		}
-		switch family {
-		case chain_selectors.FamilyEVM:
-			onchainState, ok := state.Chains[uint64(sel)]
-			if !ok {
-				return fmt.Errorf("chain %d does not exist in EVM chain state but provided in USDCCCTPObserverConfig", sel)
-			}
-			if onchainState.USDCTokenPools == nil || onchainState.USDCTokenPools[deployment.Version1_5_1] == nil {
-				return fmt.Errorf("chain %d does not have USDC token pool deployed with version %s", sel, deployment.Version1_5_1)
-			}
-			if common.HexToAddress(token.SourcePoolAddress) != onchainState.USDCTokenPools[deployment.Version1_5_1].Address() {
-				return fmt.Errorf("chain %d has USDC token pool deployed at %s, "+
-					"but SourcePoolAddress %s is provided in USDCCCTPObserverConfig",
-					sel, onchainState.USDCTokenPools[deployment.Version1_5_1].Address().String(), token.SourcePoolAddress)
-			}
-		case chain_selectors.FamilySolana:
-			onchainState, ok := state.SolChains[uint64(sel)]
-			if !ok {
-				return fmt.Errorf("chain %d does not exist in EVM chain state but provided in USDCCCTPObserverConfig", sel)
-			}
-			if onchainState.USDCTokenPool.IsZero() {
-				return fmt.Errorf("chain %d does not have CCTP token pool deployed", sel)
-			}
-			sourcePoolPubkey, err := solana.PublicKeyFromBase58(token.SourcePoolAddress)
-			if err != nil {
-				return fmt.Errorf("failed to parse token source pool address %s: %w", token.SourcePoolAddress, err)
-			}
-			if !sourcePoolPubkey.Equals(onchainState.USDCTokenPool) {
-				return fmt.Errorf("chain %d has CCTP token pool deployed at %s, "+
-					"but SourcePoolAddress %s is provided in USDCCCTPObserverConfig",
-					sel, onchainState.USDCTokenPool.String(), token.SourcePoolAddress)
-			}
-		default:
-			return fmt.Errorf("USDC configs not supported for chain family %s", family)
+		if onchainState.USDCTokenPools == nil || onchainState.USDCTokenPools[deployment.Version1_5_1] == nil {
+			return fmt.Errorf("chain %d does not have USDC token pool deployed with version %s", sel, deployment.Version1_5_1)
+		}
+		if common.HexToAddress(token.SourcePoolAddress) != onchainState.USDCTokenPools[deployment.Version1_5_1].Address() {
+			return fmt.Errorf("chain %d has USDC token pool deployed at %s, "+
+				"but SourcePoolAddress %s is provided in USDCCCTPObserverConfig",
+				sel, onchainState.USDCTokenPools[deployment.Version1_5_1].Address().String(), token.SourcePoolAddress)
 		}
 	}
 	return nil
@@ -1179,16 +1152,16 @@ func ValidateCCIPHomeConfigSetUp(
 	// final sanity checks on configs.
 	commitConfigs, err := ccipHome.GetAllConfigs(&bind.CallOpts{
 		//Pending: true,
-	}, donID, uint8(types.PluginTypeCCIPCommit))
+	}, donID, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return fmt.Errorf("get all commit configs: %w", err)
 	}
-	commitActiveDigest, err := ccipHome.GetActiveDigest(nil, donID, uint8(types.PluginTypeCCIPCommit))
+	commitActiveDigest, err := ccipHome.GetActiveDigest(nil, donID, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return fmt.Errorf("get active commit digest: %w", err)
 	}
 	lggr.Debugw("Fetched active commit digest", "commitActiveDigest", hex.EncodeToString(commitActiveDigest[:]))
-	commitCandidateDigest, err := ccipHome.GetCandidateDigest(nil, donID, uint8(types.PluginTypeCCIPCommit))
+	commitCandidateDigest, err := ccipHome.GetCandidateDigest(nil, donID, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
 		return fmt.Errorf("get commit candidate digest: %w", err)
 	}
@@ -1204,7 +1177,7 @@ func ValidateCCIPHomeConfigSetUp(
 			donID, commitConfigs.CandidateConfig, commitCandidateDigest, commitActiveDigest)
 	}
 
-	execConfigs, err := ccipHome.GetAllConfigs(nil, donID, uint8(types.PluginTypeCCIPExec))
+	execConfigs, err := ccipHome.GetAllConfigs(nil, donID, uint8(cctypes.PluginTypeCCIPExec))
 	if err != nil {
 		return fmt.Errorf("get all exec configs: %w", err)
 	}
