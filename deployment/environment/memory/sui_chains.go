@@ -74,9 +74,11 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 		// reserve all the ports we need explicitly to avoid port conflicts in other tests
 		ports := freeport.GetN(t, 2)
 
+		imagePlatform := "linux/arm64/v8"
 		bcInput := &blockchain.Input{
-			Image: "", // filled out by defaultSui function
-			Type:  "sui",
+			Image:         "mysten/sui-tools:devnet-arm64", // filled out by defaultSui function
+			ImagePlatform: &imagePlatform,
+			Type:          "sui",
 			// TODO: this is unused, can it be applied?
 			ChainID:     chainID,
 			CustomPorts: []string{fmt.Sprintf("%d:8080", ports[0]), fmt.Sprintf("%d:8081", ports[1])},
