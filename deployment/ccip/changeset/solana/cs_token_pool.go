@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	solTestTokenPoolV0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/v0_1_1/gobindings/test_token_pool"
+	solTestTokenPoolV0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/gobindings/test_token_pool"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -27,9 +27,9 @@ import (
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	tokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
-	solBurnMintTokenPool_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/v0_1_1/gobindings/burnmint_token_pool"
-	solLockReleaseTokenPool_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/v0_1_1/gobindings/lockrelease_token_pool"
-	tokens_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana/v0_1_1/utils/tokens"
+	solBurnMintTokenPool_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/gobindings/burnmint_token_pool"
+	solLockReleaseTokenPool_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/gobindings/lockrelease_token_pool"
+	tokens_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/utils/tokens"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 

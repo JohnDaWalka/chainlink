@@ -9,6 +9,8 @@ require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.2025043015
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../../
 
+replace github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1 => github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250704143810-ee587a6c0562
+
 replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 require (
