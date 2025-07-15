@@ -1258,25 +1258,49 @@ func ValidateChain(env cldf.Environment, state CCIPOnChainState, chainSel uint64
 	if err != nil {
 		return fmt.Errorf("is not valid chain selector %d: %w", chainSel, err)
 	}
-	chain, ok := env.BlockChains.EVMChains()[chainSel]
-	if !ok {
-		return fmt.Errorf("chain with selector %d does not exist in environment", chainSel)
+	family, err := chain_selectors.GetSelectorFamily(chainSel)
+	if err != nil {
+		return fmt.Errorf("failed to find family for chain selector %d: %w", chainSel, err)
 	}
-	chainState, ok := state.EVMChainState(chainSel)
-	if !ok {
-		return fmt.Errorf("%s does not exist in state", chain)
-	}
-	if mcmsCfg != nil {
-		err = mcmsCfg.Validate(chain, commonstate.MCMSWithTimelockState{
-			CancellerMcm: chainState.CancellerMcm,
-			ProposerMcm:  chainState.ProposerMcm,
-			BypasserMcm:  chainState.BypasserMcm,
-			Timelock:     chainState.Timelock,
-			CallProxy:    chainState.CallProxy,
-		})
-		if err != nil {
-			return err
+	switch family{
+	case chain_selectors.FamilyEVM:
+		chain, ok := env.BlockChains.EVMChains()[chainSel]
+		if !ok {
+			return fmt.Errorf("evm chain with selector %d does not exist in environment", chainSel)
 		}
+		chainState, ok := state.EVMChainState(chainSel)
+		if !ok {
+			return fmt.Errorf("%s does not exist in state", chain)
+		}
+		if mcmsCfg != nil {
+			err = mcmsCfg.Validate(chain, commonstate.MCMSWithTimelockState{
+				CancellerMcm: chainState.CancellerMcm,
+				ProposerMcm:  chainState.ProposerMcm,
+				BypasserMcm:  chainState.BypasserMcm,
+				Timelock:     chainState.Timelock,
+				CallProxy:    chainState.CallProxy,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	case chain_selectors.FamilySolana:
+		chain, ok := env.BlockChains.SolanaChains()[chainSel]
+		if !ok {
+			return fmt.Errorf("solana chain with selector %d does not exist in environment", chainSel)
+		}
+		_, ok = state.SolChains[chainSel]
+		if !ok {
+			return fmt.Errorf("%s does not exist in state", chain)
+		}
+		if mcmsCfg != nil {
+			err = mcmsCfg.ValidateSolana(env, chainSel)
+			if err != nil {
+				return err
+			}
+		}
+	default:
+		return fmt.Errorf("%s family not support", family)
 	}
 	return nil
 }
