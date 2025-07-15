@@ -197,7 +197,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		instructions := []solana.Instruction{createI}
 
 		// Global Configuration
-		configPDA, err = tokens.TokenPoolGlobalConfigPDA(tokenPool)
+		configPDA, err := tokens.TokenPoolGlobalConfigPDA(tokenPool)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool global config PDA: %w", err)
 		}
