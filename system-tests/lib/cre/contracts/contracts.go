@@ -353,6 +353,25 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 		return errors.Wrap(err, "failed to configure Vault OCR3 contract")
 	}
 
+	_, err = operations.ExecuteOperation(
+		input.CldEnv.OperationsBundle,
+		ks_contracts_op.ConfigureOCR3Op,
+		ks_contracts_op.ConfigureOCR3OpDeps{
+			Env:      input.CldEnv,
+			Registry: capReg.Contract,
+		},
+		ks_contracts_op.ConfigureOCR3OpInput{
+			ContractAddress:  input.EVMOCR3Address,
+			RegistryChainSel: input.ChainSelector,
+			DONs:             configDONs,
+			Config:           &input.EVMOCR3Config,
+			DryRun:           false,
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to configure EVM OCR3 contract")
+	}
+
 	return nil
 }
 
