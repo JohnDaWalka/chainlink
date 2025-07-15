@@ -63,7 +63,7 @@ func (r *capabilitiesRegistryV1Reader) GetCapabilities(ctx context.Context) ([]C
 			ConfigurationContract: cap.ConfigurationContract,
 			IsDeprecated:          cap.IsDeprecated,
 			// V1-specific fields
-			HashedId: &cap.HashedId,
+			HashedID: &cap.HashedId,
 		}
 	}
 
@@ -89,9 +89,9 @@ func (r *capabilitiesRegistryV1Reader) GetDONs(ctx context.Context) ([]DONInfo, 
 	for i, don := range dons {
 		capConfigs := make([]CapabilityConfiguration, len(don.CapabilityConfigurations))
 		for j, config := range don.CapabilityConfigurations {
-			capConfigId := config.CapabilityId // Store the [32]byte
+			capConfigID := config.CapabilityId // Store the [32]byte
 			capConfigs[j] = CapabilityConfiguration{
-				CapabilityId: &capConfigId, // Set the pointer to the V1 field
+				CapabilityID: &capConfigID, // Set the pointer to the V1 field
 				Config:       config.Config,
 			}
 		}
@@ -135,24 +135,18 @@ func (r *capabilitiesRegistryV1Reader) GetNodes(ctx context.Context) ([]NodeInfo
 	for i, node := range nodes {
 		// Convert p2pId from bytes32 to PeerID
 		// In V1, the P2P ID is stored as [32]byte which can be directly converted to PeerID
-		p2pId := p2ptypes.PeerID(node.P2pId)
-
-		// Convert uint256 slice to uint32 slice
-		capabilitiesDONIds := make([]uint32, len(node.CapabilitiesDONIds))
-		for j, id := range node.CapabilitiesDONIds {
-			capabilitiesDONIds[j] = uint32(id.Uint64())
-		}
+		p2pID := p2ptypes.PeerID(node.P2pId)
 
 		result[i] = NodeInfo{
 			NodeOperatorID:      node.NodeOperatorId,
-			P2PID:               p2pId,
+			P2PID:               p2pID,
 			Signer:              node.Signer,
 			EncryptionPublicKey: node.EncryptionPublicKey,
 			ConfigCount:         node.ConfigCount,
 			WorkflowDONId:       node.WorkflowDONId,
-			CapabilitiesDONIds:  capabilitiesDONIds,
+			CapabilitiesDONIds:  node.CapabilitiesDONIds,
 			// V1-specific fields
-			HashedCapabilityIds: &node.HashedCapabilityIds,
+			HashedCapabilityIDs: &node.HashedCapabilityIds,
 		}
 	}
 

@@ -197,8 +197,8 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 		}
 
 		// V1-specific: build hash mapping from capabilities
-		if c.HashedId != nil {
-			hashedIDsToCapabilityIDs[*c.HashedId] = c.ID
+		if c.HashedID != nil {
+			hashedIDsToCapabilityIDs[*c.HashedID] = c.ID
 		}
 	}
 
@@ -212,23 +212,23 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 	for _, d := range donInfos {
 		cc := map[string]CapabilityConfiguration{}
 		for _, dc := range d.CapabilityConfigurations {
-			// Handle V1 case where CapabilityId is a pointer to [32]byte
+			// Handle V1 case where CapabilityID is a pointer to [32]byte
 			var capabilityID string
 
-			if dc.CapabilityId != nil {
-				// This is V1 - we have the hash directly
-				hash := *dc.CapabilityId
-
-				cid, ok := hashedIDsToCapabilityIDs[hash]
-				if !ok {
-					return nil, fmt.Errorf("invariant violation: could not find capability ID for hashed ID %x", hash)
-				}
-				capabilityID = cid
-			} else {
+			if dc.CapabilityID == nil {
 				// V2 case: capability ID would be a string field (not implemented yet)
 				// For now, skip this case
 				continue
 			}
+
+			// This is V1 - we have the hash directly
+			hash := *dc.CapabilityID
+
+			cid, ok := hashedIDsToCapabilityIDs[hash]
+			if !ok {
+				return nil, fmt.Errorf("invariant violation: could not find capability ID for hashed ID %x", hash)
+			}
+			capabilityID = cid
 
 			cc[capabilityID] = CapabilityConfiguration{
 				Config: dc.Config,
@@ -257,13 +257,8 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 			Signer:              node.Signer,
 			P2pId:               [32]byte(node.P2PID), // Direct conversion from PeerID to [32]byte
 			EncryptionPublicKey: node.EncryptionPublicKey,
-			HashedCapabilityIds: *node.HashedCapabilityIds, // Dereference the pointer
-			CapabilitiesDONIds:  make([]*big.Int, len(node.CapabilitiesDONIds)),
-		}
-
-		// Convert uint32 slice to big.Int slice
-		for i, donID := range node.CapabilitiesDONIds {
-			v1Node.CapabilitiesDONIds[i] = big.NewInt(int64(donID))
+			HashedCapabilityIds: *node.HashedCapabilityIDs, // Dereference the pointer
+			CapabilitiesDONIds:  node.CapabilitiesDONIds,
 		}
 
 		idsToNodes[node.P2PID] = v1Node
@@ -427,10 +422,7 @@ func toDONInfo(don kcr.CapabilitiesRegistryDONInfo) *capabilities.DON {
 }
 
 func toDONInfoFromVersioned(don DONInfo) *capabilities.DON {
-	peerIDs := []p2ptypes.PeerID{}
-	for _, p := range don.NodeP2PIds {
-		peerIDs = append(peerIDs, p)
-	}
+	peerIDs := append([]p2ptypes.PeerID{}, don.NodeP2PIds...)
 
 	return &capabilities.DON{
 		ID:               don.ID,

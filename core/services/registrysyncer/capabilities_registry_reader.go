@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	p2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -47,7 +48,7 @@ type CapabilityInfo struct {
 	IsDeprecated          bool
 
 	// V1-specific fields
-	HashedId *[32]byte `json:"hashedId,omitempty"` // Only populated for V1
+	HashedID *[32]byte `json:"hashedId,omitempty"` // Only populated for V1
 }
 
 // DONInfo represents DON information across all versions
@@ -73,10 +74,10 @@ type NodeInfo struct {
 	EncryptionPublicKey [32]byte
 	ConfigCount         uint32
 	WorkflowDONId       uint32
-	CapabilitiesDONIds  []uint32
+	CapabilitiesDONIds  []*big.Int
 
 	// V1-specific fields
-	HashedCapabilityIds *[][32]byte `json:"hashedCapabilityIds,omitempty"` // V1 uses hashed IDs
+	HashedCapabilityIDs *[][32]byte `json:"hashedCapabilityIds,omitempty"` // V1 uses hashed IDs
 }
 
 // CapabilitiesRegistryReaderFactory creates version-specific readers
