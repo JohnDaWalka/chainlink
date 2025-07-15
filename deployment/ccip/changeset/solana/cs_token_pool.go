@@ -592,7 +592,7 @@ func ModifyMintAuthority(e cldf.Environment, cfg NewMintTokenPoolConfig) (cldf.C
 	newMintAuthority := cfg.NewMintAuthority
 	tokenPoolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
 
-	poolConfig, err := tokens.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	poolConfig, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate the pool configg: %w", err)
 	}
@@ -1574,7 +1574,7 @@ func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConf
 		tokenAmount := uint64(cfg.LiquidityCfg.Amount) // #nosec G115 - we check the amount above
 		switch cfg.LiquidityCfg.Type {
 		case Provide:
-			outDec, outVal, err := tokens.TokenBalance(
+			outDec, outVal, err := solTokenUtil.TokenBalance(
 				e.GetContext(),
 				chain.Client,
 				cfg.LiquidityCfg.RemoteTokenAccount,
@@ -1901,7 +1901,7 @@ func InitializeStateVersion(e cldf.Environment, cfg TokenPoolConfigWithMCM) (cld
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	tokenPubKey := cfg.TokenPubKey
 	tokenPool, contractType := solChainState.GetActiveTokenPool(*cfg.PoolType, cfg.Metadata)
-	poolConfig, err := tokens.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	poolConfig, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate the pool configg: %w", err)
 	}
