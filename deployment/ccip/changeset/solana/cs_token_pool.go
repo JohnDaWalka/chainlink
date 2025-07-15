@@ -25,7 +25,6 @@ import (
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	tokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	solBurnMintTokenPool_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/gobindings/burnmint_token_pool"
 	solLockReleaseTokenPool_v0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/gobindings/lockrelease_token_pool"
@@ -216,7 +215,6 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 
 		var configPDA solana.PublicKey
 		if cfg.CCIPSolanaContractVersion == Version011 {
-
 			// Global Configuration
 			configPDA, err = tokens_v0_1_1.TokenPoolGlobalConfigPDA(tokenPool)
 			if err != nil {
