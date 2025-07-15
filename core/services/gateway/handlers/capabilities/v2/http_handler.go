@@ -29,6 +29,8 @@ const (
 	defaultInitialIntervalMs           = 100
 	defaultMaxIntervalTimeMs           = 1000 * 30 // 30 seconds
 	defaultMultiplier                  = 2.0
+	defaultAuthPullIntervalMs          = 1000 * 60 // 1 minute
+	defaultAuthAggregationIntervalMs   = 1000 * 60 // 1 minute
 	internalErrorMessage               = "Internal server error occurred while processing the request"
 )
 
@@ -108,6 +110,12 @@ func WithDefaults(cfg ServiceConfig) ServiceConfig {
 	}
 	if cfg.MaxTriggerRequestDurationMs == 0 {
 		cfg.MaxTriggerRequestDurationMs = defaultMaxTriggerRequestDurationMs
+	}
+	if cfg.AuthPullIntervalMs == 0 {
+		cfg.AuthPullIntervalMs = defaultAuthPullIntervalMs
+	}
+	if cfg.AuthAggregationIntervalMs == 0 {
+		cfg.AuthAggregationIntervalMs = defaultAuthPullIntervalMs
 	}
 	if cfg.RetryConfig.InitialIntervalMs == 0 {
 		cfg.RetryConfig.InitialIntervalMs = defaultInitialIntervalMs

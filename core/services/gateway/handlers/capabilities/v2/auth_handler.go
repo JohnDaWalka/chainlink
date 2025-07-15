@@ -53,7 +53,11 @@ func (h *AuthHandler) Authorize(workflowID, payload, signature string) bool {
 // syncAuthorizedKeys aggregates the authorized keys from the AuthAggregator and updates the local cache.
 // Should be called periodically to keep the authorized keys up to date.
 func (h *AuthHandler) syncAuthorizedKeys() {
-	authData := h.agg.Aggregate()
+	authData, err := h.agg.Aggregate()
+	if err != nil {
+		h.lggr.Errorw("Failed to aggregate auth data", "error", err)
+		return
+	}
 	authorizedKeys := make(map[string]aggregation.StringSet)
 	for _, data := range authData {
 		authorizedKeys[data.WorkflowID] = make(aggregation.StringSet)
@@ -91,13 +95,17 @@ func (h *AuthHandler) OnAuthMetadataPush(ctx context.Context, resp *jsonrpc.Resp
 		return fmt.Errorf("failed to unmarshal auth metadata: %w", err)
 	}
 	h.lggr.Debugw("Received auth metadata push", "workflowID", authData.WorkflowID, "nodeAddr", nodeAddr)
+	var combinedErr error
 	for _, key := range authData.AuthorizedKeys {
-		h.agg.Collect(aggregation.WorkflowAuthObservation{
+		err := h.agg.Collect(aggregation.WorkflowAuthObservation{
 			WorkflowID:    authData.WorkflowID,
 			AuthorizedKey: key,
 		}, nodeAddr)
+		if err != nil {
+			combinedErr = errors.Join(combinedErr, fmt.Errorf("failed to collect auth observation: %w", err))
+		}
 	}
-	return nil
+	return combinedErr
 }
 
 // OnAuthMetadataPullResponse handles the response to the auth metadata pull request.
@@ -107,15 +115,17 @@ func (h *AuthHandler) OnAuthMetadataPullResponse(ctx context.Context, resp *json
 		return fmt.Errorf("failed to unmarshal auth metadata pull response: %w", err)
 	}
 	h.lggr.Debugw("Received auth metadata pull response", "nodeAddr", nodeAddr)
+	var combinedErr error
 	for _, data := range authData {
 		for _, key := range data.AuthorizedKeys {
-			h.agg.Collect(aggregation.WorkflowAuthObservation{
+			err := h.agg.Collect(aggregation.WorkflowAuthObservation{
 				WorkflowID:    data.WorkflowID,
 				AuthorizedKey: key,
 			}, nodeAddr)
+			combinedErr = errors.Join(combinedErr, err)
 		}
 	}
-	return nil
+	return combinedErr
 }
 
 // Start begins the periodic pull loop.
