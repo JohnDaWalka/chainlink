@@ -272,11 +272,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && needs.changes.outputs.should-run-cre-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run Core CRE Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -323,14 +319,9 @@ jobs:
     if: github.event_name == 'push' && needs.changes.outputs.should-run-cre-tests == 'true'
     uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@b48efd44e74faeaef7291cf8e32ffb31bd8e97c4 # 2025-07-08
     with:
-<<<<<<< HEAD
-     chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
-     chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
-=======
       ecr_name: ${{ inputs.ecr_name || 'chainlink-integration-tests' }}
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
       chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     secrets:
       inherit
 
@@ -346,14 +337,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@b48efd44e74faeaef7291cf8e32ffb31bd8e97c4 # 2025-07-08
     with:
-<<<<<<< HEAD
-     chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
-     chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
-=======
       ecr_name: ${{ inputs.ecr_name || 'chainlink-integration-tests' }}
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
       chainlink_image_tag:  test-${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     secrets:
       inherit
 
@@ -367,11 +353,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.should-run-core-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run Core E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -416,11 +398,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && needs.changes.outputs.should-run-core-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run Core E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -467,11 +445,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'push' && needs.changes.outputs.should-run-core-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run Core E2E Tests For Push
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -518,11 +492,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'workflow_dispatch'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run Core E2E Tests For Workflow Dispatch
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -568,11 +538,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && needs.changes.outputs.should-run-ccip-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run CCIP E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -620,11 +586,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && needs.changes.outputs.should-run-ccip-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run CCIP E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -674,11 +636,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'push' && needs.changes.outputs.should-run-ccip-tests == 'true'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run CCIP E2E Tests For Push
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -728,11 +686,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'workflow_dispatch'
-<<<<<<< HEAD
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
-=======
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@7120f3a614452e1c6b84876c055f574011a947d1 # 2025-07-08
->>>>>>> 833e805c3a (feat(ci): use different ECR for integration test images (#18536))
     with:
       workflow_name: Run CCIP E2E Tests For Workflow Dispatch
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
