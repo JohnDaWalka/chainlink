@@ -362,6 +362,34 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(cldErr, "failed to build full CLD environment")
 	}
 
+	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Configuring OCR3 and Keystone contracts")))
+
+	// Configure the Forwarder, OCR3 and Capabilities contracts
+	configureKeystoneInput := cretypes.ConfigureKeystoneInput{
+		ChainSelector:               homeChainOutput.ChainSelector,
+		CldEnv:                      fullCldOutput.Environment,
+		Topology:                    topology,
+		CapabilitiesRegistryAddress: &capRegAddr,
+		OCR3Address:                 &ocr3Addr,
+	}
+
+	if input.OCR3Config != nil {
+		configureKeystoneInput.OCR3Config = *input.OCR3Config
+	} else {
+		ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
+		if ocr3ConfigErr != nil {
+			return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
+		}
+		configureKeystoneInput.OCR3Config = *ocr3Config
+	}
+
+	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)
+	if keystoneErr != nil {
+		return nil, pkgerrors.Wrap(keystoneErr, "failed to configure keystone contracts")
+	}
+
+	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("OCR3 and Keystone contracts configured in %.2f seconds", stageGen.Elapsed().Seconds())))
+
 	createJobsInput := CreateJobsWithJdOpInput{}
 	createJobsDeps := CreateJobsWithJdOpDeps{
 		Logger:                    testLogger,
@@ -470,34 +498,6 @@ func SetupTestEnvironment(
 			}
 		}
 	}()
-
-	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Configuring OCR3 and Keystone contracts")))
-
-	// Configure the Forwarder, OCR3 and Capabilities contracts
-	configureKeystoneInput := cretypes.ConfigureKeystoneInput{
-		ChainSelector:               homeChainOutput.ChainSelector,
-		CldEnv:                      fullCldOutput.Environment,
-		Topology:                    topology,
-		CapabilitiesRegistryAddress: &capRegAddr,
-		OCR3Address:                 &ocr3Addr,
-	}
-
-	if input.OCR3Config != nil {
-		configureKeystoneInput.OCR3Config = *input.OCR3Config
-	} else {
-		ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
-		if ocr3ConfigErr != nil {
-			return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
-		}
-		configureKeystoneInput.OCR3Config = *ocr3Config
-	}
-
-	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)
-	if keystoneErr != nil {
-		return nil, pkgerrors.Wrap(keystoneErr, "failed to configure keystone contracts")
-	}
-
-	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("OCR3 and Keystone contracts configured in %.2f seconds", stageGen.Elapsed().Seconds())))
 
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Writing bootstrapping data into disk (address book, data store, etc...)")))
 
