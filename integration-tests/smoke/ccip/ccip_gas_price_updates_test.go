@@ -9,8 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/cciptesthelpertypes"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -23,11 +25,24 @@ func Test_CCIPGasPriceUpdatesWriteFrequency(t *testing.T) {
 	ctx := testhelpers.Context(t)
 	callOpts := &bind.CallOpts{Context: ctx}
 
+	const (
+		fRoleDON = 2
+		nRoleDON = 3*fRoleDON + 1
+	)
+
 	var gasPriceExpiry = 5 * time.Second
 	e, _, _ := testsetups.NewIntegrationEnvironment(t,
+		testhelpers.WithNumOfNodes(nRoleDON),
+		testhelpers.WithRoleDONTopology(cciptesthelpertypes.NewRandomTopology(
+			cciptesthelpertypes.RandomTopologyArgs{
+				FChainToNumChains: map[int]int{1: 1},
+				Seed:              42, // for reproducible setups.
+			},
+		)),
 		testhelpers.WithOCRConfigOverride(func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
 			if params.CommitOffChainConfig != nil {
 				params.CommitOffChainConfig.RemoteGasPriceBatchWriteFrequency = *config.MustNewDuration(gasPriceExpiry)
+				params.CommitOffChainConfig.DonBreakingChangesVersion = pluginconfig.DonBreakingChangesVersion1RoleDonSupport
 			}
 			return params
 		}),
