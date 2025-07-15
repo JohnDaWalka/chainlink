@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"context"
 	"time"
 )
 
@@ -13,6 +12,6 @@ func (tp *TimeProvider) GetNodeTime() time.Time {
 	return time.Now().UTC()
 }
 
-func (tp *TimeProvider) GetDONTime(ctx context.Context) (time.Time, error) {
-	return time.Now().UTC(), nil
+func (tp *TimeProvider) GetDONTime() time.Time {
+	return time.Now().UTC()
 }
