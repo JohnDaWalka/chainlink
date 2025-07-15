@@ -114,6 +114,7 @@ func (r ReportCodecCapabilityTrigger) Encode(report datastreamsllo.Report, cd ll
 	if err != nil {
 		return nil, fmt.Errorf("failed to wrap map: %w", err)
 	}
+	return nil, fmt.Errorf("outputs %#v", outputs)
 	p := &capabilitiespb.OCRTriggerReport{
 		EventID:   r.EventID(report),
 		Timestamp: report.ObservationTimestampNanoseconds,
