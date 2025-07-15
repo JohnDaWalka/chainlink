@@ -173,8 +173,6 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 	}
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	addressBook := cldf.NewMemoryAddressBook()
-	routerProgramAddress, _, _ := chainState.GetRouterInfo()
-	rmnRemoteAddress := chainState.RMNRemote
 
 	for _, tokenPoolCfg := range cfg.TokenPoolConfigs {
 		e.Logger.Infow("Adding token pool", "cfg", tokenPoolCfg)
@@ -215,29 +213,25 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 			solBurnMintTokenPool.SetProgramID(tokenPool)
 			// initialize token pool for token
 			poolInitI, err = solBurnMintTokenPool.NewInitializeInstruction(
-				routerProgramAddress,
-				rmnRemoteAddress,
 				poolConfigPDA,
 				tokenPubKey,
 				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
 				solana.SystemProgramID,
 				tokenPool,
 				programData.Address,
-				// configPDA,
+				configPDA,
 			).ValidateAndBuild()
 		case solTestTokenPool.LockAndRelease_PoolType:
 			solLockReleaseTokenPool.SetProgramID(tokenPool)
 			// initialize token pool for token
 			poolInitI, err = solLockReleaseTokenPool.NewInitializeInstruction(
-				routerProgramAddress,
-				rmnRemoteAddress,
 				poolConfigPDA,
 				tokenPubKey,
 				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
 				solana.SystemProgramID,
 				tokenPool,
 				programData.Address,
-				// configPDA,
+				configPDA,
 			).ValidateAndBuild()
 		default:
 			return cldf.ChangesetOutput{}, fmt.Errorf("invalid pool type: %s", tokenPoolCfg.PoolType)
@@ -1719,10 +1713,10 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 		cfg.Metadata,
 	)
 
-	// programData, err := getSolProgramData(e, chain, tokenPool)
-	// if err != nil {
-	// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool program data: %w", err)
-	// }
+	programData, err := getSolProgramData(e, chain, tokenPool)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool program data: %w", err)
+	}
 
 	switch *cfg.PoolType {
 	case solTestTokenPool.BurnAndMint_PoolType:
@@ -1756,8 +1750,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 				poolConfigPDA,
 				tokenPubKey,
 				authority,
-				// tokenPool,
-				// programData.Address,
+				tokenPool,
+				programData.Address,
 			).ValidateAndBuild()
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
@@ -1795,8 +1789,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 				poolConfigPDA,
 				tokenPubKey,
 				authority,
-				// tokenPool,
-				// programData.Address,
+				tokenPool,
+				programData.Address,
 			).ValidateAndBuild()
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
