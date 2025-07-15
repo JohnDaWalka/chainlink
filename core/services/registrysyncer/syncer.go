@@ -2,17 +2,10 @@ package registrysyncer
 
 import (
 	"context"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -21,9 +14,6 @@ import (
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	p2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/capabilities/versioning"
-	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
 type Listener interface {
@@ -54,8 +44,6 @@ type registrySyncer struct {
 	metrics              *syncerMetricLabeler
 	stopCh               services.StopChan
 	listeners            []Listener
-	reader               types.ContractReader
-	initReader           func(ctx context.Context, lggr logger.Logger, relayer ContractReaderFactory, capabilitiesContract types.BoundContract, capabilitiesRegistryVersion semver.Version) (types.ContractReader, error)
 	relayer              ContractReaderFactory
 	capabilitiesContract types.BoundContract
 	getPeerID            func() (p2ptypes.PeerID, error)
@@ -64,9 +52,8 @@ type registrySyncer struct {
 
 	updateChan chan *LocalRegistry
 
-	capabilitiesRegistryVersion semver.Version
-	capabilitiesRegistryReader  CapabilitiesRegistryReader
-	readerFactory               CapabilitiesRegistryReaderFactory
+	capabilitiesRegistryReader CapabilitiesRegistryReader
+	readerFactory              CapabilitiesRegistryReaderFactory
 
 	wg   sync.WaitGroup
 	lggr logger.Logger
@@ -102,87 +89,12 @@ func New(
 		relayer:    relayer,
 		capabilitiesContract: types.BoundContract{
 			Address: registryAddress,
-			Name:    "CapabilitiesRegistry",
+			Name:    capabilitiesRegistryContractName,
 		},
-		initReader:    newReader,
 		orm:           orm,
 		getPeerID:     getPeerID,
 		readerFactory: NewCapabilitiesRegistryReaderFactory(),
 	}, nil
-}
-
-// NOTE: this can't be called while initializing the syncer and needs to be called in the sync loop.
-// This is because Bind() makes an onchain call to verify that the contract address exists, and if
-// called during initialization, this results in a "no live nodes" error.
-func newReader(ctx context.Context, lggr logger.Logger, relayer ContractReaderFactory, capabilitiesContract types.BoundContract, capabilitiesRegistryVersion semver.Version) (types.ContractReader, error) {
-	var contractReaderConfig evmrelaytypes.ChainReaderConfig
-	switch capabilitiesRegistryVersion.Major() {
-	case 1:
-		contractReaderConfig = buildV1ContractReaderConfig()
-	case 2:
-		contractReaderConfig = buildV2ContractReaderConfig()
-	default:
-		return nil, errors.New("unsupported version " + capabilitiesRegistryVersion.String())
-	}
-
-	contractReaderConfigEncoded, err := json.Marshal(contractReaderConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	cr, err := relayer.NewContractReader(ctx, contractReaderConfigEncoded)
-	if err != nil {
-		return nil, err
-	}
-
-	err = cr.Bind(ctx, []types.BoundContract{capabilitiesContract})
-
-	return cr, err
-}
-
-func buildV1ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
-	return evmrelaytypes.ChainReaderConfig{
-		Contracts: map[string]evmrelaytypes.ChainContractReader{
-			"CapabilitiesRegistry": {
-				ContractABI: kcr.CapabilitiesRegistryABI,
-				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-					"getDONs": {
-						ChainSpecificName: "getDONs",
-					},
-					"getCapabilities": {
-						ChainSpecificName: "getCapabilities",
-					},
-					"getNodes": {
-						ChainSpecificName: "getNodes",
-					},
-				},
-			},
-		},
-	}
-}
-
-func buildV2ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
-	// TODO: This will need to be updated with the actual V2 contract ABI
-	// For now, we'll use the same structure as V1 but this will change
-	// once the V2 contract bindings are available
-	return evmrelaytypes.ChainReaderConfig{
-		Contracts: map[string]evmrelaytypes.ChainContractReader{
-			"CapabilitiesRegistry": {
-				ContractABI: kcr.CapabilitiesRegistryABI, // TODO: Replace with V2 ABI
-				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-					"getDONs": {
-						ChainSpecificName: "getDONs",
-					},
-					"getCapabilities": {
-						ChainSpecificName: "getCapabilities",
-					},
-					"getNodes": {
-						ChainSpecificName: "getNodes",
-					},
-				},
-			},
-		},
-	}
 }
 
 func (s *registrySyncer) Start(ctx context.Context) error {
@@ -253,25 +165,16 @@ func (s *registrySyncer) updateStateLoop() {
 	}
 }
 
-func (s *registrySyncer) getContractTypeAndVersion(ctx context.Context) error {
-	version, err := versioning.VerifyTypeAndVersion(ctx, s.capabilitiesContract.Address, s.relayer.NewContractReader, versioning.ContractType(capabilitiesRegistryContractName))
-	if err != nil {
-		return err
-	}
-	s.capabilitiesRegistryVersion = version
-	return nil
-}
-
 func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegistry, error) {
 	// Create versioned reader if not already created
+	// NOTE: This can't be called during syncer initialization because Bind() makes an onchain call
+	// to verify that the contract address exists, and if called during initialization,
+	// this results in a "no live nodes" error.
 	if s.capabilitiesRegistryReader == nil {
-		contractAddress := common.HexToAddress(s.capabilitiesContract.Address)
-
 		reader, err := s.readerFactory.NewCapabilitiesRegistryReader(
 			ctx,
-			s.reader,
-			contractAddress,
-			fmt.Sprintf("%d", s.capabilitiesRegistryVersion.Major()),
+			s.relayer,
+			s.capabilitiesContract.Address,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create capabilities registry reader: %w", err)
@@ -286,10 +189,16 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 	}
 
 	idsToCapabilities := map[string]Capability{}
+	hashedIDsToCapabilityIDs := map[[32]byte]string{}
 	for _, c := range capabilityInfos {
 		idsToCapabilities[c.ID] = Capability{
 			ID:             c.ID,
 			CapabilityType: toCapabilityType(c.CapabilityType),
+		}
+
+		// V1-specific: build hash mapping from capabilities
+		if c.HashedId != nil {
+			hashedIDsToCapabilityIDs[*c.HashedId] = c.ID
 		}
 	}
 
@@ -299,60 +208,26 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 		return nil, fmt.Errorf("failed to get DONs: %w", err)
 	}
 
-	// Build the hash mapping from DON configurations
-	// In V1, the DONs contain the hashed capability IDs which we need to map back to full IDs
-	hashedIDsToCapabilityIDs := map[[32]byte]string{}
-	if s.capabilitiesRegistryVersion.Major() == 1 {
-		for _, d := range donInfos {
-			for _, dc := range d.CapabilityConfigurations {
-				// dc.CapabilityId is the hex string representation of the hash
-				hashBytes, err := hex.DecodeString(strings.TrimPrefix(dc.CapabilityId, "0x"))
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode capability ID hash: %w", err)
-				}
-
-				var hash [32]byte
-				copy(hash[:], hashBytes)
-
-				// Find the corresponding capability ID
-				for capID := range idsToCapabilities {
-					// Try to match the capability ID by checking if it could generate this hash
-					// For now, we'll use a simple heuristic: if the capability ID exists in our map,
-					// assume it matches the hash
-					if _, exists := hashedIDsToCapabilityIDs[hash]; !exists {
-						hashedIDsToCapabilityIDs[hash] = capID
-						break
-					}
-				}
-			}
-		}
-	}
-
 	idsToDONs := map[DonID]DON{}
 	for _, d := range donInfos {
 		cc := map[string]CapabilityConfiguration{}
 		for _, dc := range d.CapabilityConfigurations {
-			// The versioned reader returns capability IDs as hex strings (hashed)
-			// We need to convert them back to the full capability ID using the mapping
+			// Handle V1 case where CapabilityId is a pointer to [32]byte
 			var capabilityID string
-			if s.capabilitiesRegistryVersion.Major() == 1 {
-				// For V1, dc.CapabilityId is a hex string representation of the hash
-				// We need to convert it back to bytes32 to lookup the full ID
-				hashBytes, err := hex.DecodeString(strings.TrimPrefix(dc.CapabilityId, "0x"))
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode capability ID hash: %w", err)
-				}
-				var hash [32]byte
-				copy(hash[:], hashBytes)
 
-				fullID, ok := hashedIDsToCapabilityIDs[hash]
+			if dc.CapabilityId != nil {
+				// This is V1 - we have the hash directly
+				hash := *dc.CapabilityId
+
+				cid, ok := hashedIDsToCapabilityIDs[hash]
 				if !ok {
-					return nil, fmt.Errorf("invariant violation: could not find full ID for hashed ID %s", dc.CapabilityId)
+					return nil, fmt.Errorf("invariant violation: could not find capability ID for hashed ID %x", hash)
 				}
-				capabilityID = fullID
+				capabilityID = cid
 			} else {
-				// For V2+, dc.CapabilityId should already be the full capability ID
-				capabilityID = dc.CapabilityId
+				// V2 case: capability ID would be a string field (not implemented yet)
+				// For now, skip this case
+				continue
 			}
 
 			cc[capabilityID] = CapabilityConfiguration{
@@ -382,7 +257,7 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 			Signer:              node.Signer,
 			P2pId:               [32]byte(node.P2PID), // Direct conversion from PeerID to [32]byte
 			EncryptionPublicKey: node.EncryptionPublicKey,
-			HashedCapabilityIds: node.HashedCapabilityIds,
+			HashedCapabilityIds: *node.HashedCapabilityIds, // Dereference the pointer
 			CapabilitiesDONIds:  make([]*big.Int, len(node.CapabilitiesDONIds)),
 		}
 
@@ -410,21 +285,6 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 	if len(s.listeners) == 0 {
 		s.lggr.Warn("sync called, but no listeners are registered; nooping")
 		return nil
-	}
-
-	if s.reader == nil {
-		err := s.getContractTypeAndVersion(ctx)
-		if err != nil {
-			s.lggr.Errorf("unable to get CapabilitiesRegistry contract version: %s", err)
-			return err
-		}
-
-		reader, err := s.initReader(ctx, s.lggr, s.relayer, s.capabilitiesContract, s.capabilitiesRegistryVersion)
-		if err != nil {
-			return err
-		}
-
-		s.reader = reader
 	}
 
 	var latestRegistry *LocalRegistry

@@ -62,6 +62,8 @@ func (r *capabilitiesRegistryV1Reader) GetCapabilities(ctx context.Context) ([]C
 			ResponseType:          cap.ResponseType,
 			ConfigurationContract: cap.ConfigurationContract,
 			IsDeprecated:          cap.IsDeprecated,
+			// V1-specific fields
+			HashedId: &cap.HashedId,
 		}
 	}
 
@@ -85,12 +87,19 @@ func (r *capabilitiesRegistryV1Reader) GetDONs(ctx context.Context) ([]DONInfo, 
 
 	result := make([]DONInfo, len(dons))
 	for i, don := range dons {
-		capConfigs := make([]VersionedCapabilityConfiguration, len(don.CapabilityConfigurations))
+		capConfigs := make([]CapabilityConfiguration, len(don.CapabilityConfigurations))
 		for j, config := range don.CapabilityConfigurations {
-			capConfigs[j] = VersionedCapabilityConfiguration{
-				CapabilityId: fmt.Sprintf("%x", config.CapabilityId), // Convert bytes32 to hex string
+			capConfigId := config.CapabilityId // Store the [32]byte
+			capConfigs[j] = CapabilityConfiguration{
+				CapabilityId: &capConfigId, // Set the pointer to the V1 field
 				Config:       config.Config,
 			}
+		}
+
+		// Convert P2P IDs from [32]byte to PeerID
+		nodeP2PIds := make([]p2ptypes.PeerID, len(don.NodeP2PIds))
+		for k, id := range don.NodeP2PIds {
+			nodeP2PIds[k] = p2ptypes.PeerID(id)
 		}
 
 		result[i] = DONInfo{
@@ -99,7 +108,7 @@ func (r *capabilitiesRegistryV1Reader) GetDONs(ctx context.Context) ([]DONInfo, 
 			F:                        don.F,
 			IsPublic:                 don.IsPublic,
 			AcceptsWorkflows:         don.AcceptsWorkflows,
-			NodeP2PIds:               don.NodeP2PIds,
+			NodeP2PIds:               nodeP2PIds,
 			CapabilityConfigurations: capConfigs,
 		}
 	}
@@ -139,11 +148,11 @@ func (r *capabilitiesRegistryV1Reader) GetNodes(ctx context.Context) ([]NodeInfo
 			P2PID:               p2pId,
 			Signer:              node.Signer,
 			EncryptionPublicKey: node.EncryptionPublicKey,
-			HashedCapabilityIds: node.HashedCapabilityIds,
-			CapabilityIds:       nil, // V1 doesn't have string capability IDs
 			ConfigCount:         node.ConfigCount,
 			WorkflowDONId:       node.WorkflowDONId,
 			CapabilitiesDONIds:  capabilitiesDONIds,
+			// V1-specific fields
+			HashedCapabilityIds: &node.HashedCapabilityIds,
 		}
 	}
 

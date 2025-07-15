@@ -20,7 +20,11 @@ type DON struct {
 }
 
 type CapabilityConfiguration struct {
+	// Common fields
 	Config []byte
+
+	// V1-specific fields
+	CapabilityId *[32]byte `json:"capabilityId,omitempty"` // V1 uses [32]byte hash
 }
 
 type Capability struct {
