@@ -97,7 +97,8 @@ import (
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	crConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
+	crReader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
 
 	chain_reader_types "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -987,6 +988,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	suiChains := e.BlockChains.SuiChains()
 	suiChain := suiChains[cfg.SourceChain]
+
+	e.Logger.Infof("Sending Sui request via ChainWriter for chain %d", cfg.SourceChain)
+	e.Logger.Infof("CCIP Send Request Config: %+v", cfg)
+	e.Logger.Infof("Onchain state: %+v", state)
+
 	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
 
 	keyString := base64.StdEncoding.EncodeToString(suiChain.DeployerKey)
@@ -1159,20 +1165,20 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	chainWriter.Close()
 
 	// Query the CCIPSend Event via chainReader
-	chainReaderConfig := chainreader.ChainReaderConfig{
+	chainReaderConfig := crConfig.ChainReaderConfig{
 		IsLoopPlugin: false,
-		EventsIndexer: chainreader.EventsIndexerConfig{
+		EventsIndexer: crConfig.EventsIndexerConfig{
 			PollingInterval: 10 * time.Second,
 			SyncTimeout:     10 * time.Second,
 		},
-		TransactionsIndexer: chainreader.TransactionsIndexerConfig{
+		TransactionsIndexer: crConfig.TransactionsIndexerConfig{
 			PollingInterval: 10 * time.Second,
 			SyncTimeout:     10 * time.Second,
 		},
-		Modules: map[string]*chainreader.ChainReaderModule{
+		Modules: map[string]*crConfig.ChainReaderModule{
 			"onramp": {
 				Name: "onramp",
-				Events: map[string]*chainreader.ChainReaderEvent{
+				Events: map[string]*crConfig.ChainReaderEvent{
 					"CCIPMessageSent": {
 						Name:      "CCIPMessageSent",
 						EventType: "CCIPMessageSent",
@@ -1207,7 +1213,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, err
 	}
 
-	chainReader, err := chainreader.NewChainReader(ctx, e.Logger, relayerClient, chainReaderConfig, db)
+	chainReader, err := crReader.NewChainReader(ctx, e.Logger, relayerClient, chainReaderConfig, db)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
 	}
@@ -1254,7 +1260,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to fetch event sequence")
 	}
 	e.Logger.Debugw("Query results", "sequences", sequences)
-	rawevent := sequences[0].Data.(*CCIPMessageSent)
+	rawevent := sequences[3].Data.(*CCIPMessageSent)
 
 	return &AnyMsgSentEvent{
 		SequenceNumber: rawevent.SequenceNumber,
