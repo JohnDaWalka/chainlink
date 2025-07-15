@@ -42,7 +42,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250708220600-853616d583f4
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
-	github.com/smartcontractkit/freeport v0.1.1
+	github.com/smartcontractkit/freeport v0.1.2
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
 	github.com/smartcontractkit/mcms v0.20.2
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945
