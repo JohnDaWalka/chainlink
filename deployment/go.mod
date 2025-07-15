@@ -9,15 +9,15 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
 
-// replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
-// replace github.com/smartcontractkit/chainlink-deployments-framework => ../../chainlink-deployments-framework
+//replace github.com/smartcontractkit/chainlink-deployments-framework => ../../chainlink-deployments-framework
 
 require (
 	dario.cat/mergo v1.0.1
 	github.com/AlekSi/pointer v1.1.0
 	github.com/Khan/genqlient v0.7.0
-	github.com/Masterminds/semver/v3 v3.3.1
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aptos-labs/aptos-go-sdk v1.9.1-0.20250613185448-581cb03acb8f
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/block-vision/sui-go-sdk v1.0.9
@@ -31,7 +31,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mr-tron/base58 v1.2.0
 	github.com/pelletier/go-toml v1.9.5
-	github.com/pelletier/go-toml/v2 v2.2.3
+	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/sethvargo/go-retry v0.2.4
@@ -42,14 +42,14 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250704143810-ee587a6c0562
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250710062234-1e64a19122f6
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250709160835-3dbd1ee373a2
-	github.com/smartcontractkit/chainlink-deployments-framework v0.17.3-0.20250711225258-bceac2b92545
+	github.com/smartcontractkit/chainlink-deployments-framework v0.17.3
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250707140145-45280ea11f19
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250708220600-853616d583f4
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250713062856-8e588ade17f7
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.7
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250715135906-48156204741b
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.3
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.52.4
 	github.com/smartcontractkit/freeport v0.1.1
 	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
