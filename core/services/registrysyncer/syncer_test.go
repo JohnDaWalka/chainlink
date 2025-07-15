@@ -628,7 +628,7 @@ func TestSyncer_V2Unsupported(t *testing.T) {
 	require.Error(t, err)
 
 	time.Sleep(500 * time.Millisecond) // Allow some time for the syncer to start
-	require.Contains(t, err.Error(), "unsupported version 2.0.0")
+	require.Contains(t, err.Error(), "V2 capabilities reading not yet implemented")
 }
 
 // Add this helper struct to implement the ContractReaderFactory interface

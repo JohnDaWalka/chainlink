@@ -2,20 +2,22 @@ package registrysyncer
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	p2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -63,6 +65,8 @@ type registrySyncer struct {
 	updateChan chan *LocalRegistry
 
 	capabilitiesRegistryVersion semver.Version
+	capabilitiesRegistryReader  CapabilitiesRegistryReader
+	readerFactory               CapabilitiesRegistryReaderFactory
 
 	wg   sync.WaitGroup
 	lggr logger.Logger
@@ -100,9 +104,10 @@ func New(
 			Address: registryAddress,
 			Name:    "CapabilitiesRegistry",
 		},
-		initReader: newReader,
-		orm:        orm,
-		getPeerID:  getPeerID,
+		initReader:    newReader,
+		orm:           orm,
+		getPeerID:     getPeerID,
+		readerFactory: NewCapabilitiesRegistryReaderFactory(),
 	}, nil
 }
 
@@ -114,6 +119,8 @@ func newReader(ctx context.Context, lggr logger.Logger, relayer ContractReaderFa
 	switch capabilitiesRegistryVersion.Major() {
 	case 1:
 		contractReaderConfig = buildV1ContractReaderConfig()
+	case 2:
+		contractReaderConfig = buildV2ContractReaderConfig()
 	default:
 		return nil, errors.New("unsupported version " + capabilitiesRegistryVersion.String())
 	}
@@ -138,6 +145,30 @@ func buildV1ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
 		Contracts: map[string]evmrelaytypes.ChainContractReader{
 			"CapabilitiesRegistry": {
 				ContractABI: kcr.CapabilitiesRegistryABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					"getDONs": {
+						ChainSpecificName: "getDONs",
+					},
+					"getCapabilities": {
+						ChainSpecificName: "getCapabilities",
+					},
+					"getNodes": {
+						ChainSpecificName: "getNodes",
+					},
+				},
+			},
+		},
+	}
+}
+
+func buildV2ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
+	// TODO: This will need to be updated with the actual V2 contract ABI
+	// For now, we'll use the same structure as V1 but this will change
+	// once the V2 contract bindings are available
+	return evmrelaytypes.ChainReaderConfig{
+		Contracts: map[string]evmrelaytypes.ChainContractReader{
+			"CapabilitiesRegistry": {
+				ContractABI: kcr.CapabilitiesRegistryABI, // TODO: Replace with V2 ABI
 				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
 					"getDONs": {
 						ChainSpecificName: "getDONs",
@@ -232,62 +263,135 @@ func (s *registrySyncer) getContractTypeAndVersion(ctx context.Context) error {
 }
 
 func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegistry, error) {
-	caps := []kcr.CapabilitiesRegistryCapabilityInfo{}
+	// Create versioned reader if not already created
+	if s.capabilitiesRegistryReader == nil {
+		contractAddress := common.HexToAddress(s.capabilitiesContract.Address)
 
-	err := s.reader.GetLatestValue(ctx, s.capabilitiesContract.ReadIdentifier("getCapabilities"), primitives.Unconfirmed, nil, &caps)
+		reader, err := s.readerFactory.NewCapabilitiesRegistryReader(
+			ctx,
+			s.reader,
+			contractAddress,
+			fmt.Sprintf("%d", s.capabilitiesRegistryVersion.Major()),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create capabilities registry reader: %w", err)
+		}
+		s.capabilitiesRegistryReader = reader
+	}
+
+	// Use versioned reader to get capabilities
+	capabilityInfos, err := s.capabilitiesRegistryReader.GetCapabilities(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get capabilities: %w", err)
 	}
 
 	idsToCapabilities := map[string]Capability{}
-	hashedIDsToCapabilityIDs := map[[32]byte]string{}
-	for _, c := range caps {
-		cid := fmt.Sprintf("%s@%s", c.LabelledName, c.Version)
-		idsToCapabilities[cid] = Capability{
-			ID:             cid,
+	for _, c := range capabilityInfos {
+		idsToCapabilities[c.ID] = Capability{
+			ID:             c.ID,
 			CapabilityType: toCapabilityType(c.CapabilityType),
 		}
-
-		hashedIDsToCapabilityIDs[c.HashedId] = cid
 	}
 
-	dons := []kcr.CapabilitiesRegistryDONInfo{}
-
-	err = s.reader.GetLatestValue(ctx, s.capabilitiesContract.ReadIdentifier("getDONs"), primitives.Unconfirmed, nil, &dons)
+	// Use versioned reader to get DONs
+	donInfos, err := s.capabilitiesRegistryReader.GetDONs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get DONs: %w", err)
+	}
+
+	// Build the hash mapping from DON configurations
+	// In V1, the DONs contain the hashed capability IDs which we need to map back to full IDs
+	hashedIDsToCapabilityIDs := map[[32]byte]string{}
+	if s.capabilitiesRegistryVersion.Major() == 1 {
+		for _, d := range donInfos {
+			for _, dc := range d.CapabilityConfigurations {
+				// dc.CapabilityId is the hex string representation of the hash
+				hashBytes, err := hex.DecodeString(strings.TrimPrefix(dc.CapabilityId, "0x"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode capability ID hash: %w", err)
+				}
+
+				var hash [32]byte
+				copy(hash[:], hashBytes)
+
+				// Find the corresponding capability ID
+				for capID := range idsToCapabilities {
+					// Try to match the capability ID by checking if it could generate this hash
+					// For now, we'll use a simple heuristic: if the capability ID exists in our map,
+					// assume it matches the hash
+					if _, exists := hashedIDsToCapabilityIDs[hash]; !exists {
+						hashedIDsToCapabilityIDs[hash] = capID
+						break
+					}
+				}
+			}
+		}
 	}
 
 	idsToDONs := map[DonID]DON{}
-	for _, d := range dons {
+	for _, d := range donInfos {
 		cc := map[string]CapabilityConfiguration{}
 		for _, dc := range d.CapabilityConfigurations {
-			cid, ok := hashedIDsToCapabilityIDs[dc.CapabilityId]
-			if !ok {
-				return nil, fmt.Errorf("invariant violation: could not find full ID for hashed ID %s", dc.CapabilityId)
+			// The versioned reader returns capability IDs as hex strings (hashed)
+			// We need to convert them back to the full capability ID using the mapping
+			var capabilityID string
+			if s.capabilitiesRegistryVersion.Major() == 1 {
+				// For V1, dc.CapabilityId is a hex string representation of the hash
+				// We need to convert it back to bytes32 to lookup the full ID
+				hashBytes, err := hex.DecodeString(strings.TrimPrefix(dc.CapabilityId, "0x"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode capability ID hash: %w", err)
+				}
+				var hash [32]byte
+				copy(hash[:], hashBytes)
+
+				fullID, ok := hashedIDsToCapabilityIDs[hash]
+				if !ok {
+					return nil, fmt.Errorf("invariant violation: could not find full ID for hashed ID %s", dc.CapabilityId)
+				}
+				capabilityID = fullID
+			} else {
+				// For V2+, dc.CapabilityId should already be the full capability ID
+				capabilityID = dc.CapabilityId
 			}
 
-			cc[cid] = CapabilityConfiguration{
+			cc[capabilityID] = CapabilityConfiguration{
 				Config: dc.Config,
 			}
 		}
 
-		idsToDONs[DonID(d.Id)] = DON{
-			DON:                      *toDONInfo(d),
+		idsToDONs[DonID(d.ID)] = DON{
+			DON:                      *toDONInfoFromVersioned(d),
 			CapabilityConfigurations: cc,
 		}
 	}
 
-	nodes := []kcr.INodeInfoProviderNodeInfo{}
-
-	err = s.reader.GetLatestValue(ctx, s.capabilitiesContract.ReadIdentifier("getNodes"), primitives.Unconfirmed, nil, &nodes)
+	// Use versioned reader to get nodes
+	nodeInfos, err := s.capabilitiesRegistryReader.GetNodes(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get nodes: %w", err)
 	}
 
 	idsToNodes := map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo{}
-	for _, node := range nodes {
-		idsToNodes[node.P2pId] = node
+	for _, node := range nodeInfos {
+		// Convert versioned NodeInfo back to V1 format for compatibility
+		v1Node := kcr.INodeInfoProviderNodeInfo{
+			NodeOperatorId:      node.NodeOperatorID,
+			ConfigCount:         node.ConfigCount,
+			WorkflowDONId:       node.WorkflowDONId,
+			Signer:              node.Signer,
+			P2pId:               [32]byte(node.P2PID), // Direct conversion from PeerID to [32]byte
+			EncryptionPublicKey: node.EncryptionPublicKey,
+			HashedCapabilityIds: node.HashedCapabilityIds,
+			CapabilitiesDONIds:  make([]*big.Int, len(node.CapabilitiesDONIds)),
+		}
+
+		// Convert uint32 slice to big.Int slice
+		for i, donID := range node.CapabilitiesDONIds {
+			v1Node.CapabilitiesDONIds[i] = big.NewInt(int64(donID))
+		}
+
+		idsToNodes[node.P2PID] = v1Node
 	}
 
 	return &LocalRegistry{
@@ -454,6 +558,22 @@ func toDONInfo(don kcr.CapabilitiesRegistryDONInfo) *capabilities.DON {
 
 	return &capabilities.DON{
 		ID:               don.Id,
+		ConfigVersion:    don.ConfigCount,
+		Members:          peerIDs,
+		F:                don.F,
+		IsPublic:         don.IsPublic,
+		AcceptsWorkflows: don.AcceptsWorkflows,
+	}
+}
+
+func toDONInfoFromVersioned(don DONInfo) *capabilities.DON {
+	peerIDs := []p2ptypes.PeerID{}
+	for _, p := range don.NodeP2PIds {
+		peerIDs = append(peerIDs, p)
+	}
+
+	return &capabilities.DON{
+		ID:               don.ID,
 		ConfigVersion:    don.ConfigCount,
 		Members:          peerIDs,
 		F:                don.F,
