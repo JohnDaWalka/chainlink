@@ -2,7 +2,7 @@ module github.com/smartcontractkit/chainlink/v2
 
 go 1.24.5
 
-// replace github.com/smartcontractkit/chainlink-sui => ../chainlink-sui
+replace github.com/smartcontractkit/chainlink-sui => ../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../chainlink-ccip
 
