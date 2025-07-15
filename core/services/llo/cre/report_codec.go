@@ -85,21 +85,23 @@ func (r ReportCodecCapabilityTrigger) Encode(report datastreamsllo.Report, cd ll
 		case nil:
 			// Missing observations are nil
 		case *datastreamsllo.Decimal:
-			multipliedStreamValue1 := v.Decimal()
-			multipliedStreamValue2 := v.Decimal()
+			multipliedStreamValue := v.Decimal()
 
 			if len(opts.Multipliers) != 0 {
-				multipliedStreamValue2 = multipliedStreamValue1.Mul(opts.Multipliers[i].Multiplier)
+				multipliedStreamValue = multipliedStreamValue.Mul(opts.Multipliers[i].Multiplier)
+				r.lggr.Debugw("ReportCodecCapabilityTrigger.Encode multiply called", "streamID", cd.Streams[i].StreamID, "multiplier", opts.Multipliers[i].Multiplier.String())
 			}
 
 			var err error
-			d, err = multipliedStreamValue2.MarshalBinary()
+			d, err = multipliedStreamValue.MarshalBinary()
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal decimal: %w", err)
 			}
+			r.lggr.Debugw("ReportCodecCapabilityTrigger.Encode", "streamID", cd.Streams[i].StreamID, "multiplier", opts.Multipliers[i].Multiplier.String(), "d value", d, "multipliedStreamValue", multipliedStreamValue.String())
 		default:
 			return nil, fmt.Errorf("only decimal StreamValues are supported, got: %T", stream)
 		}
+
 		payload[i] = &commonds.LLOStreamDecimal{
 			StreamID: cd.Streams[i].StreamID,
 			Decimal:  d,
@@ -111,10 +113,10 @@ func (r ReportCodecCapabilityTrigger) Encode(report datastreamsllo.Report, cd ll
 		ObservationTimestampNanoseconds: report.ObservationTimestampNanoseconds,
 	}
 	outputs, err := values.WrapMap(ste)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to wrap map: %w", err)
 	}
-	return nil, fmt.Errorf("outputs %#v", outputs)
 	p := &capabilitiespb.OCRTriggerReport{
 		EventID:   r.EventID(report),
 		Timestamp: report.ObservationTimestampNanoseconds,
