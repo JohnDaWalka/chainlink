@@ -400,8 +400,11 @@ MaxAllowedFinalityDepth = 10000 # Default
 # NOTE: persistence should not be disabled for products that use LogBroadcaster, as it might lead to missed on-chain events.
 PersistenceEnabled = true # Default
 # PersistenceBatchSize is used to batch head tracker db transactions (inserts and deletes).
-# Default is set to 100, which will be the max number of heads the head tracker will need to pull from rpc on startup (if the batch is at 99 and head tracker crashes)
-PersistenceBatchSize = 100 # Default
+# If set to 100, the head tracker will insert and delete to the db every 100 blocks.
+# If the head tracker crashes before the batch size is reached (i.e it fails to write the current batch to the db).
+# Then it will have to load that batch of heads from the rpc on startup.
+# To limit that initial fetch while also improving db usage, 100 is the default for now
+PersistenceBatchSize = 0 # Default
 
 [[EVM.KeySpecific]]
 # Key is the account to apply these settings to
