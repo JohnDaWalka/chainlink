@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
@@ -24,6 +26,8 @@ func BuildTopology(
 	chainIDs []int,
 	blockchainOutput map[uint64]*cretypes.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
+	datastore datastore.DataStore,
+	solClients map[uint64]*solrpc.Client,
 	configFactoryFunctions []cretypes.ConfigFactoryFn,
 	customBinariesPaths map[cretypes.CapabilityFlag]string,
 ) (*cretypes.Topology, []*cretypes.CapabilitiesAwareNodeSet, error) {
@@ -106,6 +110,8 @@ func BuildTopology(
 					Flags:                  donMetadata.Flags,
 					PeeringData:            peeringData,
 					AddressBook:            addressBook,
+					Datastore:              datastore,
+					SolClients:             solClients,
 					HomeChainSelector:      topology.HomeChainSelector,
 					GatewayConnectorOutput: topology.GatewayConnectorOutput,
 				},

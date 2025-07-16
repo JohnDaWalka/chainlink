@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gagliardetto/solana-go"
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/jmoiron/sqlx"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -21,6 +23,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -175,12 +178,18 @@ func SetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Blockchains started in %.2f seconds", stageGen.Elapsed().Seconds())))
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Deploying Keystone contracts")))
 
-	forwardersSelectors := make([]uint64, 0)
+	evmForwardersSelectors := make([]uint64, 0)
+	solForwarderSelectors := make([]uint64, 0)
 	for _, bcOut := range blockchainOutputs {
 		if bcOut.ReadOnly {
 			continue
 		}
-		forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
+		if bcOut.SolChain != nil {
+			solForwarderSelectors = append(solForwarderSelectors, bcOut.SolChain.ChainSelector)
+			continue
+		}
+
+		evmForwardersSelectors = append(evmForwardersSelectors, bcOut.ChainSelector)
 	}
 
 	deployKeystoneReport, err := operations.ExecuteSequence(
@@ -191,7 +200,7 @@ func SetupTestEnvironment(
 		},
 		ks_contracts_op.DeployKeystoneContractsSequenceInput{
 			RegistryChainSelector: homeChainOutput.ChainSelector,
-			ForwardersSelectors:   forwardersSelectors,
+			ForwardersSelectors:   evmForwardersSelectors,
 		},
 	)
 	if err != nil {
@@ -205,6 +214,18 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
 	}
 
+	if len(solForwarderSelectors) > 0 {
+		// TODO deploy forwarder on sol chains
+		// for now let's just save the address
+		err := memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
+			Address:       solana.PublicKey{1, 2, 3}.String(),
+			ChainSelector: solForwarderSelectors[0],
+			Qualifier:     "test-forwarder",
+		})
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to add address to the datastore")
+		}
+	}
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 
 	ocr3Addr := libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String())         //nolint:staticcheck // won't migrate now
@@ -214,7 +235,7 @@ func SetupTestEnvironment(
 	testLogger.Info().Msgf("Deployed OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, ocr3Addr)
 	testLogger.Info().Msgf("Deployed Capabilities Registry contract on chain %d at %s", homeChainOutput.ChainSelector, capRegAddr)
 	testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, wfRegAddr)
-	for _, forwarderSelector := range forwardersSelectors {
+	for _, forwarderSelector := range evmForwardersSelectors {
 		testLogger.Info().Msgf("Deployed Forwarder contract on chain %d at %s", forwarderSelector, libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, forwarderSelector, keystone_changeset.KeystoneForwarder.String())) //nolint:staticcheck // won't migrate now
 	}
 	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Contracts deployed in %.2f seconds", stageGen.Elapsed().Seconds())))
@@ -225,9 +246,17 @@ func SetupTestEnvironment(
 	chainIDs := make([]int, 0)
 	bcOuts := make(map[uint64]*cretypes.WrappedBlockchainOutput)
 	sethClients := make(map[uint64]*seth.Client)
+	solClients := make(map[uint64]*solrpc.Client)
 	for _, bcOut := range blockchainOutputs {
-		chainIDs = append(chainIDs, libc.MustSafeInt(bcOut.ChainID))
+		if bcOut.SolChain != nil {
+			sel := bcOut.SolChain.ChainSelector
+			bcOuts[sel] = bcOut
+			solClients[sel] = bcOut.SolChain.SolClient
+			bcOuts[sel].ChainSelector = sel
+			continue
+		}
 		bcOuts[bcOut.ChainSelector] = bcOut
+		chainIDs = append(chainIDs, libc.MustSafeInt(bcOut.ChainID))
 		sethClients[bcOut.ChainSelector] = bcOut.SethClient
 	}
 
@@ -240,6 +269,8 @@ func SetupTestEnvironment(
 		chainIDs,
 		bcOuts,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		allChainsCLDEnvironment.DataStore,
+		solClients,
 		input.ConfigFactoryFunctions,
 		input.CustomBinariesPaths,
 	)
@@ -282,8 +313,23 @@ func SetupTestEnvironment(
 			chainsWithContracts[chainSelector] = len(addresses) > 0
 		}
 
+		addresses, err := allChainsCLDEnvironment.DataStore.Addresses().Fetch()
+		if err != nil {
+			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr, "failed to get addresses from datastore")}
+			return
+		}
+
+		for _, addr := range addresses {
+			chainsWithContracts[addr.ChainSelector] = true
+		}
+
 		nonEmptyBlockchains := make(map[uint64]cldf_chain.BlockChain, 0)
 		for chainSelector, chain := range allChainsCLDEnvironment.BlockChains.EVMChains() {
+			if chainsWithContracts[chain.Selector] {
+				nonEmptyBlockchains[chainSelector] = chain
+			}
+		}
+		for chainSelector, chain := range allChainsCLDEnvironment.BlockChains.SolanaChains() {
 			if chainsWithContracts[chain.Selector] {
 				nonEmptyBlockchains[chainSelector] = chain
 			}
@@ -340,6 +386,7 @@ func SetupTestEnvironment(
 		JdOutput:          jdOutput,
 		BlockchainOutputs: bcOuts,
 		SethClients:       sethClients,
+		SolClients:        solClients,
 		NodeSetOutput:     nodeSetOutput,
 		ExistingAddresses: allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		Datastore:         allChainsCLDEnvironment.DataStore,
@@ -559,13 +606,18 @@ type ConcurrentNonceMap struct {
 func NewConcurrentNonceMap(ctx context.Context, blockchainOutputs []*cretypes.WrappedBlockchainOutput) (*ConcurrentNonceMap, error) {
 	nonceByChainID := make(map[uint64]uint64)
 	for _, bcOut := range blockchainOutputs {
-		var err error
-		ctxWithTimeout, cancel := context.WithTimeout(ctx, bcOut.SethClient.Cfg.Network.TxnTimeout.Duration())
-		nonceByChainID[bcOut.ChainID], err = bcOut.SethClient.Client.PendingNonceAt(ctxWithTimeout, bcOut.SethClient.MustGetRootKeyAddress())
-		cancel()
-		if err != nil {
+		switch bcOut.BlockchainOutput.Family {
+		case chainselectors.FamilyEVM:
+			var err error
+			ctxWithTimeout, cancel := context.WithTimeout(ctx, bcOut.SethClient.Cfg.Network.TxnTimeout.Duration())
+			nonceByChainID[bcOut.ChainID], err = bcOut.SethClient.Client.PendingNonceAt(ctxWithTimeout, bcOut.SethClient.MustGetRootKeyAddress())
 			cancel()
-			return nil, pkgerrors.Wrapf(err, "failed to get nonce for chain %d", bcOut.ChainID)
+			if err != nil {
+				cancel()
+				return nil, pkgerrors.Wrapf(err, "failed to get nonce for chain %d", bcOut.ChainID)
+			}
+		case chainselectors.FamilySolana:
+			// TODO
 		}
 	}
 	return &ConcurrentNonceMap{nonceByChainID: nonceByChainID}, nil

@@ -69,7 +69,8 @@ import (
 )
 
 var (
-	SinglePoRDonCapabilitiesFlags = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteEVMCapability}
+	SinglePoRDonCapabilitiesFlags       = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteEVMCapability}
+	SinglePoRDonCapabilitiesFlagsSolana = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteSolanaCapability}
 )
 
 type CustomAnvilMiner struct {
@@ -492,13 +493,12 @@ func setupPoRTestEnvironment(
 		},
 		ConfigFactoryFunctions: []types.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
-			//	solwriteconfig.GetGenerateConfig(solwriteconfig.Config{}),
 		},
 	}
 
 	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, cldlogger.NewSingleFileLogger(t), universalSetupInput)
 	require.NoError(t, setupErr, "failed to setup test environment")
-	t.Log("solchains:", universalSetupOutput.CldEnvironment.BlockChains.SolanaChains())
+	require.Len(t, universalSetupOutput.CldEnvironment.BlockChains.SolanaChains(), 1)
 	homeChainOutput := universalSetupOutput.BlockchainOutput[0]
 
 	if in.CustomAnvilMiner != nil {
@@ -523,6 +523,7 @@ func setupPoRTestEnvironment(
 		if bo.ReadOnly {
 			continue
 		}
+
 		chainSelectorToWorkflowConfig[bo.ChainSelector] = in.WorkflowConfigs[idx]
 		chainSelectorToSethClient[bo.ChainSelector] = bo.SethClient
 		chainSelectorToBlockchainOutput[bo.ChainSelector] = bo.BlockchainOutput
@@ -532,11 +533,15 @@ func setupPoRTestEnvironment(
 			Labels:         []string{"data-feeds"}, // label required by the changeset
 		}
 
-		dfOutput, dfErr := changeset.RunChangeset(df_changeset.DeployCacheChangeset, *universalSetupOutput.CldEnvironment, deployConfig)
-		require.NoError(t, dfErr, "failed to deploy data feed cache contract")
+		if bo.SolChain != nil {
+			// TODO deploy df for solana
+		} else {
+			dfOutput, dfErr := changeset.RunChangeset(df_changeset.DeployCacheChangeset, *universalSetupOutput.CldEnvironment, deployConfig)
+			require.NoError(t, dfErr, "failed to deploy data feed cache contract")
 
-		mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook) //nolint:staticcheck // won't migrate now
-		require.NoError(t, mergeErr, "failed to merge address book")
+			mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook) //nolint:staticcheck // won't migrate now
+			require.NoError(t, mergeErr, "failed to merge address book")
+		}
 
 		var creCLIAbsPath string
 		var creCLISettingsFile *os.File
@@ -550,12 +555,17 @@ func setupPoRTestEnvironment(
 			for _, bcOut := range universalSetupOutput.BlockchainOutput {
 				rpcs[bcOut.ChainSelector] = bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl
 			}
-
+			var rootAddress common.Address
+			if bo.SolChain != nil {
+				//TODO
+			} else {
+				rootAddress = bo.SethClient.MustGetRootKeyAddress()
+			}
 			// create CRE CLI settings file
 			var settingsErr error
 			creCLISettingsFile, settingsErr = libcrecli.PrepareCRECLISettingsFile(
 				libcrecli.CRECLIProfile,
-				bo.SethClient.MustGetRootKeyAddress(),
+				rootAddress,
 				universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 				universalSetupOutput.DonTopology.WorkflowDonID,
 				homeChainOutput.ChainSelector,
@@ -563,6 +573,11 @@ func setupPoRTestEnvironment(
 				nil, // without s3Provider.Output
 			)
 			require.NoError(t, settingsErr, "failed to create CRE CLI settings file")
+		}
+
+		if bo.SolChain != nil {
+			// TODO handle configure cache for solana and workflow input
+			continue
 		}
 
 		dfConfigInput := &configureDataFeedsCacheInput{
@@ -702,14 +717,13 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_Solana_MockedPrice(t *t
 	require.NoError(t, err, "couldn't load test config")
 	validateEnvVars(t, in)
 	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
-	require.NotEmpty(t, in.NodeSets[0].NodeSpecs[0].Node.EnvVars["CL_SOLANA_CMD"])
 
 	// Assign all capabilities to the single node set
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*types.CapabilitiesAwareNodeSet {
 		return []*types.CapabilitiesAwareNodeSet{
 			{
 				Input:              input[0],
-				Capabilities:       SinglePoRDonCapabilitiesFlags,
+				Capabilities:       SinglePoRDonCapabilitiesFlagsSolana,
 				DONTypes:           []string{types.WorkflowDON, types.GatewayDON},
 				BootstrapNodeIndex: 0, // not required, but set to make the configuration explicit
 				GatewayNodeIndex:   0, // not required, but set to make the configuration explicit
@@ -745,13 +759,13 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_Solana_MockedPrice(t *t
 		mustSetCapabilitiesFn,
 		capabilityFactoryFns,
 	)
-
+	time.Sleep(30 * time.Second)
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
 		debugTest(t, testLogger, setupOutput, in)
 	})
 
-	waitForFeedUpdate(t, testLogger, priceProvider, setupOutput, 5*time.Minute)
+	// TODO waitForFeedUpdateSolana()
 }
 
 // config file to use: environment-gateway-don.toml

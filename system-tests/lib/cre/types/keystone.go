@@ -23,6 +23,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	"github.com/gagliardetto/solana-go"
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 )
 
 type NodeType = string
@@ -152,6 +155,16 @@ type WrappedBlockchainOutput struct {
 	SethClient         *seth.Client
 	DeployerPrivateKey string
 	ReadOnly           bool
+	SolChain           *SolChain
+}
+
+type SolChain struct {
+	ChainSelector uint64
+	ChainID       string
+	ChainName     string
+	SolClient     *solrpc.Client
+	PrivateKey    solana.PrivateKey
+	ArtifactsDir  string
 }
 
 type CreateJobsInput struct {
@@ -281,6 +294,8 @@ type GenerateConfigsInput struct {
 	Flags                  []string
 	PeeringData            CapabilitiesPeeringData
 	AddressBook            cldf.AddressBook
+	Datastore              datastore.DataStore
+	SolClients             map[uint64]*solrpc.Client
 	GatewayConnectorOutput *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
 }
 
@@ -463,6 +478,7 @@ type FullCLDEnvironmentInput struct {
 	JdOutput          *jd.Output
 	BlockchainOutputs map[uint64]*WrappedBlockchainOutput
 	SethClients       map[uint64]*seth.Client
+	SolClients        map[uint64]*solrpc.Client
 	NodeSetOutput     []*WrappedNodeOutput
 	ExistingAddresses cldf.AddressBook
 	Datastore         datastore.DataStore
@@ -480,7 +496,7 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 	if len(f.SethClients) == 0 {
 		return errors.New("seth clients are not set")
 	}
-	if len(f.BlockchainOutputs) != len(f.SethClients) {
+	if len(f.BlockchainOutputs) != len(f.SethClients)+len(f.SolClients) {
 		return errors.New("blockchain outputs and seth clients must have the same length")
 	}
 	if len(f.NodeSetOutput) == 0 {

@@ -163,7 +163,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 
 type WorkerSolanaInput struct {
 	Name                 string
-	ChainID              uint64
+	ChainID              string
 	ChainSelector        uint64
 	NodeURL              string
 	FromAddress          solana.PublicKey
@@ -179,6 +179,7 @@ func WorkerSolana(chains []*WorkerSolanaInput) string {
 		ret += fmt.Sprintf(`
 		[[Solana]]
 		ChainID = '%s'
+		Enabled = true
 		[[Solana.Nodes]]
 		Name = '%s'
 		URL = '%s'

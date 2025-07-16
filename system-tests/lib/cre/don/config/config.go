@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -52,6 +53,26 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 	workerEVMInputs := make([]*WorkerEVMInput, 0)
 	workerSolanaInputs := make([]*WorkerSolanaInput, 0)
 	for chainSelector, bcOut := range input.BlockchainOutput {
+		if bcOut.SolChain != nil {
+			// Since solana chainID is base58 encoded genesis hash, we can't pass chainID directly from yaml.
+			client, ok := input.SolClients[chainSelector]
+			if !ok {
+				return nil, errors.Errorf("failed to find sol client for selector %d", chainSelector)
+
+			}
+			chainID, err := client.GetGenesisHash(context.Background())
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get chainID from solana")
+			}
+
+			workerSolanaInputs = append(workerSolanaInputs, &WorkerSolanaInput{
+				Name:    fmt.Sprintf("node-%d", bcOut.SolChain.ChainSelector),
+				ChainID: chainID.String(),
+				NodeURL: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
+				// TODO add the rest solana inputs (forwarder, forwarder state from datastore)
+			})
+			continue
+		}
 		// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
 		if len(input.DonMetadata.SupportedChains) > 0 && !slices.Contains(input.DonMetadata.SupportedChains, bcOut.ChainID) {
 			continue
@@ -70,9 +91,6 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 			HasForwarderContract: !bcOut.ReadOnly,
 		})
 
-		workerSolanaInputs = append(workerSolanaInputs, &WorkerSolanaInput{
-			// TODO add solana inputs?
-		})
 	}
 
 	// find contract addresses
@@ -127,9 +145,11 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 
 		// generate configuration for the bootstrap node
 		configOverrides[nodeIndex] = BootstrapEVM(donBootstrapNodePeerID, homeChainID, capabilitiesRegistryAddress, workerEVMInputs)
-
 		if flags.HasFlag(input.Flags, types.WorkflowDON) {
 			configOverrides[nodeIndex] += BoostrapDon2DonPeering(input.PeeringData)
+		}
+		if flags.HasFlag(input.Flags, types.WriteSolanaCapability) {
+			configOverrides[nodeIndex] += WorkerSolana(workerSolanaInputs)
 		}
 	default:
 		return nil, errors.New("multiple bootstrap nodes within a DON found, expected only one")
@@ -185,6 +205,10 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 		// connect worker nodes to all the chains, add chain ID for registry (home chain)
 		// we configure both EVM chains, nodes and EVM.Workflow with Forwarder
 		configOverrides[nodeIndex] = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.PeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs)
+		// we configure Solana chain if solana flag is passed
+		if flags.HasFlag(input.Flags, types.WriteSolanaCapability) {
+			configOverrides[nodeIndex] += WorkerSolana(workerSolanaInputs)
+		}
 	}
 
 	for _, factoryFn := range factoryFns {

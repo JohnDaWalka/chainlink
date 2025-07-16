@@ -337,33 +337,25 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 		}
 	}
 
-	_, err = operations.ExecuteSequence(
-		input.CldEnv.OperationsBundle,
-		ks_contracts_op.ConfigureForwardersSeq,
-		ks_contracts_op.ConfigureForwardersSeqDeps{
-			Env:      input.CldEnv,
-			Registry: capReg.Contract,
-		},
-		ks_contracts_op.ConfigureForwardersSeqInput{
-			RegistryChainSel: input.ChainSelector,
-			DONs:             configDONs,
-			Chains:           chainsWithForwarders,
-		},
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to configure forwarders")
+	if len(chainsWithForwarders) > 0 {
+		_, err = operations.ExecuteSequence(
+			input.CldEnv.OperationsBundle,
+			ks_contracts_op.ConfigureForwardersSeq,
+			ks_contracts_op.ConfigureForwardersSeqDeps{
+				Env:      input.CldEnv,
+				Registry: capReg.Contract,
+			},
+			ks_contracts_op.ConfigureForwardersSeqInput{
+				RegistryChainSel: input.ChainSelector,
+				DONs:             configDONs,
+				Chains:           chainsWithForwarders,
+			},
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to configure forwarders")
+		}
 	}
-
-	// TODO execute only if forwarder present?
-	// TODO move configure logic from changeset to sequence
-	//_, err = operations.ExecuteOperation(
-	//	input.CldEnv.OperationsBundle,
-	//		ks_contracts_sol_op.ConfigureForwarderOp,
-	//		ks_contracts_sol_op.Deps{
-	//			Env: *input.CldEnv,
-	//		},
-	//		ks_contracts_sol_op.ConfigureForwarderInput{},
-	//	)
+	// TODO Configure Solana Forwarder here
 
 	_, err = operations.ExecuteOperation(
 		input.CldEnv.OperationsBundle,
