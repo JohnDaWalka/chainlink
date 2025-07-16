@@ -142,6 +142,18 @@ func createSuiChainConfig(chainID string, chain suichain.Chain) chainlink.RawCon
 			"URL":  chain.URL,
 		},
 	}
+	chainConfig["TransactionManager"] = map[string]any{
+		"BroadcastChanSize":     100,
+		"ConfirmPollSecs":       2,
+		"DefaultMaxGasAmount":   200000,
+		"MaxTxRetryAttempts":    5,
+		"RequestType":           "WaitForEffectsCert",
+		"TransactionTimeout":    "10s",
+		"MaxConcurrentRequests": 5,
+	}
+	chainConfig["BalanceMonitor"] = map[string]any{
+		"BalancePollPeriod": "10s",
+	}
 
 	return chainConfig
 }

@@ -1088,7 +1088,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	}
 
 	// Setup new PTB client
-	keystoreInstance, err := keystore.NewSuiKeystore(e.Logger, keyString)
+	keystoreInstance, err := keystore.NewInMemoryKeystore(e.Logger)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
+	_, err = keystoreInstance.AddKey(keyString)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
 	}
