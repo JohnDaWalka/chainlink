@@ -28,7 +28,7 @@
 [[workflow_configs]]
   feed_id = "018e16c39e000320000000000000000000000000000000000000000000000000"
 
-  should_compile_new_workflow = true
+  should_compile_new_workflow = false
   use_cre_cli = true
 
   workflow_folder_location = "../../../../../proof-of-reserves-workflow-e2e-test/cron-based"
