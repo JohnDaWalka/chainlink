@@ -170,9 +170,6 @@ func WorkerWorkflowRegistry(workflowRegistryAddr common.Address, homeChainID uin
 	NetworkID = "evm"
 	ChainID = "%d"
 	# SyncStrategy = "reconciliation"
-
-	[CRE.WorkflowFetcher]
-	URL = "file:///home/chainlink/workflows"
 `,
 		workflowRegistryAddr.Hex(),
 		homeChainID,

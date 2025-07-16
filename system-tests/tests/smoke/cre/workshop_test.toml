@@ -33,10 +33,7 @@
   [[nodesets.node_specs]]
 
     [nodesets.node_specs.node]
-      # this test only works with CL node that supports the local fetcher service
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      #image = "chainlink:develop"
+      image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink:manual-249d8db-plugins"
       user_config_overrides = """
 
       [Log]
