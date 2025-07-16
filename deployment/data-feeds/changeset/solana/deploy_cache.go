@@ -308,7 +308,7 @@ func (cs ConfigureCacheDecimalReport) VerifyPreconditions(env cldf.Environment, 
 	// Check that Descriptions and DataIDs are all the same length
 
 	if len(req.DataIDs) != len(req.Descriptions) {
-		return errors.New("Descriptions and DataIDs must all have the same length")
+		return errors.New("descriptions and DataIDs must all have the same length")
 	}
 
 	return nil
