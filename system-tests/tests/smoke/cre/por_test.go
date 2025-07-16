@@ -54,6 +54,7 @@ import (
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
+	solwriterconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/writesolana"
 	crecompute "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/compute"
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
@@ -494,6 +495,7 @@ func setupPoRTestEnvironment(
 		},
 		ConfigFactoryFunctions: []types.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
+			solwriterconfig.GetGenerateConfig(solwriterconfig.Config{}),
 		},
 	}
 
@@ -557,7 +559,7 @@ func setupPoRTestEnvironment(
 			var rootAddress common.Address
 			if bo.SolChain != nil {
 				// TODO derive root address here
-				rootAddress = common.Address(bo.SolChain.PrivateKey)
+				rootAddress = common.Address(bo.SolChain.PrivateKey.PublicKey().Bytes())
 			} else {
 				rootAddress = bo.SethClient.MustGetRootKeyAddress()
 			}
@@ -759,13 +761,12 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_Solana_MockedPrice(t *t
 		mustSetCapabilitiesFn,
 		capabilityFactoryFns,
 	)
-	time.Sleep(30 * time.Second)
 	// Log extra information that might help debugging
 	t.Cleanup(func() {
 		debugTest(t, testLogger, setupOutput, in)
 	})
 
-	// TODO waitForFeedUpdateSolana()
+	// TODO PLEX-1543 waitForFeedUpdateSolana()
 }
 
 // config file to use: environment-gateway-don.toml
