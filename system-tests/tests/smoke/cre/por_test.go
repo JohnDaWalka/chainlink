@@ -557,7 +557,7 @@ func setupPoRTestEnvironment(
 			}
 			var rootAddress common.Address
 			if bo.SolChain != nil {
-				//TODO
+				// TODO derive root address here
 			} else {
 				rootAddress = bo.SethClient.MustGetRootKeyAddress()
 			}
