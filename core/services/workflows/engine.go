@@ -1023,7 +1023,7 @@ func (e *Engine) executeStep(
 	// NOTE: e.maxWorkerLimit is a static number leading to the availability always being undercut.
 	if tr.Metadata.SpendLimits, err = meteringReport.Deduct(
 		curStep.Ref,
-		metering.WithDerivedValue(userMaxSpend, e.maxWorkerLimit, info, config),
+		metering.ByDerivedAvailability(userMaxSpend, e.maxWorkerLimit, info, config),
 	); err != nil {
 		e.logger.Error(fmt.Sprintf("could not deduct balance for capability request %s: %s", curStep.Ref, err))
 	}

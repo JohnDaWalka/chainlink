@@ -189,7 +189,7 @@ func (r *Report) Reserve(ctx context.Context) error {
 
 type DeductOpt func(string, *Report) ([]capabilities.SpendLimit, error)
 
-func WithNativeValue(
+func ByResource(
 	spendType string,
 	amount decimal.Decimal,
 ) func(string, *Report) ([]capabilities.SpendLimit, error) {
@@ -214,7 +214,7 @@ func WithNativeValue(
 	}
 }
 
-func WithDerivedValue(
+func ByDerivedAvailability(
 	userSpendLimit decimal.NullDecimal,
 	openConcurrentCallSlots int,
 	info capabilities.CapabilityInfo,
@@ -416,7 +416,7 @@ func (r *Report) EmitReceipt(ctx context.Context) error {
 // this function.
 func (r *Report) creditToSpendingLimits(
 	info capabilities.CapabilityInfo,
-	config *values.Map,
+	capConfig *values.Map,
 	amount decimal.Decimal,
 ) []capabilities.SpendLimit {
 	if r.meteringMode {
@@ -428,7 +428,7 @@ func (r *Report) creditToSpendingLimits(
 		return []capabilities.SpendLimit{}
 	}
 
-	ratios, err := ratiosFromConfig(info, config)
+	ratios, err := ratiosFromConfig(info, capConfig)
 	if err != nil {
 		r.switchToMeteringMode(err)
 
@@ -652,7 +652,7 @@ func (s *Reports) Len() int {
 // is mutable enough for this purpose while the capability info.
 func ratiosFromConfig(
 	info capabilities.CapabilityInfo,
-	config *values.Map,
+	capConfig *values.Map,
 ) (map[capabilities.CapabilitySpendType]decimal.Decimal, error) {
 	ratios := make(map[capabilities.CapabilitySpendType]decimal.Decimal)
 
@@ -663,11 +663,11 @@ func ratiosFromConfig(
 		return ratios, nil
 	}
 
-	if config == nil {
+	if capConfig == nil {
 		return ratios, fmt.Errorf("%w: spending ratios not set; config is nil", ErrInvalidRatios)
 	}
 
-	rawRatiosValue, hasRatios := config.Underlying[RatiosKey]
+	rawRatiosValue, hasRatios := capConfig.Underlying[RatiosKey]
 	if !hasRatios {
 		return ratios, fmt.Errorf("%w: spending ratios not set", ErrInvalidRatios)
 	}

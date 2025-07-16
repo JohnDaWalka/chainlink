@@ -93,7 +93,7 @@ func (c *ExecutionHelper) callCapability(ctx context.Context, request *sdkpb.Cap
 
 	if capReq.Metadata.SpendLimits, err = meterReport.Deduct(
 		meteringRef,
-		metering.WithDerivedValue(
+		metering.ByDerivedAvailability(
 			userSpendLimit,
 			int(c.cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow)-c.capCallsSemaphore.Len(),
 			info,
