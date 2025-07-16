@@ -54,7 +54,7 @@ func TestDeployCache(t *testing.T) {
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
 				BuildConfig: &helpers.BuildSolanaConfig{
-					GitCommitSha:   "ba5a33ab378020fac73bda72b6bc2f9ae6bddb83",
+					GitCommitSha:   "9c2803ca58a0ea8d194223c4916a018d06b2c318",
 					DestinationDir: getProgramsPath(),
 					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
 				},
