@@ -27,7 +27,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/slack-go/slack v0.15.0
 	github.com/smartcontractkit/chain-selectors v1.0.62
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250716181906-d98192455104
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250716223422-ad10be6eb584
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
 	github.com/smartcontractkit/chainlink-common v0.8.0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.2
