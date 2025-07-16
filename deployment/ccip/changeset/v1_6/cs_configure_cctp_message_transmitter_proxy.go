@@ -11,7 +11,7 @@ import (
 
 	// TODO: New token pool contract should be imported from the latest version
 
-	mtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
+	cmtp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/cctp_message_transmitter_proxy"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -30,11 +30,11 @@ var (
 	CCTPMessageTransmitterProxyConfigOp = opsutil.NewEVMCallOperation(
 		"CCTPMessageTransmitterProxyConfigOp",
 		semver.MustParse("1.0.0"),
-		"Setting CCTP message transmitter proxy config across multiple EVM chains",
-		mtp.CCTPMessageTransmitterProxyABI,
+		"Setting CCTP message transmitter proxy config",
+		cmtp.CCTPMessageTransmitterProxyABI,
 		shared.CCTPMessageTransmitterProxy,
-		mtp.NewCCTPMessageTransmitterProxy,
-		func(proxy *mtp.CCTPMessageTransmitterProxy, opts *bind.TransactOpts, input []mtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs) (*types.Transaction, error) {
+		cmtp.NewCCTPMessageTransmitterProxy,
+		func(proxy *cmtp.CCTPMessageTransmitterProxy, opts *bind.TransactOpts, input []cmtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs) (*types.Transaction, error) {
 			return proxy.ConfigureAllowedCallers(opts, input)
 		})
 
@@ -42,7 +42,7 @@ var (
 		"CCTPMessageTransmitterProxyConfigSequence",
 		semver.MustParse("1.0.0"),
 		"Setting CCTP message transmitter proxy config across multiple EVM chains",
-		func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, inputs map[uint64]opsutil.EVMCallInput[[]mtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs]) (map[uint64][]opsutil.EVMCallOutput, error) {
+		func(b operations.Bundle, chains map[uint64]cldf_evm.Chain, inputs map[uint64]opsutil.EVMCallInput[[]cmtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs]) (map[uint64][]opsutil.EVMCallOutput, error) {
 			out := make(map[uint64][]opsutil.EVMCallOutput, len(inputs))
 
 			for chainSelector, input := range inputs {
@@ -102,7 +102,7 @@ func (i ConfigureCCTPMessageTransmitterProxyInput) Validate(ctx context.Context,
 
 // ConfigureCCTPMessageTransmitterProxyContractConfig defines the configuration for configuring the CCTP message transmitter proxy contracts.
 type ConfigureCCTPMessageTransmitterProxyContractConfig struct {
-	USDCProxies map[uint64]ConfigureCCTPMessageTransmitterProxyInput
+	CCTPProxies map[uint64]ConfigureCCTPMessageTransmitterProxyInput
 }
 
 func configureCCTPMessageTransmitterProxyContractPrecondition(env cldf.Environment, c ConfigureCCTPMessageTransmitterProxyContractConfig) error {
@@ -110,7 +110,7 @@ func configureCCTPMessageTransmitterProxyContractPrecondition(env cldf.Environme
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
-	for chainSelector, proxyConfig := range c.USDCProxies {
+	for chainSelector, proxyConfig := range c.CCTPProxies {
 		chain, chainState, err := state.GetEVMChainState(env, chainSelector)
 		if err != nil {
 			return fmt.Errorf("failed to get EVM chain state for chain selector %d: %w", chainSelector, err)
@@ -134,23 +134,23 @@ func configureCCTPMessageTransmitterProxyContractLogic(env cldf.Environment, c C
 	}
 
 	// Convert CLD/migrations inputs to onchain inputs.
-	input := make(map[uint64]opsutil.EVMCallInput[[]mtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs], len(c.USDCProxies))
-	for chainSelector, proxyConfig := range c.USDCProxies {
+	input := make(map[uint64]opsutil.EVMCallInput[[]cmtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs], len(c.CCTPProxies))
+	for chainSelector, proxyConfig := range c.CCTPProxies {
 		_, chainState, err := state.GetEVMChainState(env, chainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EVM chain state for chain selector %d: %w",
 				chainSelector, err)
 		}
 
-		allowedCallerInputs := make([]mtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs, len(proxyConfig.AllowedCallerUpdates))
+		allowedCallerInputs := make([]cmtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs, len(proxyConfig.AllowedCallerUpdates))
 		for _, allowedCallerUpdate := range proxyConfig.AllowedCallerUpdates {
-			allowedCallerInputs = append(allowedCallerInputs, mtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs{
+			allowedCallerInputs = append(allowedCallerInputs, cmtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs{
 				Allowed: true,
 				Caller:  allowedCallerUpdate.AllowedCaller,
 			})
 		}
 
-		input[chainSelector] = opsutil.EVMCallInput[[]mtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs]{
+		input[chainSelector] = opsutil.EVMCallInput[[]cmtp.CCTPMessageTransmitterProxyAllowedCallerConfigArgs]{
 			ChainSelector: chainSelector,
 			NoSend:        false, // TODO: MCMS?
 			Address:       chainState.CCTPMessageTransmitterProxies[deployment.Version1_6_0].Address(),

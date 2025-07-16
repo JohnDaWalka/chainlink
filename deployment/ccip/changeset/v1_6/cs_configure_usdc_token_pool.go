@@ -29,7 +29,7 @@ var (
 	USDCTokenPoolConfigOp = opsutil.NewEVMCallOperation(
 		"USDCTokenPoolConfigOp",
 		semver.MustParse("1.0.0"),
-		"Setting USDC Token Pool config across multiple EVM chains",
+		"Setting USDC Token Pool config",
 		utp.USDCTokenPoolABI,
 		shared.USDCTokenPool,
 		utp.NewUSDCTokenPool,
