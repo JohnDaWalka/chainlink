@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	seq "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence"
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence/operation"
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
