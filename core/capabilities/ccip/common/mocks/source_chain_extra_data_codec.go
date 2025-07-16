@@ -3,7 +3,11 @@
 package mocks
 
 import (
+<<<<<<< HEAD
 	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+=======
+	ccipocr3 "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+>>>>>>> 2b6552d77d (Revert "make generate")
 
 	mock "github.com/stretchr/testify/mock"
 )
