@@ -73,6 +73,9 @@ type ConfigureCCTPMessageTransmitterProxyInput struct {
 }
 
 func (i ConfigureCCTPMessageTransmitterProxyInput) Validate(ctx context.Context, chain cldf_evm.Chain, state evm.CCIPChainState) error {
+	if _, ok := state.CCTPMessageTransmitterProxies[deployment.Version1_6_0]; !ok {
+		return fmt.Errorf("no CCTP proxy with version %s found on %s", deployment.Version1_6_0, chain.Name())
+	}
 	for _, allowedCalleUpdate := range i.AllowedCallerUpdates {
 		if allowedCalleUpdate.AllowedCaller == utils.ZeroAddress {
 			return fmt.Errorf("token messenger must be defined for chain %s", chain.Name)
