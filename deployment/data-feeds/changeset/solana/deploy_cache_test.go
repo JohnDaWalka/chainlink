@@ -58,6 +58,7 @@ func TestDeployCache(t *testing.T) {
 					DestinationDir: getProgramsPath(),
 					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
 				},
+                FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
 			},
 		)
 
@@ -156,6 +157,7 @@ func TestConfigureCache(t *testing.T) {
 				ChainSel:  solSel,
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
+                FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
 			},
 		)
 

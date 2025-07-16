@@ -67,6 +67,7 @@ type (
 	InitCacheInput struct {
 		ProgramID solana.PublicKey
 		ChainSel  uint64
+		FeedAdmins []solana.PublicKey // Feed admins to be added to the cache
 	}
 
 	InitCacheOutput struct {
@@ -118,6 +119,7 @@ type (
 // Common helper functions to reduce duplication
 
 func ensureProgramID(programID solana.PublicKey) {
+	fmt.Printf("Ensuring program ID: %s\n", ks_cache.ProgramID)
 	if ks_cache.ProgramID.IsZero() {
 		ks_cache.SetProgramID(programID)
 	}
@@ -188,6 +190,8 @@ func getCurrentAuthority(deps Deps, chainSel uint64, mcmsConfig *proposalutils.T
 
 func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutput, error) {
 	var out InitCacheOutput
+	fmt.Printf("InitCacheInput: %+v\n", in)
+
 	ensureProgramID(in.ProgramID)
 
 	stateKey, err := solana.NewRandomPrivateKey()
@@ -195,13 +199,8 @@ func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutp
 		return out, fmt.Errorf("failed to create random keys: %w", err)
 	}
 
-	adminStateKey, err := solana.NewRandomPrivateKey()
-	if err != nil {
-		return out, fmt.Errorf("failed to create random admin keys: %w", err)
-	}
-
 	instruction, err := ks_cache.NewInitializeInstruction(
-		[]solana.PublicKey{adminStateKey.PublicKey()},
+		in.FeedAdmins,
 		deps.Chain.DeployerKey.PublicKey(),
 		stateKey.PublicKey(),
 		solana.SystemProgramID,
@@ -260,6 +259,10 @@ func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalR
 	var out ConfigureCacheOutput
 	ensureProgramID(in.ProgramID)
 
+	fmt.Printf("DataIDs: %+v\n", in.DataIDs)
+	fmt.Printf("FeedAdmin: %+v\n", in.FeedAdmin)
+	fmt.Printf("State: %+v\n", in.State)
+	fmt.Printf("ProgramID: %+v\n", in.ProgramID)
 	instruction, err := ks_cache.NewInitDecimalReportsInstruction(
 		in.DataIDs,
 		in.FeedAdmin,

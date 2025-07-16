@@ -35,8 +35,8 @@ func (cs TransferOwnershipCache) Apply(env cldf.Environment, req *TransferOwners
 		Qualifier:     req.Qualifier,
 		MCMSCfg:       req.MCMSCfg,
 		ContractConfig: solanaCs.ContractConfig{
-			ContractType: "CacheContract",
-			StateType:    "CacheState",
+			ContractType: CacheContract,
+			StateType:    CacheState,
 			OperationID:  "transfer-ownership-cache",
 			Description:  "transfers ownership of cache to mcms",
 		},

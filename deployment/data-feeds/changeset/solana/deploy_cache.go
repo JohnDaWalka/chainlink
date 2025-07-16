@@ -27,6 +27,7 @@ type DeployCacheRequest struct {
 	Qualifier   string
 	LabelSet    datastore.LabelSet
 	Version     string
+    FeedAdmins []solana.PublicKey // Feed admins to be added to the cache
 }
 
 var _ cldf.ChangeSetV2[*DeployCacheRequest] = DeployCache{}
@@ -64,6 +65,7 @@ func (cs DeployCache) Apply(env cldf.Environment, req *DeployCacheRequest) (cldf
 	deploySeqInput := seq.DeployCacheSeqInput{
 		ChainSel:    req.ChainSel,
 		ProgramName: "data_feeds_cache",
+        FeedAdmins: req.FeedAdmins,
 	}
 
 	deps := operation.Deps{
@@ -241,6 +243,12 @@ func (cs InitCacheDecimalFeed) Apply(env cldf.Environment, req *InitCacheDecimal
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
 	cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
+
+    fmt.Printf("Cache state ref: %+v", cacheStateRef)
+    fmt.Printf("Cache ref: %+v", cacheRef)
+    fmt.Printf("Cache state: %+v\n", cacheState)
+    fmt.Printf("Cache program ID: %+v\n", cacheProgramID)
+
 	if err != nil {
 		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
 	}
@@ -248,7 +256,7 @@ func (cs InitCacheDecimalFeed) Apply(env cldf.Environment, req *InitCacheDecimal
 	initInput := operation.InitCacheDecimalReportInput{
 		ChainSel:  req.ChainSel,
 		MCMS:      req.MCMS,
-		ProgramID: solana.MustPublicKeyFromBase58(cacheProgramID.Address),
+		ProgramID: solana.SystemProgramID,
 		State:     solana.MustPublicKeyFromBase58(cacheState.Address),
 		Type:      cldf.ContractType(CacheContract),
 		DataIDs:   req.DataIDs,
