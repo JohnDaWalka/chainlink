@@ -90,7 +90,6 @@ type TokenPoolTestConfig struct {
 }
 
 func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfig) {
-
 	mcms := config.MCMS
 	tokenMetadata := config.TokenMetadata
 
