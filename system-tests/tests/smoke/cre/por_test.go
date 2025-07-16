@@ -533,15 +533,14 @@ func setupPoRTestEnvironment(
 			Labels:         []string{"data-feeds"}, // label required by the changeset
 		}
 
-		if bo.SolChain != nil {
-			// TODO deploy df for solana
-		} else {
+		if bo.SolChain == nil {
 			dfOutput, dfErr := changeset.RunChangeset(df_changeset.DeployCacheChangeset, *universalSetupOutput.CldEnvironment, deployConfig)
 			require.NoError(t, dfErr, "failed to deploy data feed cache contract")
 
 			mergeErr := universalSetupOutput.CldEnvironment.ExistingAddresses.Merge(dfOutput.AddressBook) //nolint:staticcheck // won't migrate now
 			require.NoError(t, mergeErr, "failed to merge address book")
 		}
+		// TODO handle sol chain df cache deploy here
 
 		var creCLIAbsPath string
 		var creCLISettingsFile *os.File
@@ -558,6 +557,7 @@ func setupPoRTestEnvironment(
 			var rootAddress common.Address
 			if bo.SolChain != nil {
 				// TODO derive root address here
+				rootAddress = common.Address(bo.SolChain.PrivateKey)
 			} else {
 				rootAddress = bo.SethClient.MustGetRootKeyAddress()
 			}
