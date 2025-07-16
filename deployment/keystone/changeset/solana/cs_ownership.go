@@ -45,17 +45,8 @@ type TransferOwnershipForwarderRequest struct {
 	MCMSCfg                     proposalutils.TimelockConfig
 }
 
-// TransferOwnershipCacheRequest wraps the generic request for cache contracts
-type TransferOwnershipCacheRequest struct {
-	ChainSel                    uint64
-	CurrentOwner, ProposedOwner solana.PublicKey
-	Version                     string
-	Qualifier                   string
-	MCMSCfg                     proposalutils.TimelockConfig
-}
-
 // genericTransferOwnership handles the common ownership transfer logic
-func genericTransferOwnership(env cldf.Environment, req *TransferOwnershipRequest) (cldf.ChangesetOutput, error) {
+func GenericTransferOwnership(env cldf.Environment, req *TransferOwnershipRequest) (cldf.ChangesetOutput, error) {
 	var out cldf.ChangesetOutput
 	version := semver.MustParse(req.Version)
 	
@@ -131,7 +122,7 @@ func genericTransferOwnership(env cldf.Environment, req *TransferOwnershipReques
 }
 
 // genericVerifyPreconditions handles the common precondition verification logic
-func genericVerifyPreconditions(env cldf.Environment, chainSel uint64, version, qualifier string, contractType datastore.ContractType) error {
+func GenericVerifyPreconditions(env cldf.Environment, chainSel uint64, version, qualifier string, contractType datastore.ContractType) error {
 	// Validate version
 	if _, err := semver.NewVersion(version); err != nil {
 		return err
@@ -158,7 +149,7 @@ var _ cldf.ChangeSetV2[*TransferOwnershipForwarderRequest] = TransferOwnershipFo
 type TransferOwnershipForwarder struct{}
 
 func (cs TransferOwnershipForwarder) VerifyPreconditions(env cldf.Environment, req *TransferOwnershipForwarderRequest) error {
-	return genericVerifyPreconditions(env, req.ChainSel, req.Version, req.Qualifier, "ForwarderContract")
+	return GenericVerifyPreconditions(env, req.ChainSel, req.Version, req.Qualifier, "ForwarderContract")
 }
 
 func (cs TransferOwnershipForwarder) Apply(env cldf.Environment, req *TransferOwnershipForwarderRequest) (cldf.ChangesetOutput, error) {
@@ -176,32 +167,6 @@ func (cs TransferOwnershipForwarder) Apply(env cldf.Environment, req *TransferOw
 			Description:  "transfers ownership of forwarder to mcms",
 		},
 	}
-	return genericTransferOwnership(env, genericReq)
+	return GenericTransferOwnership(env, genericReq)
 }
 
-// TransferOwnershipCache implementation
-var _ cldf.ChangeSetV2[*TransferOwnershipCacheRequest] = TransferOwnershipCache{}
-
-type TransferOwnershipCache struct{}
-
-func (cs TransferOwnershipCache) VerifyPreconditions(env cldf.Environment, req *TransferOwnershipCacheRequest) error {
-	return genericVerifyPreconditions(env, req.ChainSel, req.Version, req.Qualifier, "CacheContract")
-}
-
-func (cs TransferOwnershipCache) Apply(env cldf.Environment, req *TransferOwnershipCacheRequest) (cldf.ChangesetOutput, error) {
-	genericReq := &TransferOwnershipRequest{
-		ChainSel:      req.ChainSel,
-		CurrentOwner:  req.CurrentOwner,
-		ProposedOwner: req.ProposedOwner,
-		Version:       req.Version,
-		Qualifier:     req.Qualifier,
-		MCMSCfg:       req.MCMSCfg,
-		ContractConfig: ContractConfig{
-			ContractType: "CacheContract",
-			StateType:    "CacheState",
-			OperationID:  "transfer-ownership-cache",
-			Description:  "transfers ownership of cache to mcms",
-		},
-	}
-	return genericTransferOwnership(env, genericReq)
-}
