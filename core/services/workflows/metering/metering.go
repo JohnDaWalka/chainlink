@@ -248,10 +248,7 @@ func WithDerivedValue(
 // Deduct earmarks an amount of local universal credit balance. The amount provided is expected to be in native units.
 // An option of 0 indicates a max spend should be derived from user limits and concurrent call slots. We expect to only
 // set this value once - an error is returned if a step would be overwritten.
-func (r *Report) Deduct(
-	ref string,
-	opt DeductOpt,
-) ([]capabilities.SpendLimit, error) {
+func (r *Report) Deduct(ref string, opt DeductOpt) ([]capabilities.SpendLimit, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

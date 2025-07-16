@@ -172,8 +172,11 @@ func Test_Report_MeteringMode(t *testing.T) {
 			require.NoError(t, report.Reserve(t.Context()))
 
 			balanceBefore := report.balance.balance
-			report.Deduct("ref1", WithNativeValue(testUnitA, two))
-			report.Deduct("ref2", WithDerivedValue(decimal.NewNullDecimal(decimal.Zero), 1, capabilities.CapabilityInfo{}, nil))
+			_, err := report.Deduct("ref1", WithNativeValue(testUnitA, two))
+
+			require.NoError(t, err)
+			_, err = report.Deduct("ref2", WithDerivedValue(decimal.NewNullDecimal(decimal.Zero), 1, capabilities.CapabilityInfo{}, nil))
+			require.NoError(t, err)
 
 			balanceAfter := report.balance.balance
 			assert.Equal(t, balanceBefore, balanceAfter)
