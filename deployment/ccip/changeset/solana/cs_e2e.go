@@ -55,7 +55,7 @@ func E2ETokenPool(e cldf.Environment, cfg E2ETokenPoolConfig) (cldf.ChangesetOut
 			cfg.MCMS = cfg.SetPool[0].MCMS
 		}
 	}
-	if cfg.CCIPSolanaContractVersion == Version011 {
+	if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 		initGlobalConfigErr := ProcessConfig(&e, cfg.InitializeGlobalTokenPoolConfig, InitGlobalConfigTokenPoolProgram, &finalOutput, addressBookToRemove)
 		if initGlobalConfigErr != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize global config for token pool: %w", initGlobalConfigErr)
@@ -327,7 +327,7 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 		}
 	}
 	// Initialize global configs once for each unique token pool
-	if cfg.CCIPSolanaContractVersion == Version011 {
+	if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 		for _, tokenCfg := range uniquePoolTypeConfigs {
 			output, err := InitGlobalConfigTokenPoolProgram(e, TokenPoolConfigWithMCM{
 				ChainSelector: cfg.ChainSelector,

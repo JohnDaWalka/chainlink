@@ -292,7 +292,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T, config EnvironmentConf
 
 	changesets := []commonchangeset.ConfiguredChangeSet{}
 
-	if config.CCIPSolanaContractVersion == ccipChangesetSolana.Version011 {
+	if config.CCIPSolanaContractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
 		changesets = append(changesets,
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
@@ -352,7 +352,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T, config EnvironmentConf
 }
 func TestTransferCCIPToMCMSWithTimelockSolana(t *testing.T) {
 	t.Parallel()
-	e, state := prepareEnvironmentForOwnershipTransfer(t, EnvironmentConfig{CCIPSolanaContractVersion: ccipChangesetSolana.Version010})
+	e, state := prepareEnvironmentForOwnershipTransfer(t, EnvironmentConfig{CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_0})
 	solChain1 := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilySolana))[0]
 	solChain := e.BlockChains.SolanaChains()[solChain1]
 
@@ -441,7 +441,7 @@ func TestTransferCCIPToMCMSWithTimelockSolana(t *testing.T) {
 
 func TestTransferCCIPFromMCMSWithTimelockSolana(t *testing.T) {
 	t.Parallel()
-	e, state := prepareEnvironmentForOwnershipTransfer(t, EnvironmentConfig{CCIPSolanaContractVersion: ccipChangesetSolana.Version010})
+	e, state := prepareEnvironmentForOwnershipTransfer(t, EnvironmentConfig{CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_0})
 	solChain1 := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilySolana))[0]
 	solChain := e.BlockChains.SolanaChains()[solChain1]
 

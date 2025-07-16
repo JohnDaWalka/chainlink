@@ -38,17 +38,30 @@ import (
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 )
 
-func TestAddTokenPoolWithoutMcms(t *testing.T) {
+func TestAddTokenPoolV0_1_0WithoutMcms(t *testing.T) {
 	skipInCI(t)
 	t.Parallel()
-	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1))
+	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1), testhelpers.WithCCIPSolanaContractVersion(ccipChangesetSolana.SolanaContractV0_1_0))
 	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: false, TokenMetadata: shared.CLLMetadata})
 }
 
-func TestAddTokenPoolWithMcms(t *testing.T) {
+func TestAddTokenPoolV0_1_1WithoutMcms(t *testing.T) {
+	skipInCI(t)
 	t.Parallel()
-	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1))
-	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: true, TokenMetadata: shared.CLLMetadata})
+	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1), testhelpers.WithCCIPSolanaContractVersion(ccipChangesetSolana.SolanaContractV0_1_1))
+	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: false, TokenMetadata: shared.CLLMetadata, CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_1})
+}
+
+func TestAddTokenPoolV0_1_0WithMcms(t *testing.T) {
+	t.Parallel()
+	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1), testhelpers.WithCCIPSolanaContractVersion(ccipChangesetSolana.SolanaContractV0_1_0))
+	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: true, TokenMetadata: shared.CLLMetadata, CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_0})
+}
+
+func TestAddTokenPoolV0_1_1WithMcms(t *testing.T) {
+	t.Parallel()
+	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1), testhelpers.WithCCIPSolanaContractVersion(ccipChangesetSolana.SolanaContractV0_1_1))
+	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: true, TokenMetadata: shared.CLLMetadata, CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_1})
 }
 
 func deployEVMTokenPool(t *testing.T, e cldf.Environment, evmChain uint64) (cldf.Environment, common.Address, error) {
@@ -163,7 +176,7 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 
 		var changesets []commonchangeset.ConfiguredChangeSet
 
-		if config.CCIPSolanaContractVersion == ccipChangesetSolana.Version011 {
+		if config.CCIPSolanaContractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
 			changesets = append(changesets,
 				commonchangeset.Configure(
 					cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
@@ -172,7 +185,7 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 						TokenPubKey:               tokenAddress,
 						PoolType:                  typePtr,
 						Metadata:                  tokenMetadata,
-						CCIPSolanaContractVersion: ccipChangesetSolana.Version011,
+						CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_1,
 					}))
 		}
 
@@ -497,7 +510,7 @@ var zeroRateLimitConfig = ccipChangesetSolana.RateLimiterConfig{
 }
 
 func TestAddTokenPoolE2EWithMcmsLegacy(t *testing.T) {
-	doAddTokenPoolE2EWithMcmsLegacy(t, E2EConfig{CCIPSolanaContractVersion: ccipChangesetSolana.Version010})
+	doAddTokenPoolE2EWithMcmsLegacy(t, E2EConfig{CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_0})
 }
 
 type E2EConfig struct {
@@ -533,7 +546,7 @@ func doAddTokenPoolE2EWithMcmsLegacy(t *testing.T, config E2EConfig) {
 	newAdmin := timelockSignerPDA
 
 	var initGlobalTokenPoolConfig []ccipChangesetSolana.TokenPoolConfigWithMCM
-	if contractVersion == ccipChangesetSolana.Version011 {
+	if contractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
 		initGlobalTokenPoolConfig = []ccipChangesetSolana.TokenPoolConfigWithMCM{
 			{
 				ChainSelector: solChain,
@@ -662,7 +675,7 @@ func doAddTokenPoolE2EWithMcmsLegacy(t *testing.T, config E2EConfig) {
 }
 
 func TestAddTokenPoolE2EWithMcms(t *testing.T) {
-	doAddTokenPoolE2EWithMcms(t, E2EConfig{CCIPSolanaContractVersion: ccipChangesetSolana.Version010})
+	doAddTokenPoolE2EWithMcms(t, E2EConfig{CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_0})
 }
 
 func doAddTokenPoolE2EWithMcms(t *testing.T, config E2EConfig) {
@@ -784,7 +797,7 @@ func TestPartnerTokenPools(t *testing.T) {
 	err = testhelpers.ValidateSolanaState(e, solChainSelectors)
 	require.NoError(t, err)
 
-	doTestTokenPool(t, e, TokenPoolTestConfig{MCMS: false, TokenMetadata: metadata, CCIPSolanaContractVersion: ccipChangesetSolana.Version011})
+	doTestTokenPool(t, e, TokenPoolTestConfig{MCMS: false, TokenMetadata: metadata, CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_1})
 	doTestPoolLookupTable(t, e, false, metadata)
-	doTestTokenPool(t, e, TokenPoolTestConfig{MCMS: true, TokenMetadata: metadata, CCIPSolanaContractVersion: ccipChangesetSolana.Version011})
+	doTestTokenPool(t, e, TokenPoolTestConfig{MCMS: true, TokenMetadata: metadata, CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_1})
 }

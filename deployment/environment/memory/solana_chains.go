@@ -101,11 +101,11 @@ func FundSolanaAccounts(
 	return nil
 }
 
-func generateChainsSol(t *testing.T, numChains int) []cldf_chain.BlockChain {
+func generateChainsSol(t *testing.T, numChains int, commitSha string) []cldf_chain.BlockChain {
 	t.Helper()
 
 	once.Do(func() {
-		err := DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, logger.Test(t), "")
+		err := DownloadSolanaCCIPProgramArtifacts(t.Context(), programsPath, logger.Test(t), commitSha)
 		require.NoError(t, err)
 	})
 

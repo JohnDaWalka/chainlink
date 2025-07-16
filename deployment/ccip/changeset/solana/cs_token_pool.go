@@ -109,9 +109,14 @@ type TokenPoolConfig struct {
 type CCIPSolanaContractVersion string
 
 const (
-	Version010 CCIPSolanaContractVersion = "v0.1.0"
-	Version011 CCIPSolanaContractVersion = "v0.1.1"
+	SolanaContractV0_1_0 CCIPSolanaContractVersion = "v0.1.0"
+	SolanaContractV0_1_1 CCIPSolanaContractVersion = "v0.1.1"
 )
+
+var ContractVersionShortSha = map[CCIPSolanaContractVersion]string{
+	SolanaContractV0_1_0: "0ee732e80586",
+	SolanaContractV0_1_1: "ee587a6c0562",
+}
 
 type AddTokenPoolAndLookupTableConfig struct {
 	ChainSelector             uint64
@@ -211,7 +216,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		instructions := []solana.Instruction{createI}
 
 		var configPDA solana.PublicKey
-		if cfg.CCIPSolanaContractVersion == Version011 {
+		if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 			// Global Configuration
 			configPDA, err = tokens_v0_1_1.TokenPoolGlobalConfigPDA(tokenPool)
 			if err != nil {
@@ -229,7 +234,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		case solTestTokenPool.BurnAndMint_PoolType:
 			solBurnMintTokenPool.SetProgramID(tokenPool)
 			// initialize token pool for token
-			if cfg.CCIPSolanaContractVersion == Version011 {
+			if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 				poolInitI, err = solBurnMintTokenPool_v0_1_1.NewInitializeInstruction(
 					poolConfigPDA,
 					tokenPubKey,
@@ -254,7 +259,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		case solTestTokenPool.LockAndRelease_PoolType:
 			solLockReleaseTokenPool.SetProgramID(tokenPool)
 			// initialize token pool for token
-			if cfg.CCIPSolanaContractVersion == Version011 {
+			if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 				poolInitI, err = solLockReleaseTokenPool_v0_1_1.NewInitializeInstruction(
 					poolConfigPDA,
 					tokenPubKey,
@@ -561,7 +566,6 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 
 	return cldf.ChangesetOutput{}, nil
 }
-
 func ModifyMintAuthority(e cldf.Environment, cfg NewMintTokenPoolConfig) (cldf.ChangesetOutput, error) {
 	e.Logger.Infow("Use multisig as mint authority", "cfg", cfg)
 
@@ -1789,7 +1793,7 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 			ixns = append(ixns, ix)
 		}
 		if cfg.SetRouterCfg != nil {
-			if cfg.CCIPSolanaContractVersion == Version011 {
+			if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 				ix, err = solBurnMintTokenPool_v0_1_1.NewSetRouterInstruction(
 					cfg.SetRouterCfg.Router,
 					poolConfigPDA,
@@ -1837,7 +1841,7 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 			ixns = append(ixns, ix)
 		}
 		if cfg.SetRouterCfg != nil {
-			if cfg.CCIPSolanaContractVersion == Version011 {
+			if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 				ix, err = solLockReleaseTokenPool_v0_1_1.NewSetRouterInstruction(
 					cfg.SetRouterCfg.Router,
 					poolConfigPDA,
