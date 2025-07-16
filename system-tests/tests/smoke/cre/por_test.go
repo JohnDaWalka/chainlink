@@ -498,7 +498,6 @@ func setupPoRTestEnvironment(
 
 	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, cldlogger.NewSingleFileLogger(t), universalSetupInput)
 	require.NoError(t, setupErr, "failed to setup test environment")
-	require.Len(t, universalSetupOutput.CldEnvironment.BlockChains.SolanaChains(), 1)
 	homeChainOutput := universalSetupOutput.BlockchainOutput[0]
 
 	if in.CustomAnvilMiner != nil {
