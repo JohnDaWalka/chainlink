@@ -16,6 +16,7 @@
 			"transports": ["rest"]
 		}
 	],
+	"defaultEndpoint": "price",
 	"configuration": [
 		{
 			"name": "API_KEY",

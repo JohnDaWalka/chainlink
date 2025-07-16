@@ -2,10 +2,13 @@ package eastatusreporter
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	bridgeMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
@@ -43,7 +47,7 @@ func loadFixture(t *testing.T, filename string) string {
 	return string(data)
 }
 
-// loadTestEAStatusResponse loads the test fixture from JSON using existing loadFixture helper
+// loadFixtureAsEAStatusResponse loads and unmarshals fixture data
 func loadFixtureAsEAStatusResponse(t *testing.T, filename string) EAStatusResponse {
 	fixtureData := loadFixture(t, filename)
 
@@ -54,7 +58,7 @@ func loadFixtureAsEAStatusResponse(t *testing.T, filename string) EAStatusRespon
 	return status
 }
 
-// Helper function to create WebURL for testing
+// parseWebURL creates WebURL from string
 func parseWebURL(s string) models.WebURL {
 	u, err := url.Parse(s)
 	if err != nil {
@@ -76,7 +80,7 @@ var (
 	testBridges = []bridges.BridgeType{testBridge1, testBridge2}
 )
 
-// setupTestService creates a test service with the given configuration overrides
+// setupTestService creates a test service with mocks
 func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client) (*Service, *bridgeMocks.ORM, *mocks.MessageEmitter) {
 	t.Helper()
 
@@ -85,6 +89,9 @@ func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration,
 	bridgeORM := bridgeMocks.NewORM(t)
 	emitter := mocks.NewMessageEmitter()
 	lggr := logger.TestLogger(t)
+
+	// Reduce log noise
+	lggr.SetLogLevel(zapcore.ErrorLevel)
 
 	service := NewEaStatusReporter(eaConfig, bridgeORM, httpClient, emitter, lggr)
 
@@ -131,39 +138,39 @@ func TestService_HealthReport(t *testing.T) {
 	assert.Contains(t, health, service.Name())
 }
 
-func TestService_refreshBridgeURLs_NoBridges(t *testing.T) {
+func TestService_pollAllBridges_NoBridges(t *testing.T) {
 	httpClient := &http.Client{}
 	service, bridgeORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return([]bridges.BridgeType{}, 0, nil)
 
 	ctx := context.Background()
-	err := service.refreshBridgeURLs(ctx)
-	assert.NoError(t, err)
 
-	service.mu.RLock()
-	assert.Empty(t, service.bridgeURLs)
-	service.mu.RUnlock()
+	// Should handle no bridges gracefully
+	assert.NotPanics(t, func() {
+		service.pollAllBridges(ctx)
+	})
+
+	bridgeORM.AssertExpectations(t)
 }
 
-func TestService_refreshBridgeURLs_WithBridges(t *testing.T) {
-	httpClient := &http.Client{}
-	service, bridgeORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
+func TestService_pollAllBridges_WithBridges(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	service, bridgeORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return(testBridges, len(testBridges), nil)
 
-	ctx := context.Background()
-	err := service.refreshBridgeURLs(ctx)
-	assert.NoError(t, err)
+	emitter.On("With", mock.Anything).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
-	service.mu.RLock()
-	assert.Len(t, service.bridgeURLs, 2)
-	assert.Equal(t, testBridgeURL1, service.bridgeURLs[testBridgeName1])
-	assert.Equal(t, testBridgeURL2, service.bridgeURLs[testBridgeName2])
-	service.mu.RUnlock()
+	ctx := context.Background()
+	service.pollAllBridges(ctx)
+
+	bridgeORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
 }
 
-func TestService_refreshBridgeURLs_Error(t *testing.T) {
+func TestService_pollAllBridges_FetchError(t *testing.T) {
 	httpClient := &http.Client{}
 	service, bridgeORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -171,21 +178,18 @@ func TestService_refreshBridgeURLs_Error(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Should handle bridge ORM error gracefully (no panic)
-	var err error
+	// Should handle bridge ORM error gracefully
 	assert.NotPanics(t, func() {
-		err = service.refreshBridgeURLs(ctx)
+		service.pollAllBridges(ctx)
 	})
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to fetch bridges")
+	bridgeORM.AssertExpectations(t)
 }
 
 func TestService_pollBridge_Success(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Setup emitter mock
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
@@ -196,21 +200,19 @@ func TestService_pollBridge_Success(t *testing.T) {
 }
 
 func TestService_pollBridge_HTTPError(t *testing.T) {
-	httpClient := &http.Client{} // Real client will fail to connect
+	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Expect no emitter calls on HTTP error
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 
-	// Should handle HTTP error gracefully (no panic, no emission)
+	// Should handle HTTP error gracefully
 	assert.NotPanics(t, func() {
 		service.pollBridge(ctx, "test-bridge", "http://127.0.0.1:8080")
 	})
 
-	// The emitter should not be called since the HTTP request fails
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
 }
 
@@ -218,18 +220,14 @@ func TestService_pollBridge_InvalidJSON(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("invalid json", http.StatusOK)
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Expect no emitter calls on JSON parse error
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 
-	// Should handle invalid JSON gracefully (no panic, no emission)
 	assert.NotPanics(t, func() {
 		service.pollBridge(ctx, "test-bridge", "http://example.com")
 	})
-
-	// The emitter should not be called since JSON parsing fails
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
 }
 
@@ -237,43 +235,14 @@ func TestService_pollBridge_InvalidURL(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Expect no emitter calls on invalid URL
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 
-	// Should handle invalid URL gracefully (no panic, no emission)
 	assert.NotPanics(t, func() {
 		service.pollBridge(ctx, "test-bridge", "://invalid-url")
 	})
-
-	// The emitter should not be called since URL parsing fails
-	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
-}
-
-func TestService_pollBridge_Timeout(t *testing.T) {
-	httpClient := &http.Client{
-		Timeout: 1 * time.Millisecond, // Very short timeout
-	}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
-
-	// Expect no emitter calls on timeout
-	emitter.On("With", mock.Anything).Return(emitter).Maybe()
-	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	ctx := context.Background()
-
-	// Should handle timeout gracefully (no panic, no emission)
-	assert.NotPanics(t, func() {
-		service.pollBridge(ctx, "test-bridge", "http://127.0.0.1:8080")
-	})
-
-	// Wait longer than the timeout to ensure the request actually times out
-	// This prevents flakiness
-	time.Sleep(10 * time.Millisecond)
-
-	// The emitter should not be called since HTTP request times out
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
 }
 
@@ -281,18 +250,14 @@ func TestService_pollBridge_Non200Status(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("Not Found", http.StatusNotFound)
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Expect no emitter calls on non-200 status
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 
-	// Should handle non-200 status gracefully (no panic, no emission)
 	assert.NotPanics(t, func() {
 		service.pollBridge(ctx, "test-bridge", "http://example.com")
 	})
-
-	// The emitter should not be called since status is 404 Not Found
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
 }
 
@@ -300,7 +265,6 @@ func TestService_emitEAStatus_Success(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Setup emitter mock
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
@@ -314,13 +278,10 @@ func TestService_emitEAStatus_EmitError(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
-	// Setup emitter mock to return error
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(assert.AnError)
 
 	ctx := context.Background()
-
-	// This should not panic or return an error, even when emitter fails
 	assert.NotPanics(t, func() {
 		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
 	})
@@ -352,8 +313,11 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	// Setup bridge ORM mock to return our test bridges
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return(testBridges, len(testBridges), nil)
 
-	// Track emitted bridge names to verify each bridge was processed
+	// Track emitted bridge names
+	var emittedBridgeNamesMutex sync.Mutex
 	emittedBridgeNames := []string{}
+
+	var emittedMessagesMutex sync.Mutex
 	emittedMessages := []string{}
 
 	// Setup emitter mock to capture bridge names and messages
@@ -361,59 +325,57 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 		kvs := args.Get(0).([]string)
 		for i := 0; i < len(kvs); i += 2 {
 			if i+1 < len(kvs) && kvs[i] == "bridge_name" {
+				emittedBridgeNamesMutex.Lock()
 				emittedBridgeNames = append(emittedBridgeNames, kvs[i+1])
+				emittedBridgeNamesMutex.Unlock()
 			}
 		}
 	})
 
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
+		emittedMessagesMutex.Lock()
 		emittedMessages = append(emittedMessages, args.Get(1).(string))
+		emittedMessagesMutex.Unlock()
 	})
 
 	ctx := context.Background()
 	service.pollAllBridges(ctx)
 
-	// Verify bridge ORM was called
 	bridgeORM.AssertExpectations(t)
 
-	// Verify telemetry was emitted for each bridge
 	expectedBridgeNames := []string{testBridgeName1, testBridgeName2}
 	assert.ElementsMatch(t, expectedBridgeNames, emittedBridgeNames, "Should emit telemetry for each bridge")
-
-	// Verify correct number of emissions (once per bridge)
-	assert.Len(t, emittedMessages, 2, "Should emit telemetry exactly twice")
+	assert.Len(t, emittedMessages, 2)
 	for _, msg := range emittedMessages {
-		assert.Contains(t, msg, "EA Status - Bridge:", "Should emit correct message format")
-		assert.Contains(t, msg, "Adapter: test-adapter", "Should include adapter name")
-		assert.Contains(t, msg, "Version: 1.0.0", "Should include version")
+		assert.Contains(t, msg, "EA Status - Bridge:")
+		assert.Contains(t, msg, "Adapter: test-adapter")
+		assert.Contains(t, msg, "Version: 1.0.0")
 	}
 
 	emitter.AssertExpectations(t)
 }
 
 func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
-	// Create a mock emitter that captures the data
 	emitter := mocks.NewMessageEmitter()
-
-	// Mock the With method to capture labels
+	var capturedLabelsMutex sync.Mutex
 	capturedLabels := make(map[string]string)
+
 	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter).Run(func(args mock.Arguments) {
 		kvs := args.Get(0).([]string)
 		// Process key-value pairs
+		capturedLabelsMutex.Lock()
 		for i := 0; i < len(kvs); i += 2 {
 			if i+1 < len(kvs) {
 				capturedLabels[kvs[i]] = kvs[i+1]
 			}
 		}
+		capturedLabelsMutex.Unlock()
 	})
 
-	// Mock the Emit method to capture the message
 	capturedMessage := ""
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
 		capturedMessage = args.Get(1).(string)
 	})
-
-	// Create service with mock emitter
 	config := mocks.NewTestEAStatusReporterConfig(true, "/status", 5*time.Minute)
 	service := &Service{
 		config:  config,
@@ -426,11 +388,8 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_response.json")
 	service.emitEAStatus(ctx, "test-bridge", status)
 
-	// Verify the expected message format (based on fixture data)
 	expectedMessage := "EA Status - Bridge: test-bridge, Adapter: test-adapter, Version: 1.0.0"
 	assert.Equal(t, expectedMessage, capturedMessage)
-
-	// Verify key labels are present (based on fixture data)
 	assert.Equal(t, "test-bridge", capturedLabels["bridge_name"])
 	assert.Equal(t, "test-adapter", capturedLabels["adapter_name"])
 	assert.Equal(t, "1.0.0", capturedLabels["adapter_version"])
@@ -441,7 +400,6 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	assert.Equal(t, "ea-adapter-01", capturedLabels["runtime_hostname"])
 	assert.Equal(t, "true", capturedLabels["metrics_enabled"])
 
-	// Verify JSON data is present
 	assert.Contains(t, capturedLabels, "endpoints")
 	assert.Contains(t, capturedLabels, "configuration")
 
@@ -475,7 +433,6 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	assert.Equal(t, "TIMEOUT", configuration[1].Name)
 	assert.Equal(t, "CACHE_ENABLED", configuration[2].Name)
 
-	// Verify all mocks were called as expected
 	emitter.AssertExpectations(t)
 }
 
@@ -490,7 +447,6 @@ func TestService_emitEAStatus_MissingFields(t *testing.T) {
 	err := json.Unmarshal([]byte(fixtureData), &responseData)
 	require.NoError(t, err)
 
-	// Remove the version field from adapter section
 	if adapter, ok := responseData["adapter"].(map[string]interface{}); ok {
 		delete(adapter, "version")
 	}
@@ -504,11 +460,16 @@ func TestService_emitEAStatus_MissingFields(t *testing.T) {
 	require.NoError(t, err)
 
 	// Setup emitter mock - collect all fields from all With() calls
+	var allFieldsMutex sync.Mutex
 	var allFields []string
+
 	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter).Run(func(args mock.Arguments) {
 		kvs := args.Get(0).([]string)
+		allFieldsMutex.Lock()
 		allFields = append(allFields, kvs...)
+		allFieldsMutex.Unlock()
 	})
+
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	ctx := context.Background()
@@ -540,7 +501,6 @@ func TestService_emitEAStatus_ExtraFields(t *testing.T) {
 	err := json.Unmarshal([]byte(fixtureData), &responseData)
 	require.NoError(t, err)
 
-	// Add one extra field to the adapter section
 	if adapter, ok := responseData["adapter"].(map[string]interface{}); ok {
 		adapter["buildNumber"] = "12345"
 	}
@@ -575,11 +535,8 @@ func TestService_Start_AlreadyStarted(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Start service first time
 	err := service.Start(ctx)
 	assert.NoError(t, err)
-
-	// Attempt to start again - should return error or be no-op
 	err = service.Start(ctx)
 	// services.StateMachine prevents double start, should return error
 	assert.Error(t, err)
@@ -595,16 +552,88 @@ func TestService_Close_AlreadyClosed(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Start and close service
 	err := service.Start(ctx)
 	assert.NoError(t, err)
 
 	err = service.Close()
 	assert.NoError(t, err)
-
-	// Attempt to close again - should return error or be no-op
 	err = service.Close()
 
 	// services.StateMachine prevents double close, should return error
 	assert.Error(t, err)
+}
+
+func TestService_PollAllBridges_3000Bridges(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	service, mockORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	numBridges := 3000
+	var allBridges []bridges.BridgeType
+	for i := 0; i < numBridges; i++ {
+		u, _ := url.Parse(fmt.Sprintf("http://bridge%d.example.com", i))
+		bridge := bridges.BridgeType{
+			Name: bridges.MustParseBridgeName(fmt.Sprintf("bridge%d", i)),
+			URL:  models.WebURL(*u),
+		}
+		allBridges = append(allBridges, bridge)
+	}
+
+	// Page 1: bridges 0-999 (1000 bridges)
+	page1 := allBridges[0:1000]
+	mockORM.On("BridgeTypes", mock.Anything, 0, bridgePollPageSize).Return(page1, 3000, nil).Once()
+
+	// Page 2: bridges 1000-1999 (1000 bridges)
+	page2 := allBridges[1000:2000]
+	mockORM.On("BridgeTypes", mock.Anything, 1000, bridgePollPageSize).Return(page2, 3000, nil).Once()
+
+	// Page 3: bridges 2000-2999 (1000 bridges)
+	page3 := allBridges[2000:3000]
+	mockORM.On("BridgeTypes", mock.Anything, 2000, bridgePollPageSize).Return(page3, 3000, nil).Once()
+
+	// Page 4: empty (end of results)
+	mockORM.On("BridgeTypes", mock.Anything, 3000, bridgePollPageSize).Return([]bridges.BridgeType{}, 3000, nil).Once()
+
+	// Expect 3000 telemetry emissions
+	emitter.On("With", mock.Anything).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Times(numBridges)
+
+	ctx := context.Background()
+
+	service.pollAllBridges(ctx)
+	mockORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
+	httpClient := &http.Client{}
+	service, mockORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
+
+	numBridges := 5
+	var allBridges []bridges.BridgeType
+	for i := 0; i < numBridges; i++ {
+		u, _ := url.Parse(fmt.Sprintf("http://bridge%d.example.com", i))
+		bridge := bridges.BridgeType{
+			Name: bridges.MustParseBridgeName(fmt.Sprintf("bridge%d", i)),
+			URL:  models.WebURL(*u),
+		}
+		allBridges = append(allBridges, bridge)
+	}
+
+	mockORM.On("BridgeTypes", mock.Anything, 0, bridgePollPageSize).Return(allBridges, numBridges, nil).Once()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Fail(t, "HTTP handler should not complete due to context cancellation")
+	}))
+	defer server.Close()
+
+	serverURL, _ := url.Parse(server.URL)
+	for i := range allBridges {
+		allBridges[i].URL = models.WebURL(*serverURL)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	service.pollAllBridges(ctx)
+	mockORM.AssertExpectations(t)
 }

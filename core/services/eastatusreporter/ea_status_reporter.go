@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/recovery"
 )
 
 // EAStatusResponse represents the response schema from EA status endpoint
@@ -30,7 +29,8 @@ type EAStatusResponse struct {
 		Aliases    []string `json:"aliases"`
 		Transports []string `json:"transports"`
 	} `json:"endpoints"`
-	Configuration []struct {
+	DefaultEndpoint string `json:"defaultEndpoint"`
+	Configuration   []struct {
 		Name               string      `json:"name"`
 		Value              interface{} `json:"value"`
 		Type               string      `json:"type"`
@@ -66,13 +66,12 @@ type Service struct {
 	// Service management
 	chStop services.StopChan
 	wg     sync.WaitGroup
-
-	// Tracking state
-	bridgeURLs map[string]string
-	mu         sync.RWMutex
 }
 
-const ServiceName = "EAStatusReporter"
+const (
+	ServiceName        = "EAStatusReporter"
+	bridgePollPageSize = 1_000
+)
 
 // NewService creates a new EA Status Reporter Service
 func NewEaStatusReporter(
@@ -89,7 +88,6 @@ func NewEaStatusReporter(
 		emitter:    emitter,
 		lggr:       lggr.Named(ServiceName),
 		chStop:     make(services.StopChan),
-		bridgeURLs: make(map[string]string),
 	}
 }
 
@@ -117,6 +115,7 @@ func (s *Service) Close() error {
 		s.lggr.Info("Stopping " + ServiceName)
 		close(s.chStop)
 		s.wg.Wait()
+
 		return nil
 	})
 }
@@ -135,20 +134,14 @@ func (s *Service) HealthReport() map[string]error {
 func (s *Service) pollLoop() {
 	defer s.wg.Done()
 
-	interval := s.config.PollingInterval()
-	if interval <= 0 {
-		interval = 5 * time.Minute // Default to 5 minutes as specified
-	}
-
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(s.config.PollingInterval())
 	defer ticker.Stop()
-
-	s.lggr.Infow("Started EA Status Reporter polling loop", "interval", interval)
 
 	for {
 		select {
 		case <-ticker.C:
-			ctx, cancel := s.chStop.CtxWithTimeout(30 * time.Second)
+			// Create a context with polling interval timeout
+			ctx, cancel := s.chStop.CtxWithTimeout(s.config.PollingInterval())
 			s.pollAllBridges(ctx)
 			cancel()
 
@@ -158,59 +151,46 @@ func (s *Service) pollLoop() {
 	}
 }
 
-// refreshBridgeURLs loads all bridges from the database
-func (s *Service) refreshBridgeURLs(ctx context.Context) error {
-	// Get all bridges from database
-	bridges, _, err := s.bridgeORM.BridgeTypes(ctx, 0, 1000)
-	if err != nil {
-		return fmt.Errorf("failed to fetch bridges: %w", err)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Clear existing URLs
-	s.bridgeURLs = make(map[string]string)
-
-	// Add all bridges
-	for _, bridge := range bridges {
-		s.bridgeURLs[string(bridge.Name)] = bridge.URL.String()
-	}
-
-	s.lggr.Infow("Refreshed bridge URLs for EA Status Reporter", "count", len(bridges))
-	return nil
-}
-
-// pollAllBridges polls all registered bridges
+// pollAllBridges polls all registered bridges using pagination
 func (s *Service) pollAllBridges(ctx context.Context) {
-	// Refresh bridge list on every poll to catch new/deleted bridges
-	if err := s.refreshBridgeURLs(ctx); err != nil {
-		s.lggr.Warnw("Failed to refresh bridge URLs", "error", err)
-		return
+	var allBridges []bridges.BridgeType
+	var offset = 0
+
+	// Paginate through all bridges
+	for {
+		bridgeList, _, err := s.bridgeORM.BridgeTypes(ctx, offset, bridgePollPageSize)
+		if err != nil {
+			s.lggr.Debugw("Failed to fetch bridges", "error", err, "offset", offset)
+			return
+		}
+
+		allBridges = append(allBridges, bridgeList...)
+
+		// If we got fewer than pageSize bridges, we've reached the end
+		if len(bridgeList) < bridgePollPageSize {
+			break
+		}
+
+		offset += bridgePollPageSize
 	}
 
-	s.mu.RLock()
-	bridgeURLs := make(map[string]string)
-	for name, url := range s.bridgeURLs {
-		bridgeURLs[name] = url
-	}
-	s.mu.RUnlock()
-
-	if len(bridgeURLs) == 0 {
+	if len(allBridges) == 0 {
 		s.lggr.Debug("No bridges configured for EA Status Reporter polling")
 		return
 	}
 
-	s.lggr.Debugw("Polling EA Status Reporter for all bridges", "count", len(bridgeURLs))
+	s.lggr.Debugw("Polling EA Status Reporter for all bridges", "count", len(allBridges))
 
-	// Poll each bridge concurrently
+	// Poll each bridge concurrently and wait for completion
 	var wg sync.WaitGroup
-	for bridgeName, bridgeURL := range bridgeURLs {
+	for _, bridge := range allBridges {
 		wg.Add(1)
-		go recovery.WrapRecover(s.lggr, func() {
+		bridgeName := string(bridge.Name)
+		bridgeURL := bridge.URL.String()
+		go func(name, url string) {
 			defer wg.Done()
-			s.pollBridge(ctx, bridgeName, bridgeURL)
-		})
+			s.pollBridge(ctx, name, url)
+		}(bridgeName, bridgeURL)
 	}
 
 	wg.Wait()
@@ -218,36 +198,38 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 
 // pollBridge polls a single bridge's status endpoint
 func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL string) {
+	s.lggr.Debugw("Polling bridge", "bridge", bridgeName, "url", bridgeURL)
+
 	// Parse bridge URL and construct status endpoint
 	parsedURL, err := url.Parse(bridgeURL)
 	if err != nil {
-		s.lggr.Warnw("Failed to parse bridge URL", "bridge", bridgeName, "url", bridgeURL, "error", err)
+		s.lggr.Debugw("Failed to parse bridge URL", "bridge", bridgeName, "url", bridgeURL, "error", err)
 		return
 	}
 
 	// Construct status endpoint URL (bridge::8080/status)
 	statusURL := &url.URL{
 		Scheme: parsedURL.Scheme,
-		Host:   parsedURL.Host + ":8080",
+		Host:   parsedURL.Host,
 		Path:   s.config.StatusPath(),
 	}
 
 	// Make HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL.String(), nil)
 	if err != nil {
-		s.lggr.Warnw("Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.lggr.Debugw("Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		s.lggr.Warnw("Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.lggr.Debugw("Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		s.lggr.Warnw("EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
+		s.lggr.Debugw("EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
 		return
 	}
 
@@ -284,12 +266,15 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 		"runtime_node_version", status.Runtime.NodeVersion,
 		"runtime_hostname", status.Runtime.Hostname,
 		"metrics_enabled", fmt.Sprintf("%t", status.Metrics.Enabled),
+		"default_endpoint", status.DefaultEndpoint,
 	)
 
 	// Add endpoints information as structured data
 	if len(status.Endpoints) > 0 {
 		endpointsJSON, err := json.Marshal(status.Endpoints)
-		if err == nil {
+		if err != nil {
+			s.lggr.Debugw("Failed to marshal endpoints", "bridge", bridgeName, "error", err)
+		} else {
 			emitter = emitter.With("endpoints", string(endpointsJSON))
 		}
 	}
@@ -297,7 +282,9 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 	// Add configuration information as structured data
 	if len(status.Configuration) > 0 {
 		configJSON, err := json.Marshal(status.Configuration)
-		if err == nil {
+		if err != nil {
+			s.lggr.Debugw("Failed to marshal configuration", "bridge", bridgeName, "error", err)
+		} else {
 			emitter = emitter.With("configuration", string(configJSON))
 		}
 	}
