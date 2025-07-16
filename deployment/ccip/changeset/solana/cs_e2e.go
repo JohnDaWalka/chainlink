@@ -194,8 +194,9 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 
 	// token pool and lookup table
 	tokenPoolAndLookupTableCfg := AddTokenPoolAndLookupTableConfig{
-		ChainSelector:    cfg.ChainSelector,
-		TokenPoolConfigs: make([]TokenPoolConfig, 0),
+		ChainSelector:             cfg.ChainSelector,
+		TokenPoolConfigs:          make([]TokenPoolConfig, 0),
+		CCIPSolanaContractVersion: cfg.CCIPSolanaContractVersion,
 	}
 
 	// register token admin registry

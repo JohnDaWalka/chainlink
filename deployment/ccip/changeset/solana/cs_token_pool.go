@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	solTestTokenPoolV0_1_1 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_1/gobindings/test_token_pool"
-
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -127,7 +125,6 @@ type TokenPoolConfigWithMCM struct {
 	TokenPubKey               solana.PublicKey
 	Metadata                  string
 	MCMS                      *proposalutils.TimelockConfig
-	PoolTypeV0_1_1            *solTestTokenPoolV0_1_1.PoolType
 	CCIPSolanaContractVersion CCIPSolanaContractVersion
 }
 
@@ -513,11 +510,11 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 	}
 
 	var initGlobalConfigIx solana.Instruction
-	switch *cfg.PoolTypeV0_1_1 {
-	case solTestTokenPoolV0_1_1.BurnAndMint_PoolType:
+	switch *cfg.PoolType {
+	case solTestTokenPool.BurnAndMint_PoolType:
 		solBurnMintTokenPool.SetProgramID(tokenPool)
 		initGlobalConfigIx, err = solBurnMintTokenPool_v0_1_1.NewInitGlobalConfigInstruction(routerProgramAddress, rmnRemoteAddress, configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
-	case solTestTokenPoolV0_1_1.LockAndRelease_PoolType:
+	case solTestTokenPool.LockAndRelease_PoolType:
 		solLockReleaseTokenPool.SetProgramID(tokenPool)
 		initGlobalConfigIx, err = solLockReleaseTokenPool_v0_1_1.NewInitGlobalConfigInstruction(routerProgramAddress, rmnRemoteAddress, configPDA, chain.DeployerKey.PublicKey(), solana.SystemProgramID, tokenPool, programData.Address).ValidateAndBuild()
 	default:

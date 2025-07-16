@@ -183,9 +183,13 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+type EnvironmentConfig struct {
+	CCIPSolanaContractVersion ccipChangesetSolana.CCIPSolanaContractVersion
+}
+
 // prepareEnvironmentForOwnershipTransfer helper that deploys the necessary contracts as pre-requisite to
 // the transfer ownership changeset.
-func prepareEnvironmentForOwnershipTransfer(t *testing.T) (cldf.Environment, stateview.CCIPOnChainState) {
+func prepareEnvironmentForOwnershipTransfer(t *testing.T, config EnvironmentConfig) (cldf.Environment, stateview.CCIPOnChainState) {
 	t.Helper()
 	lggr := logger.TestLogger(t)
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
@@ -285,25 +289,33 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (cldf.Environment, sta
 
 	lnr := test_token_pool.LockAndRelease_PoolType
 	bnm := test_token_pool.BurnAndMint_PoolType
-	e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
-		// commonchangeset.Configure(
-		//	cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
-		//	ccipChangesetSolana.TokenPoolConfigWithMCM{
-		//		ChainSelector: solChain1,
-		//		TokenPubKey:   tokenAddressLockRelease,
-		//		PoolType:      &lnr,
-		//		Metadata:      shared.CLLMetadata,
-		//	},
-		// ),
-		// commonchangeset.Configure(
-		//	cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
-		//	ccipChangesetSolana.TokenPoolConfigWithMCM{
-		//		ChainSelector: solChain1,
-		//		TokenPubKey:   tokenAddressBurnMint,
-		//		PoolType:      &bnm,
-		//		Metadata:      shared.CLLMetadata,
-		//	},
-		// ),
+
+	changesets := []commonchangeset.ConfiguredChangeSet{}
+
+	if config.CCIPSolanaContractVersion == ccipChangesetSolana.Version011 {
+		changesets = append(changesets,
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
+				ccipChangesetSolana.TokenPoolConfigWithMCM{
+					ChainSelector: solChain1,
+					TokenPubKey:   tokenAddressLockRelease,
+					PoolType:      &lnr,
+					Metadata:      shared.CLLMetadata,
+				},
+			),
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
+				ccipChangesetSolana.TokenPoolConfigWithMCM{
+					ChainSelector: solChain1,
+					TokenPubKey:   tokenAddressBurnMint,
+					PoolType:      &bnm,
+					Metadata:      shared.CLLMetadata,
+				},
+			),
+		)
+	}
+
+	changesets = append(changesets,
 		commonchangeset.Configure(
 			cldf.CreateLegacyChangeSet(solanachangesets.AddTokenPoolAndLookupTable),
 			solanachangesets.AddTokenPoolAndLookupTableConfig{
@@ -315,6 +327,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (cldf.Environment, sta
 						Metadata:    shared.CLLMetadata,
 					},
 				},
+				CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 			},
 		),
 		commonchangeset.Configure(
@@ -328,15 +341,18 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T) (cldf.Environment, sta
 						Metadata:    shared.CLLMetadata,
 					},
 				},
+				CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 			},
 		),
-	})
+	)
+
+	e, _, err = commonchangeset.ApplyChangesets(t, e, changesets)
 	require.NoError(t, err)
 	return e, state
 }
 func TestTransferCCIPToMCMSWithTimelockSolana(t *testing.T) {
 	t.Parallel()
-	e, state := prepareEnvironmentForOwnershipTransfer(t)
+	e, state := prepareEnvironmentForOwnershipTransfer(t, EnvironmentConfig{CCIPSolanaContractVersion: ccipChangesetSolana.Version010})
 	solChain1 := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilySolana))[0]
 	solChain := e.BlockChains.SolanaChains()[solChain1]
 
@@ -425,7 +441,7 @@ func TestTransferCCIPToMCMSWithTimelockSolana(t *testing.T) {
 
 func TestTransferCCIPFromMCMSWithTimelockSolana(t *testing.T) {
 	t.Parallel()
-	e, state := prepareEnvironmentForOwnershipTransfer(t)
+	e, state := prepareEnvironmentForOwnershipTransfer(t, EnvironmentConfig{CCIPSolanaContractVersion: ccipChangesetSolana.Version010})
 	solChain1 := e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilySolana))[0]
 	solChain := e.BlockChains.SolanaChains()[solChain1]
 
