@@ -1260,7 +1260,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to fetch event sequence")
 	}
 	e.Logger.Debugw("Query results", "sequences", sequences)
-	rawevent := sequences[0].Data.(*CCIPMessageSent)
+	rawevent := sequences[3].Data.(*CCIPMessageSent)
 
 	return &AnyMsgSentEvent{
 		SequenceNumber: rawevent.SequenceNumber,
