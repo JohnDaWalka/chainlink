@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
+    "github.com/gagliardetto/solana-go"
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	seq "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence"
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana/sequence/operation"
+    "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence/operation"
 )
 
 const (
@@ -181,4 +182,183 @@ func (cs SetCacheUpgradeAuthority) Apply(env cldf.Environment, req *SetCacheUpgr
 	out.MCMSTimelockProposals = execSetAuthOut.Output.Proposals
 
 	return out, nil
+}
+
+type InitCacheDecimalFeedRequest struct {
+    ChainSel    uint64
+    Version     string
+    Qualifier   string
+    MCMS        *proposalutils.TimelockConfig // if set, assumes current ownership
+    DataIds         [][16]uint8
+	FeedAdmin solana.PublicKey
+}
+var _ cldf.ChangeSetV2[*InitCacheDecimalFeedRequest] = InitCacheDecimalFeed{}
+
+type InitCacheDecimalFeed struct{}
+
+func (cs InitCacheDecimalFeed) VerifyPreconditions(env cldf.Environment, req *InitCacheDecimalFeedRequest) error {
+    if _, ok := env.BlockChains.SolanaChains()[req.ChainSel]; !ok {
+        return fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
+    }
+
+    if _, err := semver.NewVersion(req.Version); err != nil {
+        return err
+    }
+
+    cacheKey := datastore.NewAddressRefKey(req.ChainSel, CacheContract, semver.MustParse(req.Version), req.Qualifier)
+    _, err := env.DataStore.Addresses().Get(cacheKey)
+    if err != nil {
+        return fmt.Errorf("failed to load cache contract: %w", err)
+    }
+
+    if len(req.DataIds) == 0 {
+        return fmt.Errorf("DataIds cannot be empty") 
+	}
+
+    if req.FeedAdmin.IsZero() { 
+        return fmt.Errorf("FeedAdmin cannot be zero")
+    }
+
+    return nil
+}
+
+func (cs InitCacheDecimalFeed) Apply(env cldf.Environment, req *InitCacheDecimalFeedRequest) (cldf.ChangesetOutput, error) {
+    var out cldf.ChangesetOutput
+
+    version := semver.MustParse(req.Version)
+    ch, ok := env.BlockChains.SolanaChains()[req.ChainSel]
+    if !ok {
+        return out, fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
+    }
+
+    cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
+		cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
+		cacheState, err := env.DataStore.Addresses().Get(cacheStateRef)
+		if err != nil {
+			return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
+		}
+		cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
+        if err != nil {
+			return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
+		}
+
+    initInput := operation.InitCacheDecimalReportInput{
+        ChainSel:  req.ChainSel,
+        MCMS:      req.MCMS,
+        ProgramID: solana.MustPublicKeyFromBase58(cacheProgramID.Address),
+        State:     solana.MustPublicKeyFromBase58(cacheState.Address),
+        Type:      cldf.ContractType(CacheContract),
+        DataIds:   req.DataIds,
+        FeedAdmin: req.FeedAdmin,
+    }
+
+    deps := operation.Deps{
+        Datastore: env.DataStore,
+        Env:       env,
+        Chain:     ch,
+    }
+
+    execInitOut, err := operations.ExecuteOperation(env.OperationsBundle, operation.InitCacheDecimalReportOp, deps, initInput)
+    if err != nil {
+        return out, err
+    }
+
+    out.MCMSTimelockProposals = execInitOut.Output.Proposals
+
+    return out, nil
+}
+
+
+type ConfigureCacheDecimalReportRequest struct {
+	MCMS *proposalutils.TimelockConfig // if set, assumes current ownership is the timelock
+
+	// Chains is optional. Defines chains for which request will be executed. If empty, runs for all available chains.
+	ChainSel    uint64
+    Qualifier   string
+    Version     string
+
+    AllowedSender        []solana.PublicKey
+    AllowedWorkflowOwner [][20]uint8
+    AllowedWorkflowName  [][10]uint8
+    FeedAdmin            solana.PublicKey
+
+    Descriptions [][32]uint8
+	DataIds         [][16]uint8
+}
+
+var _ cldf.ChangeSetV2[*ConfigureCacheDecimalReportRequest] = ConfigureCacheDecimalReport{}
+
+type ConfigureCacheDecimalReport struct{}
+
+func (cs ConfigureCacheDecimalReport) VerifyPreconditions(env cldf.Environment, req *ConfigureCacheDecimalReportRequest) error {
+    if _, ok := env.BlockChains.SolanaChains()[req.ChainSel]; !ok {
+		return fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
+	}
+	if _, err := semver.NewVersion(req.Version); err != nil {
+		return err
+	}
+    // Check that AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName are all the same length
+    // This is a requirement for the ConfigureCacheDecimalFeed operation
+	if len(req.AllowedSender) != len(req.AllowedWorkflowOwner) || len(req.AllowedSender) != len(req.AllowedWorkflowName) {
+		return fmt.Errorf("AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName must all have the same length")
+	}
+
+    // Check that Descriptions and DataIds are all the same length
+
+    if len(req.DataIds) != len(req.Descriptions) {
+		return fmt.Errorf("Descriptions and DataIds must all have the same length")
+	}
+
+    return nil
+}
+
+func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *ConfigureCacheDecimalReportRequest) (cldf.ChangesetOutput, error) {
+    var out cldf.ChangesetOutput
+
+    version := semver.MustParse(req.Version)
+
+    ch, ok := env.BlockChains.SolanaChains()[req.ChainSel]
+	if !ok {
+		return out, fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
+	}
+
+    cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
+		cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
+		cacheState, err := env.DataStore.Addresses().Get(cacheStateRef)
+		if err != nil {
+			return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
+		}
+		cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
+        if err != nil {
+			return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
+		}
+
+		configureCacheDecimalReportInput := operation.ConfigureCacheDecimalReportInput{
+            ChainSel:       req.ChainSel,
+			MCMS:           req.MCMS,   
+			ProgramID:      solana.MustPublicKeyFromBase58(cacheProgramID.Address),
+			State:          solana.MustPublicKeyFromBase58(cacheState.Address),
+			Type:           cldf.ContractType(CacheContract),
+			AllowedSender:  req.AllowedSender,
+			AllowedWorkflowOwner: req.AllowedWorkflowOwner,
+			AllowedWorkflowName:  req.AllowedWorkflowName,
+			FeedAdmin: req.FeedAdmin,
+            DataIds: req.DataIds,
+            Descriptions: req.Descriptions,
+		}
+
+        deps := operation.Deps{
+		Datastore: env.DataStore,
+		Env:       env,
+		Chain:     ch,
+	}
+
+		execSetAuthOut, err := operations.ExecuteOperation(env.OperationsBundle, operation.ConfigureCacheDecimalReportOp, deps, configureCacheDecimalReportInput)
+        if err != nil {
+            return out, err
+        }
+
+	out.MCMSTimelockProposals = execSetAuthOut.Output.Proposals
+
+    return out, nil
 }
