@@ -4,8 +4,8 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	solanaCs "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	solanaCs "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 )
 
 // TransferOwnershipCacheRequest wraps the generic request for cache contracts

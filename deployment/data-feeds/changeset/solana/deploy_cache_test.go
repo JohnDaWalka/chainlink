@@ -2,35 +2,31 @@ package solana
 
 import (
 	"github.com/Masterminds/semver/v3"
+	"math/big"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
-    "time"
-    "math/big"
+	"time"
 
-    	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/wsrpc/logger"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-    	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-    	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
-
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 
 	cldfchain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
+	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
-    commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
-    "github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-    solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
-
-
-
 )
 
 func TestDeployCache(t *testing.T) {
@@ -100,7 +96,7 @@ func TestDeployCache(t *testing.T) {
 }
 
 func TestConfigureCache(t *testing.T) {
-    skipInCI(t)
+	skipInCI(t)
 	t.Parallel()
 
 	lggr := logger.Test(t)
@@ -115,187 +111,186 @@ func TestConfigureCache(t *testing.T) {
 	chain := env.BlockChains.SolanaChains()[solSel]
 	chain.ProgramsPath = getProgramsPath()
 	env.BlockChains = cldfchain.NewBlockChains(map[uint64]cldfchain.BlockChain{solSel: chain})
-    // Example array of dataIds as [][16]uint8
-    dataIds := [][16]uint8{
-        [16]uint8{'B', 'T', 'C', '/', 'U', 'S', 'D'},
-        [16]uint8{'E', 'T', 'H', '/', 'U', 'S', 'D'},
-        [16]uint8{'S', 'O', 'L', '/', 'U', 'S', 'D'},
-    }
+	// Example array of dataIds as [][16]uint8
+	dataIds := [][16]uint8{
+		[16]uint8{'B', 'T', 'C', '/', 'U', 'S', 'D'},
+		[16]uint8{'E', 'T', 'H', '/', 'U', 'S', 'D'},
+		[16]uint8{'S', 'O', 'L', '/', 'U', 'S', 'D'},
+	}
 
-    descriptions := [][32]uint8{
-    [32]uint8{'B', 'i', 't', 'c', 'o', 'i', 'n', ' ', 'P', 'r', 'i', 'c', 'e', ' ', 'F', 'e', 'e', 'd'},
-    [32]uint8{'E', 't', 'h', 'e', 'r', 'e', 'u', 'm', ' ', 'P', 'r', 'i', 'c', 'e', ' ', 'F', 'e', 'e', 'd'},
-    [32]uint8{'S', 'o', 'l', 'a', 'n', 'a', ' ', 'P', 'r', 'i', 'c', 'e', ' ', 'F', 'e', 'e', 'd'},
-}
+	descriptions := [][32]uint8{
+		[32]uint8{'B', 'i', 't', 'c', 'o', 'i', 'n', ' ', 'P', 'r', 'i', 'c', 'e', ' ', 'F', 'e', 'e', 'd'},
+		[32]uint8{'E', 't', 'h', 'e', 'r', 'e', 'u', 'm', ' ', 'P', 'r', 'i', 'c', 'e', ' ', 'F', 'e', 'e', 'd'},
+		[32]uint8{'S', 'o', 'l', 'a', 'n', 'a', ' ', 'P', 'r', 'i', 'c', 'e', ' ', 'F', 'e', 'e', 'd'},
+	}
 
-        // For AllowedSender (slice of solana.PublicKey)
-    allowedSender := []solana.PublicKey{
-        solana.MustPublicKeyFromBase58("11111111111111111111111111111112"), // example public key
-    }
+	// For AllowedSender (slice of solana.PublicKey)
+	allowedSender := []solana.PublicKey{
+		solana.MustPublicKeyFromBase58("11111111111111111111111111111112"), // example public key
+	}
 
-    // For AllowedWorkflowOwner (slice of [20]uint8 arrays)
-    allowedWorkflowOwner := [][20]uint8{
-        {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14},
-    }
+	// For AllowedWorkflowOwner (slice of [20]uint8 arrays)
+	allowedWorkflowOwner := [][20]uint8{
+		{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14},
+	}
 
-    // For AllowedWorkflowName (slice of [10]uint8 arrays)
-    allowedWorkflowName := [][10]uint8{
-        {0x74, 0x65, 0x73, 0x74, 0x5f, 0x77, 0x6f, 0x72, 0x6b, 0x00}, // "test_work" with null terminator
-    }
+	// For AllowedWorkflowName (slice of [10]uint8 arrays)
+	allowedWorkflowName := [][10]uint8{
+		{0x74, 0x65, 0x73, 0x74, 0x5f, 0x77, 0x6f, 0x72, 0x6b, 0x00}, // "test_work" with null terminator
+	}
 
+	t.Run("should init cache decimal report without mcms", func(t *testing.T) {
+		configuredChangeset := commonchangeset.Configure(InitCacheDecimalFeed{},
+			&InitCacheDecimalFeedRequest{
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+				DataIds:   dataIds,
+				FeedAdmin: chain.DeployerKey.PublicKey(),
+			},
+		)
 
-    t.Run("should init cache decimal report without mcms", func(t *testing.T) {
-        configuredChangeset := commonchangeset.Configure(InitCacheDecimalFeed{},
-            &InitCacheDecimalFeedRequest{
-                ChainSel:  solSel,
-                Qualifier: testQualifier,
-                Version:   "1.0.0",
-                DataIds:   dataIds,
-                FeedAdmin: chain.DeployerKey.PublicKey(),
-            },
-        )
+		deployChangeset := commonchangeset.Configure(DeployCache{},
+			&DeployCacheRequest{
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+			},
+		)
 
-        deployChangeset := commonchangeset.Configure(DeployCache{},
-					&DeployCacheRequest{
-						ChainSel:  solSel,
-						Qualifier: testQualifier,
-						Version:   "1.0.0",
-					},
-				)
+		var err error
+		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
+		require.NoError(t, err)
+	})
 
-        var err error
-        _, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
-        require.NoError(t, err)
-    })
+	t.Run("should init cache decimal report with mcms", func(t *testing.T) {
+		configuredChangeset := commonchangeset.Configure(InitCacheDecimalFeed{},
+			&InitCacheDecimalFeedRequest{
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+				DataIds:   dataIds,
+				FeedAdmin: chain.DeployerKey.PublicKey(),
+				MCMS: &proposalutils.TimelockConfig{
+					MinDelay: time.Second,
+				},
+			},
+		)
 
-    t.Run("should init cache decimal report with mcms", func(t *testing.T) {
-        configuredChangeset := commonchangeset.Configure(InitCacheDecimalFeed{},
-            &InitCacheDecimalFeedRequest{
-                ChainSel:  solSel,
-                Qualifier: testQualifier,
-                Version:   "1.0.0",
-                DataIds:   dataIds,
-                FeedAdmin: chain.DeployerKey.PublicKey(),
-                MCMS: &proposalutils.TimelockConfig{
-						MinDelay: time.Second,
-					},
-            },
-        )
+		deployChangeset := commonchangeset.Configure(DeployCache{},
+			&DeployCacheRequest{
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+			},
+		)
 
-        deployChangeset := commonchangeset.Configure(DeployCache{},
-                    &DeployCacheRequest{
-                        ChainSel:  solSel,
-                        Qualifier: testQualifier,
-                        Version:   "1.0.0",
-                    },
-                )
+		ds := datastore.NewMemoryDataStore()
 
-        ds := datastore.NewMemoryDataStore()
+		// deploy mcms
+		mcmsState, err := solanaMCMS.DeployMCMSWithTimelockProgramsSolanaV2(env, ds, chain,
+			commontypes.MCMSWithTimelockConfigV2{
+				Canceller:        proposalutils.SingleGroupMCMSV2(t),
+				Proposer:         proposalutils.SingleGroupMCMSV2(t),
+				Bypasser:         proposalutils.SingleGroupMCMSV2(t),
+				TimelockMinDelay: big.NewInt(0),
+			},
+		)
+		require.NoError(t, err)
 
-        // deploy mcms
-        mcmsState, err := solanaMCMS.DeployMCMSWithTimelockProgramsSolanaV2(env, ds, chain,
-            commontypes.MCMSWithTimelockConfigV2{
-                Canceller:        proposalutils.SingleGroupMCMSV2(t),
-                Proposer:         proposalutils.SingleGroupMCMSV2(t),
-                Bypasser:         proposalutils.SingleGroupMCMSV2(t),
-                TimelockMinDelay: big.NewInt(0),
-            },
-        )
-        require.NoError(t, err)
-
-        ds.Seal()
+		ds.Seal()
 		fundSignerPDAs(t, env, solSel, mcmsState)
 
-        transferOwnershipChangeset := commonchangeset.Configure(TransferOwnershipCache{},
-					&TransferOwnershipCacheRequest{
-						ChainSel:  solSel,
-						MCMSCfg:   proposalutils.TimelockConfig{MinDelay: 1 * time.Second},
-						Qualifier: testQualifier,
-						Version:   "1.0.0",
-					})
+		transferOwnershipChangeset := commonchangeset.Configure(TransferOwnershipCache{},
+			&TransferOwnershipCacheRequest{
+				ChainSel:  solSel,
+				MCMSCfg:   proposalutils.TimelockConfig{MinDelay: 1 * time.Second},
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+			})
 
-        _, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
-        require.NoError(t, err)
-    })
+		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
+		require.NoError(t, err)
+	})
 
-     t.Run("should set cache decimal report config without mcms", func(t *testing.T) {
-        configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
-            &ConfigureCacheDecimalReportRequest{
-                ChainSel:  solSel,
-                Qualifier: testQualifier,
-                Version:  "1.0.0",
-                AllowedSender: allowedSender,
-                AllowedWorkflowOwner: allowedWorkflowOwner,
-                AllowedWorkflowName: allowedWorkflowName,
-                FeedAdmin: chain.DeployerKey.PublicKey(),
-                DataIds: dataIds,
-                Descriptions: descriptions,
-            },
-        )
+	t.Run("should set cache decimal report config without mcms", func(t *testing.T) {
+		configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
+			&ConfigureCacheDecimalReportRequest{
+				ChainSel:             solSel,
+				Qualifier:            testQualifier,
+				Version:              "1.0.0",
+				AllowedSender:        allowedSender,
+				AllowedWorkflowOwner: allowedWorkflowOwner,
+				AllowedWorkflowName:  allowedWorkflowName,
+				FeedAdmin:            chain.DeployerKey.PublicKey(),
+				DataIds:              dataIds,
+				Descriptions:         descriptions,
+			},
+		)
 
-        deployChangeset := commonchangeset.Configure(DeployCache{},
-					&DeployCacheRequest{
-						ChainSel:  solSel,
-						Qualifier: testQualifier,
-						Version:   "1.0.0",
-					},
-				)
+		deployChangeset := commonchangeset.Configure(DeployCache{},
+			&DeployCacheRequest{
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+			},
+		)
 
-        var err error
-        _, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
-        require.NoError(t, err)
-    })
+		var err error
+		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
+		require.NoError(t, err)
+	})
 
-    t.Run("should set cache decimal report config with mcms", func(t *testing.T) {
-        configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
-            &ConfigureCacheDecimalReportRequest{
-                ChainSel:  solSel,
-                Qualifier: testQualifier,
-                Version:  "1.0.0",
-                AllowedSender: allowedSender,
-                AllowedWorkflowOwner: allowedWorkflowOwner,
-                AllowedWorkflowName: allowedWorkflowName,
-                FeedAdmin: chain.DeployerKey.PublicKey(),
-                DataIds: dataIds,
-                Descriptions: descriptions,
-            },
-        )
+	t.Run("should set cache decimal report config with mcms", func(t *testing.T) {
+		configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
+			&ConfigureCacheDecimalReportRequest{
+				ChainSel:             solSel,
+				Qualifier:            testQualifier,
+				Version:              "1.0.0",
+				AllowedSender:        allowedSender,
+				AllowedWorkflowOwner: allowedWorkflowOwner,
+				AllowedWorkflowName:  allowedWorkflowName,
+				FeedAdmin:            chain.DeployerKey.PublicKey(),
+				DataIds:              dataIds,
+				Descriptions:         descriptions,
+			},
+		)
 
-        deployChangeset := commonchangeset.Configure(DeployCache{},
-                    &DeployCacheRequest{
-                        ChainSel:  solSel,
-                        Qualifier: testQualifier,
-                        Version:   "1.0.0",
-                    },
-                )
+		deployChangeset := commonchangeset.Configure(DeployCache{},
+			&DeployCacheRequest{
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+			},
+		)
 
-        ds := datastore.NewMemoryDataStore()
+		ds := datastore.NewMemoryDataStore()
 
-        // deploy mcms
-        mcmsState, err := solanaMCMS.DeployMCMSWithTimelockProgramsSolanaV2(env, ds, chain,
-            commontypes.MCMSWithTimelockConfigV2{
-                Canceller:        proposalutils.SingleGroupMCMSV2(t),
-                Proposer:         proposalutils.SingleGroupMCMSV2(t),
-                Bypasser:         proposalutils.SingleGroupMCMSV2(t),
-                TimelockMinDelay: big.NewInt(0),
-            },
-        )
-        require.NoError(t, err)
+		// deploy mcms
+		mcmsState, err := solanaMCMS.DeployMCMSWithTimelockProgramsSolanaV2(env, ds, chain,
+			commontypes.MCMSWithTimelockConfigV2{
+				Canceller:        proposalutils.SingleGroupMCMSV2(t),
+				Proposer:         proposalutils.SingleGroupMCMSV2(t),
+				Bypasser:         proposalutils.SingleGroupMCMSV2(t),
+				TimelockMinDelay: big.NewInt(0),
+			},
+		)
+		require.NoError(t, err)
 
-        ds.Seal()
+		ds.Seal()
 		fundSignerPDAs(t, env, solSel, mcmsState)
 
-        transferOwnershipChangeset := commonchangeset.Configure(TransferOwnershipCache{},
-					&TransferOwnershipCacheRequest{
-						ChainSel:  solSel,
-						MCMSCfg:   proposalutils.TimelockConfig{MinDelay: 1 * time.Second},
-						Qualifier: testQualifier,
-						Version:   "1.0.0",
-					})
+		transferOwnershipChangeset := commonchangeset.Configure(TransferOwnershipCache{},
+			&TransferOwnershipCacheRequest{
+				ChainSel:  solSel,
+				MCMSCfg:   proposalutils.TimelockConfig{MinDelay: 1 * time.Second},
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+			})
 
-        _, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
-        require.NoError(t, err)
-    })
+		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
+		require.NoError(t, err)
+	})
 }
 
 func ParseSemver(v string) *semver.Version {

@@ -29,14 +29,14 @@ var (
 		Version1_0_0,
 		"Initialize DataFeeds Cache for Solana Chain",
 		initCache,
-  )
+	)
 	DeployCacheOp = operations.NewOperation(
 		"deploy-cache-op",
 		Version1_0_0,
 		"Deploys the DataFeeds Cache program for Solana Chain",
 		commonOps.Deploy,
 	)
-		SetUpgradeAuthorityOp = operations.NewOperation(
+	SetUpgradeAuthorityOp = operations.NewOperation(
 		"set-upgrade-authority-op",
 		Version1_0_0,
 		"Sets Cache's upgrade authority for Solana Chain",
@@ -70,7 +70,7 @@ type (
 	}
 
 	InitCacheOutput struct {
-			StatePubKey solana.PublicKey
+		StatePubKey solana.PublicKey
 	}
 
 	SetUpgradeAuthorityInput struct {
@@ -85,17 +85,17 @@ type (
 	}
 
 	ConfigureCacheDecimalReportInput struct {
-		ChainSel            uint64
-		Descriptions [][32]uint8
-		DataIds         [][16]uint8
-		MCMS           *proposalutils.TimelockConfig // if set, assumes current owner is the timelock
-		ProgramID      solana.PublicKey
+		ChainSel             uint64
+		Descriptions         [][32]uint8
+		DataIds              [][16]uint8
+		MCMS                 *proposalutils.TimelockConfig // if set, assumes current owner is the timelock
+		ProgramID            solana.PublicKey
 		AllowedSender        []solana.PublicKey
 		AllowedWorkflowOwner [][20]uint8
 		AllowedWorkflowName  [][10]uint8
-		FeedAdmin solana.PublicKey
-		State solana.PublicKey
-		Type cldf.ContractType
+		FeedAdmin            solana.PublicKey
+		State                solana.PublicKey
+		Type                 cldf.ContractType
 	}
 
 	ConfigureCacheOutput struct {
@@ -103,47 +103,47 @@ type (
 	}
 
 	InitCacheDecimalReportInput struct {
-		ChainSel    uint64
-		Version     string
-		Qualifier   string
-		MCMS        *proposalutils.TimelockConfig // if set, assumes current
-		DataIds         [][16]uint8
+		ChainSel  uint64
+		Version   string
+		Qualifier string
+		MCMS      *proposalutils.TimelockConfig // if set, assumes current
+		DataIds   [][16]uint8
 		FeedAdmin solana.PublicKey
-		State solana.PublicKey
-		ProgramID      solana.PublicKey
-		Type cldf.ContractType
+		State     solana.PublicKey
+		ProgramID solana.PublicKey
+		Type      cldf.ContractType
 	}
 )
 
 func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutput, error) {
-    var out InitCacheOutput
-    if ks_cache.ProgramID.IsZero() {
-        ks_cache.SetProgramID(in.ProgramID)
-    }
+	var out InitCacheOutput
+	if ks_cache.ProgramID.IsZero() {
+		ks_cache.SetProgramID(in.ProgramID)
+	}
 
-    stateKey, err := solana.NewRandomPrivateKey()
-    if err != nil {
-        return out, fmt.Errorf("failed to create random keys: %w", err)
-    }
+	stateKey, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		return out, fmt.Errorf("failed to create random keys: %w", err)
+	}
 
-		adminStateKey, err := solana.NewRandomPrivateKey()
-		if err != nil {
-			return out, fmt.Errorf("failed to create random admin keys: %w", err)
-		}
+	adminStateKey, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		return out, fmt.Errorf("failed to create random admin keys: %w", err)
+	}
 
-    instruction, err := ks_cache.NewInitializeInstruction([]solana.PublicKey{adminStateKey.PublicKey()}, deps.Chain.DeployerKey.PublicKey(), stateKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
-    if err != nil {
-        return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
-    }
+	instruction, err := ks_cache.NewInitializeInstruction([]solana.PublicKey{adminStateKey.PublicKey()}, deps.Chain.DeployerKey.PublicKey(), stateKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+	if err != nil {
+		return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
+	}
 
-    instructions := []solana.Instruction{instruction}
-    if err = deps.Chain.Confirm(instructions, solanaUtils.AddSigners(stateKey)); err != nil {
-        return out, errors.New("failed to confirm ")
-    }
+	instructions := []solana.Instruction{instruction}
+	if err = deps.Chain.Confirm(instructions, solanaUtils.AddSigners(stateKey)); err != nil {
+		return out, errors.New("failed to confirm ")
+	}
 
-    out.StatePubKey = stateKey.PublicKey()
+	out.StatePubKey = stateKey.PublicKey()
 
-    return out, nil
+	return out, nil
 }
 
 func setUpgradeAuthority(b operations.Bundle, deps Deps, in SetUpgradeAuthorityInput) (SetUpgradeAuthorityOutput, error) {
@@ -250,15 +250,14 @@ func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCac
 
 	workflowMetas := make([]ks_cache.WorkflowMetadata, len(in.AllowedSender))
 	for i := range in.AllowedSender {
-			workflowMetas[i] = ks_cache.WorkflowMetadata{
-					AllowedSender:        in.AllowedSender[i],
-					AllowedWorkflowOwner: in.AllowedWorkflowOwner[i],
-					AllowedWorkflowName:  in.AllowedWorkflowName[i],
-			}
+		workflowMetas[i] = ks_cache.WorkflowMetadata{
+			AllowedSender:        in.AllowedSender[i],
+			AllowedWorkflowOwner: in.AllowedWorkflowOwner[i],
+			AllowedWorkflowName:  in.AllowedWorkflowName[i],
+		}
 	}
 
 	mcmsTxns := make([]mcmsTypes.Transaction, 0)
-
 
 	ixn, err := ks_cache.NewSetDecimalFeedConfigsInstruction(
 		in.DataIds,

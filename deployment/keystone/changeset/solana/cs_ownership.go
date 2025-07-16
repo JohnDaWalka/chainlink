@@ -49,7 +49,7 @@ type TransferOwnershipForwarderRequest struct {
 func GenericTransferOwnership(env cldf.Environment, req *TransferOwnershipRequest) (cldf.ChangesetOutput, error) {
 	var out cldf.ChangesetOutput
 	version := semver.MustParse(req.Version)
-	
+
 	// Build address references
 	contractStateRef := datastore.NewAddressRefKey(req.ChainSel, req.ContractConfig.StateType, version, req.Qualifier)
 	contractRef := datastore.NewAddressRefKey(req.ChainSel, req.ContractConfig.ContractType, version, req.Qualifier)
@@ -59,7 +59,7 @@ func GenericTransferOwnership(env cldf.Environment, req *TransferOwnershipReques
 	if err != nil {
 		return out, fmt.Errorf("failed to get contract address: %w", err)
 	}
-	
+
 	contractState, err := env.DataStore.Addresses().Get(contractStateRef)
 	if err != nil {
 		return out, fmt.Errorf("failed to get contract state address: %w", err)
@@ -169,4 +169,3 @@ func (cs TransferOwnershipForwarder) Apply(env cldf.Environment, req *TransferOw
 	}
 	return GenericTransferOwnership(env, genericReq)
 }
-
