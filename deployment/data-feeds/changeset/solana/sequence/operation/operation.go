@@ -115,11 +115,80 @@ type (
 	}
 )
 
+// Common helper functions to reduce duplication
+
+func ensureProgramID(programID solana.PublicKey) {
+	if ks_cache.ProgramID.IsZero() {
+		ks_cache.SetProgramID(programID)
+	}
+}
+
+func confirmInstructionOrBuildProposal(
+	deps Deps,
+	chainSel uint64,
+	instruction solana.Instruction,
+	mcmsConfig *proposalutils.TimelockConfig,
+	proposalDescription string,
+) ([]mcms.TimelockProposal, error) {
+	if mcmsConfig == nil {
+		if err := deps.Chain.Confirm([]solana.Instruction{instruction}); err != nil {
+			return nil, fmt.Errorf("failed to confirm instructions: %w", err)
+		}
+		return nil, nil
+	}
+
+	return buildMCMSProposal(deps, chainSel, instruction, mcmsConfig, proposalDescription)
+}
+
+func buildMCMSProposal(
+	deps Deps,
+	chainSel uint64,
+	instruction solana.Instruction,
+	mcmsConfig *proposalutils.TimelockConfig,
+	description string,
+) ([]mcms.TimelockProposal, error) {
+	tx, err := helpers.BuildMCMSTxn(
+		instruction,
+		solana.BPFLoaderUpgradeableProgramID.String(),
+		cldf.ContractType(solana.BPFLoaderUpgradeableProgramID.String()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transaction: %w", err)
+	}
+
+	proposal, err := helpers.BuildProposalsForTxns(
+		deps.Env,
+		chainSel,
+		description,
+		mcmsConfig.MinDelay,
+		[]mcmsTypes.Transaction{*tx},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build proposal: %w", err)
+	}
+
+	return []mcms.TimelockProposal{*proposal}, nil
+}
+
+func getCurrentAuthority(deps Deps, chainSel uint64, mcmsConfig *proposalutils.TimelockConfig) (solana.PublicKey, error) {
+	if mcmsConfig == nil {
+		return deps.Chain.DeployerKey.PublicKey(), nil
+	}
+
+	timelockSignerPDA, err := helpers.FetchTimelockSigner(
+		deps.Datastore.Addresses().Filter(datastore.AddressRefByChainSelector(chainSel)),
+	)
+	if err != nil {
+		return solana.PublicKey{}, fmt.Errorf("failed to get timelock signer: %w", err)
+	}
+	return timelockSignerPDA, nil
+}
+
+// Refactored functions
+
 func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutput, error) {
 	var out InitCacheOutput
-	if ks_cache.ProgramID.IsZero() {
-		ks_cache.SetProgramID(in.ProgramID)
-	}
+	ensureProgramID(in.ProgramID)
 
 	stateKey, err := solana.NewRandomPrivateKey()
 	if err != nil {
@@ -131,18 +200,21 @@ func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutp
 		return out, fmt.Errorf("failed to create random admin keys: %w", err)
 	}
 
-	instruction, err := ks_cache.NewInitializeInstruction([]solana.PublicKey{adminStateKey.PublicKey()}, deps.Chain.DeployerKey.PublicKey(), stateKey.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
+	instruction, err := ks_cache.NewInitializeInstruction(
+		[]solana.PublicKey{adminStateKey.PublicKey()},
+		deps.Chain.DeployerKey.PublicKey(),
+		stateKey.PublicKey(),
+		solana.SystemProgramID,
+	).ValidateAndBuild()
 	if err != nil {
 		return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
 	}
 
-	instructions := []solana.Instruction{instruction}
-	if err = deps.Chain.Confirm(instructions, solanaUtils.AddSigners(stateKey)); err != nil {
-		return out, errors.New("failed to confirm ")
+	if err = deps.Chain.Confirm([]solana.Instruction{instruction}, solanaUtils.AddSigners(stateKey)); err != nil {
+		return out, errors.New("failed to confirm")
 	}
 
 	out.StatePubKey = stateKey.PublicKey()
-
 	return out, nil
 }
 
@@ -159,94 +231,66 @@ func setUpgradeAuthority(b operations.Bundle, deps Deps, in SetUpgradeAuthorityI
 		return out, fmt.Errorf("failed parse upgrade authority: %w", err)
 	}
 
-	currentAuthority := deps.Chain.DeployerKey.PublicKey()
-	if in.MCMS != nil {
-		timelockSignerPDA, err := helpers.FetchTimelockSigner(deps.Datastore.Addresses().Filter(datastore.AddressRefByChainSelector(in.ChainSel)))
-		if err != nil {
-			return out, fmt.Errorf("failed to get timelock signer: %w", err)
-		}
-		currentAuthority = timelockSignerPDA
-	}
-
-	mcmsTxns := make([]mcmsTypes.Transaction, 0)
-
-	ixn := helpers.SetUpgradeAuthority(&deps.Env, programID, currentAuthority, newAuthority, false)
-
-	if in.MCMS == nil {
-		if err := deps.Chain.Confirm([]solana.Instruction{ixn}); err != nil {
-			return out, fmt.Errorf("failed to confirm instructions: %w", err)
-		}
-
-		return out, nil
-	}
-
-	// build MCMS proposal
-	tx, err := helpers.BuildMCMSTxn(
-		ixn,
-		solana.BPFLoaderUpgradeableProgramID.String(),
-		cldf.ContractType(solana.BPFLoaderUpgradeableProgramID.String()))
+	currentAuthority, err := getCurrentAuthority(deps, in.ChainSel, in.MCMS)
 	if err != nil {
-		return out, fmt.Errorf("failed to create transaction: %w", err)
+		return out, err
 	}
-	mcmsTxns = append(mcmsTxns, *tx)
 
-	proposal, err := helpers.BuildProposalsForTxns(
-		deps.Env, in.ChainSel, "proposal to SetUpgradeAuthority in Solana", in.MCMS.MinDelay, mcmsTxns)
+	instruction := helpers.SetUpgradeAuthority(&deps.Env, programID, currentAuthority, newAuthority, false)
+
+	proposals, err := confirmInstructionOrBuildProposal(
+		deps,
+		in.ChainSel,
+		instruction,
+		in.MCMS,
+		"proposal to SetUpgradeAuthority in Solana",
+	)
 	if err != nil {
-		return out, fmt.Errorf("failed to build proposal: %w", err)
+		return out, err
 	}
-	out.Proposals = []mcms.TimelockProposal{*proposal}
+
+	if proposals != nil {
+		out.Proposals = proposals
+	}
 
 	return out, nil
 }
 
 func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalReportInput) (ConfigureCacheOutput, error) {
 	var out ConfigureCacheOutput
-	var ixn *ks_cache.Instruction
-	mcmsTxns := make([]mcmsTypes.Transaction, 0)
-	if ks_cache.ProgramID.IsZero() {
-		ks_cache.SetProgramID(in.ProgramID)
-	}
+	ensureProgramID(in.ProgramID)
 
-	ixn, err := ks_cache.NewInitDecimalReportsInstruction(in.DataIDs, in.FeedAdmin, in.State, in.ProgramID).ValidateAndBuild()
+	instruction, err := ks_cache.NewInitDecimalReportsInstruction(
+		in.DataIDs,
+		in.FeedAdmin,
+		in.State,
+		in.ProgramID,
+	).ValidateAndBuild()
 	if err != nil {
 		return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
 	}
 
-	if in.MCMS == nil {
-		if err := deps.Chain.Confirm([]solana.Instruction{ixn}); err != nil {
-			return out, fmt.Errorf("failed to confirm instructions: %w", err)
-		}
-
-		return out, nil
-	}
-
-	tx, err := helpers.BuildMCMSTxn(
-		ixn,
-		solana.BPFLoaderUpgradeableProgramID.String(),
-		cldf.ContractType(solana.BPFLoaderUpgradeableProgramID.String()))
+	proposals, err := confirmInstructionOrBuildProposal(
+		deps,
+		in.ChainSel,
+		instruction,
+		in.MCMS,
+		"proposal to InitDecimalReports in Solana",
+	)
 	if err != nil {
-		return out, fmt.Errorf("failed to create transaction: %w", err)
+		return out, err
 	}
 
-	mcmsTxns = append(mcmsTxns, *tx)
-
-	proposal, err := helpers.BuildProposalsForTxns(
-		deps.Env, in.ChainSel, "proposal to SetUpgradeAuthority in Solana", in.MCMS.MinDelay, mcmsTxns)
-	if err != nil {
-		return out, fmt.Errorf("failed to build proposal: %w", err)
+	if proposals != nil {
+		out.Proposals = proposals
 	}
-	out.Proposals = []mcms.TimelockProposal{*proposal}
 
 	return out, nil
 }
 
 func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCacheDecimalReportInput) (ConfigureCacheOutput, error) {
 	var out ConfigureCacheOutput
-	var ixn *ks_cache.Instruction
-	if ks_cache.ProgramID.IsZero() {
-		ks_cache.SetProgramID(in.ProgramID)
-	}
+	ensureProgramID(in.ProgramID)
 
 	workflowMetas := make([]ks_cache.WorkflowMetadata, len(in.AllowedSender))
 	for i := range in.AllowedSender {
@@ -257,9 +301,7 @@ func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCac
 		}
 	}
 
-	mcmsTxns := make([]mcmsTypes.Transaction, 0)
-
-	ixn, err := ks_cache.NewSetDecimalFeedConfigsInstruction(
+	instruction, err := ks_cache.NewSetDecimalFeedConfigsInstruction(
 		in.DataIDs,
 		in.Descriptions,
 		workflowMetas,
@@ -271,30 +313,20 @@ func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCac
 		return out, fmt.Errorf("cant build init oracle instruction: %w", err)
 	}
 
-	if in.MCMS == nil {
-		if err := deps.Chain.Confirm([]solana.Instruction{ixn}); err != nil {
-			return out, fmt.Errorf("failed to confirm instructions: %w", err)
-		}
-
-		return out, nil
-	}
-
-	tx, err := helpers.BuildMCMSTxn(
-		ixn,
-		solana.BPFLoaderUpgradeableProgramID.String(),
-		cldf.ContractType(solana.BPFLoaderUpgradeableProgramID.String()))
+	proposals, err := confirmInstructionOrBuildProposal(
+		deps,
+		in.ChainSel,
+		instruction,
+		in.MCMS,
+		"proposal to SetDecimalFeedConfigs in Solana",
+	)
 	if err != nil {
-		return out, fmt.Errorf("failed to create transaction: %w", err)
+		return out, err
 	}
 
-	mcmsTxns = append(mcmsTxns, *tx)
-
-	proposal, err := helpers.BuildProposalsForTxns(
-		deps.Env, in.ChainSel, "proposal to SetUpgradeAuthority in Solana", in.MCMS.MinDelay, mcmsTxns)
-	if err != nil {
-		return out, fmt.Errorf("failed to build proposal: %w", err)
+	if proposals != nil {
+		out.Proposals = proposals
 	}
-	out.Proposals = []mcms.TimelockProposal{*proposal}
 
 	return out, nil
 }
