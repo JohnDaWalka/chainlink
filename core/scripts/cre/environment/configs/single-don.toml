@@ -50,8 +50,6 @@
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
       image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink:manual-6bdfcdf-plugins"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
       custom_ports = ["5002:5002"]
       user_config_overrides = """
       [Log]
@@ -64,6 +62,7 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
 
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
@@ -74,8 +73,6 @@
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
       image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink:manual-6bdfcdf-plugins"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -87,6 +84,7 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
 
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
@@ -97,8 +95,6 @@
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
       image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink:manual-6bdfcdf-plugins"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -110,6 +106,7 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
 
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
@@ -120,8 +117,6 @@
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
       image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink:manual-6bdfcdf-plugins"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -133,6 +128,7 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
 
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
@@ -143,8 +139,6 @@
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
       image = "***.dkr.ecr.us-west-2.amazonaws.com/chainlink:manual-6bdfcdf-plugins"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -156,6 +150,7 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
 
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
