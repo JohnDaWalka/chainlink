@@ -91,8 +91,10 @@ func (r *capabilitiesRegistryV1Reader) GetDONs(ctx context.Context) ([]DONInfo, 
 		for j, config := range don.CapabilityConfigurations {
 			capConfigID := config.CapabilityId // Store the [32]byte
 			capConfigs[j] = CapabilityConfiguration{
-				CapabilityID: &capConfigID, // Set the pointer to the V1 field
-				Config:       config.Config,
+				CapabilityID:       &capConfigID, // Set the pointer to the V1 field
+				Config:             config.Config,
+				CapabilityIDString: nil, // V2 field is nil
+				Version:            "v1",
 			}
 		}
 
@@ -110,6 +112,11 @@ func (r *capabilitiesRegistryV1Reader) GetDONs(ctx context.Context) ([]DONInfo, 
 			AcceptsWorkflows:         don.AcceptsWorkflows,
 			NodeP2PIds:               nodeP2PIds,
 			CapabilityConfigurations: capConfigs,
+			// V2-specific fields are nil for V1
+			Name:        nil,
+			Config:      nil,
+			DONFamilies: nil,
+			Version:     "v1",
 		}
 	}
 
@@ -147,6 +154,8 @@ func (r *capabilitiesRegistryV1Reader) GetNodes(ctx context.Context) ([]NodeInfo
 			CapabilitiesDONIds:  node.CapabilitiesDONIds,
 			// V1-specific fields
 			HashedCapabilityIDs: &node.HashedCapabilityIds,
+			CapabilityIDs:       nil, // V2 data is nil
+			Version:             "v1",
 		}
 	}
 

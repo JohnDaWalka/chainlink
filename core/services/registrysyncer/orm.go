@@ -12,41 +12,56 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 )
 
 type capabilitiesRegistryNodeInfo struct {
-	NodeOperatorId      uint32         `json:"nodeOperatorId"`
-	ConfigCount         uint32         `json:"configCount"`
-	WorkflowDONId       uint32         `json:"workflowDONId"`
-	Signer              types.PeerID   `json:"signer"`
-	P2pId               types.PeerID   `json:"p2pId"`
-	EncryptionPublicKey [32]byte       `json:"encryptionPublicKey"`
-	HashedCapabilityIds []types.PeerID `json:"hashedCapabilityIds"`
-	CapabilitiesDONIds  []string       `json:"capabilitiesDONIds"`
+	NodeOperatorId      uint32       `json:"nodeOperatorId"`
+	ConfigCount         uint32       `json:"configCount"`
+	WorkflowDONId       uint32       `json:"workflowDONId"`
+	Signer              types.PeerID `json:"signer"`
+	P2pId               types.PeerID `json:"p2pId"`
+	EncryptionPublicKey [32]byte     `json:"encryptionPublicKey"`
+	CapabilitiesDONIds  []string     `json:"capabilitiesDONIds"`
+
+	// Version-specific fields
+	HashedCapabilityIds *[]types.PeerID `json:"hashedCapabilityIds,omitempty"`
+	CapabilityIds       *[]string       `json:"capabilityIds,omitempty"`
+	Version             string          `json:"version"`
 }
 
 func (l *LocalRegistry) MarshalJSON() ([]byte, error) {
 	idsToNodes := make(map[types.PeerID]capabilitiesRegistryNodeInfo)
 	for k, v := range l.IDsToNodes {
-		hashedCapabilityIds := make([]types.PeerID, len(v.HashedCapabilityIds))
-		for i, id := range v.HashedCapabilityIds {
-			hashedCapabilityIds[i] = types.PeerID(id[:])
+		var hashedCapabilityIds *[]types.PeerID
+		if v.HashedCapabilityIDs != nil {
+			hashedIds := make([]types.PeerID, len(*v.HashedCapabilityIDs))
+			for i, id := range *v.HashedCapabilityIDs {
+				hashedIds[i] = types.PeerID(id[:])
+			}
+			hashedCapabilityIds = &hashedIds
 		}
+
+		var capabilityIds *[]string
+		if v.CapabilityIDs != nil {
+			capabilityIds = v.CapabilityIDs
+		}
+
 		capabilitiesDONIds := make([]string, len(v.CapabilitiesDONIds))
 		for i, id := range v.CapabilitiesDONIds {
 			capabilitiesDONIds[i] = id.String()
 		}
-		idsToNodes[k] = capabilitiesRegistryNodeInfo{
-			NodeOperatorId:      v.NodeOperatorId,
+
+		idsToNodes[types.PeerID(k)] = capabilitiesRegistryNodeInfo{
+			NodeOperatorId:      v.NodeOperatorID,
 			ConfigCount:         v.ConfigCount,
 			WorkflowDONId:       v.WorkflowDONId,
 			Signer:              types.PeerID(v.Signer[:]),
-			P2pId:               types.PeerID(v.P2pId[:]),
+			P2pId:               types.PeerID(v.P2PID),
 			EncryptionPublicKey: v.EncryptionPublicKey,
 			HashedCapabilityIds: hashedCapabilityIds,
+			CapabilityIds:       capabilityIds,
 			CapabilitiesDONIds:  capabilitiesDONIds,
+			Version:             v.Version,
 		}
 	}
 
@@ -82,11 +97,20 @@ func (l *LocalRegistry) UnmarshalJSON(data []byte) error {
 
 	l.IDsToDONs = temp.IDsToDONs
 
-	l.IDsToNodes = make(map[types.PeerID]kcr.INodeInfoProviderNodeInfo)
+	l.IDsToNodes = make(map[types.PeerID]NodeInfo)
 	for peerID, v := range temp.IDsToNodes {
-		hashedCapabilityIds := make([][32]byte, len(v.HashedCapabilityIds))
-		for i, id := range v.HashedCapabilityIds {
-			copy(hashedCapabilityIds[i][:], id[:])
+		var hashedCapabilityIds *[][32]byte
+		if v.HashedCapabilityIds != nil {
+			hashedIds := make([][32]byte, len(*v.HashedCapabilityIds))
+			for i, id := range *v.HashedCapabilityIds {
+				hashedIds[i] = [32]byte(id)
+			}
+			hashedCapabilityIds = &hashedIds
+		}
+
+		var capabilityIds *[]string
+		if v.CapabilityIds != nil {
+			capabilityIds = v.CapabilityIds
 		}
 
 		capabilitiesDONIds := make([]*big.Int, len(v.CapabilitiesDONIds))
@@ -95,16 +119,21 @@ func (l *LocalRegistry) UnmarshalJSON(data []byte) error {
 			bigInt.SetString(id, 10)
 			capabilitiesDONIds[i] = bigInt
 		}
-		l.IDsToNodes[peerID] = kcr.INodeInfoProviderNodeInfo{
-			NodeOperatorId:      v.NodeOperatorId,
+
+		nodeInfo := NodeInfo{
+			NodeOperatorID:      v.NodeOperatorId,
 			ConfigCount:         v.ConfigCount,
 			WorkflowDONId:       v.WorkflowDONId,
-			Signer:              v.Signer,
-			P2pId:               v.P2pId,
+			Signer:              [32]byte(v.Signer),
+			P2PID:               types.PeerID(v.P2pId),
 			EncryptionPublicKey: v.EncryptionPublicKey,
-			HashedCapabilityIds: hashedCapabilityIds,
+			HashedCapabilityIDs: hashedCapabilityIds,
+			CapabilityIDs:       capabilityIds,
 			CapabilitiesDONIds:  capabilitiesDONIds,
+			Version:             v.Version,
 		}
+
+		l.IDsToNodes[peerID] = nodeInfo
 	}
 
 	l.IDsToCapabilities = temp.IDsToCapabilities

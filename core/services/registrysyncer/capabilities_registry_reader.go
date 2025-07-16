@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	kcrv2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/capabilities/versioning"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -48,7 +49,10 @@ type CapabilityInfo struct {
 	IsDeprecated          bool
 
 	// V1-specific fields
-	HashedID *[32]byte `json:"hashedId,omitempty"` // Only populated for V1
+	HashedID *[32]byte `json:"hashedId,omitempty"`
+
+	// V2-specific fields
+	Metadata *[]byte `json:"metadata,omitempty"`
 }
 
 // DONInfo represents DON information across all versions
@@ -62,6 +66,14 @@ type DONInfo struct {
 	AcceptsWorkflows         bool
 	NodeP2PIds               []p2ptypes.PeerID
 	CapabilityConfigurations []CapabilityConfiguration
+
+	// V2-specific fields
+	Name        *string   `json:"name,omitempty"`
+	Config      *[]byte   `json:"config,omitempty"`
+	DONFamilies *[]string `json:"donFamilies,omitempty"`
+
+	// Version indicator
+	Version string `json:"version"` // "v1" or "v2"
 }
 
 // NodeInfo represents node information across all versions
@@ -78,6 +90,21 @@ type NodeInfo struct {
 
 	// V1-specific fields
 	HashedCapabilityIDs *[][32]byte `json:"hashedCapabilityIds,omitempty"` // V1 uses hashed IDs
+
+	// V2-specific fields
+	CapabilityIDs *[]string `json:"capabilityIds,omitempty"` // V2 uses string capability IDs
+
+	// Version indicator
+	Version string `json:"version"` // "v1" or "v2"
+}
+
+// Helper methods for NodeInfo
+func (n *NodeInfo) IsV1() bool {
+	return n.Version == "v1"
+}
+
+func (n *NodeInfo) IsV2() bool {
+	return n.Version == "v2"
 }
 
 // CapabilitiesRegistryReaderFactory creates version-specific readers
@@ -188,13 +215,10 @@ func buildV1ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
 
 // buildV2ContractReaderConfig creates the contract reader configuration for V2 capabilities registry
 func buildV2ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
-	// TODO: This will need to be updated with the actual V2 contract ABI
-	// For now, we'll use the same structure as V1 but this will change
-	// once the V2 contract bindings are available
 	return evmrelaytypes.ChainReaderConfig{
 		Contracts: map[string]evmrelaytypes.ChainContractReader{
 			"CapabilitiesRegistry": {
-				ContractABI: kcr.CapabilitiesRegistryABI, // TODO: Replace with V2 ABI
+				ContractABI: kcrv2.CapabilitiesRegistryABI,
 				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
 					"getDONs": {
 						ChainSpecificName: "getDONs",

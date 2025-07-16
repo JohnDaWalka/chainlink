@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
 type DonID uint32
@@ -25,6 +25,12 @@ type CapabilityConfiguration struct {
 
 	// V1-specific fields
 	CapabilityID *[32]byte `json:"capabilityId,omitempty"` // V1 uses [32]byte hash
+
+	// V2-specific fields
+	CapabilityIDString *string `json:"capabilityIdString,omitempty"` // V2 uses string capability ID
+
+	// Version indicator
+	Version string `json:"version"` // "v1" or "v2"
 }
 
 type Capability struct {
@@ -36,7 +42,7 @@ type LocalRegistry struct {
 	lggr              logger.Logger
 	getPeerID         func() (types.PeerID, error)
 	IDsToDONs         map[DonID]DON
-	IDsToNodes        map[types.PeerID]kcr.INodeInfoProviderNodeInfo
+	IDsToNodes        map[p2ptypes.PeerID]NodeInfo
 	IDsToCapabilities map[string]Capability
 }
 
@@ -44,11 +50,11 @@ func NewLocalRegistry(
 	lggr logger.Logger,
 	getPeerID func() (types.PeerID, error),
 	IDsToDONs map[DonID]DON,
-	IDsToNodes map[types.PeerID]kcr.INodeInfoProviderNodeInfo,
+	IDsToNodes map[p2ptypes.PeerID]NodeInfo,
 	IDsToCapabilities map[string]Capability,
-) LocalRegistry {
-	return LocalRegistry{
-		lggr:              logger.Named(lggr, "LocalRegistry"),
+) *LocalRegistry {
+	return &LocalRegistry{
+		lggr:              lggr,
 		getPeerID:         getPeerID,
 		IDsToDONs:         IDsToDONs,
 		IDsToNodes:        IDsToNodes,
@@ -57,15 +63,12 @@ func NewLocalRegistry(
 }
 
 func (l *LocalRegistry) LocalNode(ctx context.Context) (capabilities.Node, error) {
-	// Load the current nodes PeerWrapper, this gets us the current node's
-	// PeerID, allowing us to contextualize registry information in terms of DON ownership
-	// (eg. get my current DON configuration, etc).
 	pid, err := l.getPeerID()
 	if err != nil {
-		return capabilities.Node{}, errors.New("unable to get local node: peerWrapper hasn't started yet")
+		return capabilities.Node{}, fmt.Errorf("failed to get peer ID: %w", err)
 	}
 
-	return l.NodeByPeerID(ctx, pid)
+	return l.NodeByPeerID(ctx, p2ptypes.PeerID(pid))
 }
 
 func (l *LocalRegistry) NodeByPeerID(ctx context.Context, peerID types.PeerID) (capabilities.Node, error) {
@@ -101,7 +104,7 @@ func (l *LocalRegistry) NodeByPeerID(ctx context.Context, peerID types.PeerID) (
 
 	return capabilities.Node{
 		PeerID:              &peerID,
-		NodeOperatorID:      nodeInfo.NodeOperatorId,
+		NodeOperatorID:      nodeInfo.NodeOperatorID,
 		Signer:              nodeInfo.Signer,
 		EncryptionPublicKey: nodeInfo.EncryptionPublicKey,
 		WorkflowDON:         workflowDON,
@@ -138,4 +141,70 @@ func (l *LocalRegistry) ensureNotEmpty() error {
 		return errors.New("empty local registry. no capabilities registered in the local registry")
 	}
 	return nil
+}
+
+func (l *LocalRegistry) HasCapability(id string) (bool, error) {
+	_, ok := l.IDsToCapabilities[id]
+	return ok, nil
+}
+
+func (l *LocalRegistry) HasDON(id DonID) (bool, error) {
+	_, ok := l.IDsToDONs[id]
+	return ok, nil
+}
+
+func (l *LocalRegistry) CapabilityForID(id string) (capabilities.CapabilityInfo, error) {
+	c, ok := l.IDsToCapabilities[id]
+	if !ok {
+		return capabilities.CapabilityInfo{}, fmt.Errorf("could not find capability with id %s", id)
+	}
+
+	return capabilities.CapabilityInfo{
+		ID:             c.ID,
+		CapabilityType: c.CapabilityType,
+	}, nil
+}
+
+func (l *LocalRegistry) DONForID(id DonID) (capabilities.DON, error) {
+	d, ok := l.IDsToDONs[id]
+	if !ok {
+		return capabilities.DON{}, fmt.Errorf("could not find DON with id %d", id)
+	}
+
+	return d.DON, nil
+}
+
+func (l *LocalRegistry) AllCapabilities() []capabilities.CapabilityInfo {
+	capabilityInfos := make([]capabilities.CapabilityInfo, 0, len(l.IDsToCapabilities))
+	for _, c := range l.IDsToCapabilities {
+		capabilityInfos = append(capabilityInfos, capabilities.CapabilityInfo{
+			ID:             c.ID,
+			CapabilityType: c.CapabilityType,
+		})
+	}
+
+	return capabilityInfos
+}
+
+func (l *LocalRegistry) AllDONs() []capabilities.DON {
+	dons := make([]capabilities.DON, 0, len(l.IDsToDONs))
+	for _, d := range l.IDsToDONs {
+		dons = append(dons, d.DON)
+	}
+
+	return dons
+}
+
+func (l *LocalRegistry) AllNodes() []capabilities.Node {
+	nodes := make([]capabilities.Node, 0, len(l.IDsToNodes))
+	for peerID := range l.IDsToNodes {
+		node, err := l.NodeByPeerID(context.Background(), peerID)
+		if err != nil {
+			l.lggr.Errorf("could not find node for peer %s: %s", peerID, err)
+			continue
+		}
+		nodes = append(nodes, node)
+	}
+
+	return nodes
 }

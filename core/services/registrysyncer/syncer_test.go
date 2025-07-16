@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -330,44 +329,44 @@ func TestReader_Integration(t *testing.T) {
 	assert.Equal(t, expectedDON, gotDon.DON)
 	assert.Equal(t, configb, gotDon.CapabilityConfigurations[cid].Config)
 
-	nodesInfo := []kcr_v1.INodeInfoProviderNodeInfo{
+	nodesInfo := []registrysyncer.NodeInfo{
 		{
-			// The first NodeOperatorId has id 1 since the id is auto-incrementing.
-			NodeOperatorId:      uint32(1),
+			NodeOperatorID:      uint32(1),
 			ConfigCount:         1,
 			WorkflowDONId:       1,
 			Signer:              signersSet[0],
-			P2pId:               nodeSet[0],
+			P2PID:               p2ptypes.PeerID(nodeSet[0]),
 			EncryptionPublicKey: encPubKey1,
-			HashedCapabilityIds: [][32]byte{hid},
+			HashedCapabilityIDs: &[][32]byte{hid},
 			CapabilitiesDONIds:  []*big.Int{},
+			Version:             "v1",
 		},
 		{
-			// The first NodeOperatorId has id 1 since the id is auto-incrementing.
-			NodeOperatorId:      uint32(1),
+			NodeOperatorID:      uint32(1),
 			ConfigCount:         1,
 			WorkflowDONId:       1,
 			Signer:              signersSet[1],
-			P2pId:               nodeSet[1],
+			P2PID:               p2ptypes.PeerID(nodeSet[1]),
 			EncryptionPublicKey: encPubKey2,
-			HashedCapabilityIds: [][32]byte{hid},
+			HashedCapabilityIDs: &[][32]byte{hid},
 			CapabilitiesDONIds:  []*big.Int{},
+			Version:             "v1",
 		},
 		{
-			// The first NodeOperatorId has id 1 since the id is auto-incrementing.
-			NodeOperatorId:      uint32(1),
+			NodeOperatorID:      uint32(1),
 			ConfigCount:         1,
 			WorkflowDONId:       1,
 			Signer:              signersSet[2],
-			P2pId:               nodeSet[2],
+			P2PID:               p2ptypes.PeerID(nodeSet[2]),
 			EncryptionPublicKey: encPubKey3,
-			HashedCapabilityIds: [][32]byte{hid},
+			HashedCapabilityIDs: &[][32]byte{hid},
 			CapabilitiesDONIds:  []*big.Int{},
+			Version:             "v1",
 		},
 	}
 
 	assert.Len(t, s.IDsToNodes, 3)
-	assert.Equal(t, map[p2ptypes.PeerID]kcr_v1.INodeInfoProviderNodeInfo{
+	assert.Equal(t, map[p2ptypes.PeerID]registrysyncer.NodeInfo{
 		nodeSet[0]: nodesInfo[0],
 		nodeSet[1]: nodesInfo[1],
 		nodeSet[2]: nodesInfo[2],
@@ -533,30 +532,34 @@ func TestSyncer_LocalNode(t *testing.T) {
 				},
 			},
 		},
-		map[p2ptypes.PeerID]kcr_v1.INodeInfoProviderNodeInfo{
+		map[p2ptypes.PeerID]registrysyncer.NodeInfo{
 			workflowDonNodes[0]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				Signer:              randomWord(),
-				P2pId:               workflowDonNodes[0],
+				P2PID:               workflowDonNodes[0],
 				EncryptionPublicKey: randomWord(),
+				Version:             "v1",
 			},
 			workflowDonNodes[1]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				Signer:              randomWord(),
-				P2pId:               workflowDonNodes[1],
+				P2PID:               workflowDonNodes[1],
 				EncryptionPublicKey: randomWord(),
+				Version:             "v1",
 			},
 			workflowDonNodes[2]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				Signer:              randomWord(),
-				P2pId:               workflowDonNodes[2],
+				P2PID:               workflowDonNodes[2],
 				EncryptionPublicKey: randomWord(),
+				Version:             "v1",
 			},
 			workflowDonNodes[3]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				Signer:              randomWord(),
-				P2pId:               workflowDonNodes[3],
+				P2PID:               workflowDonNodes[3],
 				EncryptionPublicKey: randomWord(),
+				Version:             "v1",
 			},
 		},
 		map[string]registrysyncer.Capability{
@@ -589,46 +592,499 @@ func TestSyncer_LocalNode(t *testing.T) {
 	assert.Equal(t, expectedNode, node)
 }
 
-func TestSyncer_V2Unsupported(t *testing.T) {
+func TestReader_V2_Integration(t *testing.T) {
 	ctx := testutils.Context(t)
-	lggr, _ := logger.TestLoggerObserved(t, zapcore.DPanicLevel)
-	backendTH := captestutils.NewEVMBackendTH(t)
+	lggr := logger.TestLogger(t)
+	
+	// Create a simulated backend similar to V1 tests
+	owner := evmtestutils.MustNewSimTransactor(t)
+	i := &big.Int{}
+	oneEth, _ := i.SetString("100000000000000000000", 10)
+	gasLimit := ethconfig.Defaults.Miner.GasCeil * 2 // 60 M blocks
 
-	// Deploy a test V2 capabilities registry
-	regAddress, _, _, err := kcr_v2.DeployCapabilitiesRegistry(backendTH.ContractsOwner, backendTH.Backend.Client(), kcr_v2.CapabilitiesRegistryConstructorParams{})
+	simulatedBackend := simulated.NewBackend(gethtypes.GenesisAlloc{owner.From: {
+		Balance: oneEth,
+	}}, simulated.WithBlockGasLimit(gasLimit))
+	simulatedBackend.Commit()
+
+	// Deploy a V2 capabilities registry
+	regAddress, _, reg, err := kcr_v2.DeployCapabilitiesRegistry(owner, simulatedBackend.Client(), kcr_v2.CapabilitiesRegistryConstructorParams{})
 	require.NoError(t, err, "DeployCapabilitiesRegistry failed")
-	backendTH.Backend.Commit()
-	backendTH.Backend.Commit()
-	backendTH.Backend.Commit()
-	require.NoError(t, err)
+	simulatedBackend.Commit()
 
-	db := pgtest.NewSqlxDB(t)
-
-	syncerORM := registrysyncer.NewORM(db, lggr)
-	testContractReaderFactory := &testContractReaderFactory{
-		backendTH: backendTH,
-		t:         t,
+	// Add a V2 capability with string ID and metadata
+	writeChainCapabilityV2 := kcr_v2.CapabilitiesRegistryCapability{
+		CapabilityId:          "write-chain@1.0.1",
+		ConfigurationContract: common.Address{},
+		Metadata:              []byte(`{"capabilityType": 3, "responseType": 1}`), // 3 = target capability
 	}
 
-	syncer, err := registrysyncer.New(
+	// Add capability
+	_, err = reg.AddCapabilities(owner, []kcr_v2.CapabilitiesRegistryCapability{writeChainCapabilityV2})
+	require.NoError(t, err, "AddCapability failed for %s", writeChainCapabilityV2.CapabilityId)
+	simulatedBackend.Commit()
+
+	// V2 uses string capability IDs directly
+	cid := writeChainCapabilityV2.CapabilityId
+
+	// Add node operator
+	_, err = reg.AddNodeOperators(owner, []kcr_v2.CapabilitiesRegistryNodeOperator{
+		{
+			Admin: owner.From,
+			Name:  "TEST_NOP_V2",
+		},
+	})
+	require.NoError(t, err, "Failed to add node operator")
+	simulatedBackend.Commit()
+
+	// Create test nodes
+	nodeSet := [][32]byte{
+		randomWord(),
+		randomWord(),
+		randomWord(),
+	}
+
+	signersSet := [][32]byte{
+		randomWord(),
+		randomWord(),
+		randomWord(),
+	}
+
+	encPubKey1 := randomWord()
+	encPubKey2 := randomWord()
+	encPubKey3 := randomWord()
+
+	// V2 nodes use string capability IDs and require CsaKey
+	nodes := []kcr_v2.CapabilitiesRegistryNodeParams{
+		{
+			NodeOperatorId:      uint32(1),
+			Signer:              signersSet[0],
+			P2pId:               nodeSet[0],
+			EncryptionPublicKey: encPubKey1,
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{cid},
+		},
+		{
+			NodeOperatorId:      uint32(1),
+			Signer:              signersSet[1],
+			P2pId:               nodeSet[1],
+			EncryptionPublicKey: encPubKey2,
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{cid},
+		},
+		{
+			NodeOperatorId:      uint32(1),
+			Signer:              signersSet[2],
+			P2pId:               nodeSet[2],
+			EncryptionPublicKey: encPubKey3,
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{cid},
+		},
+	}
+	_, err = reg.AddNodes(owner, nodes)
+	require.NoError(t, err, "Failed to add nodes")
+	simulatedBackend.Commit()
+
+	// Create capability configuration
+	config := &capabilitiespb.CapabilityConfig{
+		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
+		RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+				RegistrationRefresh: durationpb.New(20 * time.Second),
+				RegistrationExpiry:  durationpb.New(60 * time.Second),
+				MinResponsesToAggregate: uint32(1) + 1,
+				MessageExpiry:           durationpb.New(120 * time.Second),
+			},
+		},
+	}
+	configb, err := proto.Marshal(config)
+	require.NoError(t, err)
+
+	// V2 DON configuration uses string capability IDs
+	cfgs := []kcr_v2.CapabilitiesRegistryCapabilityConfiguration{
+		{
+			CapabilityId: cid,
+			Config:       configb,
+		},
+	}
+
+	// Add DON using AddDONs with DON family (V2 feature)
+	newDONs := []kcr_v2.CapabilitiesRegistryNewDONParams{
+		{
+			Name:                     "test-don-v2",
+			DonFamilies:              []string{"workflow-don-family"},
+			Config:                   []byte{},
+			CapabilityConfigurations: cfgs,
+			Nodes:                    nodeSet,
+			F:                        1,
+			IsPublic:                 true,
+			AcceptsWorkflows:         true,
+		},
+	}
+	_, err = reg.AddDONs(owner, newDONs)
+	require.NoError(t, err)
+	simulatedBackend.Commit()
+
+	// Test the syncer using the same setup as V1 tests
+	db := pgtest.NewSqlxDB(t)
+	factory := newContractReaderFactory(t, simulatedBackend)
+	syncerORM := registrysyncer.NewORM(db, lggr)
+	syncer, err := registrysyncer.New(lggr, func() (p2ptypes.PeerID, error) { return p2ptypes.PeerID{}, nil }, factory, regAddress.Hex(), syncerORM)
+	require.NoError(t, err)
+
+	l := &launcher{}
+	syncer.AddListener(l)
+
+	err = syncer.Sync(ctx, false)
+	require.NoError(t, err)
+
+	s := l.localRegistry
+	require.NotNil(t, s)
+
+	// Test V2 capabilities with string IDs
+	assert.Len(t, s.IDsToCapabilities, 1)
+	gotCap := s.IDsToCapabilities[cid]
+	assert.Equal(t, registrysyncer.Capability{
+		CapabilityType: capabilities.CapabilityTypeTarget,
+		ID:             "write-chain@1.0.1",
+	}, gotCap)
+
+	// Test V2 DON with family
+	assert.Len(t, s.IDsToDONs, 1)
+	expectedDON := capabilities.DON{
+		ID:               1,
+		ConfigVersion:    1,
+		IsPublic:         true,
+		AcceptsWorkflows: true,
+		F:                1,
+		Members:          toPeerIDs(nodeSet),
+	}
+	gotDon := s.IDsToDONs[1]
+	assert.Equal(t, expectedDON, gotDon.DON)
+	assert.Equal(t, configb, gotDon.CapabilityConfigurations[cid].Config)
+
+	// Test V2 node info with string capability IDs
+	expectedNodesInfo := []registrysyncer.NodeInfo{
+		{
+			NodeOperatorID:      uint32(1),
+			ConfigCount:         1,
+			WorkflowDONId:       1,
+			Signer:              signersSet[0],
+			P2PID:               p2ptypes.PeerID(nodeSet[0]),
+			EncryptionPublicKey: encPubKey1,
+			CapabilityIDs:       &[]string{cid}, // V2 uses string IDs
+			CapabilitiesDONIds:  []*big.Int{},
+			Version:             "v2",
+		},
+		{
+			NodeOperatorID:      uint32(1),
+			ConfigCount:         1,
+			WorkflowDONId:       1,
+			Signer:              signersSet[1],
+			P2PID:               p2ptypes.PeerID(nodeSet[1]),
+			EncryptionPublicKey: encPubKey2,
+			CapabilityIDs:       &[]string{cid}, // V2 uses string IDs
+			CapabilitiesDONIds:  []*big.Int{},
+			Version:             "v2",
+		},
+		{
+			NodeOperatorID:      uint32(1),
+			ConfigCount:         1,
+			WorkflowDONId:       1,
+			Signer:              signersSet[2],
+			P2PID:               p2ptypes.PeerID(nodeSet[2]),
+			EncryptionPublicKey: encPubKey3,
+			CapabilityIDs:       &[]string{cid}, // V2 uses string IDs
+			CapabilitiesDONIds:  []*big.Int{},
+			Version:             "v2",
+		},
+	}
+
+	assert.Len(t, s.IDsToNodes, 3)
+	assert.Equal(t, map[p2ptypes.PeerID]registrysyncer.NodeInfo{
+		nodeSet[0]: expectedNodesInfo[0],
+		nodeSet[1]: expectedNodesInfo[1],
+		nodeSet[2]: expectedNodesInfo[2],
+	}, s.IDsToNodes)
+}
+
+func TestSyncer_V2_DBIntegration(t *testing.T) {
+	ctx := testutils.Context(t)
+	lggr := logger.TestLogger(t)
+	
+	// Create a simulated backend similar to V1 tests
+	owner := evmtestutils.MustNewSimTransactor(t)
+	i := &big.Int{}
+	oneEth, _ := i.SetString("100000000000000000000", 10)
+	gasLimit := ethconfig.Defaults.Miner.GasCeil * 2 // 60 M blocks
+
+	simulatedBackend := simulated.NewBackend(gethtypes.GenesisAlloc{owner.From: {
+		Balance: oneEth,
+	}}, simulated.WithBlockGasLimit(gasLimit))
+	simulatedBackend.Commit()
+
+	// Deploy a V2 capabilities registry
+	regAddress, _, reg, err := kcr_v2.DeployCapabilitiesRegistry(owner, simulatedBackend.Client(), kcr_v2.CapabilitiesRegistryConstructorParams{})
+	require.NoError(t, err, "DeployCapabilitiesRegistry failed")
+	simulatedBackend.Commit()
+
+	// Add a V2 capability
+	writeChainCapabilityV2 := kcr_v2.CapabilitiesRegistryCapability{
+		CapabilityId:          "write-chain@1.0.1",
+		ConfigurationContract: common.Address{},
+		Metadata:              []byte(`{"capabilityType": 3, "responseType": 1}`), // 3 = target capability
+	}
+
+	_, err = reg.AddCapabilities(owner, []kcr_v2.CapabilitiesRegistryCapability{writeChainCapabilityV2})
+	require.NoError(t, err, "AddCapability failed for %s", writeChainCapabilityV2.CapabilityId)
+	simulatedBackend.Commit()
+
+	cid := writeChainCapabilityV2.CapabilityId
+
+	// Add node operator
+	_, err = reg.AddNodeOperators(owner, []kcr_v2.CapabilitiesRegistryNodeOperator{
+		{
+			Admin: owner.From,
+			Name:  "TEST_NOP_V2",
+		},
+	})
+	require.NoError(t, err)
+	simulatedBackend.Commit()
+
+	// Create test nodes
+	nodeSet := [][32]byte{
+		randomWord(),
+		randomWord(),
+		randomWord(),
+	}
+
+	signersSet := [][32]byte{
+		randomWord(),
+		randomWord(),
+		randomWord(),
+	}
+
+	nodes := []kcr_v2.CapabilitiesRegistryNodeParams{
+		{
+			NodeOperatorId:      uint32(1),
+			Signer:              signersSet[0],
+			P2pId:               nodeSet[0],
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{cid},
+		},
+		{
+			NodeOperatorId:      uint32(1),
+			Signer:              signersSet[1],
+			P2pId:               nodeSet[1],
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{cid},
+		},
+		{
+			NodeOperatorId:      uint32(1),
+			Signer:              signersSet[2],
+			P2pId:               nodeSet[2],
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{cid},
+		},
+	}
+	_, err = reg.AddNodes(owner, nodes)
+	require.NoError(t, err)
+	simulatedBackend.Commit()
+
+	// Create capability configuration
+	config := &capabilitiespb.CapabilityConfig{
+		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
+		RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+				RegistrationRefresh: durationpb.New(20 * time.Second),
+				RegistrationExpiry:  durationpb.New(60 * time.Second),
+				MinResponsesToAggregate: uint32(1) + 1,
+			},
+		},
+	}
+	configb, err := proto.Marshal(config)
+	require.NoError(t, err)
+
+	cfgs := []kcr_v2.CapabilitiesRegistryCapabilityConfiguration{
+		{
+			CapabilityId: cid,
+			Config:       configb,
+		},
+	}
+
+	// Add DON using AddDONs with DON family (V2 feature)
+	newDONs := []kcr_v2.CapabilitiesRegistryNewDONParams{
+		{
+			Name:                     "test-don-v2-db",
+			DonFamilies:              []string{"workflow-don-family-v2"},
+			Config:                   []byte{},
+			CapabilityConfigurations: cfgs,
+			Nodes:                    nodeSet,
+			F:                        1,
+			IsPublic:                 true,
+			AcceptsWorkflows:         true,
+		},
+	}
+	_, err = reg.AddDONs(owner, newDONs)
+	require.NoError(t, err)
+	simulatedBackend.Commit()
+
+	// Test database integration
+	syncerORM := newORM(t)
+	syncerORM.ormMock.On("LatestLocalRegistry", mock.Anything).Return(nil, errors.New("no state found"))
+	syncerORM.ormMock.On("AddLocalRegistry", mock.Anything, mock.Anything).Return(nil)
+
+	factory := newContractReaderFactory(t, simulatedBackend)
+
+	syncer, err := newTestSyncer(
 		lggr,
 		func() (p2ptypes.PeerID, error) { return p2ptypes.PeerID{}, nil },
-		testContractReaderFactory,
+		factory,
 		regAddress.Hex(),
 		syncerORM,
 	)
 	require.NoError(t, err)
+	require.NoError(t, syncer.Start(ctx))
+	
+	t.Cleanup(func() {
+		syncerORM.Cleanup()
+		require.NoError(t, syncer.Close())
+	})
 
-	// Add a launcher like in TestReader_Integration
 	l := &launcher{}
 	syncer.AddListener(l)
 
-	// Call Sync directly - this should return an error for V2 contracts
-	err = syncer.Sync(ctx, false)
-	require.Error(t, err)
+	// Test that the syncer calls the ORM methods
+	var latestLocalRegistryCalled, addLocalRegistryCalled bool
+	timeout := time.After(testutils.WaitTimeout(t))
 
-	time.Sleep(500 * time.Millisecond) // Allow some time for the syncer to start
-	require.Contains(t, err.Error(), "V2 capabilities reading not yet implemented")
+	for !latestLocalRegistryCalled || !addLocalRegistryCalled {
+		select {
+		case val := <-syncerORM.latestLocalRegistryCh:
+			assert.Equal(t, struct{}{}, val)
+			latestLocalRegistryCalled = true
+		case val := <-syncerORM.addLocalRegistryCh:
+			assert.Equal(t, struct{}{}, val)
+			addLocalRegistryCalled = true
+		case <-timeout:
+			t.Fatal("test timed out; channels did not received data")
+		}
+	}
+}
+
+func TestSyncer_V2_LocalNode(t *testing.T) {
+	ctx := testutils.Context(t)
+	lggr := logger.TestLogger(t)
+
+	var pid p2ptypes.PeerID
+	err := pid.UnmarshalText([]byte("12D3KooWBCF1XT5Wi8FzfgNCqRL76Swv8TRU3TiD4QiJm8NMNX7N"))
+	require.NoError(t, err)
+
+	workflowDonNodes := []p2ptypes.PeerID{
+		pid,
+		randomWord(),
+		randomWord(),
+		randomWord(),
+	}
+
+	dID := uint32(1)
+	// Test V2 local registry with string capability IDs
+	localRegistry := registrysyncer.NewLocalRegistry(
+		lggr,
+		func() (p2ptypes.PeerID, error) { return pid, nil },
+		map[registrysyncer.DonID]registrysyncer.DON{
+			registrysyncer.DonID(dID): {
+				DON: capabilities.DON{
+					ID:               dID,
+					ConfigVersion:    uint32(2),
+					F:                uint8(1),
+					IsPublic:         true,
+					AcceptsWorkflows: true,
+					Members:          workflowDonNodes,
+				},
+			},
+		},
+		map[p2ptypes.PeerID]registrysyncer.NodeInfo{
+			workflowDonNodes[0]: {
+				NodeOperatorID:      1,
+				Signer:              randomWord(),
+				P2PID:               workflowDonNodes[0],
+				EncryptionPublicKey: randomWord(),
+				CapabilityIDs:       &[]string{"write-chain@1.0.1", "trigger@1.0.0"}, // V2 uses string IDs
+				Version:             "v2",
+			},
+			workflowDonNodes[1]: {
+				NodeOperatorID:      1,
+				Signer:              randomWord(),
+				P2PID:               workflowDonNodes[1],
+				EncryptionPublicKey: randomWord(),
+				CapabilityIDs:       &[]string{"write-chain@1.0.1", "trigger@1.0.0"}, // V2 uses string IDs
+				Version:             "v2",
+			},
+			workflowDonNodes[2]: {
+				NodeOperatorID:      1,
+				Signer:              randomWord(),
+				P2PID:               workflowDonNodes[2],
+				EncryptionPublicKey: randomWord(),
+				CapabilityIDs:       &[]string{"write-chain@1.0.1"}, // V2 uses string IDs
+				Version:             "v2",
+			},
+			workflowDonNodes[3]: {
+				NodeOperatorID:      1,
+				Signer:              randomWord(),
+				P2PID:               workflowDonNodes[3],
+				EncryptionPublicKey: randomWord(),
+				CapabilityIDs:       &[]string{"write-chain@1.0.1"}, // V2 uses string IDs
+				Version:             "v2",
+			},
+		},
+		map[string]registrysyncer.Capability{
+			"write-chain@1.0.1": {
+				CapabilityType: capabilities.CapabilityTypeTarget,
+				ID:             "write-chain@1.0.1",
+			},
+			"trigger@1.0.0": {
+				CapabilityType: capabilities.CapabilityTypeTrigger,
+				ID:             "trigger@1.0.0",
+			},
+		},
+	)
+
+	node, err := localRegistry.LocalNode(ctx)
+	require.NoError(t, err)
+
+	don := capabilities.DON{
+		ID:               dID,
+		ConfigVersion:    2,
+		Members:          workflowDonNodes,
+		F:                1,
+		IsPublic:         true,
+		AcceptsWorkflows: true,
+	}
+	expectedNode := capabilities.Node{
+		PeerID:              &pid,
+		NodeOperatorID:      1,
+		Signer:              localRegistry.IDsToNodes[pid].Signer,
+		EncryptionPublicKey: localRegistry.IDsToNodes[pid].EncryptionPublicKey,
+		WorkflowDON:         don,
+		CapabilityDONs:      []capabilities.DON{don},
+	}
+	assert.Equal(t, expectedNode, node)
+
+	// Test that V2 capabilities are properly handled
+	assert.Len(t, localRegistry.IDsToCapabilities, 2)
+	assert.Contains(t, localRegistry.IDsToCapabilities, "write-chain@1.0.1")
+	assert.Contains(t, localRegistry.IDsToCapabilities, "trigger@1.0.0")
+
+	// Test that V2 node info has string capability IDs
+	nodeInfo := localRegistry.IDsToNodes[pid]
+	assert.Equal(t, "v2", nodeInfo.Version)
+	assert.NotNil(t, nodeInfo.CapabilityIDs)
+	assert.Nil(t, nodeInfo.HashedCapabilityIDs)
+	assert.Equal(t, []string{"write-chain@1.0.1", "trigger@1.0.0"}, *nodeInfo.CapabilityIDs)
 }
 
 // Add this helper struct to implement the ContractReaderFactory interface

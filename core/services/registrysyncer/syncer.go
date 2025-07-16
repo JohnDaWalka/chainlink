@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	p2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
@@ -212,23 +211,24 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 	for _, d := range donInfos {
 		cc := map[string]CapabilityConfiguration{}
 		for _, dc := range d.CapabilityConfigurations {
-			// Handle V1 case where CapabilityID is a pointer to [32]byte
+			// Handle both V1 and V2 cases
 			var capabilityID string
 
-			if dc.CapabilityID == nil {
-				// V2 case: capability ID would be a string field (not implemented yet)
-				// For now, skip this case
+			if dc.CapabilityID != nil {
+				// V1 case: capability ID is a hash that needs to be looked up
+				hash := *dc.CapabilityID
+				cid, ok := hashedIDsToCapabilityIDs[hash]
+				if !ok {
+					return nil, fmt.Errorf("invariant violation: could not find capability ID for hashed ID %x", hash)
+				}
+				capabilityID = cid
+			} else if dc.CapabilityIDString != nil {
+				// V2 case: capability ID is a string directly
+				capabilityID = *dc.CapabilityIDString
+			} else {
+				// Neither V1 nor V2 capability ID is set - skip this capability
 				continue
 			}
-
-			// This is V1 - we have the hash directly
-			hash := *dc.CapabilityID
-
-			cid, ok := hashedIDsToCapabilityIDs[hash]
-			if !ok {
-				return nil, fmt.Errorf("invariant violation: could not find capability ID for hashed ID %x", hash)
-			}
-			capabilityID = cid
 
 			cc[capabilityID] = CapabilityConfiguration{
 				Config: dc.Config,
@@ -247,21 +247,9 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 		return nil, fmt.Errorf("failed to get nodes: %w", err)
 	}
 
-	idsToNodes := map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo{}
+	idsToNodes := map[p2ptypes.PeerID]NodeInfo{}
 	for _, node := range nodeInfos {
-		// Convert versioned NodeInfo back to V1 format for compatibility
-		v1Node := kcr.INodeInfoProviderNodeInfo{
-			NodeOperatorId:      node.NodeOperatorID,
-			ConfigCount:         node.ConfigCount,
-			WorkflowDONId:       node.WorkflowDONId,
-			Signer:              node.Signer,
-			P2pId:               [32]byte(node.P2PID), // Direct conversion from PeerID to [32]byte
-			EncryptionPublicKey: node.EncryptionPublicKey,
-			HashedCapabilityIds: *node.HashedCapabilityIDs, // Dereference the pointer
-			CapabilitiesDONIds:  node.CapabilitiesDONIds,
-		}
-
-		idsToNodes[node.P2PID] = v1Node
+		idsToNodes[node.P2PID] = node
 	}
 
 	return &LocalRegistry{
@@ -335,18 +323,20 @@ func deepCopyLocalRegistry(lr *LocalRegistry) LocalRegistry {
 	lrCopy.IDsToDONs = make(map[DonID]DON, len(lr.IDsToDONs))
 	for id, don := range lr.IDsToDONs {
 		d := capabilities.DON{
-			ID:               don.ID,
-			ConfigVersion:    don.ConfigVersion,
-			Members:          make([]p2ptypes.PeerID, len(don.Members)),
-			F:                don.F,
-			IsPublic:         don.IsPublic,
-			AcceptsWorkflows: don.AcceptsWorkflows,
+			ID:               don.DON.ID,
+			ConfigVersion:    don.DON.ConfigVersion,
+			Members:          make([]p2ptypes.PeerID, len(don.DON.Members)),
+			F:                don.DON.F,
+			IsPublic:         don.DON.IsPublic,
+			AcceptsWorkflows: don.DON.AcceptsWorkflows,
 		}
-		copy(d.Members, don.Members)
+		copy(d.Members, don.DON.Members)
 		capCfgs := make(map[string]CapabilityConfiguration, len(don.CapabilityConfigurations))
 		for capID, capCfg := range don.CapabilityConfigurations {
 			capCfgs[capID] = CapabilityConfiguration{
-				Config: capCfg.Config,
+				Config:             capCfg.Config,
+				CapabilityID:       capCfg.CapabilityID,
+				CapabilityIDString: capCfg.CapabilityIDString,
 			}
 		}
 		lrCopy.IDsToDONs[id] = DON{
@@ -361,20 +351,33 @@ func deepCopyLocalRegistry(lr *LocalRegistry) LocalRegistry {
 		lrCopy.IDsToCapabilities[id] = cp
 	}
 
-	lrCopy.IDsToNodes = make(map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo, len(lr.IDsToNodes))
+	lrCopy.IDsToNodes = make(map[p2ptypes.PeerID]NodeInfo, len(lr.IDsToNodes))
 	for id, node := range lr.IDsToNodes {
-		nodeInfo := kcr.INodeInfoProviderNodeInfo{
-			NodeOperatorId:      node.NodeOperatorId,
+		nodeInfo := NodeInfo{
+			NodeOperatorID:      node.NodeOperatorID,
+			P2PID:               node.P2PID,
+			Signer:              node.Signer,
+			EncryptionPublicKey: node.EncryptionPublicKey,
 			ConfigCount:         node.ConfigCount,
 			WorkflowDONId:       node.WorkflowDONId,
-			Signer:              node.Signer,
-			P2pId:               node.P2pId,
-			EncryptionPublicKey: node.EncryptionPublicKey,
-			HashedCapabilityIds: make([][32]byte, len(node.HashedCapabilityIds)),
 			CapabilitiesDONIds:  make([]*big.Int, len(node.CapabilitiesDONIds)),
+			Version:             node.Version,
 		}
-		copy(nodeInfo.HashedCapabilityIds, node.HashedCapabilityIds)
 		copy(nodeInfo.CapabilitiesDONIds, node.CapabilitiesDONIds)
+
+		// Copy version-specific capability IDs
+		if node.HashedCapabilityIDs != nil {
+			hashedIDs := make([][32]byte, len(*node.HashedCapabilityIDs))
+			copy(hashedIDs, *node.HashedCapabilityIDs)
+			nodeInfo.HashedCapabilityIDs = &hashedIDs
+		}
+
+		if node.CapabilityIDs != nil {
+			capabilityIDs := make([]string, len(*node.CapabilityIDs))
+			copy(capabilityIDs, *node.CapabilityIDs)
+			nodeInfo.CapabilityIDs = &capabilityIDs
+		}
+
 		lrCopy.IDsToNodes[id] = nodeInfo
 	}
 
@@ -402,22 +405,6 @@ func toCapabilityType(capabilityType uint8) capabilities.CapabilityType {
 		return capabilities.CapabilityTypeTarget
 	default:
 		return capabilities.CapabilityTypeUnknown
-	}
-}
-
-func toDONInfo(don kcr.CapabilitiesRegistryDONInfo) *capabilities.DON {
-	peerIDs := []p2ptypes.PeerID{}
-	for _, p := range don.NodeP2PIds {
-		peerIDs = append(peerIDs, p)
-	}
-
-	return &capabilities.DON{
-		ID:               don.Id,
-		ConfigVersion:    don.ConfigCount,
-		Members:          peerIDs,
-		F:                don.F,
-		IsPublic:         don.IsPublic,
-		AcceptsWorkflows: don.AcceptsWorkflows,
 	}
 }
 
