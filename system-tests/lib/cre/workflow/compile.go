@@ -69,7 +69,7 @@ func compressWorkflow(workflowWasmPath string) (string, error) {
 
 	outputData := []byte(base64.StdEncoding.EncodeToString(compressed.Bytes()))
 
-	if err := os.WriteFile(outputFile, outputData, 0600); err != nil {
+	if err := os.WriteFile(outputFile, outputData, 0644); err != nil { //nolint:gosec // G306: we want it to be readable by everyone
 		return "", errors.Wrap(err, "failed to write output file")
 	}
 

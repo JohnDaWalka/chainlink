@@ -116,7 +116,7 @@ func Test_V2_Workflow_Workshop(t *testing.T) {
 	workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(universalSetupOutput.CldEnvironment.ExistingAddresses, universalSetupOutput.BlockchainOutput[0].ChainSelector, keystone_changeset.WorkflowRegistry.String()) //nolint:staticcheck // won't migrate now
 	require.NoError(t, workflowRegistryErr, "failed to find workflow registry address for chain %d", universalSetupOutput.BlockchainOutput[0].ChainID)
 
-	compressedWorkflowWasmPath, compileErr := creworkflow.CompileWorkflow("../../../../core/scripts/cre/environment/examples/workflows/v2/cron/main.go")
+	compressedWorkflowWasmPath, compileErr := creworkflow.CompileWorkflow("../../../../core/scripts/cre/environment/examples/workflows/v2/cron/main.go", "test-workflow")
 	require.NoError(t, compileErr, "failed to compile workflow")
 
 	copyErr := creworkflow.CopyWorkflowToDockerContainers(compressedWorkflowWasmPath, "workflow-node", containerTargetDir)
