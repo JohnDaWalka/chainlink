@@ -60,7 +60,7 @@ func deployCCTPMessageTransmitterProxyContractPrecondition(env cldf.Environment,
 	return nil
 }
 
-// DeployCCTPMessageTransmitterProxyContractChangeset deploys new USDC pools across multiple chains.
+// DeployCCTPMessageTransmitterProxyContractChangeset deploys new CCTP message transmitter proxies across multiple chains.
 func deployCCTPMessageTransmitterProxyContractLogic(env cldf.Environment, c DeployCCTPMessageTransmitterProxyContractConfig) (cldf.ChangesetOutput, error) {
 	if err := deployCCTPMessageTransmitterProxyContractPrecondition(env, c); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid DeployCCTPMessageTransmitterProxyContractConfig: %w", err)
