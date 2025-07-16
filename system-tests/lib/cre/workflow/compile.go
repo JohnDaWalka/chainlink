@@ -69,6 +69,14 @@ func compressWorkflow(workflowWasmPath string) (string, error) {
 
 	outputData := []byte(base64.StdEncoding.EncodeToString(compressed.Bytes()))
 
+	// remove the file if it already exists
+	_, statErr := os.Stat(outputFile)
+	if statErr == nil {
+		if err := os.Remove(outputFile); err != nil {
+			return "", errors.Wrap(err, "failed to remove existing output file")
+		}
+	}
+
 	if err := os.WriteFile(outputFile, outputData, 0644); err != nil { //nolint:gosec // G306: we want it to be readable by everyone
 		return "", errors.Wrap(err, "failed to write output file")
 	}
