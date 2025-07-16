@@ -2,10 +2,26 @@ package ccipsolana
 
 import (
 	"context"
-	"errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
+
+type usdcAttestationPayload struct {
+	Message     []byte
+	Attestation []byte
+}
+
+func (m usdcAttestationPayload) AbiString() string {
+	return `
+	[{
+		"components": [
+			{"name": "message", "type": "bytes"},
+			{"name": "attestation", "type": "bytes"}
+		],
+		"type": "tuple"
+	}]`
+}
 
 type SolanaTokenDataEncoder struct{}
 
@@ -14,5 +30,8 @@ func NewSolanaTokenDataEncoder() SolanaTokenDataEncoder {
 }
 
 func (e SolanaTokenDataEncoder) EncodeUSDC(_ context.Context, message cciptypes.Bytes, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
-	return nil, errors.New("not implemented")
+	return abihelpers.EncodeAbiStruct(usdcAttestationPayload{
+		Message:     message,
+		Attestation: attestation,
+	})
 }
