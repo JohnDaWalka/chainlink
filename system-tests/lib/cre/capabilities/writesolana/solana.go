@@ -13,7 +13,7 @@ import (
 var WriteSolanaCapabilityFactory = func(chainID string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
 	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
-		// TODO use GenerateWriteTargetName from solana WT
+		// TODO PLEX-347 once WT solana implementation is merged use GenerateWriteTargetName
 		fullName := "write_solana@1.0.0"
 		splitName := strings.Split(fullName, "@")
 

@@ -153,6 +153,7 @@ type WrappedBlockchainOutput struct {
 	ChainID            uint64
 	BlockchainOutput   *blockchain.Output
 	SethClient         *seth.Client
+	SolClient          *solrpc.Client
 	DeployerPrivateKey string
 	ReadOnly           bool
 	SolChain           *SolChain
@@ -162,7 +163,6 @@ type SolChain struct {
 	ChainSelector uint64
 	ChainID       string
 	ChainName     string
-	SolClient     *solrpc.Client
 	PrivateKey    solana.PrivateKey
 	ArtifactsDir  string
 }
@@ -295,7 +295,6 @@ type GenerateConfigsInput struct {
 	PeeringData            CapabilitiesPeeringData
 	AddressBook            cldf.AddressBook
 	Datastore              datastore.DataStore
-	SolClients             map[uint64]*solrpc.Client
 	GatewayConnectorOutput *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
 }
 
@@ -496,8 +495,21 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 	if len(f.SethClients) == 0 {
 		return errors.New("seth clients are not set")
 	}
-	if len(f.BlockchainOutputs) != len(f.SethClients)+len(f.SolClients) {
-		return errors.New("blockchain outputs and seth clients must have the same length")
+
+	var expectedSeth, expectedSols int
+	for _, chain := range f.BlockchainOutputs {
+		if chain.SolChain != nil {
+			expectedSols++
+			continue
+		}
+		expectedSeth++
+	}
+
+	if expectedSeth != len(f.SethClients) {
+		return errors.Errorf("expected '%d' got '%d' unexpected number of seth clients", expectedSeth, len(f.SethClients))
+	}
+	if expectedSols != len(f.SolClients) {
+		return errors.Errorf("expected '%d' got '%d' unexpected number of seth clients", expectedSols, len(f.SolClients))
 	}
 	if len(f.NodeSetOutput) == 0 {
 		return errors.New("node set output not set")

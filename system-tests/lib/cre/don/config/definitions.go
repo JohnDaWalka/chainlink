@@ -174,7 +174,7 @@ type WorkerSolanaInput struct {
 
 func WorkerSolana(chains []*WorkerSolanaInput) string {
 	var ret string
-	// TODO populate cfg from input with Forwarder Address
+	// TODO PLEX-1543 populate cfg from input with ForwarderInfo once CS are ready
 	for _, chain := range chains {
 		ret += fmt.Sprintf(`
 		[[Solana]]

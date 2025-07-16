@@ -25,6 +25,7 @@ import (
 	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 
+	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 )
 
@@ -88,14 +89,18 @@ func CreateBlockchains(
 				return nil, pkgerrors.Errorf("selector not found for solana chainID '%s'", bi.ChainID)
 			}
 
-			// TODO add private key to solchain?
-			// TODO add artifacts path to solchain?
+			// TODO GetEnv("PRIVATE_KEY_SOLANA") ?
+			privKey, err := solana.NewRandomPrivateKey()
+			if err != nil {
+				return nil, pkgerrors.Wrap(err, "failed to generate private key for solana")
+			}
 			blockchainOutput = append(blockchainOutput, &cretypes.WrappedBlockchainOutput{
 				BlockchainOutput: bcOut,
+				SolClient:        solClient,
 				SolChain: &cretypes.SolChain{
 					ChainSelector: selector,
 					ChainID:       bi.ChainID,
-					SolClient:     solClient,
+					PrivateKey:    privKey,
 				},
 			})
 

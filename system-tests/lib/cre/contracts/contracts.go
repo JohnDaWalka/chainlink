@@ -123,18 +123,6 @@ var ChainWriterCapabilityFactory = func(chainID uint64) func(donFlags []string) 
 			})
 		}
 
-		if flags.HasFlag(donFlags, types.WriteSolanaCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   splitName[0],
-					Version:        splitName[1],
-					CapabilityType: 3, // TARGET
-					ResponseType:   1, // OBSERVATION_IDENTICAL
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
-
 		return capabilities
 	}
 }
@@ -355,7 +343,7 @@ func ConfigureKeystone(input types.ConfigureKeystoneInput, capabilityFactoryFns 
 			return errors.Wrap(err, "failed to configure forwarders")
 		}
 	}
-	// TODO Configure Solana Forwarder here
+	// TODO PLEX-1622 Configure Solana Forwarder here once Changeset with programID resolution is ready
 
 	_, err = operations.ExecuteOperation(
 		input.CldEnv.OperationsBundle,

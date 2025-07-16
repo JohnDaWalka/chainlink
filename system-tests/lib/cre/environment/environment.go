@@ -216,8 +216,8 @@ func SetupTestEnvironment(
 	}
 
 	if len(solForwarderSelectors) > 0 {
-		// TODO deploy forwarder on sol chains
-		// for now let's just save the address
+		// TODO PLEX-1543 deploy forwarder on sol chains
+		// for now just save random address
 		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
 			Address:       solana.PublicKey{1, 2, 3}.String(),
 			ChainSelector: solForwarderSelectors[0],
@@ -252,8 +252,9 @@ func SetupTestEnvironment(
 		if bcOut.SolChain != nil {
 			sel := bcOut.SolChain.ChainSelector
 			bcOuts[sel] = bcOut
-			solClients[sel] = bcOut.SolChain.SolClient
+			solClients[sel] = bcOut.SolClient
 			bcOuts[sel].ChainSelector = sel
+			bcOuts[sel].SolChain = bcOut.SolChain
 			continue
 		}
 		bcOuts[bcOut.ChainSelector] = bcOut
@@ -271,7 +272,6 @@ func SetupTestEnvironment(
 		bcOuts,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		allChainsCLDEnvironment.DataStore,
-		solClients,
 		input.ConfigFactoryFunctions,
 		input.CustomBinariesPaths,
 	)

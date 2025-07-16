@@ -34,7 +34,7 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *type
 	dons := make([]*devenv.DON, len(input.NodeSetOutput))
 
 	var allNodesInfo []devenv.NodeInfo
-	var buildChain = func(chainSelector uint64, bcOut *blockchain.Output) (*devenv.ChainConfig, error) {
+	var buildEVMChain = func(chainSelector uint64, bcOut *blockchain.Output) (*devenv.ChainConfig, error) {
 		cID, err := strconv.ParseUint(bcOut.ChainID, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse chain ID: %w", err)
@@ -102,12 +102,12 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *type
 			if bcOut.SolChain != nil {
 				cfg, err = buildSolChain(bcOut.SolChain, bcOut.BlockchainOutput)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to build chain config")
+					return nil, errors.Wrap(err, "failed to build solana chain config")
 				}
 			} else {
-				cfg, err = buildChain(chainSelector, bcOut.BlockchainOutput)
+				cfg, err = buildEVMChain(chainSelector, bcOut.BlockchainOutput)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to build chain config")
+					return nil, errors.Wrap(err, "failed to build EVM chain config")
 				}
 			}
 
