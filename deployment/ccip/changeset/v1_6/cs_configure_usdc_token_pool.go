@@ -11,6 +11,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	utp "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/usdc_token_pool"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -50,7 +51,7 @@ var (
 
 				report, err := operations.ExecuteOperation(b, USDCTokenPoolConfigOp, chains[chainSelector], input)
 				if err != nil {
-					return map[uint64][]opsutil.EVMCallOutput{}, fmt.Errorf("failed to set RMNRemoteConfig for chain %d: %w", chainSelector, err)
+					return map[uint64][]opsutil.EVMCallOutput{}, fmt.Errorf("failed to set USDC token pool config for chain %d: %w", chainSelector, err)
 				}
 				out[chainSelector] = []opsutil.EVMCallOutput{report.Output}
 			}
