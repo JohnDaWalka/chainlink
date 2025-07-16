@@ -1,7 +1,9 @@
 package solana
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 	"github.com/Masterminds/semver/v3"
@@ -189,7 +191,7 @@ type InitCacheDecimalFeedRequest struct {
 	Version   string
 	Qualifier string
 	MCMS      *proposalutils.TimelockConfig // if set, assumes current ownership
-	DataIds   [][16]uint8
+	DataIDs   [][16]uint8
 	FeedAdmin solana.PublicKey
 }
 
@@ -212,12 +214,12 @@ func (cs InitCacheDecimalFeed) VerifyPreconditions(env cldf.Environment, req *In
 		return fmt.Errorf("failed to load cache contract: %w", err)
 	}
 
-	if len(req.DataIds) == 0 {
-		return fmt.Errorf("DataIds cannot be empty")
+	if len(req.DataIDs) == 0 {
+		return errors.New("DataIDs cannot be empty")
 	}
 
 	if req.FeedAdmin.IsZero() {
-		return fmt.Errorf("FeedAdmin cannot be zero")
+		return errors.New("FeedAdmin cannot be zero")
 	}
 
 	return nil
@@ -249,7 +251,7 @@ func (cs InitCacheDecimalFeed) Apply(env cldf.Environment, req *InitCacheDecimal
 		ProgramID: solana.MustPublicKeyFromBase58(cacheProgramID.Address),
 		State:     solana.MustPublicKeyFromBase58(cacheState.Address),
 		Type:      cldf.ContractType(CacheContract),
-		DataIds:   req.DataIds,
+		DataIDs:   req.DataIDs,
 		FeedAdmin: req.FeedAdmin,
 	}
 
@@ -283,7 +285,7 @@ type ConfigureCacheDecimalReportRequest struct {
 	FeedAdmin            solana.PublicKey
 
 	Descriptions [][32]uint8
-	DataIds      [][16]uint8
+	DataIDs      [][16]uint8
 }
 
 var _ cldf.ChangeSetV2[*ConfigureCacheDecimalReportRequest] = ConfigureCacheDecimalReport{}
@@ -300,13 +302,13 @@ func (cs ConfigureCacheDecimalReport) VerifyPreconditions(env cldf.Environment, 
 	// Check that AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName are all the same length
 	// This is a requirement for the ConfigureCacheDecimalFeed operation
 	if len(req.AllowedSender) != len(req.AllowedWorkflowOwner) || len(req.AllowedSender) != len(req.AllowedWorkflowName) {
-		return fmt.Errorf("AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName must all have the same length")
+		return errors.New("AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName must all have the same length")
 	}
 
-	// Check that Descriptions and DataIds are all the same length
+	// Check that Descriptions and DataIDs are all the same length
 
-	if len(req.DataIds) != len(req.Descriptions) {
-		return fmt.Errorf("Descriptions and DataIds must all have the same length")
+	if len(req.DataIDs) != len(req.Descriptions) {
+		return errors.New("Descriptions and DataIDs must all have the same length")
 	}
 
 	return nil
@@ -343,7 +345,7 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 		AllowedWorkflowOwner: req.AllowedWorkflowOwner,
 		AllowedWorkflowName:  req.AllowedWorkflowName,
 		FeedAdmin:            req.FeedAdmin,
-		DataIds:              req.DataIds,
+		DataIDs:              req.DataIDs,
 		Descriptions:         req.Descriptions,
 	}
 

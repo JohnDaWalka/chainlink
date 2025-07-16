@@ -1,13 +1,14 @@
 package solana
 
 import (
-	"github.com/Masterminds/semver/v3"
 	"math/big"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/Masterminds/semver/v3"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -111,8 +112,8 @@ func TestConfigureCache(t *testing.T) {
 	chain := env.BlockChains.SolanaChains()[solSel]
 	chain.ProgramsPath = getProgramsPath()
 	env.BlockChains = cldfchain.NewBlockChains(map[uint64]cldfchain.BlockChain{solSel: chain})
-	// Example array of dataIds as [][16]uint8
-	dataIds := [][16]uint8{
+	// Example array of DataIDs as [][16]uint8
+	DataIDs := [][16]uint8{
 		[16]uint8{'B', 'T', 'C', '/', 'U', 'S', 'D'},
 		[16]uint8{'E', 'T', 'H', '/', 'U', 'S', 'D'},
 		[16]uint8{'S', 'O', 'L', '/', 'U', 'S', 'D'},
@@ -145,7 +146,7 @@ func TestConfigureCache(t *testing.T) {
 				ChainSel:  solSel,
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
-				DataIds:   dataIds,
+				DataIDs:   DataIDs,
 				FeedAdmin: chain.DeployerKey.PublicKey(),
 			},
 		)
@@ -169,7 +170,7 @@ func TestConfigureCache(t *testing.T) {
 				ChainSel:  solSel,
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
-				DataIds:   dataIds,
+				DataIDs:   DataIDs,
 				FeedAdmin: chain.DeployerKey.PublicKey(),
 				MCMS: &proposalutils.TimelockConfig{
 					MinDelay: time.Second,
@@ -223,7 +224,7 @@ func TestConfigureCache(t *testing.T) {
 				AllowedWorkflowOwner: allowedWorkflowOwner,
 				AllowedWorkflowName:  allowedWorkflowName,
 				FeedAdmin:            chain.DeployerKey.PublicKey(),
-				DataIds:              dataIds,
+				DataIDs:              DataIDs,
 				Descriptions:         descriptions,
 			},
 		)
@@ -251,7 +252,7 @@ func TestConfigureCache(t *testing.T) {
 				AllowedWorkflowOwner: allowedWorkflowOwner,
 				AllowedWorkflowName:  allowedWorkflowName,
 				FeedAdmin:            chain.DeployerKey.PublicKey(),
-				DataIds:              dataIds,
+				DataIDs:              DataIDs,
 				Descriptions:         descriptions,
 			},
 		)

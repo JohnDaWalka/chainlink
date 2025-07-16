@@ -87,7 +87,7 @@ type (
 	ConfigureCacheDecimalReportInput struct {
 		ChainSel             uint64
 		Descriptions         [][32]uint8
-		DataIds              [][16]uint8
+		DataIDs              [][16]uint8
 		MCMS                 *proposalutils.TimelockConfig // if set, assumes current owner is the timelock
 		ProgramID            solana.PublicKey
 		AllowedSender        []solana.PublicKey
@@ -107,7 +107,7 @@ type (
 		Version   string
 		Qualifier string
 		MCMS      *proposalutils.TimelockConfig // if set, assumes current
-		DataIds   [][16]uint8
+		DataIDs   [][16]uint8
 		FeedAdmin solana.PublicKey
 		State     solana.PublicKey
 		ProgramID solana.PublicKey
@@ -208,7 +208,7 @@ func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalR
 		ks_cache.SetProgramID(in.ProgramID)
 	}
 
-	ixn, err := ks_cache.NewInitDecimalReportsInstruction(in.DataIds, in.FeedAdmin, in.State, in.ProgramID).ValidateAndBuild()
+	ixn, err := ks_cache.NewInitDecimalReportsInstruction(in.DataIDs, in.FeedAdmin, in.State, in.ProgramID).ValidateAndBuild()
 	if err != nil {
 		return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
 	}
@@ -260,7 +260,7 @@ func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCac
 	mcmsTxns := make([]mcmsTypes.Transaction, 0)
 
 	ixn, err := ks_cache.NewSetDecimalFeedConfigsInstruction(
-		in.DataIds,
+		in.DataIDs,
 		in.Descriptions,
 		workflowMetas,
 		in.FeedAdmin,

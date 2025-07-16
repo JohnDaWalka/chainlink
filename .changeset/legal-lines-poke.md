@@ -2,4 +2,4 @@
 "chainlink": patch
 ---
 
-Adding Chainlink Deployments for Solana Datafeeds Cache
+#added Deployment and decimal report config Changesets for Solana DataFeeds Cache 
