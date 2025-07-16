@@ -26,9 +26,9 @@ import (
 	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	monitor "github.com/smartcontractkit/chainlink-common/pkg/types"
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
+	monitor "github.com/smartcontractkit/chainlink-framework/capabilities/writetarget/beholder"
 	relayevmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 

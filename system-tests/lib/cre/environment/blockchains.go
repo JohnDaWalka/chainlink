@@ -24,6 +24,8 @@ import (
 	libinfra "github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
+
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 )
 
 type BlockchainsInput struct {
@@ -76,12 +78,36 @@ func CreateBlockchains(
 				return nil, pkgerrors.Wrap(bcErr, "failed to deploy blockchain")
 			}
 		}
+		// handle solana here
+		if bcOut.Family == chainselectors.FamilySolana {
+			solClient := solrpc.New(bcOut.Nodes[0].ExternalHTTPUrl)
+
+			// we pass selector from input, because local solana chainID is unpredictable
+			selector, ok := chainselectors.SolanaChainIdToChainSelector()[bi.Input.ChainID]
+			if !ok {
+				return nil, pkgerrors.Errorf("selector not found for solana chainID '%s'", bi.Input.ChainID)
+			}
+
+			// TODO add private key to solchain?
+			// TODO add artifacts path to solchain?
+			blockchainOutput = append(blockchainOutput, &cretypes.WrappedBlockchainOutput{
+				BlockchainOutput: bcOut,
+				SolChain: &cretypes.SolChain{
+					ChainSelector: selector,
+					ChainID:       bi.Input.ChainID,
+					SolClient:     solClient,
+				},
+			})
+
+			continue
+		}
 
 		pkey := os.Getenv("PRIVATE_KEY")
 		if pkey == "" {
 			return nil, pkgerrors.New("PRIVATE_KEY env var must be set")
 		}
 
+		// create client based on chainID
 		sethClient, err := seth.NewClientBuilder().
 			WithRpcUrl(bcOut.Nodes[0].ExternalWSUrl).
 			WithPrivateKeys([]string{pkey}).
@@ -133,22 +159,40 @@ func StartBlockchains(loggers BlockchainLoggers, input BlockchainsInput) (StartB
 	chainsConfigs := make([]devenv.ChainConfig, 0)
 
 	for _, bcOut := range blockchainsOutput {
-		chainsConfigs = append(chainsConfigs, devenv.ChainConfig{
-			ChainID:   strconv.FormatUint(bcOut.SethClient.Cfg.Network.ChainID, 10),
-			ChainName: bcOut.SethClient.Cfg.Network.Name,
-			ChainType: strings.ToUpper(bcOut.BlockchainOutput.Family),
-			WSRPCs: []devenv.CribRPCs{{
-				External: bcOut.BlockchainOutput.Nodes[0].ExternalWSUrl,
-				Internal: bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
-			}},
-			HTTPRPCs: []devenv.CribRPCs{{
-				External: bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
-				Internal: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
-			}},
-			DeployerKey: bcOut.SethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the RPC node
-		})
+		switch bcOut.BlockchainOutput.Family {
+		case chainselectors.FamilyEVM:
+			chainsConfigs = append(chainsConfigs, devenv.ChainConfig{
+				ChainID:   strconv.FormatUint(bcOut.SethClient.Cfg.Network.ChainID, 10),
+				ChainName: bcOut.SethClient.Cfg.Network.Name,
+				ChainType: strings.ToUpper(bcOut.BlockchainOutput.Family),
+				WSRPCs: []devenv.CribRPCs{{
+					External: bcOut.BlockchainOutput.Nodes[0].ExternalWSUrl,
+					Internal: bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
+				}},
+				HTTPRPCs: []devenv.CribRPCs{{
+					External: bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
+					Internal: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
+				}},
+				DeployerKey: bcOut.SethClient.NewTXOpts(seth.WithNonce(nil)), // set nonce to nil, so that it will be fetched from the RPC node
+			})
+		case chainselectors.FamilySolana:
+			chainsConfigs = append(chainsConfigs, devenv.ChainConfig{
+				ChainID:   bcOut.SolChain.ChainID,
+				ChainName: bcOut.SolChain.ChainName,
+				ChainType: strings.ToUpper(bcOut.BlockchainOutput.Family),
+				WSRPCs: []devenv.CribRPCs{{
+					External: bcOut.BlockchainOutput.Nodes[0].ExternalWSUrl,
+					Internal: bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
+				}},
+				HTTPRPCs: []devenv.CribRPCs{{
+					External: bcOut.BlockchainOutput.Nodes[0].ExternalHTTPUrl,
+					Internal: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
+				}},
+				SolDeployerKey: bcOut.SolChain.PrivateKey,
+				SolArtifactDir: bcOut.SolChain.ArtifactsDir,
+			})
+		}
 	}
-
 	blockChains, err := devenv.NewChains(loggers.singleFile, chainsConfigs)
 	if err != nil {
 		return StartBlockchainsOutput{}, pkgerrors.Wrap(err, "failed to create chains")
