@@ -83,9 +83,9 @@ func CreateBlockchains(
 			solClient := solrpc.New(bcOut.Nodes[0].ExternalHTTPUrl)
 
 			// we pass selector from input, because local solana chainID is unpredictable
-			selector, ok := chainselectors.SolanaChainIdToChainSelector()[bi.Input.ChainID]
+			selector, ok := chainselectors.SolanaChainIdToChainSelector()[bi.ChainID]
 			if !ok {
-				return nil, pkgerrors.Errorf("selector not found for solana chainID '%s'", bi.Input.ChainID)
+				return nil, pkgerrors.Errorf("selector not found for solana chainID '%s'", bi.ChainID)
 			}
 
 			// TODO add private key to solchain?
@@ -94,7 +94,7 @@ func CreateBlockchains(
 				BlockchainOutput: bcOut,
 				SolChain: &cretypes.SolChain{
 					ChainSelector: selector,
-					ChainID:       bi.Input.ChainID,
+					ChainID:       bi.ChainID,
 					SolClient:     solClient,
 				},
 			})

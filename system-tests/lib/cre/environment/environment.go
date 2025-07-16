@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -217,7 +218,7 @@ func SetupTestEnvironment(
 	if len(solForwarderSelectors) > 0 {
 		// TODO deploy forwarder on sol chains
 		// for now let's just save the address
-		err := memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
+		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
 			Address:       solana.PublicKey{1, 2, 3}.String(),
 			ChainSelector: solForwarderSelectors[0],
 			Qualifier:     "test-forwarder",
@@ -313,9 +314,9 @@ func SetupTestEnvironment(
 			chainsWithContracts[chainSelector] = len(addresses) > 0
 		}
 
-		addresses, err := allChainsCLDEnvironment.DataStore.Addresses().Fetch()
-		if err != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr, "failed to get addresses from datastore")}
+		addresses, addrErr1 := allChainsCLDEnvironment.DataStore.Addresses().Fetch()
+		if addrErr1 != nil {
+			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr1, "failed to get addresses from datastore")}
 			return
 		}
 

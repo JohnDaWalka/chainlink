@@ -58,7 +58,6 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 			client, ok := input.SolClients[chainSelector]
 			if !ok {
 				return nil, errors.Errorf("failed to find sol client for selector %d", chainSelector)
-
 			}
 			chainID, err := client.GetGenesisHash(context.Background())
 			if err != nil {
@@ -90,7 +89,6 @@ func Generate(input types.GenerateConfigsInput, factoryFns []types.ConfigFactory
 			WSRPC:                bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
 			HasForwarderContract: !bcOut.ReadOnly,
 		})
-
 	}
 
 	// find contract addresses
