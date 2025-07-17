@@ -2,6 +2,7 @@ package sequence
 
 import (
 	"fmt"
+
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	commonOps "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/operations"
@@ -22,7 +23,7 @@ var (
 type DeployCacheSeqInput struct {
 	ChainSel    uint64
 	ProgramName string
-	FeedAdmins []solana.PublicKey // Feed admins to be added to the cache
+	FeedAdmins  []solana.PublicKey // Feed admins to be added to the cache
 }
 
 // DeployCacheSeqOutput defines the output of the deployment sequence.
@@ -46,8 +47,8 @@ func deployCache(b operations.Bundle, deps operation.Deps, in DeployCacheSeqInpu
 	fmt.Printf("Cache program deployed with ID: %s\n", out.ProgramID)
 	// 2. Initialize the DataFeeds Cache state
 	initOut, err := operations.ExecuteOperation(b, operation.InitCacheOp, deps, operation.InitCacheInput{
-		ProgramID: out.ProgramID,
-		ChainSel:  in.ChainSel,
+		ProgramID:  out.ProgramID,
+		ChainSel:   in.ChainSel,
 		FeedAdmins: in.FeedAdmins,
 	})
 	if err != nil {

@@ -27,7 +27,7 @@ type DeployCacheRequest struct {
 	Qualifier   string
 	LabelSet    datastore.LabelSet
 	Version     string
-    FeedAdmins []solana.PublicKey // Feed admins to be added to the cache
+	FeedAdmins  []solana.PublicKey // Feed admins to be added to the cache
 }
 
 var _ cldf.ChangeSetV2[*DeployCacheRequest] = DeployCache{}
@@ -65,7 +65,7 @@ func (cs DeployCache) Apply(env cldf.Environment, req *DeployCacheRequest) (cldf
 	deploySeqInput := seq.DeployCacheSeqInput{
 		ChainSel:    req.ChainSel,
 		ProgramName: "data_feeds_cache",
-        FeedAdmins: req.FeedAdmins,
+		FeedAdmins:  req.FeedAdmins,
 	}
 
 	deps := operation.Deps{
@@ -188,20 +188,21 @@ func (cs SetCacheUpgradeAuthority) Apply(env cldf.Environment, req *SetCacheUpgr
 	return out, nil
 }
 
-type InitCacheDecimalFeedRequest struct {
-	ChainSel  uint64
-	Version   string
-	Qualifier string
-	MCMS      *proposalutils.TimelockConfig // if set, assumes current ownership
-	DataIDs   [][16]uint8
-	FeedAdmin solana.PublicKey
+type InitCacheDecimalReportRequest struct {
+	ChainSel          uint64
+	Version           string
+	Qualifier         string
+	MCMS              *proposalutils.TimelockConfig // if set, assumes current ownership
+	DataIDs           [][16]uint8
+	FeedAdmin         solana.PublicKey
+	RemainingAccounts []solana.AccountMeta
 }
 
-var _ cldf.ChangeSetV2[*InitCacheDecimalFeedRequest] = InitCacheDecimalFeed{}
+var _ cldf.ChangeSetV2[*InitCacheDecimalReportRequest] = InitCacheDecimalReport{}
 
-type InitCacheDecimalFeed struct{}
+type InitCacheDecimalReport struct{}
 
-func (cs InitCacheDecimalFeed) VerifyPreconditions(env cldf.Environment, req *InitCacheDecimalFeedRequest) error {
+func (cs InitCacheDecimalReport) VerifyPreconditions(env cldf.Environment, req *InitCacheDecimalReportRequest) error {
 	if _, ok := env.BlockChains.SolanaChains()[req.ChainSel]; !ok {
 		return fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
 	}
@@ -224,10 +225,14 @@ func (cs InitCacheDecimalFeed) VerifyPreconditions(env cldf.Environment, req *In
 		return errors.New("FeedAdmin cannot be zero")
 	}
 
+	if len(req.DataIDs) != len(req.RemainingAccounts) {
+		return errors.New("DataIDs and RemainingAccounts must have the same length")
+	}
+
 	return nil
 }
 
-func (cs InitCacheDecimalFeed) Apply(env cldf.Environment, req *InitCacheDecimalFeedRequest) (cldf.ChangesetOutput, error) {
+func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecimalReportRequest) (cldf.ChangesetOutput, error) {
 	var out cldf.ChangesetOutput
 
 	version := semver.MustParse(req.Version)
@@ -244,23 +249,33 @@ func (cs InitCacheDecimalFeed) Apply(env cldf.Environment, req *InitCacheDecimal
 	}
 	cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
 
-    fmt.Printf("Cache state ref: %+v", cacheStateRef)
-    fmt.Printf("Cache ref: %+v", cacheRef)
-    fmt.Printf("Cache state: %+v\n", cacheState)
-    fmt.Printf("Cache program ID: %+v\n", cacheProgramID)
+	fmt.Printf("Cache state ref: %+v", cacheStateRef)
+	fmt.Printf("Cache ref: %+v", cacheRef)
+	fmt.Printf("Cache state: %+v\n", cacheState)
+	fmt.Printf("Cache program ID: %+v\n", cacheProgramID)
 
 	if err != nil {
 		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
 	}
 
+	// Convert user-provided remaining accounts to operation type
+	remainingAccounts := make([]solana.AccountMeta, len(req.RemainingAccounts))
+	for i, account := range req.RemainingAccounts {
+		remainingAccounts[i] = solana.AccountMeta{
+			PublicKey:  account.PublicKey,
+			IsSigner:   account.IsSigner,
+			IsWritable: account.IsWritable,
+		}
+	}
+
 	initInput := operation.InitCacheDecimalReportInput{
-		ChainSel:  req.ChainSel,
-		MCMS:      req.MCMS,
-		ProgramID: solana.SystemProgramID,
-		State:     solana.MustPublicKeyFromBase58(cacheState.Address),
-		Type:      cldf.ContractType(CacheContract),
-		DataIDs:   req.DataIDs,
-		FeedAdmin: req.FeedAdmin,
+		ChainSel:          req.ChainSel,
+		MCMS:              req.MCMS,
+		State:             solana.MustPublicKeyFromBase58(cacheState.Address),
+		Type:              cldf.ContractType(CacheContract),
+		DataIDs:           req.DataIDs,
+		FeedAdmin:         req.FeedAdmin,
+		RemainingAccounts: remainingAccounts,
 	}
 
 	deps := operation.Deps{
@@ -294,6 +309,8 @@ type ConfigureCacheDecimalReportRequest struct {
 
 	Descriptions [][32]uint8
 	DataIDs      [][16]uint8
+
+	RemainingAccounts []solana.AccountMeta
 }
 
 var _ cldf.ChangeSetV2[*ConfigureCacheDecimalReportRequest] = ConfigureCacheDecimalReport{}
@@ -333,20 +350,14 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	}
 
 	cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
-	cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
 	cacheState, err := env.DataStore.Addresses().Get(cacheStateRef)
 	if err != nil {
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
-	}
-	cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
-	if err != nil {
-		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
 	}
 
 	configureCacheDecimalReportInput := operation.ConfigureCacheDecimalReportInput{
 		ChainSel:             req.ChainSel,
 		MCMS:                 req.MCMS,
-		ProgramID:            solana.MustPublicKeyFromBase58(cacheProgramID.Address),
 		State:                solana.MustPublicKeyFromBase58(cacheState.Address),
 		Type:                 cldf.ContractType(CacheContract),
 		AllowedSender:        req.AllowedSender,
@@ -355,6 +366,7 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 		FeedAdmin:            req.FeedAdmin,
 		DataIDs:              req.DataIDs,
 		Descriptions:         req.Descriptions,
+		RemainingAccounts:    req.RemainingAccounts,
 	}
 
 	deps := operation.Deps{

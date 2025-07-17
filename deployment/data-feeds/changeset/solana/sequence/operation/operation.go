@@ -65,8 +65,8 @@ type (
 
 	// For DataFeeds Cache initialization
 	InitCacheInput struct {
-		ProgramID solana.PublicKey
-		ChainSel  uint64
+		ProgramID  solana.PublicKey
+		ChainSel   uint64
 		FeedAdmins []solana.PublicKey // Feed admins to be added to the cache
 	}
 
@@ -90,13 +90,13 @@ type (
 		Descriptions         [][32]uint8
 		DataIDs              [][16]uint8
 		MCMS                 *proposalutils.TimelockConfig // if set, assumes current owner is the timelock
-		ProgramID            solana.PublicKey
 		AllowedSender        []solana.PublicKey
 		AllowedWorkflowOwner [][20]uint8
 		AllowedWorkflowName  [][10]uint8
 		FeedAdmin            solana.PublicKey
 		State                solana.PublicKey
 		Type                 cldf.ContractType
+		RemainingAccounts    []solana.AccountMeta
 	}
 
 	ConfigureCacheOutput struct {
@@ -104,15 +104,15 @@ type (
 	}
 
 	InitCacheDecimalReportInput struct {
-		ChainSel  uint64
-		Version   string
-		Qualifier string
-		MCMS      *proposalutils.TimelockConfig // if set, assumes current
-		DataIDs   [][16]uint8
-		FeedAdmin solana.PublicKey
-		State     solana.PublicKey
-		ProgramID solana.PublicKey
-		Type      cldf.ContractType
+		ChainSel          uint64
+		Version           string
+		Qualifier         string
+		MCMS              *proposalutils.TimelockConfig // if set, assumes current
+		DataIDs           [][16]uint8
+		FeedAdmin         solana.PublicKey
+		State             solana.PublicKey
+		Type              cldf.ContractType
+		RemainingAccounts []solana.AccountMeta
 	}
 )
 
@@ -120,9 +120,7 @@ type (
 
 func ensureProgramID(programID solana.PublicKey) {
 	fmt.Printf("Ensuring program ID: %s\n", ks_cache.ProgramID)
-	if ks_cache.ProgramID.IsZero() {
-		ks_cache.SetProgramID(programID)
-	}
+
 }
 
 func confirmInstructionOrBuildProposal(
@@ -132,6 +130,7 @@ func confirmInstructionOrBuildProposal(
 	mcmsConfig *proposalutils.TimelockConfig,
 	proposalDescription string,
 ) ([]mcms.TimelockProposal, error) {
+	fmt.Printf("instruction: %+v\n", instruction)
 	if mcmsConfig == nil {
 		if err := deps.Chain.Confirm([]solana.Instruction{instruction}); err != nil {
 			return nil, fmt.Errorf("failed to confirm instructions: %w", err)
@@ -192,7 +191,9 @@ func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutp
 	var out InitCacheOutput
 	fmt.Printf("InitCacheInput: %+v\n", in)
 
-	ensureProgramID(in.ProgramID)
+	if ks_cache.ProgramID.IsZero() {
+		ks_cache.SetProgramID(in.ProgramID)
+	}
 
 	stateKey, err := solana.NewRandomPrivateKey()
 	if err != nil {
@@ -257,18 +258,23 @@ func setUpgradeAuthority(b operations.Bundle, deps Deps, in SetUpgradeAuthorityI
 
 func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalReportInput) (ConfigureCacheOutput, error) {
 	var out ConfigureCacheOutput
-	ensureProgramID(in.ProgramID)
 
 	fmt.Printf("DataIDs: %+v\n", in.DataIDs)
 	fmt.Printf("FeedAdmin: %+v\n", in.FeedAdmin)
 	fmt.Printf("State: %+v\n", in.State)
-	fmt.Printf("ProgramID: %+v\n", in.ProgramID)
-	instruction, err := ks_cache.NewInitDecimalReportsInstruction(
+	instruction := ks_cache.NewInitDecimalReportsInstruction(
 		in.DataIDs,
 		in.FeedAdmin,
 		in.State,
-		in.ProgramID,
-	).ValidateAndBuild()
+		solana.SystemProgramID,
+	)
+
+	for _, acc := range in.RemainingAccounts {
+		instruction.AccountMetaSlice = append(instruction.AccountMetaSlice, &acc)
+	}
+
+	tx, err := instruction.ValidateAndBuild()
+
 	if err != nil {
 		return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
 	}
@@ -276,7 +282,7 @@ func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalR
 	proposals, err := confirmInstructionOrBuildProposal(
 		deps,
 		in.ChainSel,
-		instruction,
+		tx,
 		in.MCMS,
 		"proposal to InitDecimalReports in Solana",
 	)
@@ -293,7 +299,6 @@ func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalR
 
 func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCacheDecimalReportInput) (ConfigureCacheOutput, error) {
 	var out ConfigureCacheOutput
-	ensureProgramID(in.ProgramID)
 
 	workflowMetas := make([]ks_cache.WorkflowMetadata, len(in.AllowedSender))
 	for i := range in.AllowedSender {
@@ -304,22 +309,25 @@ func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCac
 		}
 	}
 
-	instruction, err := ks_cache.NewSetDecimalFeedConfigsInstruction(
+	instruction := ks_cache.NewSetDecimalFeedConfigsInstruction(
 		in.DataIDs,
 		in.Descriptions,
 		workflowMetas,
 		in.FeedAdmin,
 		in.State,
-		in.ProgramID,
-	).ValidateAndBuild()
-	if err != nil {
-		return out, fmt.Errorf("cant build init oracle instruction: %w", err)
+		solana.SystemProgramID,
+	)
+
+	for _, acc := range in.RemainingAccounts {
+		instruction.AccountMetaSlice = append(instruction.AccountMetaSlice, &acc)
 	}
+
+	tx, err := instruction.ValidateAndBuild()
 
 	proposals, err := confirmInstructionOrBuildProposal(
 		deps,
 		in.ChainSel,
-		instruction,
+		tx,
 		in.MCMS,
 		"proposal to SetDecimalFeedConfigs in Solana",
 	)

@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"crypto/sha256"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func TestDeployCache(t *testing.T) {
 					DestinationDir: getProgramsPath(),
 					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
 				},
-                FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
 			},
 		)
 
@@ -142,52 +143,71 @@ func TestConfigureCache(t *testing.T) {
 	}
 
 	t.Run("should init cache decimal report without mcms", func(t *testing.T) {
-		configuredChangeset := commonchangeset.Configure(InitCacheDecimalFeed{},
-			&InitCacheDecimalFeedRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
-				DataIDs:   DataIDs,
-				FeedAdmin: chain.DeployerKey.PublicKey(),
-			},
-		)
-
+		// First deploy the cache to get the program ID and state
 		deployChangeset := commonchangeset.Configure(DeployCache{},
 			&DeployCacheRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
-                FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ChainSel:   solSel,
+				Qualifier:  testQualifier,
+				Version:    "1.0.0",
+				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
 			},
 		)
 
-		var err error
+		// Apply deploy changeset first to get the cache state and program ID
+		env, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		require.NoError(t, err)
+
+		// Create remaining accounts for the decimal reports
+		remainingAccounts := createRemainingAccounts(t, env.DataStore, solSel, testQualifier, "1.0.0", DataIDs)
+
+		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
+			&InitCacheDecimalReportRequest{
+				ChainSel:          solSel,
+				Qualifier:         testQualifier,
+				Version:           "1.0.0",
+				DataIDs:           DataIDs,
+				FeedAdmin:         chain.DeployerKey.PublicKey(),
+				RemainingAccounts: remainingAccounts,
+			},
+		)
+
+		// Apply the init changeset
 		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
 		require.NoError(t, err)
 	})
 
 	t.Run("should init cache decimal report with mcms", func(t *testing.T) {
-		configuredChangeset := commonchangeset.Configure(InitCacheDecimalFeed{},
-			&InitCacheDecimalFeedRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
-				DataIDs:   DataIDs,
-				FeedAdmin: chain.DeployerKey.PublicKey(),
+		// First deploy the cache
+		deployChangeset := commonchangeset.Configure(DeployCache{},
+			&DeployCacheRequest{
+				ChainSel:   solSel,
+				Qualifier:  testQualifier,
+				Version:    "1.0.0",
+				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+			},
+		)
+
+		// Apply deploy changeset first
+		out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		require.NoError(t, err)
+
+		// Create remaining accounts
+		remainingAccounts := createRemainingAccounts(t, out.DataStore, solSel, testQualifier, "1.0.0", DataIDs)
+
+		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
+			&InitCacheDecimalReportRequest{
+				ChainSel:          solSel,
+				Qualifier:         testQualifier,
+				Version:           "1.0.0",
+				DataIDs:           DataIDs,
+				FeedAdmin:         chain.DeployerKey.PublicKey(),
+				RemainingAccounts: remainingAccounts,
 				MCMS: &proposalutils.TimelockConfig{
 					MinDelay: time.Second,
 				},
 			},
 		)
 
-		deployChangeset := commonchangeset.Configure(DeployCache{},
-			&DeployCacheRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
-			},
-		)
-
 		ds := datastore.NewMemoryDataStore()
 
 		// deploy mcms
@@ -212,11 +232,28 @@ func TestConfigureCache(t *testing.T) {
 				Version:   "1.0.0",
 			})
 
-		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
+		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{configuredChangeset, transferOwnershipChangeset})
 		require.NoError(t, err)
 	})
 
 	t.Run("should set cache decimal report config without mcms", func(t *testing.T) {
+		// First deploy the cache
+		deployChangeset := commonchangeset.Configure(DeployCache{},
+			&DeployCacheRequest{
+				ChainSel:   solSel,
+				Qualifier:  testQualifier,
+				Version:    "1.0.0",
+				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+			},
+		)
+
+		// Apply deploy changeset first to get the cache state and program ID
+		env, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		require.NoError(t, err)
+
+		// Now create remaining accounts after deployment
+		remainingAccounts := createConfigureRemainingAccounts(t, env.DataStore, solSel, testQualifier, "1.0.0", DataIDs, allowedSender, allowedWorkflowOwner, allowedWorkflowName)
+
 		configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
 			&ConfigureCacheDecimalReportRequest{
 				ChainSel:             solSel,
@@ -228,23 +265,18 @@ func TestConfigureCache(t *testing.T) {
 				FeedAdmin:            chain.DeployerKey.PublicKey(),
 				DataIDs:              DataIDs,
 				Descriptions:         descriptions,
+				RemainingAccounts:    remainingAccounts,
 			},
 		)
 
-		deployChangeset := commonchangeset.Configure(DeployCache{},
-			&DeployCacheRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
-			},
-		)
-
-		var err error
-		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
+		// Apply the configure changeset
+		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
 		require.NoError(t, err)
 	})
 
 	t.Run("should set cache decimal report config with mcms", func(t *testing.T) {
+		remainingAccounts := createConfigureRemainingAccounts(t, env.DataStore, solSel, testQualifier, "1.0.0", DataIDs, allowedSender, allowedWorkflowOwner, allowedWorkflowName)
+
 		configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
 			&ConfigureCacheDecimalReportRequest{
 				ChainSel:             solSel,
@@ -256,14 +288,16 @@ func TestConfigureCache(t *testing.T) {
 				FeedAdmin:            chain.DeployerKey.PublicKey(),
 				DataIDs:              DataIDs,
 				Descriptions:         descriptions,
+				RemainingAccounts:    remainingAccounts, // Add this line
 			},
 		)
 
 		deployChangeset := commonchangeset.Configure(DeployCache{},
 			&DeployCacheRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
+				ChainSel:   solSel,
+				Qualifier:  testQualifier,
+				Version:    "1.0.0",
+				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
 			},
 		)
 
@@ -294,6 +328,42 @@ func TestConfigureCache(t *testing.T) {
 		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
 		require.NoError(t, err)
 	})
+}
+
+// createRemainingAccounts creates the remaining accounts needed for InitCacheDecimalFeed
+// by deriving the decimal report PDAs for each DataID
+func createRemainingAccounts(t *testing.T, ds datastore.DataStore, chainSel uint64, qualifier, version string, dataIDs [][16]uint8) []solana.AccountMeta {
+	t.Helper()
+
+	// Get the deployed cache state and program ID from the datastore
+	parsedVersion := semver.MustParse(version)
+	cacheStateRef := datastore.NewAddressRefKey(chainSel, CacheState, parsedVersion, qualifier)
+	cacheRef := datastore.NewAddressRefKey(chainSel, CacheContract, parsedVersion, qualifier)
+
+	cacheState, err := ds.Addresses().Get(cacheStateRef)
+	require.NoError(t, err)
+	cacheProgramID, err := ds.Addresses().Get(cacheRef)
+	require.NoError(t, err)
+
+	cacheStateKey := solana.MustPublicKeyFromBase58(cacheState.Address)
+	cacheProgramKey := solana.MustPublicKeyFromBase58(cacheProgramID.Address)
+
+	remainingAccounts := make([]solana.AccountMeta, len(dataIDs))
+	for i, dataID := range dataIDs {
+		// Derive decimal report PDA for each data ID
+		seeds := [][]byte{
+			[]byte("decimal_report"),
+			cacheStateKey.Bytes(),
+			dataID[:],
+		}
+		reportPDA, _, err := solana.FindProgramAddress(seeds, cacheProgramKey)
+		require.NoError(t, err)
+
+		// Use the Meta helper for consistency with generated bindings
+		remainingAccounts[i] = *solana.Meta(reportPDA).WRITE()
+	}
+
+	return remainingAccounts
 }
 
 func ParseSemver(v string) *semver.Version {
@@ -339,3 +409,69 @@ func fundSignerPDAs(
 const (
 	testQualifier = "test-deploy"
 )
+
+func createConfigureRemainingAccounts(t *testing.T, ds datastore.DataStore, chainSel uint64, qualifier, version string, dataIDs [][16]uint8, allowedSender []solana.PublicKey, allowedWorkflowOwner [][20]uint8, allowedWorkflowName [][10]uint8) []solana.AccountMeta {
+	t.Helper()
+
+	// Get the deployed cache state and program ID from the datastore
+	parsedVersion := semver.MustParse(version)
+	cacheStateRef := datastore.NewAddressRefKey(chainSel, CacheState, parsedVersion, qualifier)
+	cacheRef := datastore.NewAddressRefKey(chainSel, CacheContract, parsedVersion, qualifier)
+
+	cacheState, err := ds.Addresses().Get(cacheStateRef)
+	require.NoError(t, err)
+	cacheProgramID, err := ds.Addresses().Get(cacheRef)
+	require.NoError(t, err)
+
+	cacheStateKey := solana.MustPublicKeyFromBase58(cacheState.Address)
+	cacheProgramKey := solana.MustPublicKeyFromBase58(cacheProgramID.Address)
+
+	var remainingAccounts []solana.AccountMeta
+
+	// First, add feed config accounts (one per data ID)
+	for _, dataID := range dataIDs {
+		// Derive feed config PDA
+		seeds := [][]byte{
+			[]byte("feed_config"),
+			cacheStateKey.Bytes(),
+			dataID[:],
+		}
+		feedConfigPDA, _, err := solana.FindProgramAddress(seeds, cacheProgramKey)
+		require.NoError(t, err)
+
+		remainingAccounts = append(remainingAccounts, *solana.Meta(feedConfigPDA).WRITE())
+	}
+
+	// Then, add permission flag accounts (one per data ID × workflow metadata combination)
+	for _, dataID := range dataIDs {
+		for i := range allowedSender {
+			// Create report hash like in the contract
+			reportHash := createReportHash(dataID[:], allowedSender[i], allowedWorkflowOwner[i][:], allowedWorkflowName[i][:])
+
+			// Derive permission flag PDA
+			seeds := [][]byte{
+				[]byte("permission_flag"),
+				cacheStateKey.Bytes(),
+				reportHash[:],
+			}
+			permissionFlagPDA, _, err := solana.FindProgramAddress(seeds, cacheProgramKey)
+			require.NoError(t, err)
+
+			remainingAccounts = append(remainingAccounts, *solana.Meta(permissionFlagPDA).WRITE())
+		}
+	}
+
+	return remainingAccounts
+}
+
+func createReportHash(dataID []byte, sender solana.PublicKey, owner []byte, name []byte) [32]byte {
+	// Concatenate all the data like in the contract
+	var combined []byte
+	combined = append(combined, dataID...)
+	combined = append(combined, sender.Bytes()...)
+	combined = append(combined, owner...)
+	combined = append(combined, name...)
+
+	// Use SHA256 hash (this matches Solana's hash::hash function)
+	return sha256.Sum256(combined)
+}
