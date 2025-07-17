@@ -148,6 +148,7 @@ type Relayer struct {
 	evmKeystore          keys.Store
 	codec                commontypes.Codec
 	capabilitiesRegistry coretypes.CapabilitiesRegistry
+	evmService
 
 	// Mercury
 	mercuryCfg        MercuryConfig
@@ -226,6 +227,10 @@ func NewRelayer(lggr logger.Logger, chain legacyevm.Chain, opts RelayerOpts) (*R
 		mercuryORM:            mercuryORM,
 		mercuryCfg:            opts.MercuryConfig,
 		capabilitiesRegistry:  opts.CapabilitiesRegistry,
+		evmService: evmService{
+			chain:  chain,
+			logger: sugared,
+		},
 	}, nil
 }
 
