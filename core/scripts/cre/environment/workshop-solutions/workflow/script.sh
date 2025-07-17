@@ -114,6 +114,3 @@ case "$1" in
     exit 1
     ;;
 esac
-
-# forward all args to the actual command
-exec "$@"

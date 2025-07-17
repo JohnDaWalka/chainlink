@@ -2,12 +2,12 @@
 
 checkout_broken_capability() {
   echo "Checking out broken capability..."
-  cd ./capabilities || exit 1
+  cd ./capabilities/cron || exit 1
   if ! git fetch && git checkout dx-1343-broken-capability; then
     echo "Failed to checkout broken capability branch."
     exit 1
   fi
-  cd ./cron || exit 1
+  echo "Building broken cron capability binary..."
   if ! go mod tidy && GOOS="linux" GOARCH="amd64" CGO_ENABLED=0 go build -o cron; then
     echo "Failed to build broken cron capability binary."
     exit 1
@@ -98,6 +98,3 @@ case "$1" in
     exit 1
     ;;
 esac
-
-# forward all args to the actual command
-exec "$@"
