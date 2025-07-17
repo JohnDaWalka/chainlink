@@ -118,7 +118,7 @@ func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) ch
 			},
 		},
 		ChainSpecificName:        "execute",
-		ArgsTransform:            "CCIPExecute",
+		ArgsTransform:            "CCIPExecuteV2",
 		ComputeUnitLimitOverhead: 150_000,
 		BufferPayloadMethod:      "CCIPExecutionReportBuffer",
 		LookupTables: chainwriter.LookupTables{
