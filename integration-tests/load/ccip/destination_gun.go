@@ -209,14 +209,12 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 			// Try to extract detailed revert reason
 			rpcError, extractErr := evmclient.ExtractRPCError(err)
 			if extractErr == nil && rpcError.Data != nil {
-				decodedReason := decodeRevertReason(rpcError.Data)
 				m.l.Errorw("fee calculation failed with detailed revert data",
 					"dstChainSelector", m.chainSelector,
 					"srcChainSelector", src,
 					"rpcErrorCode", rpcError.Code,
 					"rpcErrorMessage", rpcError.Message,
 					"revertData", rpcError.Data,
-					"decodedReason", decodedReason,
 					"originalErr", cldf.MaybeDataErr(err))
 			} else {
 				m.l.Errorw("could not get fee",
@@ -247,14 +245,12 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 		// Try to extract detailed revert reason for transaction submission failure
 		rpcError, extractErr := evmclient.ExtractRPCError(err)
 		if extractErr == nil && rpcError.Data != nil {
-			decodedReason := decodeRevertReason(rpcError.Data)
 			m.l.Errorw("transaction submission failed with detailed revert data",
 				"sourceChain", src,
 				"destChain", m.chainSelector,
 				"rpcErrorCode", rpcError.Code,
 				"rpcErrorMessage", rpcError.Message,
 				"revertData", rpcError.Data,
-				"decodedReason", decodedReason,
 				"originalErr", cldf.MaybeDataErr(err))
 		} else {
 			m.l.Errorw("execution reverted",
@@ -335,11 +331,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			ComputeUnits:             150000,
 		}
 	case selectors.FamilyAptos:
-		// For Aptos destinations, the receiver is already 32 bytes from the load test setup
-		// Aptos addresses are 32 bytes, so we use the receiver as-is
 		rcv = m.receiver
 		// Aptos destinations require out-of-order execution to be enabled
-		// Use gas limit 100000 to match working test pattern
 		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(100000), true)
 		if err != nil {
 			m.l.Error("Error encoding extra args for aptos dest")
@@ -608,20 +601,4 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 		FeeTokenStore: feeToken, // Set FeeTokenStore to same as FeeToken for messaging-only transactions
 		TokenAmounts:  tokenAmounts,
 	}, nil
-}
-
-// decodeRevertReason attempts to decode revert data using the CCIP contract ABIs
-func decodeRevertReason(revertData interface{}) string {
-	if revertData == nil {
-		return ""
-	}
-
-	revertDataStr, ok := revertData.(string)
-	if !ok {
-		return ""
-	}
-
-	// This would require importing the revert-reason handler, but for now just return the hex data
-	// You can use the core/scripts/ccip/ccip-revert-reason tool with this data
-	return fmt.Sprintf("Revert data: %s (use ccip-revert-reason tool to decode)", revertDataStr)
 }
