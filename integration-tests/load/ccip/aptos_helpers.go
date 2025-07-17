@@ -141,7 +141,14 @@ func subscribeAptosTransmitEvents(
 				DestChainSelector:   event.DestChainSelector,
 			}
 
-			// Update sequence number range
+			if seqNums[csPair].Start == nil {
+				lggr.Infow("Initializing sequence number range for new chain pair", "csPair", csPair)
+				seqNums[csPair] = SeqNumRange{
+					Start: atomic.NewUint64(math.MaxUint64),
+					End:   atomic.NewUint64(0),
+				}
+			}
+
 			if event.SequenceNumber < seqNums[csPair].Start.Load() {
 				seqNums[csPair].Start.Store(event.SequenceNumber)
 			}
@@ -249,13 +256,6 @@ func subscribeAptosCommitEvents(
 			// Process both blessed and unblessed merkle roots
 			allRoots := append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...)
 			for _, mr := range allRoots {
-				lggr.Infow("Received aptos commit report ",
-					"sourceChain", mr.SourceChainSelector,
-					"destChain", chainSelector,
-					"minSeqNr", mr.MinSeqNr,
-					"maxSeqNr", mr.MaxSeqNr,
-					"version", eventWithVersion.Version)
-
 				// Push metrics for each sequence number in the range
 				for i := mr.MinSeqNr; i <= mr.MaxSeqNr; i++ {
 					data := messageData{
@@ -401,11 +401,12 @@ func subscribeAptosExecutionEvents(
 				continue
 			}
 
-			lggr.Debugw("received aptos execution event for",
+			lggr.Infow("received aptos execution event for",
 				"destChain", chainSelector,
 				"sourceChain", event.SourceChainSelector,
 				"sequenceNumber", event.SequenceNumber,
-				"version", eventWithVersion.Version)
+				"version", eventWithVersion.Version,
+				"executionState", event.State)
 
 			// Push metrics
 			data := messageData{

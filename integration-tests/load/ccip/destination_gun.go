@@ -189,29 +189,44 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 		acc.GasLimit = uint64(gasLimit)
 	}
 
-	fee, err := r.GetFee(
-		&bind.CallOpts{Context: context.Background()}, m.chainSelector, msg)
+	// Check if destination is Aptos
+	dstSelFamily, err := selectors.GetSelectorFamily(m.chainSelector)
 	if err != nil {
-		// Try to extract detailed revert reason
-		rpcError, extractErr := evmclient.ExtractRPCError(err)
-		if extractErr == nil && rpcError.Data != nil {
-			decodedReason := decodeRevertReason(rpcError.Data)
-			m.l.Errorw("fee calculation failed with detailed revert data",
-				"dstChainSelector", m.chainSelector,
-				"srcChainSelector", src,
-				"rpcErrorCode", rpcError.Code,
-				"rpcErrorMessage", rpcError.Message,
-				"revertData", rpcError.Data,
-				"decodedReason", decodedReason,
-				"originalErr", cldf.MaybeDataErr(err))
-		} else {
-			m.l.Errorw("could not get fee",
-				"dstChainSelector", m.chainSelector,
-				"srcChainSelector", src,
-				"fee", fee,
-				"err", cldf.MaybeDataErr(err))
+		return fmt.Errorf("failed to get destination chain family: %w", err)
+	}
+
+	var fee *big.Int
+	if dstSelFamily == selectors.FamilyAptos {
+		// For Aptos destinations, skip fee calculation as Router.GetFee rejects Aptos addresses
+		// Use a default fee instead
+		fee = big.NewInt(172725000000000000) // Default fee value
+		m.l.Infow("Using default fee for Aptos destination", "fee", fee)
+	} else {
+		// For EVM destinations, calculate fee normally
+		fee, err = r.GetFee(
+			&bind.CallOpts{Context: context.Background()}, m.chainSelector, msg)
+		if err != nil {
+			// Try to extract detailed revert reason
+			rpcError, extractErr := evmclient.ExtractRPCError(err)
+			if extractErr == nil && rpcError.Data != nil {
+				decodedReason := decodeRevertReason(rpcError.Data)
+				m.l.Errorw("fee calculation failed with detailed revert data",
+					"dstChainSelector", m.chainSelector,
+					"srcChainSelector", src,
+					"rpcErrorCode", rpcError.Code,
+					"rpcErrorMessage", rpcError.Message,
+					"revertData", rpcError.Data,
+					"decodedReason", decodedReason,
+					"originalErr", cldf.MaybeDataErr(err))
+			} else {
+				m.l.Errorw("could not get fee",
+					"dstChainSelector", m.chainSelector,
+					"srcChainSelector", src,
+					"fee", fee,
+					"err", cldf.MaybeDataErr(err))
+			}
+			return fmt.Errorf("failed to get fee: %w", err)
 		}
-		return fmt.Errorf("failed to get fee: %w", err)
 	}
 
 	if msg.FeeToken == common.HexToAddress("0x0") {
@@ -320,10 +335,12 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			ComputeUnits:             150000,
 		}
 	case selectors.FamilyAptos:
-		// For Aptos destinations, the receiver is already 32 bytes, don't pad it
+		// For Aptos destinations, the receiver is already 32 bytes from the load test setup
+		// Aptos addresses are 32 bytes, so we use the receiver as-is
 		rcv = m.receiver
 		// Aptos destinations require out-of-order execution to be enabled
-		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(0), true)
+		// Use gas limit 100000 to match working test pattern
+		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(100000), true)
 		if err != nil {
 			m.l.Error("Error encoding extra args for aptos dest")
 			return router.ClientEVM2AnyMessage{}, 0, err
@@ -588,7 +605,7 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 		Data:          data,
 		ExtraArgs:     extraArgs,
 		FeeToken:      feeToken,
-		FeeTokenStore: aptos.AccountAddress{}, // Add missing FeeTokenStore field (zero address)
+		FeeTokenStore: feeToken, // Set FeeTokenStore to same as FeeToken for messaging-only transactions
 		TokenAmounts:  tokenAmounts,
 	}, nil
 }

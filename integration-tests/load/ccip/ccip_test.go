@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -46,11 +47,22 @@ var (
 )
 
 // this key only works on simulated geth chains in crib
-const (
-	simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	solTestKey      = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
-	aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
+var (
+	// Sim key - read from environment variables
+	simChainTestKey = getEnvOrDefault("SIM_CHAIN_TEST_KEY", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	// simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	solTestKey   = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
+	aptosTestKey = getEnvOrDefault("APTOS_TEST_KEY", "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366")
+	// aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
 )
+
+// getEnvOrDefault returns the environment variable value or the default if not set
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 func runSafely(ops ...func()) {
 	for _, op := range ops {
@@ -160,7 +172,9 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		require.NoError(t, deployerKey.FromHex(aptosTestKey))
 		deployerAccount, err := aptos.NewAccountFromSigner(deployerKey)
 		require.NoError(t, err)
-		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 100*1e8)
+		// TMP for testnet
+		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 10_000_000)
+		// aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 100*1e8)
 		require.NoError(t, err)
 	}
 
@@ -331,13 +345,14 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
-					return prepareAccountToSendLink(
-						lggr,
-						state,
-						*env,
-						src,
-						evmSourceKeys[cs][src],
-					)
+					return nil
+					// return prepareAccountToSendLink(
+					// 	lggr,
+					// 	state,
+					// 	*env,
+					// 	src,
+					// 	evmSourceKeys[cs][src],
+					// )
 				default:
 					return nil
 				}
