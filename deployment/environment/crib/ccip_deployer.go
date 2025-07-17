@@ -1001,14 +1001,14 @@ func mustOCR(e *cldf.Environment, homeChainSel uint64, feedChainSel uint64, newD
 		commitOCRConfigPerSelector[selector] = v1_6.DeriveOCRParamsForCommit(chainType, feedChainSel, tokenInfo,
 			func(params v1_6.CCIPOCRParams) v1_6.CCIPOCRParams {
 				params.OCRParameters.MaxDurationQuery = 100 * time.Millisecond
-				params.OCRParameters.DeltaRound = 5 * time.Second
+				params.OCRParameters.DeltaRound = 800 * time.Millisecond
 				params.CommitOffChainConfig.RMNEnabled = false
 				params.CommitOffChainConfig.RMNSignaturesTimeout = 100 * time.Millisecond
 				params.CommitOffChainConfig.MultipleReportsEnabled = true
 				params.CommitOffChainConfig.MaxMerkleRootsPerReport = 1
 				params.CommitOffChainConfig.MaxPricesPerReport = 3
 				params.CommitOffChainConfig.MaxMerkleTreeSize = 1
-
+				params.CommitOffChainConfig.MerkleRootAsyncObserverDisabled = true
 				return params
 			})
 		execOCRConfigPerSelector[selector] = v1_6.DeriveOCRParamsForExec(chainType, tokenDataProviders,
