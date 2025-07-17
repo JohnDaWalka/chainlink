@@ -9,7 +9,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 )
 
 type DonID uint32
@@ -42,7 +41,7 @@ type LocalRegistry struct {
 	lggr              logger.Logger
 	getPeerID         func() (types.PeerID, error)
 	IDsToDONs         map[DonID]DON
-	IDsToNodes        map[p2ptypes.PeerID]NodeInfo
+	IDsToNodes        map[types.PeerID]NodeInfo
 	IDsToCapabilities map[string]Capability
 }
 
@@ -50,7 +49,7 @@ func NewLocalRegistry(
 	lggr logger.Logger,
 	getPeerID func() (types.PeerID, error),
 	IDsToDONs map[DonID]DON,
-	IDsToNodes map[p2ptypes.PeerID]NodeInfo,
+	IDsToNodes map[types.PeerID]NodeInfo,
 	IDsToCapabilities map[string]Capability,
 ) *LocalRegistry {
 	return &LocalRegistry{
@@ -68,7 +67,7 @@ func (l *LocalRegistry) LocalNode(ctx context.Context) (capabilities.Node, error
 		return capabilities.Node{}, fmt.Errorf("failed to get peer ID: %w", err)
 	}
 
-	return l.NodeByPeerID(ctx, p2ptypes.PeerID(pid))
+	return l.NodeByPeerID(ctx, pid)
 }
 
 func (l *LocalRegistry) NodeByPeerID(ctx context.Context, peerID types.PeerID) (capabilities.Node, error) {

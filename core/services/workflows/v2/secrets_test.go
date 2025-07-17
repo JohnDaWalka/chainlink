@@ -15,8 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/metrics"
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-
 	coreCap "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
@@ -377,34 +375,38 @@ func CreateLocalRegistry(t *testing.T, pid ragetypes.PeerID) *registrysyncer.Loc
 				},
 			},
 		},
-		map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo{
+		map[p2ptypes.PeerID]registrysyncer.NodeInfo{
 			workflowDonNodes[0]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				WorkflowDONId:       dID,
 				Signer:              coreCap.RandomUTF8BytesWord(),
-				P2pId:               workflowDonNodes[0],
+				P2PID:               workflowDonNodes[0],
 				EncryptionPublicKey: coreCap.RandomUTF8BytesWord(),
+				Version:             "v1", // Set version for V1 compatibility
 			},
 			workflowDonNodes[1]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				WorkflowDONId:       dID,
 				Signer:              coreCap.RandomUTF8BytesWord(),
-				P2pId:               workflowDonNodes[1],
+				P2PID:               workflowDonNodes[1],
 				EncryptionPublicKey: coreCap.RandomUTF8BytesWord(),
+				Version:             "v1", // Set version for V1 compatibility
 			},
 			workflowDonNodes[2]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				WorkflowDONId:       dID,
 				Signer:              coreCap.RandomUTF8BytesWord(),
-				P2pId:               workflowDonNodes[2],
+				P2PID:               workflowDonNodes[2],
 				EncryptionPublicKey: coreCap.RandomUTF8BytesWord(),
+				Version:             "v1", // Set version for V1 compatibility
 			},
 			workflowDonNodes[3]: {
-				NodeOperatorId:      1,
+				NodeOperatorID:      1,
 				WorkflowDONId:       dID,
 				Signer:              coreCap.RandomUTF8BytesWord(),
-				P2pId:               workflowDonNodes[3],
+				P2PID:               workflowDonNodes[3],
 				EncryptionPublicKey: coreCap.RandomUTF8BytesWord(),
+				Version:             "v1", // Set version for V1 compatibility
 			},
 		},
 		map[string]registrysyncer.Capability{
@@ -414,5 +416,5 @@ func CreateLocalRegistry(t *testing.T, pid ragetypes.PeerID) *registrysyncer.Loc
 			},
 		},
 	)
-	return &localRegistry
+	return localRegistry
 }
