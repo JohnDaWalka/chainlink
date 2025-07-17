@@ -14,12 +14,24 @@ stop_docker_containers() {
 prepare_capabilities_repo() {
   echo "Preparing capabilities repository..."
   cd ./capabilities || exit 1
-  if ! git fetch && git checkout dx-1407-workshop-cre && git pull; then
+  if ! git fetch; then
+    echo "Failed to git fetch capabilities repository."
+    exit 1
+  fi
+  if ! git checkout dx-1407-workshop-cre; then
     echo "Failed to checkout capabilities workshop branch."
     exit 1
   fi
+  if ! git pull; then
+    echo "Failed to pull latest changes in capabilities repository."
+    exit 1
+  fi
   cd ./cron || exit 1
-  if ! go mod tidy && GOOS="linux" GOARCH="amd64" CGO_ENABLED=0 go build -o cron; then
+  if ! go mod tidy; then
+    echo "Failed to tidy Go modules."
+    exit 1
+  fi
+  if ! GOOS="linux" GOARCH="amd64" CGO_ENABLED=0 go build -o cron; then
     echo "Failed to build cron binary."
     exit 1
   fi
@@ -30,8 +42,16 @@ prepare_capabilities_repo() {
 prepare_core_repo() {
   echo "Preparing core repository..."
   cd ./chainlink || exit 1
-  if ! git fetch && git checkout dx-1407-workshop-cre && git pull; then
+  if ! git fetch; then
+    echo "Failed to git fetch core repository."
+    exit 1
+  fi
+  if ! git checkout dx-1407-workshop-cre; then
     echo "Failed to checkout core workshop branch."
+    exit 1
+  fi
+  if ! git pull; then
+    echo "Failed to pull latest changes in core repository."
     exit 1
   fi
   echo "Core repository prepared for workshop successfully."

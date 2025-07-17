@@ -3,13 +3,21 @@
 checkout_broken_capability() {
   echo "Checking out broken capability..."
   cd ./capabilities/cron || exit 1
-  if ! git fetch && git checkout dx-1343-broken-capability; then
+  if ! git fetch; then
+    echo "Failed to git fetch."
+    exit 1
+  fi
+  if ! git checkout dx-1343-broken-capability; then
     echo "Failed to checkout broken capability branch."
     exit 1
   fi
+  if ! go mod tidy; then
+    echo "Failed to tidy Go modules."
+    exit 1
+  fi
   echo "Building broken cron capability binary..."
-  if ! go mod tidy && GOOS="linux" GOARCH="amd64" CGO_ENABLED=0 go build -o cron; then
-    echo "Failed to build broken cron capability binary."
+  if ! GOOS="linux" GOARCH="amd64" CGO_ENABLED=0 go build -o cron; then
+    echo "Failed to compile broken cron capability."
     exit 1
   fi
   echo "Broken cron capability checked out successfully."
