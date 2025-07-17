@@ -6,7 +6,6 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	commonOps "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/operations"
-
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence/operation"
 )
 

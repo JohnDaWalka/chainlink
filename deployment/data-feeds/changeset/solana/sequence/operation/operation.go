@@ -116,13 +116,6 @@ type (
 	}
 )
 
-// Common helper functions to reduce duplication
-
-func ensureProgramID(programID solana.PublicKey) {
-	fmt.Printf("Ensuring program ID: %s\n", ks_cache.ProgramID)
-
-}
-
 func confirmInstructionOrBuildProposal(
 	deps Deps,
 	chainSel uint64,
@@ -184,8 +177,6 @@ func getCurrentAuthority(deps Deps, chainSel uint64, mcmsConfig *proposalutils.T
 	}
 	return timelockSignerPDA, nil
 }
-
-// Refactored functions
 
 func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutput, error) {
 	var out InitCacheOutput
@@ -323,6 +314,10 @@ func configureCacheDecimalReport(b operations.Bundle, deps Deps, in ConfigureCac
 	}
 
 	tx, err := instruction.ValidateAndBuild()
+
+	if err != nil {
+		return out, fmt.Errorf("failed to build and validate initialize instruction %w", err)
+	}
 
 	proposals, err := confirmInstructionOrBuildProposal(
 		deps,

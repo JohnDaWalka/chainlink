@@ -154,7 +154,9 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first to get the cache state and program ID
-		env, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		var changesetOutput cldf.Environment
+        changesetOutput, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
+        env = changesetOutput
 		require.NoError(t, err)
 
 		// Create remaining accounts for the decimal reports
@@ -248,6 +250,7 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first to get the cache state and program ID
+        var env cldf.Environment
 		env, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
 		require.NoError(t, err)
 
