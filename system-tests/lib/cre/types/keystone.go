@@ -509,7 +509,7 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 		return errors.Errorf("expected '%d' got '%d' unexpected number of seth clients", expectedSeth, len(f.SethClients))
 	}
 	if expectedSols != len(f.SolClients) {
-		return errors.Errorf("expected '%d' got '%d' unexpected number of seth clients", expectedSols, len(f.SolClients))
+		return errors.Errorf("expected '%d' got '%d' unexpected number of sol clients", expectedSols, len(f.SolClients))
 	}
 	if len(f.NodeSetOutput) == 0 {
 		return errors.New("node set output not set")
