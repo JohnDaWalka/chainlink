@@ -2253,8 +2253,8 @@ func (e *EAStatusReporter) ValidateConfig() error {
 	if e.StatusPath == nil || *e.StatusPath == "" {
 		return configutils.ErrInvalid{Name: "StatusPath", Value: "", Msg: "status path must be set when EA Status Reporter is enabled"}
 	}
-	if e.PollingInterval == nil || e.PollingInterval.Duration() == 0 {
-		return configutils.ErrInvalid{Name: "PollingInterval", Value: "", Msg: "polling interval must be set when EA Status Reporter is enabled"}
+	if e.PollingInterval == nil || e.PollingInterval.Duration() < config.MINIMUM_POLLING_INTERVAL {
+		return configutils.ErrInvalid{Name: "PollingInterval", Value: "", Msg: "polling interval must be at least 1 minute when EA Status Reporter is enabled"}
 	}
 
 	return nil

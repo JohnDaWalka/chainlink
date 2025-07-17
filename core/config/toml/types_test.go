@@ -720,7 +720,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 				PollingInterval: nil,
 			},
 			expectError: true,
-			errorMsg:    "polling interval must be set when EA Status Reporter is enabled",
+			errorMsg:    "polling interval must be at least 1 minute when EA Status Reporter is enabled",
 		},
 		{
 			name: "enabled with zero polling interval",
@@ -730,7 +730,26 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 				PollingInterval: durationPtr(0),
 			},
 			expectError: true,
-			errorMsg:    "polling interval must be set when EA Status Reporter is enabled",
+			errorMsg:    "polling interval must be at least 1 minute when EA Status Reporter is enabled",
+		},
+		{
+			name: "enabled with polling interval less than 1 minute",
+			config: &EAStatusReporter{
+				Enabled:         ptr(true),
+				StatusPath:      ptr("/status"),
+				PollingInterval: durationPtr(30 * time.Second),
+			},
+			expectError: true,
+			errorMsg:    "polling interval must be at least 1 minute when EA Status Reporter is enabled",
+		},
+		{
+			name: "enabled with polling interval exactly 1 minute",
+			config: &EAStatusReporter{
+				Enabled:         ptr(true),
+				StatusPath:      ptr("/status"),
+				PollingInterval: durationPtr(1 * time.Minute),
+			},
+			expectError: false,
 		},
 		{
 			name: "enabled with both fields invalid",

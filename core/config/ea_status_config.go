@@ -2,6 +2,7 @@ package config
 
 import "time"
 
+const MINIMUM_POLLING_INTERVAL = time.Minute
 type EAStatusReporter interface {
 	Enabled() bool
 	StatusPath() string
