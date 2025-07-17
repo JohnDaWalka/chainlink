@@ -7,13 +7,9 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
-
-type usdcAttestationPayload struct {
-	Message     []byte
-	Attestation []byte
-}
 
 type SolanaTokenDataEncoder struct{}
 
@@ -22,8 +18,8 @@ func NewSolanaTokenDataEncoder() SolanaTokenDataEncoder {
 }
 
 func (e SolanaTokenDataEncoder) EncodeUSDC(_ context.Context, message cciptypes.Bytes, attestation cciptypes.Bytes) (cciptypes.Bytes, error) {
-	messageAndAttestation := usdcAttestationPayload{
-		Message:     message,
+	messageAndAttestation := cctp_token_pool.MessageAndAttestation{
+		Message:     cctp_token_pool.CctpMessage{Data: message},
 		Attestation: attestation,
 	}
 	buf := new(bytes.Buffer)
