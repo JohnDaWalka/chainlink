@@ -48,16 +48,16 @@ type LocalRegistry struct {
 func NewLocalRegistry(
 	lggr logger.Logger,
 	getPeerID func() (types.PeerID, error),
-	IDsToDONs map[DonID]DON,
-	IDsToNodes map[types.PeerID]NodeInfo,
-	IDsToCapabilities map[string]Capability,
+	idsToDONs map[DonID]DON,
+	idsToNodes map[types.PeerID]NodeInfo,
+	idsToCapabilities map[string]Capability,
 ) *LocalRegistry {
 	return &LocalRegistry{
 		lggr:              lggr,
 		getPeerID:         getPeerID,
-		IDsToDONs:         IDsToDONs,
-		IDsToNodes:        IDsToNodes,
-		IDsToCapabilities: IDsToCapabilities,
+		IDsToDONs:         idsToDONs,
+		IDsToNodes:        idsToNodes,
+		IDsToCapabilities: idsToCapabilities,
 	}
 }
 

@@ -54,13 +54,13 @@ func DonMaker(dID uint32, donNodes []p2ptypes.PeerID, acceptWorkflow bool) capab
 func (tt *TestTopology) IDsToNodesMaker(triggerCapID [32]byte) map[p2ptypes.PeerID]registrysyncer.NodeInfo {
 	IDsToNodes := map[p2ptypes.PeerID]registrysyncer.NodeInfo{}
 	for i := range tt.capabilityDonNodes {
-		hashedCapabilityIds := [][32]byte{triggerCapID}
+		hashedCapabilityIDs := [][32]byte{triggerCapID}
 		IDsToNodes[tt.capabilityDonNodes[i]] = registrysyncer.NodeInfo{
 			NodeOperatorID:      1,
 			Signer:              RandomUTF8BytesWord(),
 			P2PID:               tt.capabilityDonNodes[i],
 			EncryptionPublicKey: RandomUTF8BytesWord(),
-			HashedCapabilityIDs: &hashedCapabilityIds,
+			HashedCapabilityIDs: &hashedCapabilityIDs,
 			CapabilitiesDONIds:  nil,
 			Version:             "v1",
 		}

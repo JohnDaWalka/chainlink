@@ -595,7 +595,7 @@ func TestSyncer_LocalNode(t *testing.T) {
 func TestReader_V2_Integration(t *testing.T) {
 	ctx := testutils.Context(t)
 	lggr := logger.TestLogger(t)
-	
+
 	// Create a simulated backend similar to V1 tests
 	owner := evmtestutils.MustNewSimTransactor(t)
 	i := &big.Int{}
@@ -690,8 +690,8 @@ func TestReader_V2_Integration(t *testing.T) {
 		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
 		RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
 			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
-				RegistrationRefresh: durationpb.New(20 * time.Second),
-				RegistrationExpiry:  durationpb.New(60 * time.Second),
+				RegistrationRefresh:     durationpb.New(20 * time.Second),
+				RegistrationExpiry:      durationpb.New(60 * time.Second),
 				MinResponsesToAggregate: uint32(1) + 1,
 				MessageExpiry:           durationpb.New(120 * time.Second),
 			},
@@ -811,7 +811,7 @@ func TestReader_V2_Integration(t *testing.T) {
 func TestSyncer_V2_DBIntegration(t *testing.T) {
 	ctx := testutils.Context(t)
 	lggr := logger.TestLogger(t)
-	
+
 	// Create a simulated backend similar to V1 tests
 	owner := evmtestutils.MustNewSimTransactor(t)
 	i := &big.Int{}
@@ -899,8 +899,8 @@ func TestSyncer_V2_DBIntegration(t *testing.T) {
 		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
 		RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
 			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
-				RegistrationRefresh: durationpb.New(20 * time.Second),
-				RegistrationExpiry:  durationpb.New(60 * time.Second),
+				RegistrationRefresh:     durationpb.New(20 * time.Second),
+				RegistrationExpiry:      durationpb.New(60 * time.Second),
 				MinResponsesToAggregate: uint32(1) + 1,
 			},
 		},
@@ -948,7 +948,7 @@ func TestSyncer_V2_DBIntegration(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NoError(t, syncer.Start(ctx))
-	
+
 	t.Cleanup(func() {
 		syncerORM.Cleanup()
 		require.NoError(t, syncer.Close())

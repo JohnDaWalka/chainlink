@@ -214,7 +214,8 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 			// Handle both V1 and V2 cases
 			var capabilityID string
 
-			if dc.CapabilityID != nil {
+			switch {
+			case dc.CapabilityID != nil:
 				// V1 case: capability ID is a hash that needs to be looked up
 				hash := *dc.CapabilityID
 				cid, ok := hashedIDsToCapabilityIDs[hash]
@@ -222,10 +223,10 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 					return nil, fmt.Errorf("invariant violation: could not find capability ID for hashed ID %x", hash)
 				}
 				capabilityID = cid
-			} else if dc.CapabilityIDString != nil {
+			case dc.CapabilityIDString != nil:
 				// V2 case: capability ID is a string directly
 				capabilityID = *dc.CapabilityIDString
-			} else {
+			default:
 				// Neither V1 nor V2 capability ID is set - skip this capability
 				continue
 			}
@@ -323,14 +324,14 @@ func deepCopyLocalRegistry(lr *LocalRegistry) LocalRegistry {
 	lrCopy.IDsToDONs = make(map[DonID]DON, len(lr.IDsToDONs))
 	for id, don := range lr.IDsToDONs {
 		d := capabilities.DON{
-			ID:               don.DON.ID,
-			ConfigVersion:    don.DON.ConfigVersion,
-			Members:          make([]p2ptypes.PeerID, len(don.DON.Members)),
-			F:                don.DON.F,
-			IsPublic:         don.DON.IsPublic,
-			AcceptsWorkflows: don.DON.AcceptsWorkflows,
+			ID:               don.ID,
+			ConfigVersion:    don.ConfigVersion,
+			Members:          make([]p2ptypes.PeerID, len(don.Members)),
+			F:                don.F,
+			IsPublic:         don.IsPublic,
+			AcceptsWorkflows: don.AcceptsWorkflows,
 		}
-		copy(d.Members, don.DON.Members)
+		copy(d.Members, don.Members)
 		capCfgs := make(map[string]CapabilityConfiguration, len(don.CapabilityConfigurations))
 		for capID, capCfg := range don.CapabilityConfigurations {
 			capCfgs[capID] = CapabilityConfiguration{
