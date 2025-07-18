@@ -47,7 +47,7 @@ type gatewayHandler struct {
 	stopCh          services.StopChan
 	responseCache   ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
 	triggerHandler  HTTPTriggerHandler
-	authHandler     *AuthHandler // Handles authorization for HTTP trigger requests
+	metadataHandler *WorkflowMetadataHandler // Handles authorization for HTTP trigger requests
 }
 
 type ResponseCache interface {
@@ -88,7 +88,7 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		return nil, err
 	}
 	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don)
-	authHandler := NewAuthHandler(lggr, cfg, don, donConfig)
+	metadataHandler := NewWorkflowMetadataHandler(lggr, cfg, don, donConfig)
 	return &gatewayHandler{
 		config:          cfg,
 		don:             don,
@@ -100,7 +100,7 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		stopCh:          make(services.StopChan),
 		responseCache:   newResponseCache(lggr),
 		triggerHandler:  triggerHandler,
-		authHandler:     authHandler,
+		metadataHandler: metadataHandler,
 	}, nil
 }
 
@@ -147,10 +147,10 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		switch methodName {
 		case gateway_common.MethodHTTPAction:
 			return h.makeOutgoingRequest(ctx, resp, nodeAddr)
-		case gateway_common.MethodWorkflowPushAuthMetadata:
-			return h.authHandler.OnAuthMetadataPush(ctx, resp, nodeAddr)
-		case gateway_common.MethodWorkflowPullAuthMetadata:
-			return h.authHandler.OnAuthMetadataPullResponse(ctx, resp, nodeAddr)
+		case gateway_common.MethodPushWorkflowMetadata:
+			return h.metadataHandler.OnAuthMetadataPush(ctx, resp, nodeAddr)
+		case gateway_common.MethodPullWorkflowMetadata:
+			return h.metadataHandler.OnAuthMetadataPullResponse(ctx, resp, nodeAddr)
 		default:
 			return fmt.Errorf("unsupported method %s in node message ID %s", methodName, resp.ID)
 		}
@@ -256,7 +256,7 @@ func (h *gatewayHandler) Start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to start HTTP trigger handler: %w", err)
 		}
-		err = h.authHandler.Start(ctx)
+		err = h.metadataHandler.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to start HTTP auth handler: %w", err)
 		}
@@ -283,7 +283,7 @@ func (h *gatewayHandler) Close() error {
 		if err != nil {
 			h.lggr.Errorw("failed to close HTTP trigger handler", "err", err)
 		}
-		err = h.authHandler.Close()
+		err = h.metadataHandler.Close()
 		if err != nil {
 			h.lggr.Errorw("failed to close HTTP auth handler", "err", err)
 		}

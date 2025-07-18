@@ -2,8 +2,6 @@ package aggregation
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -14,7 +12,7 @@ import (
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 )
 
-type AuthAggregator struct {
+type WorkflowMetadataAggregator struct {
 	services.StateMachine
 	lggr      logger.Logger
 	stopCh    services.StopChan
@@ -29,12 +27,12 @@ type AuthAggregator struct {
 	cleanupInterval time.Duration
 }
 
-func NewAuthAggregator(lggr logger.Logger, threshold int, cleanupInterval time.Duration) *AuthAggregator {
+func NewWorkflowMetadataAggregator(lggr logger.Logger, threshold int, cleanupInterval time.Duration) *WorkflowMetadataAggregator {
 	if threshold <= 0 {
 		panic(fmt.Sprintf("threshold must be greater than 0, got %d", threshold))
 	}
-	return &AuthAggregator{
-		lggr:            logger.Named(lggr, "AuthAggregator"),
+	return &WorkflowMetadataAggregator{
+		lggr:            logger.Named(lggr, "WorkflowMetadataAggregator"),
 		threshold:       threshold,
 		observations:    make(map[string]*NodeObservations),
 		observedAt:      make(map[string]map[string]time.Time),
@@ -43,7 +41,7 @@ func NewAuthAggregator(lggr logger.Logger, threshold int, cleanupInterval time.D
 	}
 }
 
-func (agg *AuthAggregator) reapObservations() {
+func (agg *WorkflowMetadataAggregator) reapObservations() {
 	agg.mu.Lock()
 	defer agg.mu.Unlock()
 	now := time.Now()
@@ -73,9 +71,9 @@ func (agg *AuthAggregator) reapObservations() {
 	}
 }
 
-func (agg *AuthAggregator) Start(context.Context) error {
-	return agg.StartOnce("AuthAggregator", func() error {
-		agg.lggr.Info("Starting AuthAggregator")
+func (agg *WorkflowMetadataAggregator) Start(context.Context) error {
+	return agg.StartOnce("WorkflowMetadataAggregator", func() error {
+		agg.lggr.Info("Starting WorkflowMetadataAggregator")
 		go func() {
 			ticker := time.NewTicker(agg.cleanupInterval)
 			defer ticker.Stop()
@@ -92,28 +90,29 @@ func (agg *AuthAggregator) Start(context.Context) error {
 	})
 }
 
-func (agg *AuthAggregator) Close() error {
-	return agg.StopOnce("AuthAggregator", func() error {
-		agg.lggr.Info("Stopping AuthAggregator")
+func (agg *WorkflowMetadataAggregator) Close() error {
+	return agg.StopOnce("WorkflowMetadataAggregator", func() error {
+		agg.lggr.Info("Stopping WorkflowMetadataAggregator")
 		close(agg.stopCh)
 		return nil
 	})
 }
 
 // Collect adds an observation from a workflow node to the aggregator.
-func (agg *AuthAggregator) Collect(o WorkflowAuthObservation, nodeAddress string) error {
-	if o.WorkflowID == "" {
-		return errors.New("workflow ID cannot be empty")
-	}
-	if o.AuthorizedKey.PublicKey == "" {
-		return errors.New("authorized key public key cannot be empty")
+func (agg *WorkflowMetadataAggregator) Collect(obs *gateway_common.WorkflowMetadata, nodeAddress string) error {
+	if obs.WorkflowSelector.WorkflowID == "" || obs.WorkflowSelector.WorkflowName == "" ||
+		obs.WorkflowSelector.WorkflowOwner == "" || obs.WorkflowSelector.WorkflowTag == "" {
+		return errors.New("observation is missing required fields")
 	}
 	if nodeAddress == "" {
 		return errors.New("node address cannot be empty")
 	}
 	agg.mu.Lock()
 	defer agg.mu.Unlock()
-	digest := o.Digest()
+	digest, err := obs.Digest()
+	if err != nil {
+		return err
+	}
 	_, ok := agg.observedAt[nodeAddress]
 	if !ok {
 		agg.observedAt[nodeAddress] = make(map[string]time.Time)
@@ -123,7 +122,7 @@ func (agg *AuthAggregator) Collect(o WorkflowAuthObservation, nodeAddress string
 	_, ok = agg.observations[digest]
 	if !ok {
 		agg.observations[digest] = &NodeObservations{
-			observation: o,
+			observation: obs,
 			nodes:       make(StringSet),
 		}
 	}
@@ -131,42 +130,21 @@ func (agg *AuthAggregator) Collect(o WorkflowAuthObservation, nodeAddress string
 	return nil
 }
 
-// Aggregate returns the aggregated auth metadata for workflows that have reached the threshold.
-func (agg *AuthAggregator) Aggregate() ([]gateway_common.WorkflowAuthMetadata, error) {
+// Aggregate returns the aggregated workflow metadata for workflows that have reached the threshold.
+func (agg *WorkflowMetadataAggregator) Aggregate() ([]gateway_common.WorkflowMetadata, error) {
 	agg.mu.RLock()
 	defer agg.mu.RUnlock()
 
-	var authKeys = make(map[string][]gateway_common.AuthorizedKey)
+	var aggregated []gateway_common.WorkflowMetadata
 	for _, nodeObs := range agg.observations {
 		if len(nodeObs.nodes) >= agg.threshold {
-			authKeys[nodeObs.observation.WorkflowID] = append(authKeys[nodeObs.observation.WorkflowID], nodeObs.observation.AuthorizedKey)
+			aggregated = append(aggregated, *nodeObs.observation)
 		}
 	}
-
-	result := make([]gateway_common.WorkflowAuthMetadata, 0, len(authKeys))
-	for workflowID, keys := range authKeys {
-		result = append(result, gateway_common.WorkflowAuthMetadata{
-			WorkflowID:     workflowID,
-			AuthorizedKeys: keys,
-		})
-	}
-	return result, nil
-}
-
-type WorkflowAuthObservation struct {
-	WorkflowID    string
-	AuthorizedKey gateway_common.AuthorizedKey
+	return aggregated, nil
 }
 
 type NodeObservations struct {
-	observation WorkflowAuthObservation
+	observation *gateway_common.WorkflowMetadata
 	nodes       StringSet
-}
-
-func (w WorkflowAuthObservation) Digest() string {
-	keyBytes := []byte(fmt.Sprintf("%s:%x", w.AuthorizedKey.KeyType, w.AuthorizedKey.PublicKey))
-	data := []byte(w.WorkflowID)
-	data = append(data, keyBytes...)
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
 }

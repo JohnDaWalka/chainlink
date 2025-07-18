@@ -1,0 +1,381 @@
+package v2
+
+import (
+	"encoding/json"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/mocks"
+)
+
+func createTestWorkflowMetadataHandler(t *testing.T) (*WorkflowMetadataHandler, *mocks.DON, *config.DONConfig) {
+	lggr := logger.Test(t)
+	mockDon := mocks.NewDON(t)
+
+	donConfig := &config.DONConfig{
+		F: 1,
+		Members: []config.NodeConfig{
+			{Address: "node1"},
+			{Address: "node2"},
+			{Address: "node3"},
+		},
+	}
+
+	cfg := WithDefaults(ServiceConfig{})
+	handler := NewWorkflowMetadataHandler(lggr, cfg, mockDon, donConfig)
+	return handler, mockDon, donConfig
+}
+
+func TestSyncAuthorizedKeys(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+
+	// Test when aggregator has no data
+	handler.syncAuthorizedKeys()
+	require.Empty(t, handler.authorizedKeys)
+
+	// Start the aggregator to enable data collection
+	ctx := testutils.Context(t)
+	err := handler.agg.Start(ctx)
+	require.NoError(t, err)
+	defer handler.agg.Close()
+
+	// Add some test data to aggregator
+	key := gateway_common.AuthorizedKey{
+		KeyType:   gateway_common.KeyTypeECDSA,
+		PublicKey: "key1",
+	}
+	observation := gateway_common.WorkflowMetadata{
+		WorkflowSelector: gateway_common.WorkflowSelector{
+			WorkflowID:    "workflowID",
+			WorkflowName:  "workflowName",
+			WorkflowOwner: "workflowOwner",
+			WorkflowTag:   "workflowTag",
+		},
+		AuthorizedKeys: []gateway_common.AuthorizedKey{key},
+	}
+
+	// Collect enough observations to meet threshold (F+1 = 2)
+	err = handler.agg.Collect(&observation, "node1")
+	require.NoError(t, err)
+	err = handler.agg.Collect(&observation, "node2")
+	require.NoError(t, err)
+	handler.syncAuthorizedKeys()
+
+	workflowKeys, exists := handler.authorizedKeys["workflowID"]
+	require.True(t, exists)
+	_, exists = workflowKeys[key]
+	require.True(t, exists)
+	require.Len(t, workflowKeys, 1)
+	ref, exists := handler.workflowIDToRef["workflowID"]
+	require.True(t, exists)
+	expectedRef := workflowReference{
+		workflowName:  "workflowName",
+		workflowOwner: "workflowOwner",
+		workflowTag:   "workflowTag",
+	}
+	require.Equal(t, expectedRef, ref)
+	workflowID, exists := handler.workflowRefToID[expectedRef]
+	require.True(t, exists)
+	require.Equal(t, "workflowID", workflowID)
+}
+
+func TestSyncAuthorizedKeysMultipleWorkflows(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+
+	ctx := testutils.Context(t)
+	err := handler.agg.Start(ctx)
+	require.NoError(t, err)
+	defer handler.agg.Close()
+
+	// Add observations for multiple workflows
+	workflows := []string{"workflow1", "workflow2"}
+	keys := []string{"key1", "key2", "key3"}
+
+	for _, workflowID := range workflows {
+		for _, key := range keys {
+			observation := gateway_common.WorkflowMetadata{
+				WorkflowSelector: gateway_common.WorkflowSelector{
+					WorkflowID:    workflowID,
+					WorkflowName:  "workflowName",
+					WorkflowOwner: "workflowOwner",
+					WorkflowTag:   "workflowTag",
+				},
+				AuthorizedKeys: []gateway_common.AuthorizedKey{
+					{
+						KeyType:   gateway_common.KeyTypeECDSA,
+						PublicKey: key,
+					},
+				},
+			}
+			err = handler.agg.Collect(&observation, "node1")
+			require.NoError(t, err)
+			err = handler.agg.Collect(&observation, "node2")
+			require.NoError(t, err)
+		}
+	}
+	handler.syncAuthorizedKeys()
+
+	expectedRef := workflowReference{
+		workflowName:  "workflowName",
+		workflowOwner: "workflowOwner",
+		workflowTag:   "workflowTag",
+	}
+	require.Len(t, handler.authorizedKeys, 1)
+	for workflowID, workflowKeys := range handler.authorizedKeys {
+		ref, exists := handler.workflowIDToRef[workflowID]
+		require.True(t, exists)
+		require.Equal(t, expectedRef, ref)
+		_, exists = handler.workflowRefToID[expectedRef]
+		require.True(t, exists)
+		require.Len(t, workflowKeys, 1)
+	}
+}
+
+func TestSendAuthPullRequest(t *testing.T) {
+	handler, mockDon, donConfig := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+	for _, member := range donConfig.Members {
+		mockDon.EXPECT().SendToNode(ctx, member.Address, mock.Anything).Return(nil).Once()
+	}
+
+	err := handler.sendAuthPullRequest(ctx)
+	require.NoError(t, err)
+	mockDon.AssertExpectations(t)
+}
+
+func TestSendAuthPullRequestWithErrors(t *testing.T) {
+	handler, mockDon, donConfig := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+
+	// Mock errors for some nodes
+	expectedErrors := []error{
+		errors.New("connection failed"),
+		nil,
+		errors.New("timeout"),
+	}
+
+	for i, member := range donConfig.Members {
+		mockDon.EXPECT().SendToNode(ctx, member.Address, mock.Anything).Return(expectedErrors[i]).Once()
+	}
+
+	err := handler.sendAuthPullRequest(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "connection failed")
+	require.Contains(t, err.Error(), "timeout")
+	require.NotContains(t, err.Error(), "node2")
+	mockDon.AssertExpectations(t)
+}
+
+func TestSendAuthPullRequestVerifyPayload(t *testing.T) {
+	handler, mockDon, donConfig := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+	// Capture the request payload
+	var capturedReq *jsonrpc.Request[json.RawMessage]
+	mockDon.On("SendToNode", ctx, mock.AnythingOfType("string"), mock.Anything).
+		Run(func(args mock.Arguments) {
+			capturedReq = args.Get(2).(*jsonrpc.Request[json.RawMessage])
+		}).Return(nil)
+
+	err := handler.sendAuthPullRequest(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, jsonrpc.JsonRpcVersion, capturedReq.Version)
+	require.Equal(t, gateway_common.MethodPullWorkflowMetadata, capturedReq.Method)
+	require.NotEmpty(t, capturedReq.ID)
+
+	mockDon.AssertNumberOfCalls(t, "SendToNode", len(donConfig.Members))
+}
+
+func TestOnAuthMetadataPush(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+
+	err := handler.agg.Start(ctx)
+	require.NoError(t, err)
+	defer handler.agg.Close()
+
+	authData := gateway_common.WorkflowMetadata{
+		WorkflowSelector: gateway_common.WorkflowSelector{
+			WorkflowID:    "workflowID",
+			WorkflowName:  "workflowName",
+			WorkflowOwner: "workflowOwner",
+			WorkflowTag:   "workflowTag",
+		},
+		AuthorizedKeys: []gateway_common.AuthorizedKey{
+			{
+				KeyType:   gateway_common.KeyTypeECDSA,
+				PublicKey: "key1",
+			},
+			{
+				KeyType:   gateway_common.KeyTypeECDSA,
+				PublicKey: "key2",
+			},
+		},
+	}
+
+	result, err := json.Marshal(authData)
+	require.NoError(t, err)
+
+	rawResult := json.RawMessage(result)
+	resp := &jsonrpc.Response[json.RawMessage]{
+		Result: &rawResult,
+	}
+
+	err = handler.OnAuthMetadataPush(ctx, resp, "node1")
+	require.NoError(t, err)
+
+	handler.syncAuthorizedKeys()
+	require.Len(t, handler.authorizedKeys, 0)
+	require.Len(t, handler.workflowIDToRef, 0)
+	require.Len(t, handler.workflowRefToID, 0)
+}
+
+func TestOnAuthMetadataPushInvalidJSON(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+
+	invalidJSON := json.RawMessage(`{"invalid": json}`)
+	resp := &jsonrpc.Response[json.RawMessage]{
+		Result: &invalidJSON,
+	}
+
+	err := handler.OnAuthMetadataPush(ctx, resp, "node1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to unmarshal auth metadata")
+}
+
+func TestOnAuthMetadataPullResponse(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+
+	err := handler.agg.Start(ctx)
+	require.NoError(t, err)
+	defer handler.agg.Close()
+
+	key1 := gateway_common.AuthorizedKey{
+		KeyType:   gateway_common.KeyTypeECDSA,
+		PublicKey: "key1",
+	}
+	key2 := gateway_common.AuthorizedKey{
+		KeyType:   gateway_common.KeyTypeECDSA,
+		PublicKey: "key2",
+	}
+	key3 := gateway_common.AuthorizedKey{
+		KeyType:   gateway_common.KeyTypeECDSA,
+		PublicKey: "key3",
+	}
+	authData := []gateway_common.WorkflowMetadata{
+		{
+			WorkflowSelector: gateway_common.WorkflowSelector{
+				WorkflowID:    "workflowID1",
+				WorkflowName:  "workflowName1",
+				WorkflowOwner: "workflowOwner1",
+				WorkflowTag:   "workflowTag1",
+			},
+			AuthorizedKeys: []gateway_common.AuthorizedKey{key1},
+		},
+		{
+			WorkflowSelector: gateway_common.WorkflowSelector{
+				WorkflowID:    "workflowID2",
+				WorkflowName:  "workflowName2",
+				WorkflowOwner: "workflowOwner2",
+				WorkflowTag:   "workflowTag2",
+			},
+			AuthorizedKeys: []gateway_common.AuthorizedKey{key2, key3},
+		},
+	}
+
+	result, err := json.Marshal(authData)
+	require.NoError(t, err)
+
+	rawResult := json.RawMessage(result)
+	resp := &jsonrpc.Response[json.RawMessage]{
+		Result: &rawResult,
+	}
+
+	err = handler.OnAuthMetadataPullResponse(ctx, resp, "node1")
+	require.NoError(t, err)
+	handler.syncAuthorizedKeys()
+	require.Len(t, handler.authorizedKeys, 0)
+	require.Len(t, handler.workflowIDToRef, 0)
+	require.Len(t, handler.workflowRefToID, 0)
+
+	// node2 responds with the same payload so observations should be aggregated because f=1
+	err = handler.OnAuthMetadataPullResponse(ctx, resp, "node2")
+	require.NoError(t, err)
+	handler.syncAuthorizedKeys()
+	require.Len(t, handler.authorizedKeys, 2)
+	keys, exists := handler.authorizedKeys["workflowID1"]
+	require.True(t, exists)
+	require.Len(t, keys, 1)
+	_, exists = keys[key1]
+	require.True(t, exists)
+	keys, exists = handler.authorizedKeys["workflowID2"]
+	require.True(t, exists)
+	require.Len(t, keys, 2)
+	_, exists = keys[key2]
+	require.True(t, exists)
+	_, exists = keys[key3]
+	require.True(t, exists)
+	ref1 := workflowReference{
+		workflowOwner: "workflowOwner1",
+		workflowName:  "workflowName1",
+		workflowTag:   "workflowTag1",
+	}
+	ref2 := workflowReference{
+		workflowName:  "workflowName2",
+		workflowOwner: "workflowOwner2",
+		workflowTag:   "workflowTag2",
+	}
+	id, exists := handler.workflowRefToID[ref1]
+	require.True(t, exists)
+	require.Equal(t, "workflowID1", id)
+	id, exists = handler.workflowRefToID[ref2]
+	require.True(t, exists)
+	require.Equal(t, "workflowID2", id)
+	r1, exists := handler.workflowIDToRef["workflowID1"]
+	require.True(t, exists)
+	require.Equal(t, ref1, r1)
+	r2, exists := handler.workflowIDToRef["workflowID2"]
+	require.True(t, exists)
+	require.Equal(t, ref2, r2)
+}
+
+func TestOnAuthMetadataPullResponseInvalidJSON(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+
+	invalidJSON := json.RawMessage(`[{"invalid": json}]`)
+	resp := &jsonrpc.Response[json.RawMessage]{
+		Result: &invalidJSON,
+	}
+
+	err := handler.OnAuthMetadataPullResponse(ctx, resp, "node1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to unmarshal auth metadata pull response")
+}
+
+func TestStartAndClose(t *testing.T) {
+	handler, _, _ := createTestWorkflowMetadataHandler(t)
+	ctx := testutils.Context(t)
+
+	err := handler.Start(ctx)
+	require.NoError(t, err)
+	require.NoError(t, handler.Ready())
+	err = handler.Start(ctx) // Should error on second start
+	require.Error(t, err)
+
+	err = handler.Close()
+	require.NoError(t, err)
+	require.Error(t, handler.Ready())
+	err = handler.Close() // Should error on second close
+	require.Error(t, err)
+}
