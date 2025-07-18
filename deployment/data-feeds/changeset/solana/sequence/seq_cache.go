@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	commonOps "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/operations"
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence/operation"
@@ -44,6 +45,7 @@ func deployCache(b operations.Bundle, deps operation.Deps, in DeployCacheSeqInpu
 	}
 	out.ProgramID = deployOut.Output.ProgramID
 	fmt.Printf("Cache program deployed with ID: %s\n", out.ProgramID)
+	
 	// 2. Initialize the DataFeeds Cache state
 	initOut, err := operations.ExecuteOperation(b, operation.InitCacheOp, deps, operation.InitCacheInput{
 		ProgramID:  out.ProgramID,

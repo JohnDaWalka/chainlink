@@ -154,7 +154,7 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first to get the cache state and program ID
-        out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
 		require.NoError(t, err)
 
 		// Create remaining accounts for the decimal reports
