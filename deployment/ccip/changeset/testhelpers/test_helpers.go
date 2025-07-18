@@ -1916,7 +1916,7 @@ func DeployTransferableTokenSolana(
 	// // Setup global config
 	// e, err = commoncs.Apply(nil, e,
 	//	commoncs.Configure(
-	//		cldf.CreateLegacyChangeSet(ccipChangeSetSolana.InitGlobalConfigTokenPoolProgram),
+	//		cldf.CreateLegacyChangeSet(ccipChangeSetSolana.InitTokenPoolProgram),
 	//		ccipChangeSetSolana.TokenPoolConfigWithMCM{
 	//			ChainSelector: solChainSel,
 	//			TokenPubKey:   solTokenAddress,

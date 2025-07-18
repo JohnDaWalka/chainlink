@@ -42,7 +42,7 @@ func TestAddTokenPoolV0_1_0WithoutMcms(t *testing.T) {
 	skipInCI(t)
 	t.Parallel()
 	tenv, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1), testhelpers.WithCCIPSolanaContractVersion(ccipChangesetSolana.SolanaContractV0_1_0))
-	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: false, TokenMetadata: shared.CLLMetadata})
+	doTestTokenPool(t, tenv.Env, TokenPoolTestConfig{MCMS: false, TokenMetadata: shared.CLLMetadata, CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_0})
 }
 
 func TestAddTokenPoolV0_1_1WithoutMcms(t *testing.T) {
@@ -174,22 +174,17 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 	for _, testCase := range testCases {
 		typePtr := &testCase.poolType
 
-		var changesets []commonchangeset.ConfiguredChangeSet
-
-		if config.CCIPSolanaContractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
-			changesets = append(changesets,
-				commonchangeset.Configure(
-					cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
-					ccipChangesetSolana.TokenPoolConfigWithMCM{
-						ChainSelector:             solChain,
-						TokenPubKey:               tokenAddress,
-						PoolType:                  typePtr,
-						Metadata:                  tokenMetadata,
-						CCIPSolanaContractVersion: ccipChangesetSolana.SolanaContractV0_1_1,
-					}))
-		}
-
-		changesets = append(changesets,
+		e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
+			commonchangeset.Configure(
+				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitTokenPoolProgram),
+				ccipChangesetSolana.TokenPoolConfigWithMCM{
+					ChainSelector:             solChain,
+					TokenPubKey:               tokenAddress,
+					PoolType:                  typePtr,
+					Metadata:                  tokenMetadata,
+					CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
+				},
+			),
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.AddTokenPoolAndLookupTable),
 				ccipChangesetSolana.AddTokenPoolAndLookupTableConfig{
@@ -233,9 +228,8 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 					},
 					MCMS: mcmsConfig,
 				},
-			))
-
-		e, _, err = commonchangeset.ApplyChangesets(t, e, changesets)
+			),
+		})
 		require.NoError(t, err)
 
 		// test AddTokenPool results
@@ -295,32 +289,35 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.ConfigureTokenPoolAllowList),
 				ccipChangesetSolana.ConfigureTokenPoolAllowListConfig{
-					SolChainSelector: solChain,
-					SolTokenPubKey:   tokenAddress.String(),
-					PoolType:         typePtr,
-					Metadata:         tokenMetadata,
-					Accounts:         []solana.PublicKey{allowedAccount1.PublicKey(), allowedAccount2.PublicKey()},
-					Enabled:          true,
-					MCMS:             mcmsConfig,
+					SolChainSelector:          solChain,
+					SolTokenPubKey:            tokenAddress.String(),
+					PoolType:                  typePtr,
+					Metadata:                  tokenMetadata,
+					Accounts:                  []solana.PublicKey{allowedAccount1.PublicKey(), allowedAccount2.PublicKey()},
+					Enabled:                   true,
+					MCMS:                      mcmsConfig,
+					CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 				},
 			),
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.RemoveFromTokenPoolAllowList),
 				ccipChangesetSolana.RemoveFromAllowListConfig{
-					SolChainSelector: solChain,
-					SolTokenPubKey:   tokenAddress.String(),
-					PoolType:         typePtr,
-					Metadata:         tokenMetadata,
-					Accounts:         []solana.PublicKey{allowedAccount1.PublicKey(), allowedAccount2.PublicKey()},
-					MCMS:             mcmsConfig,
+					SolChainSelector:          solChain,
+					SolTokenPubKey:            tokenAddress.String(),
+					PoolType:                  typePtr,
+					Metadata:                  tokenMetadata,
+					Accounts:                  []solana.PublicKey{allowedAccount1.PublicKey(), allowedAccount2.PublicKey()},
+					MCMS:                      mcmsConfig,
+					CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 				},
 			),
 			// test update
 			commonchangeset.Configure(
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.SetupTokenPoolForRemoteChain),
 				ccipChangesetSolana.SetupTokenPoolForRemoteChainConfig{
-					SolChainSelector: solChain,
-					MCMS:             mcmsConfig,
+					SolChainSelector:          solChain,
+					MCMS:                      mcmsConfig,
+					CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 					RemoteTokenPoolConfigs: []ccipChangesetSolana.RemoteChainTokenPoolConfig{
 						{
 							SolTokenPubKey: tokenAddress,
@@ -364,6 +361,7 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 						RebalancerCfg: &ccipChangesetSolana.RebalancerConfig{
 							Rebalancer: rebalancer,
 						},
+						CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 					},
 				),
 				commonchangeset.Configure(
@@ -377,7 +375,8 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 							RemoteTokenAccount: deployerATA,
 							Type:               ccipChangesetSolana.Provide,
 						},
-						MCMS: mcmsConfig,
+						MCMS:                      mcmsConfig,
+						CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 					},
 				),
 				commonchangeset.Configure(
@@ -391,7 +390,8 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 							RemoteTokenAccount: testUserATA,
 							Type:               ccipChangesetSolana.Withdraw,
 						},
-						MCMS: mcmsConfig,
+						MCMS:                      mcmsConfig,
+						CCIPSolanaContractVersion: config.CCIPSolanaContractVersion,
 					},
 				),
 			},
@@ -448,7 +448,7 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 								CurrentOwner:  timelockSignerPDA,
 								ProposedOwner: deployerKey,
 								ContractsByChain: map[uint64]ccipChangesetSolana.CCIPContractsToTransfer{
-									solChain: ccipChangesetSolana.CCIPContractsToTransfer{
+									solChain: {
 										LockReleaseTokenPools: map[string][]solana.PublicKey{
 											tokenMetadata: {tokenAddress},
 										},

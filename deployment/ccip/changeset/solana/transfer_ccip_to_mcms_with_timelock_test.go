@@ -295,7 +295,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T, config EnvironmentConf
 	if config.CCIPSolanaContractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
 		changesets = append(changesets,
 			commonchangeset.Configure(
-				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
+				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitTokenPoolProgram),
 				ccipChangesetSolana.TokenPoolConfigWithMCM{
 					ChainSelector: solChain1,
 					TokenPubKey:   tokenAddressLockRelease,
@@ -304,7 +304,7 @@ func prepareEnvironmentForOwnershipTransfer(t *testing.T, config EnvironmentConf
 				},
 			),
 			commonchangeset.Configure(
-				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
+				cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitTokenPoolProgram),
 				ccipChangesetSolana.TokenPoolConfigWithMCM{
 					ChainSelector: solChain1,
 					TokenPubKey:   tokenAddressBurnMint,
