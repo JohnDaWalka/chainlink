@@ -5,7 +5,7 @@ stop_docker_containers() {
   echo "Checking for running Docker containers..."
   if [ "$(docker ps -q)" ]; then
      echo "Stopping all running Docker containers..."
-     docker stop "$(docker ps -q)"
+     docker ps -q | xargs -r docker stop
   else
      echo "No running Docker containers to stop."
   fi
