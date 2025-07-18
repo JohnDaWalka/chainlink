@@ -34,6 +34,8 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
+	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -140,6 +142,9 @@ type TestConfigs struct {
 	// i.e. AddDONAndSetCandidate, SetCandidate, PromoteCandidate, and SetOCR3.
 	// This is useful for tests that need to initialize DONs using different changesets.
 	SkipDONConfiguration bool
+
+	// Solana Handle different contract versions
+	CCIPSolanaContractVersion ccipChangesetSolana.CCIPSolanaContractVersion
 }
 
 func (tc *TestConfigs) Validate() error {
@@ -183,6 +188,12 @@ func DefaultTestConfigs() *TestConfigs {
 }
 
 type TestOps func(testCfg *TestConfigs)
+
+func WithCCIPSolanaContractVersion(version ccipChangesetSolana.CCIPSolanaContractVersion) TestOps {
+	return func(testCfg *TestConfigs) {
+		testCfg.CCIPSolanaContractVersion = version
+	}
+}
 
 func WithLogMessagesToIgnore(logMessages []LogMessageToIgnore) TestOps {
 	return func(testCfg *TestConfigs) {
@@ -425,7 +436,17 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	}
 
 	m.Chains = chains
-	solChains := memory.NewMemoryChainsSol(t, tc.SolChains)
+
+	var commitSha string
+
+	ccipContractVersion := m.TestConfig.CCIPSolanaContractVersion
+	if ccipContractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
+		commitSha = ccipChangesetSolana.ContractVersionShortSha[ccipContractVersion]
+	} else {
+		commitSha = ""
+	}
+
+	solChains := memory.NewMemoryChainsSol(t, tc.SolChains, commitSha)
 	aptosChains := memory.NewMemoryChainsAptos(t, tc.AptosChains)
 	tonChains := memory.NewMemoryChainsTon(t, tc.TonChains)
 	// if we have Aptos and Solana chains, we need to set their chain selectors on the wrapper
@@ -886,7 +907,19 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		),
 	}...)
 	if len(solChains) != 0 {
-		solCs, err := DeployChainContractsToSolChainCS(e, solChains[0], true, nil)
+		var buildSolConfig *ccipChangeSetSolana.BuildSolanaConfig = nil
+		if tEnv.TestConfigs().CCIPSolanaContractVersion == ccipChangesetSolana.SolanaContractV0_1_1 {
+			buildSolConfig = &ccipChangeSetSolana.BuildSolanaConfig{
+				GitCommitSha:   ccipChangesetSolana.ContractVersionShortSha[ccipChangesetSolana.SolanaContractV0_1_1],
+				DestinationDir: memory.ProgramsPath,
+			}
+		} else if tEnv.TestConfigs().CCIPSolanaContractVersion == ccipChangesetSolana.SolanaContractV0_1_0 {
+			buildSolConfig = &ccipChangeSetSolana.BuildSolanaConfig{
+				GitCommitSha:   ccipChangesetSolana.ContractVersionShortSha[ccipChangesetSolana.SolanaContractV0_1_0],
+				DestinationDir: memory.ProgramsPath,
+			}
+		}
+		solCs, err := DeployChainContractsToSolChainCS(e, solChains[0], true, buildSolConfig)
 		require.NoError(t, err)
 		apps = append(apps, solCs...)
 	}
