@@ -1,5 +1,7 @@
 #!/bin/bash
 
+START_DIR=$(pwd)
+
 checkout_broken_capability() {
   echo "Checking out broken capability..."
   cd ./capabilities/cron || exit 1
@@ -7,10 +9,12 @@ checkout_broken_capability() {
     echo "Failed to git fetch."
     exit 1
   fi
+  echo "Checking out broken capability branch..."
   if ! git checkout dx-1343-broken-capability; then
     echo "Failed to checkout broken capability branch."
     exit 1
   fi
+  echo "Cleaning up Go modules in capabilities repository..."
   if ! go mod tidy; then
     echo "Failed to tidy Go modules."
     exit 1
@@ -21,7 +25,7 @@ checkout_broken_capability() {
     exit 1
   fi
   echo "Broken cron capability checked out successfully."
-  cd - || exit 1
+  cd "$START_DIR" || exit 1
 }
 
 start_observability_stack() {
@@ -31,7 +35,7 @@ start_observability_stack() {
     exit 1
   fi
   echo "Observability stack started successfully."
-  cd - || exit 1
+  cd "$START_DIR" || exit 1
 }
 
 restart_local_cre() {
@@ -41,12 +45,13 @@ restart_local_cre() {
     echo "Failed to restart local CRE environment."
     exit 1
   fi
+  echo "Restarting Beholder..."
   if ! go run . env beholder start; then
     echo "Failed to restart local CRE Beholder."
     exit 1
   fi
   echo "Local CRE environment restarted successfully."
-  cd - || exit 1
+  cd "$START_DIR" || exit 1
 }
 
 shutdown_local_cre() {
@@ -57,7 +62,7 @@ shutdown_local_cre() {
     exit 1
   fi
   echo "Local CRE environment stopped successfully."
-  cd - || exit 1
+  cd "$START_DIR" || exit 1
 }
 
 run_workflow_test() {
@@ -68,7 +73,7 @@ run_workflow_test() {
     exit 1
   fi
   echo "Workflow test executed successfully."
-  cd - || exit 1
+  cd "$START_DIR" || exit 1
 }
 
 compile_cron_capability() {
@@ -79,7 +84,7 @@ compile_cron_capability() {
     exit 1
   fi
   echo "Cron capability compiled successfully."
-  cd - || exit 1
+  cd "$START_DIR" || exit 1
 }
 
 case "$1" in
