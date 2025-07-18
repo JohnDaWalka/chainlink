@@ -106,7 +106,7 @@ func buildCommitAccountsList(fromAddress, offrampProgramAddress string, priceOnl
 	return accounts
 }
 
-func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) chainwriter.MethodConfig {
+func getExecuteMethodConfig(fromAddress string) chainwriter.MethodConfig {
 	return chainwriter.MethodConfig{
 		FromAddress: fromAddress,
 		InputModifications: []codec.ModifierConfig{
@@ -121,28 +121,16 @@ func getExecuteMethodConfig(fromAddress string, offrampProgramAddress string) ch
 		ArgsTransform:            "CCIPExecuteV2",
 		ComputeUnitLimitOverhead: 150_000,
 		BufferPayloadMethod:      "CCIPExecutionReportBuffer",
-		LookupTables: chainwriter.LookupTables{
-			DerivedLookupTables: []chainwriter.DerivedLookupTable{
-				getCommonAddressLookupTableConfig(offrampProgramAddress),
-				// TokenAdminRegistry lookup tables are provided for token transfers through on-chain account derivation
-			},
-		},
 		ATAs: []chainwriter.ATALookup{
 			{
 				Location:      destTokenAddress,
 				WalletAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: tokenReceiverAddress}},
-				TokenProgram: chainwriter.Lookup{
-					AccountsFromLookupTable: &chainwriter.AccountsFromLookupTable{
-						LookupTableName: "PoolLookupTable", // Populated by the ArgsTransform
-						IncludeIndexes:  []int{6},
-					},
-				},
 				MintAddress: chainwriter.Lookup{AccountLookup: &chainwriter.AccountLookup{Location: destTokenAddress}},
 				Optional:    true, // ATA lookup is optional if DestTokenAddress is not present in report
 			},
 		},
-		// All accounts including the ones for messaging and token transfers are derived using an on-chain method
-		// TODO: Add link to derivation code once merged
+		// All accounts and lookup tables including the ones for messaging and token transfers are derived using an on-chain method
+		// https://github.com/smartcontractkit/chainlink-ccip/blob/main/chains/solana/contracts/programs/ccip-offramp/src/instructions/v1/execute/derive.rs
 		Accounts:        nil,
 		DebugIDLocation: "Info.AbstractReports.Messages.Header.MessageID",
 	}
@@ -173,7 +161,7 @@ func GetSolanaChainWriterConfig(offrampProgramAddress string, fromAddress string
 		Programs: map[string]chainwriter.ProgramConfig{
 			ccipconsts.ContractNameOffRamp: {
 				Methods: map[string]chainwriter.MethodConfig{
-					ccipconsts.MethodExecute:         getExecuteMethodConfig(fromAddress, offrampProgramAddress),
+					ccipconsts.MethodExecute:         getExecuteMethodConfig(fromAddress),
 					ccipconsts.MethodCommit:          getCommitMethodConfig(fromAddress, offrampProgramAddress, false),
 					ccipconsts.MethodCommitPriceOnly: getCommitMethodConfig(fromAddress, offrampProgramAddress, true),
 				},
