@@ -42,8 +42,6 @@ import (
 	syncerMocks "github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
-
-	captestutils "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/capabilities/testutils"
 )
 
 var writeChainCapability = kcr_v1.CapabilitiesRegistryCapability{
@@ -186,7 +184,7 @@ func (o *orm) LatestLocalRegistry(ctx context.Context) (*registrysyncer.LocalReg
 }
 
 func toPeerIDs(ids [][32]byte) []p2ptypes.PeerID {
-	var pids []p2ptypes.PeerID
+	pids := make([]p2ptypes.PeerID, 0, len(ids))
 	for _, id := range ids {
 		pids = append(pids, id)
 	}
@@ -470,7 +468,7 @@ func TestSyncer_DBIntegration(t *testing.T) {
 	syncerORM := newORM(t)
 	syncerORM.ormMock.On("LatestLocalRegistry", mock.Anything).Return(nil, errors.New("no state found"))
 	syncerORM.ormMock.On("AddLocalRegistry", mock.Anything, mock.Anything).Return(nil)
-	syncer, err := newTestSyncer(logger.TestLogger(t), func() (p2ptypes.PeerID, error) { return p2ptypes.PeerID{}, nil }, factory, regAddress.Hex(), syncerORM)
+	syncer, err := registrysyncer.New(logger.TestLogger(t), func() (p2ptypes.PeerID, error) { return p2ptypes.PeerID{}, nil }, factory, regAddress.Hex(), syncerORM)
 	require.NoError(t, err)
 	require.NoError(t, syncer.Start(ctx))
 	t.Cleanup(func() {
@@ -713,7 +711,7 @@ func TestReader_V2_Integration(t *testing.T) {
 		{
 			Name:                     "test-don-v2",
 			DonFamilies:              []string{"workflow-don-family"},
-			Config:                   []byte{},
+			Config:                   []byte("test-don-v2-config"),
 			CapabilityConfigurations: cfgs,
 			Nodes:                    nodeSet,
 			F:                        1,
@@ -725,7 +723,6 @@ func TestReader_V2_Integration(t *testing.T) {
 	require.NoError(t, err)
 	simulatedBackend.Commit()
 
-	// Test the syncer using the same setup as V1 tests
 	db := pgtest.NewSqlxDB(t)
 	factory := newContractReaderFactory(t, simulatedBackend)
 	syncerORM := registrysyncer.NewORM(db, lggr)
@@ -752,12 +749,15 @@ func TestReader_V2_Integration(t *testing.T) {
 	// Test V2 DON with family
 	assert.Len(t, s.IDsToDONs, 1)
 	expectedDON := capabilities.DON{
+		Name:             "test-don-v2",
 		ID:               1,
+		Families:         []string{"workflow-don-family"},
 		ConfigVersion:    1,
 		IsPublic:         true,
 		AcceptsWorkflows: true,
 		F:                1,
 		Members:          toPeerIDs(nodeSet),
+		Config:           []byte("test-don-v2-config"),
 	}
 	gotDon := s.IDsToDONs[1]
 	assert.Equal(t, expectedDON, gotDon.DON)
@@ -920,7 +920,7 @@ func TestSyncer_V2_DBIntegration(t *testing.T) {
 		{
 			Name:                     "test-don-v2-db",
 			DonFamilies:              []string{"workflow-don-family-v2"},
-			Config:                   []byte{},
+			Config:                   []byte("test-don-v2-db-config"),
 			CapabilityConfigurations: cfgs,
 			Nodes:                    nodeSet,
 			F:                        1,
@@ -939,7 +939,7 @@ func TestSyncer_V2_DBIntegration(t *testing.T) {
 
 	factory := newContractReaderFactory(t, simulatedBackend)
 
-	syncer, err := newTestSyncer(
+	syncer, err := registrysyncer.New(
 		lggr,
 		func() (p2ptypes.PeerID, error) { return p2ptypes.PeerID{}, nil },
 		factory,
@@ -991,6 +991,9 @@ func TestSyncer_V2_LocalNode(t *testing.T) {
 	}
 
 	dID := uint32(1)
+	dName := "test-don-v2-db"
+	dFamilies := []string{"workflow-don-family-v2"}
+	dConfig := []byte("test-don-v2-db-config")
 	// Test V2 local registry with string capability IDs
 	localRegistry := registrysyncer.NewLocalRegistry(
 		lggr,
@@ -998,6 +1001,9 @@ func TestSyncer_V2_LocalNode(t *testing.T) {
 		map[registrysyncer.DonID]registrysyncer.DON{
 			registrysyncer.DonID(dID): {
 				DON: capabilities.DON{
+					Name:             dName,
+					Families:         dFamilies,
+					Config:           dConfig,
 					ID:               dID,
 					ConfigVersion:    uint32(2),
 					F:                uint8(1),
@@ -1058,6 +1064,9 @@ func TestSyncer_V2_LocalNode(t *testing.T) {
 
 	don := capabilities.DON{
 		ID:               dID,
+		Name:             dName,
+		Families:         dFamilies,
+		Config:           dConfig,
 		ConfigVersion:    2,
 		Members:          workflowDonNodes,
 		F:                1,
@@ -1087,26 +1096,364 @@ func TestSyncer_V2_LocalNode(t *testing.T) {
 	assert.Equal(t, []string{"write-chain@1.0.1", "trigger@1.0.0"}, *nodeInfo.CapabilityIDs)
 }
 
-// Add this helper struct to implement the ContractReaderFactory interface
-type testContractReaderFactory struct {
-	backendTH *captestutils.EVMBackendTH
-	t         *testing.T
-}
+func TestReader_V2_FamilyOperations(t *testing.T) {
+	ctx := testutils.Context(t)
+	lggr := logger.TestLogger(t)
 
-func (f *testContractReaderFactory) NewContractReader(ctx context.Context, bytes []byte) (types.ContractReader, error) {
-	return f.backendTH.NewContractReader(ctx, f.t, bytes)
-}
+	// Create a simulated backend
+	owner := evmtestutils.MustNewSimTransactor(t)
+	i := &big.Int{}
+	oneEth, _ := i.SetString("100000000000000000000", 10)
+	gasLimit := ethconfig.Defaults.Miner.GasCeil * 2
 
-func newTestSyncer(
-	lggr logger.Logger,
-	getPeerID func() (p2ptypes.PeerID, error),
-	relayer registrysyncer.ContractReaderFactory,
-	registryAddress string,
-	orm *orm,
-) (registrysyncer.RegistrySyncer, error) {
-	rs, err := registrysyncer.New(lggr, getPeerID, relayer, registryAddress, orm)
-	if err != nil {
-		return nil, err
+	simulatedBackend := simulated.NewBackend(gethtypes.GenesisAlloc{owner.From: {
+		Balance: oneEth,
+	}}, simulated.WithBlockGasLimit(gasLimit))
+	simulatedBackend.Commit()
+
+	// Deploy a V2 capabilities registry
+	regAddress, _, reg, err := kcr_v2.DeployCapabilitiesRegistry(owner, simulatedBackend.Client(), kcr_v2.CapabilitiesRegistryConstructorParams{})
+	require.NoError(t, err, "DeployCapabilitiesRegistry failed")
+	simulatedBackend.Commit()
+
+	// Add V2 capabilities
+	writeChainCapabilityV2 := kcr_v2.CapabilitiesRegistryCapability{
+		CapabilityId:          "write-chain@1.0.1",
+		ConfigurationContract: common.Address{},
+		Metadata:              []byte(`{"capabilityType": 3, "responseType": 1}`),
 	}
-	return rs, nil
+	triggerCapabilityV2 := kcr_v2.CapabilitiesRegistryCapability{
+		CapabilityId:          "trigger@1.0.0",
+		ConfigurationContract: common.Address{},
+		Metadata:              []byte(`{"capabilityType": 1, "responseType": 1}`),
+	}
+
+	_, err = reg.AddCapabilities(owner, []kcr_v2.CapabilitiesRegistryCapability{
+		writeChainCapabilityV2,
+		triggerCapabilityV2,
+	})
+	require.NoError(t, err, "AddCapabilities failed")
+	simulatedBackend.Commit()
+
+	// Add node operator
+	_, err = reg.AddNodeOperators(owner, []kcr_v2.CapabilitiesRegistryNodeOperator{
+		{
+			Admin: owner.From,
+			Name:  "TEST_NOP_V2_FAMILY",
+		},
+	})
+	require.NoError(t, err, "Failed to add node operator")
+	simulatedBackend.Commit()
+
+	// Create different node sets for different DONs
+	nodeSetA := [][32]byte{randomWord(), randomWord(), randomWord()}
+	nodeSetB := [][32]byte{randomWord(), randomWord(), randomWord()}
+	nodeSetC := [][32]byte{randomWord(), randomWord(), randomWord()}
+	nodeSetD := [][32]byte{randomWord(), randomWord(), randomWord()}
+
+	// Create all nodes with both capabilities
+	allNodes := []kcr_v2.CapabilitiesRegistryNodeParams{}
+
+	// Add nodes for DON A (workflow-family-a)
+	for _, nodeID := range nodeSetA {
+		allNodes = append(allNodes, kcr_v2.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      uint32(1),
+			Signer:              randomWord(),
+			P2pId:               nodeID,
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{"write-chain@1.0.1", "trigger@1.0.0"},
+		})
+	}
+
+	// Add nodes for DON B (workflow-family-b)
+	for _, nodeID := range nodeSetB {
+		allNodes = append(allNodes, kcr_v2.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      uint32(1),
+			Signer:              randomWord(),
+			P2pId:               nodeID,
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{"write-chain@1.0.1", "trigger@1.0.0"},
+		})
+	}
+
+	// Add nodes for DON C (multiple families)
+	for _, nodeID := range nodeSetC {
+		allNodes = append(allNodes, kcr_v2.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      uint32(1),
+			Signer:              randomWord(),
+			P2pId:               nodeID,
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{"write-chain@1.0.1", "trigger@1.0.0"},
+		})
+	}
+
+	// Add nodes for DON D (no family)
+	for _, nodeID := range nodeSetD {
+		allNodes = append(allNodes, kcr_v2.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      uint32(1),
+			Signer:              randomWord(),
+			P2pId:               nodeID,
+			EncryptionPublicKey: randomWord(),
+			CsaKey:              randomWord(),
+			CapabilityIds:       []string{"write-chain@1.0.1"},
+		})
+	}
+
+	_, err = reg.AddNodes(owner, allNodes)
+	require.NoError(t, err, "Failed to add nodes")
+	simulatedBackend.Commit()
+
+	// Create capability configurations
+	config := &capabilitiespb.CapabilityConfig{
+		DefaultConfig: values.Proto(values.EmptyMap()).GetMapValue(),
+		RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+			RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+				RegistrationRefresh:     durationpb.New(20 * time.Second),
+				RegistrationExpiry:      durationpb.New(60 * time.Second),
+				MinResponsesToAggregate: uint32(1) + 1,
+				MessageExpiry:           durationpb.New(120 * time.Second),
+			},
+		},
+	}
+	configb, err := proto.Marshal(config)
+	require.NoError(t, err)
+
+	cfgs := []kcr_v2.CapabilitiesRegistryCapabilityConfiguration{
+		{
+			CapabilityId: "write-chain@1.0.1",
+			Config:       configb,
+		},
+		{
+			CapabilityId: "trigger@1.0.0",
+			Config:       configb,
+		},
+	}
+
+	// Create multiple DONs with different family configurations
+	newDONs := []kcr_v2.CapabilitiesRegistryNewDONParams{
+		{
+			Name:                     "don-family-a",
+			DonFamilies:              []string{"workflow-family-a"},
+			Config:                   []byte("config-family-a"),
+			CapabilityConfigurations: cfgs,
+			Nodes:                    nodeSetA,
+			F:                        1,
+			IsPublic:                 true,
+			AcceptsWorkflows:         true,
+		},
+		{
+			Name:                     "don-family-b",
+			DonFamilies:              []string{"workflow-family-b"},
+			Config:                   []byte("config-family-b"),
+			CapabilityConfigurations: cfgs,
+			Nodes:                    nodeSetB,
+			F:                        1,
+			IsPublic:                 true,
+			AcceptsWorkflows:         true,
+		},
+		{
+			Name:                     "don-multi-family",
+			DonFamilies:              []string{"workflow-family-a", "workflow-family-c"},
+			Config:                   []byte("config-multi-family"),
+			CapabilityConfigurations: cfgs,
+			Nodes:                    nodeSetC,
+			F:                        1,
+			IsPublic:                 true,
+			AcceptsWorkflows:         true,
+		},
+		{
+			Name:        "don-no-family",
+			DonFamilies: []string{}, // empty families array
+			Config:      []byte("config-no-family"),
+			CapabilityConfigurations: []kcr_v2.CapabilitiesRegistryCapabilityConfiguration{
+				{
+					CapabilityId: "write-chain@1.0.1",
+					Config:       configb,
+				},
+			},
+			Nodes:            nodeSetD,
+			F:                1,
+			IsPublic:         true,
+			AcceptsWorkflows: true,
+		},
+	}
+	_, err = reg.AddDONs(owner, newDONs)
+	require.NoError(t, err)
+	simulatedBackend.Commit()
+
+	// Set up syncer and reader
+	db := pgtest.NewSqlxDB(t)
+	factory := newContractReaderFactory(t, simulatedBackend)
+	syncerORM := registrysyncer.NewORM(db, lggr)
+	syncer, err := registrysyncer.New(lggr, func() (p2ptypes.PeerID, error) { return p2ptypes.PeerID{}, nil }, factory, regAddress.Hex(), syncerORM)
+	require.NoError(t, err)
+
+	l := &launcher{}
+	syncer.AddListener(l)
+
+	err = syncer.Sync(ctx, false)
+	require.NoError(t, err)
+
+	s := l.localRegistry
+	require.NotNil(t, s)
+
+	// Verify we have 4 DONs
+	assert.Len(t, s.IDsToDONs, 4)
+
+	// Create a V2 reader to test family operations directly
+	// First, we need to create a properly configured contract reader
+	contractReaderConfig := evmrelaytypes.ChainReaderConfig{
+		Contracts: map[string]evmrelaytypes.ChainContractReader{
+			"CapabilitiesRegistry": {
+				ContractABI: kcr_v2.CapabilitiesRegistryABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					"getDONs": {
+						ChainSpecificName: "getDONs",
+					},
+					"getCapabilities": {
+						ChainSpecificName: "getCapabilities",
+					},
+					"getNodes": {
+						ChainSpecificName: "getNodes",
+					},
+					"getDONsInFamily": {
+						ChainSpecificName: "getDONsInFamily",
+					},
+					"getHistoricalDONInfo": {
+						ChainSpecificName: "getHistoricalDONInfo",
+					},
+					"getNode": {
+						ChainSpecificName: "getNode",
+					},
+					"getNodeOperator": {
+						ChainSpecificName: "getNodeOperator",
+					},
+					"getNodeOperators": {
+						ChainSpecificName: "getNodeOperators",
+					},
+					"getNodesByP2PIds": {
+						ChainSpecificName: "getNodesByP2PIds",
+					},
+					"isCapabilityDeprecated": {
+						ChainSpecificName: "isCapabilityDeprecated",
+					},
+				},
+			},
+		},
+	}
+	contractReaderConfigEncoded, err := json.Marshal(contractReaderConfig)
+	require.NoError(t, err)
+
+	contractReader, err := factory.NewContractReader(ctx, contractReaderConfigEncoded)
+	require.NoError(t, err)
+
+	// Bind the contract
+	err = contractReader.Bind(ctx, []types.BoundContract{
+		{
+			Address: regAddress.Hex(),
+			Name:    "CapabilitiesRegistry",
+		},
+	})
+	require.NoError(t, err)
+
+	reader, err := registrysyncer.NewCapabilitiesRegistryV2Reader(ctx, contractReader, regAddress)
+	require.NoError(t, err)
+
+	// Test GetDONsInFamily functionality
+	t.Run("GetDONsInFamily_SingleFamily", func(t *testing.T) {
+		// Query "workflow-family-a" -> should return DON IDs [1, 3] (don-family-a and don-multi-family)
+		familyADONs, err := reader.GetDONsInFamily(ctx, "workflow-family-a")
+		require.NoError(t, err)
+		require.Len(t, familyADONs, 2, "Should find 2 DONs in workflow-family-a")
+		assert.Contains(t, familyADONs, uint32(1), "DON 1 should be in workflow-family-a")
+		assert.Contains(t, familyADONs, uint32(3), "DON 3 should be in workflow-family-a")
+
+		// Query "workflow-family-b" -> should return DON ID [2]
+		familyBDONs, err := reader.GetDONsInFamily(ctx, "workflow-family-b")
+		require.NoError(t, err)
+		require.Len(t, familyBDONs, 1, "Should find 1 DON in workflow-family-b")
+		assert.Contains(t, familyBDONs, uint32(2), "DON 2 should be in workflow-family-b")
+
+		// Query "workflow-family-c" -> should return DON ID [3]
+		familyCDONs, err := reader.GetDONsInFamily(ctx, "workflow-family-c")
+		require.NoError(t, err)
+		require.Len(t, familyCDONs, 1, "Should find 1 DON in workflow-family-c")
+		assert.Contains(t, familyCDONs, uint32(3), "DON 3 should be in workflow-family-c")
+	})
+
+	t.Run("GetDONsInFamily_NonExistentFamily", func(t *testing.T) {
+		// Query "non-existent-family" -> should return empty
+		nonExistentDONs, err := reader.GetDONsInFamily(ctx, "non-existent-family")
+		require.NoError(t, err)
+		assert.Empty(t, nonExistentDONs, "Non-existent family should return empty")
+	})
+
+	t.Run("GetHistoricalDONInfo_FamilyData", func(t *testing.T) {
+		// Test GetHistoricalDONInfo with configCount=1 for each DON
+		for donID := uint32(1); donID <= 4; donID++ {
+			historicalDON, err := reader.GetHistoricalDONInfo(ctx, donID, 1)
+			require.NoError(t, err, "GetHistoricalDONInfo should work for DON %d", donID)
+			require.NotNil(t, historicalDON, "Historical DON info should not be nil for DON %d", donID)
+
+			// Verify family data is preserved in historical records
+			switch donID {
+			case 1:
+				assert.Equal(t, "don-family-a", *historicalDON.Name)
+				assert.Equal(t, []string{"workflow-family-a"}, *historicalDON.DONFamilies)
+			case 2:
+				assert.Equal(t, "don-family-b", *historicalDON.Name)
+				assert.Equal(t, []string{"workflow-family-b"}, *historicalDON.DONFamilies)
+			case 3:
+				assert.Equal(t, "don-multi-family", *historicalDON.Name)
+				assert.Equal(t, []string{"workflow-family-a", "workflow-family-c"}, *historicalDON.DONFamilies)
+			case 4:
+				assert.Equal(t, "don-no-family", *historicalDON.Name)
+				if historicalDON.DONFamilies != nil {
+					assert.Empty(t, *historicalDON.DONFamilies, "DON 4 should have empty families")
+				}
+			}
+		}
+	})
+
+	t.Run("GetHistoricalDONInfo_InvalidConfigCount", func(t *testing.T) {
+		// Test with invalid configCount -> should handle gracefully
+		_, err := reader.GetHistoricalDONInfo(ctx, 1, 999)
+		require.Error(t, err, "Should return error for invalid configCount")
+		assert.ErrorContains(t, err, "failed to get historical DON info for DON 1, config 999", "Error should indicate invalid configCount")
+	})
+
+	// Verify synced data integrity in local registry
+	t.Run("LocalRegistry_FamilyIntegrity", func(t *testing.T) {
+		// Verify each DON has correct family data
+		don1 := s.IDsToDONs[1].DON
+		assert.Equal(t, "don-family-a", don1.Name)
+		assert.Equal(t, []string{"workflow-family-a"}, don1.Families)
+		assert.Equal(t, []byte("config-family-a"), don1.Config)
+
+		don2 := s.IDsToDONs[2].DON
+		assert.Equal(t, "don-family-b", don2.Name)
+		assert.Equal(t, []string{"workflow-family-b"}, don2.Families)
+		assert.Equal(t, []byte("config-family-b"), don2.Config)
+
+		don3 := s.IDsToDONs[3].DON
+		assert.Equal(t, "don-multi-family", don3.Name)
+		assert.Equal(t, []string{"workflow-family-a", "workflow-family-c"}, don3.Families)
+		assert.Equal(t, []byte("config-multi-family"), don3.Config)
+
+		don4 := s.IDsToDONs[4].DON
+		assert.Equal(t, "don-no-family", don4.Name)
+		assert.Empty(t, don4.Families)
+		assert.Equal(t, []byte("config-no-family"), don4.Config)
+	})
+
+	// Verify capabilities are correctly synced
+	assert.Len(t, s.IDsToCapabilities, 2)
+	assert.Contains(t, s.IDsToCapabilities, "write-chain@1.0.1")
+	assert.Contains(t, s.IDsToCapabilities, "trigger@1.0.0")
+
+	// Verify all nodes are correctly synced
+	assert.Len(t, s.IDsToNodes, 12) // 3 nodes * 4 DONs = 12 nodes
 }

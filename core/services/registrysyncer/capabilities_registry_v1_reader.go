@@ -162,6 +162,43 @@ func (r *capabilitiesRegistryV1Reader) GetNodes(ctx context.Context) ([]NodeInfo
 	return result, nil
 }
 
+// V2-only methods - return explicit errors for V1
+
+// GetDONsInFamily returns an error as family operations are not supported in V1
+func (r *capabilitiesRegistryV1Reader) GetDONsInFamily(ctx context.Context, donFamily string) ([]uint32, error) {
+	return nil, fmt.Errorf("GetDONsInFamily: %w", ErrNotSupportedInV1)
+}
+
+// GetHistoricalDONInfo returns an error as historical data is not available in V1
+func (r *capabilitiesRegistryV1Reader) GetHistoricalDONInfo(ctx context.Context, donID uint32, configCount uint32) (*DONInfo, error) {
+	return nil, fmt.Errorf("GetHistoricalDONInfo: %w", ErrNotSupportedInV1)
+}
+
+// GetNode returns an error as single node lookup is not supported in V1
+func (r *capabilitiesRegistryV1Reader) GetNode(ctx context.Context, p2pID [32]byte) (*NodeInfo, error) {
+	return nil, fmt.Errorf("GetNode: %w", ErrNotSupportedInV1)
+}
+
+// GetNodeOperator returns an error as node operator information is not available in V1
+func (r *capabilitiesRegistryV1Reader) GetNodeOperator(ctx context.Context, nodeOperatorID uint32) (*NodeOperator, error) {
+	return nil, fmt.Errorf("GetNodeOperator: %w", ErrNotSupportedInV1)
+}
+
+// GetNodeOperators returns an error as node operator information is not available in V1
+func (r *capabilitiesRegistryV1Reader) GetNodeOperators(ctx context.Context) ([]NodeOperator, error) {
+	return nil, fmt.Errorf("GetNodeOperators: %w", ErrNotSupportedInV1)
+}
+
+// GetNodesByP2PIds returns an error as filtered node lookup is not supported in V1
+func (r *capabilitiesRegistryV1Reader) GetNodesByP2PIds(ctx context.Context, p2pIDs [][32]byte) ([]NodeInfo, error) {
+	return nil, fmt.Errorf("GetNodesByP2PIds: %w", ErrNotSupportedInV1)
+}
+
+// IsCapabilityDeprecated returns an error as deprecation checking is not supported in V1
+func (r *capabilitiesRegistryV1Reader) IsCapabilityDeprecated(ctx context.Context, capabilityID string) (bool, error) {
+	return false, fmt.Errorf("IsCapabilityDeprecated: %w", ErrNotSupportedInV1)
+}
+
 // Address returns the contract address
 func (r *capabilitiesRegistryV1Reader) Address() common.Address {
 	return r.address

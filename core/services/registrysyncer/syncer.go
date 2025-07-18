@@ -324,12 +324,15 @@ func deepCopyLocalRegistry(lr *LocalRegistry) LocalRegistry {
 	lrCopy.IDsToDONs = make(map[DonID]DON, len(lr.IDsToDONs))
 	for id, don := range lr.IDsToDONs {
 		d := capabilities.DON{
+			Name:             don.Name,
 			ID:               don.ID,
+			Families:         don.Families,
 			ConfigVersion:    don.ConfigVersion,
 			Members:          make([]p2ptypes.PeerID, len(don.Members)),
 			F:                don.F,
 			IsPublic:         don.IsPublic,
 			AcceptsWorkflows: don.AcceptsWorkflows,
+			Config:           don.Config,
 		}
 		copy(d.Members, don.Members)
 		capCfgs := make(map[string]CapabilityConfiguration, len(don.CapabilityConfigurations))
@@ -412,7 +415,7 @@ func toCapabilityType(capabilityType uint8) capabilities.CapabilityType {
 func toDONInfoFromVersioned(don DONInfo) *capabilities.DON {
 	peerIDs := append([]p2ptypes.PeerID{}, don.NodeP2PIds...)
 
-	return &capabilities.DON{
+	capDon := &capabilities.DON{
 		ID:               don.ID,
 		ConfigVersion:    don.ConfigCount,
 		Members:          peerIDs,
@@ -420,6 +423,21 @@ func toDONInfoFromVersioned(don DONInfo) *capabilities.DON {
 		IsPublic:         don.IsPublic,
 		AcceptsWorkflows: don.AcceptsWorkflows,
 	}
+
+	if don.Name != nil {
+		capDon.Name = *don.Name
+	}
+
+	if don.DONFamilies != nil {
+		capDon.Families = make([]string, len(*don.DONFamilies))
+		copy(capDon.Families, *don.DONFamilies)
+	}
+
+	if don.Config != nil {
+		capDon.Config = *don.Config
+	}
+
+	return capDon
 }
 
 func (s *registrySyncer) AddListener(listeners ...Listener) {

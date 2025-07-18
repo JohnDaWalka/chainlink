@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -232,6 +234,254 @@ func (r *capabilitiesRegistryV2Reader) GetNodes(ctx context.Context) ([]NodeInfo
 	}
 
 	return result, nil
+}
+
+// V2-specific methods
+
+// GetDONsInFamily returns DON IDs that belong to the specified family
+func (r *capabilitiesRegistryV2Reader) GetDONsInFamily(ctx context.Context, donFamily string) ([]uint32, error) {
+	var donIDsBig []big.Int
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("getDONsInFamily"),
+		primitives.Unconfirmed,
+		map[string]any{
+			"donFamily": donFamily,
+		},
+		&donIDsBig,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DONs in family %s: %w", donFamily, err)
+	}
+
+	// Convert []big.Int to []uint32
+	donIDs := make([]uint32, len(donIDsBig))
+	for i, bigID := range donIDsBig {
+		if bigID.Cmp(big.NewInt(math.MaxUint32)) > 0 {
+			return nil, fmt.Errorf("DON ID %s exceeds uint32 range", bigID.String())
+		}
+		donIDs[i] = uint32(bigID.Uint64()) // #nosec G115
+	}
+
+	return donIDs, nil
+}
+
+// GetHistoricalDONInfo returns historical DON information by DON ID and config count
+func (r *capabilitiesRegistryV2Reader) GetHistoricalDONInfo(ctx context.Context, donID uint32, configCount uint32) (*DONInfo, error) {
+	var don kcrv2.CapabilitiesRegistryDONInfo
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("getHistoricalDONInfo"),
+		primitives.Unconfirmed,
+		map[string]any{
+			"donId":       donID,
+			"configCount": configCount,
+		},
+		&don,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get historical DON info for DON %d, config %d: %w", donID, configCount, err)
+	}
+
+	// Convert node P2P IDs
+	nodeP2PIDs := make([]p2ptypes.PeerID, len(don.NodeP2PIds))
+	for i, nodeP2PID := range don.NodeP2PIds {
+		nodeP2PIDs[i] = p2ptypes.PeerID(nodeP2PID)
+	}
+
+	// Convert capability configurations
+	capabilities := make([]CapabilityConfiguration, len(don.CapabilityConfigurations))
+	for i, cap := range don.CapabilityConfigurations {
+		capabilities[i] = CapabilityConfiguration{
+			CapabilityIDString: &cap.CapabilityId,
+			Config:             cap.Config,
+		}
+	}
+
+	// Convert DON families if present
+	var donFamilies *[]string
+	if len(don.DonFamilies) > 0 {
+		families := make([]string, len(don.DonFamilies))
+		copy(families, don.DonFamilies)
+		donFamilies = &families
+	}
+
+	result := &DONInfo{
+		ID:                       don.Id,
+		ConfigCount:              don.ConfigCount,
+		F:                        don.F,
+		IsPublic:                 don.IsPublic,
+		AcceptsWorkflows:         don.AcceptsWorkflows,
+		NodeP2PIds:               nodeP2PIDs,
+		CapabilityConfigurations: capabilities,
+		// V2-specific fields
+		Name:        &don.Name,
+		Config:      &don.Config,
+		DONFamilies: donFamilies,
+		Version:     "v2",
+	}
+
+	return result, nil
+}
+
+// GetNode returns a single node by its P2P ID
+func (r *capabilitiesRegistryV2Reader) GetNode(ctx context.Context, p2pID [32]byte) (*NodeInfo, error) {
+	var node kcrv2.INodeInfoProviderNodeInfo
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("getNode"),
+		primitives.Unconfirmed,
+		map[string]any{
+			"p2pId": p2pID,
+		},
+		&node,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node with P2P ID %x: %w", p2pID, err)
+	}
+
+	// Convert capability IDs
+	var capabilityIDs *[]string
+	if len(node.CapabilityIds) > 0 {
+		ids := make([]string, len(node.CapabilityIds))
+		copy(ids, node.CapabilityIds)
+		capabilityIDs = &ids
+	}
+
+	result := &NodeInfo{
+		NodeOperatorID:      node.NodeOperatorId,
+		P2PID:               p2ptypes.PeerID(node.P2pId),
+		Signer:              node.Signer,
+		EncryptionPublicKey: node.EncryptionPublicKey,
+		ConfigCount:         node.ConfigCount,
+		WorkflowDONId:       node.WorkflowDONId,
+		CapabilitiesDONIds:  node.CapabilitiesDONIds,
+		// V2-specific fields
+		CapabilityIDs: capabilityIDs,
+		Version:       "v2",
+	}
+
+	return result, nil
+}
+
+// GetNodeOperator returns node operator information by ID
+func (r *capabilitiesRegistryV2Reader) GetNodeOperator(ctx context.Context, nodeOperatorID uint32) (*NodeOperator, error) {
+	var nodeOp kcrv2.CapabilitiesRegistryNodeOperator
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("getNodeOperator"),
+		primitives.Unconfirmed,
+		map[string]any{
+			"nodeOperatorId": nodeOperatorID,
+		},
+		&nodeOp,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node operator %d: %w", nodeOperatorID, err)
+	}
+
+	result := &NodeOperator{
+		Admin:   nodeOp.Admin,
+		Name:    nodeOp.Name,
+		Version: "v2",
+	}
+
+	return result, nil
+}
+
+// GetNodeOperators returns all node operators
+func (r *capabilitiesRegistryV2Reader) GetNodeOperators(ctx context.Context) ([]NodeOperator, error) {
+	var nodeOps []kcrv2.CapabilitiesRegistryNodeOperator
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("getNodeOperators"),
+		primitives.Unconfirmed,
+		nil,
+		&nodeOps,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node operators: %w", err)
+	}
+
+	result := make([]NodeOperator, len(nodeOps))
+	for i, nodeOp := range nodeOps {
+		result[i] = NodeOperator{
+			Admin:   nodeOp.Admin,
+			Name:    nodeOp.Name,
+			Version: "v2",
+		}
+	}
+
+	return result, nil
+}
+
+// GetNodesByP2PIds returns nodes filtered by the provided P2P IDs
+func (r *capabilitiesRegistryV2Reader) GetNodesByP2PIds(ctx context.Context, p2pIDs [][32]byte) ([]NodeInfo, error) {
+	var nodes []kcrv2.INodeInfoProviderNodeInfo
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("getNodesByP2PIds"),
+		primitives.Unconfirmed,
+		map[string]any{
+			"p2pIds": p2pIDs,
+		},
+		&nodes,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get nodes by P2P IDs: %w", err)
+	}
+
+	result := make([]NodeInfo, len(nodes))
+	for i, node := range nodes {
+		// Convert capability IDs
+		var capabilityIDs *[]string
+		if len(node.CapabilityIds) > 0 {
+			ids := make([]string, len(node.CapabilityIds))
+			copy(ids, node.CapabilityIds)
+			capabilityIDs = &ids
+		}
+
+		result[i] = NodeInfo{
+			NodeOperatorID:      node.NodeOperatorId,
+			P2PID:               p2ptypes.PeerID(node.P2pId),
+			Signer:              node.Signer,
+			EncryptionPublicKey: node.EncryptionPublicKey,
+			ConfigCount:         node.ConfigCount,
+			WorkflowDONId:       node.WorkflowDONId,
+			CapabilitiesDONIds:  node.CapabilitiesDONIds,
+			// V2-specific fields
+			CapabilityIDs: capabilityIDs,
+			Version:       "v2",
+		}
+	}
+
+	return result, nil
+}
+
+// IsCapabilityDeprecated checks if a capability is marked as deprecated
+func (r *capabilitiesRegistryV2Reader) IsCapabilityDeprecated(ctx context.Context, capabilityID string) (bool, error) {
+	var isDeprecated bool
+
+	err := r.contractReader.GetLatestValue(
+		ctx,
+		r.boundContract.ReadIdentifier("isCapabilityDeprecated"),
+		primitives.Unconfirmed,
+		map[string]any{
+			"capabilityId": capabilityID,
+		},
+		&isDeprecated,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if capability %s is deprecated: %w", capabilityID, err)
+	}
+
+	return isDeprecated, nil
 }
 
 // Address returns the contract address

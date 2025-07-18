@@ -3,6 +3,7 @@ package registrysyncer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -16,24 +17,30 @@ import (
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
+// Error constants for unsupported operations
+var (
+	ErrNotSupportedInV1 = errors.New("operation not supported in V1 capabilities registry")
+)
+
 // CapabilitiesRegistryReader defines the interface for reading from capabilities registry contracts
 // across different versions. This interface abstracts the version-specific differences in the
 // contract structure and provides a unified way to access capabilities, DONs, and nodes.
 type CapabilitiesRegistryReader interface {
-	// GetCapabilities returns all capabilities from the registry
+	// Core methods supported by all versions
 	GetCapabilities(ctx context.Context) ([]CapabilityInfo, error)
-
-	// GetDONs returns all DONs from the registry
 	GetDONs(ctx context.Context) ([]DONInfo, error)
-
-	// GetNodes returns all nodes from the registry
 	GetNodes(ctx context.Context) ([]NodeInfo, error)
-
-	// Address returns the contract address
 	Address() common.Address
-
-	// Close closes the reader and releases any resources
 	Close() error
+
+	// V2-specific methods (return ErrNotSupportedInV1 for V1 registries)
+	GetDONsInFamily(ctx context.Context, donFamily string) ([]uint32, error)
+	GetHistoricalDONInfo(ctx context.Context, donID uint32, configCount uint32) (*DONInfo, error)
+	GetNode(ctx context.Context, p2pID [32]byte) (*NodeInfo, error)
+	GetNodeOperator(ctx context.Context, nodeOperatorID uint32) (*NodeOperator, error)
+	GetNodeOperators(ctx context.Context) ([]NodeOperator, error)
+	GetNodesByP2PIds(ctx context.Context, p2pIDs [][32]byte) ([]NodeInfo, error)
+	IsCapabilityDeprecated(ctx context.Context, capabilityID string) (bool, error)
 }
 
 // CapabilityInfo represents capability information across all versions
@@ -96,6 +103,13 @@ type NodeInfo struct {
 
 	// Version indicator
 	Version string `json:"version"` // "v1" or "v2"
+}
+
+// NodeOperator represents node operator information (V2 only)
+type NodeOperator struct {
+	Admin   common.Address
+	Name    string
+	Version string `json:"version"` // "v2" only
 }
 
 // Helper methods for NodeInfo
@@ -228,6 +242,27 @@ func buildV2ContractReaderConfig() evmrelaytypes.ChainReaderConfig {
 					},
 					"getNodes": {
 						ChainSpecificName: "getNodes",
+					},
+					"getDONsInFamily": {
+						ChainSpecificName: "getDONsInFamily",
+					},
+					"getHistoricalDONInfo": {
+						ChainSpecificName: "getHistoricalDONInfo",
+					},
+					"getNode": {
+						ChainSpecificName: "getNode",
+					},
+					"getNodeOperator": {
+						ChainSpecificName: "getNodeOperator",
+					},
+					"getNodeOperators": {
+						ChainSpecificName: "getNodeOperators",
+					},
+					"getNodesByP2PIds": {
+						ChainSpecificName: "getNodesByP2PIds",
+					},
+					"isCapabilityDeprecated": {
+						ChainSpecificName: "isCapabilityDeprecated",
 					},
 				},
 			},
