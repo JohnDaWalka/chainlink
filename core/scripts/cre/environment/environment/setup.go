@@ -913,7 +913,8 @@ func checkCTF(ctx context.Context, requiredVersion string, noPrompt bool, purge 
 	if purge {
 		_ = os.Remove(filepath.Join(binDir, "ctf"))
 	}
-	if isCommandAvailable("ctf") {
+	// Check for CTF CLI is in binDir
+	if _, err := os.Stat(filepath.Join(binDir, "ctf")); err == nil {
 		logger.Info().Msg("✓ CTF CLI is already installed")
 		return true, nil
 	}
@@ -960,6 +961,7 @@ func checkCTF(ctx context.Context, requiredVersion string, noPrompt bool, purge 
 	osType := runtime.GOOS
 	archType := runtime.GOARCH
 	archiveName := fmt.Sprintf("framework-v%s-%s-%s.tar.gz", requiredVersion, osType, archType)
+	// gh release download framework/v0.10.3 --repo smartcontractkit/chainlink-testing-framework --pattern framework-v0.10.3-darwin-arm64.tar.gz
 	cmd := exec.CommandContext(ctx, "gh", "release", "download", "framework/v"+requiredVersion, "--repo", "smartcontractkit/chainlink-testing-framework", "--pattern", archiveName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
