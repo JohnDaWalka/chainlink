@@ -2,9 +2,17 @@ package fakes
 
 import (
 	"context"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
+
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	consensusserver "github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/consensus/server"
+	consensustypes "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/evm"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -42,7 +50,108 @@ func (fc *fakeConsensusNoDAG) close() error {
 // When the real NoDAG consensus OCR plugin is ready, it should be used here, similarly to how the V1 fake works.
 func (fc *fakeConsensusNoDAG) Simple(ctx context.Context, metadata capabilities.RequestMetadata, input *sdkpb.SimpleConsensusInputs) (*valpb.Value, error) {
 	fc.eng.Infow("Executing Fake Consensus NoDAG", "input", input)
-	return input.GetValue(), nil
+
+	switch obs := input.Observation.(type) {
+	case *sdkpb.SimpleConsensusInputs_Value:
+		if obs.Value == nil {
+			return nil, errors.New("input value cannot be nil")
+		}
+		return obs.Value, nil
+	case *sdkpb.SimpleConsensusInputs_Error:
+		return nil, errors.New(obs.Error)
+	case nil:
+		return nil, errors.New("input observation cannot be nil")
+	default:
+		return nil, errors.New("unknown observation type")
+	}
+}
+
+func (fc *fakeConsensusNoDAG) Report(ctx context.Context, metadata capabilities.RequestMetadata, input *sdkpb.ReportRequest) (*sdkpb.ReportResponse, error) {
+	// Prepare EVM metadata that will be prepended to all reports
+	meta := consensustypes.Metadata{
+		Version:          1,
+		ExecutionID:      metadata.WorkflowExecutionID,
+		Timestamp:        100,
+		DONID:            metadata.WorkflowDonID,
+		DONConfigVersion: metadata.WorkflowDonConfigVersion,
+		WorkflowID:       metadata.WorkflowID,
+		WorkflowName:     metadata.WorkflowName,
+		WorkflowOwner:    metadata.WorkflowOwner,
+		ReportID:         "0001",
+	}
+
+	var rawOutput []byte
+	var err error
+
+	switch input.EncoderName {
+	case "proto", "": // mode-switch (default)
+		// Just use the encoded payload directly, no wrapping in metadata/payload map
+		// Always prepend EVM metadata
+		rawOutput, err = evm.PrependMetadataFields(meta, input.EncodedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepend metadata fields: %w", err)
+		}
+
+		// For proto encoder, we return simplified response without real signatures
+		return &sdkpb.ReportResponse{
+			RawReport:     rawOutput,
+			ConfigDigest:  []byte("fake_config_digest"),
+			SeqNr:         42,
+			ReportContext: []byte("fake_report_context"),
+			Sigs: []*sdkpb.AttributedSignature{
+				{
+					SignerId:  3,
+					Signature: []byte("fake_signature_value"),
+				},
+			},
+		}, nil
+
+	case "evm": // report-gen for EVM
+		if len(input.EncodedPayload) == 0 {
+			return nil, errors.New("input value for EVM encoder needs to be a byte array and cannot be empty or nil")
+		}
+
+		// Prepend EVM metadata
+		rawOutput, err = evm.PrependMetadataFields(meta, input.EncodedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepend metadata fields: %w", err)
+		}
+
+		// sign the report
+		sigs := []*sdkpb.AttributedSignature{}
+		var idx uint32
+		for _, signer := range fc.signers {
+			sig, err := signer.Sign3(fc.configDigest, uint64(fc.seqNr), rawOutput)
+			if err != nil {
+				return nil, fmt.Errorf("failed to sign with signer %s: %w", signer.ID(), err)
+			}
+			sigs = append(sigs, &sdkpb.AttributedSignature{
+				SignerId:  idx,
+				Signature: sig,
+			})
+			idx++
+		}
+
+		return &sdkpb.ReportResponse{
+			RawReport:     rawOutput,
+			ConfigDigest:  fc.configDigest[:],
+			SeqNr:         uint64(fc.seqNr),
+			ReportContext: reportContext(fc.configDigest[:], fc.seqNr),
+			Sigs:          sigs,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported encoder name: %s", input.EncoderName)
+	}
+}
+
+func reportContext(configDigest []byte, seqNr uint32) []byte {
+	// report context is the config digest + the sequence number padded with zeros
+	seqToEpoch := make([]byte, 32)
+	binary.BigEndian.PutUint32(seqToEpoch[32-5:32-1], seqNr)
+	zeros := make([]byte, 32)
+	return append(append(configDigest, seqToEpoch...), zeros...)
+}
 }
 
 func (fc *fakeConsensusNoDAG) Description() string {

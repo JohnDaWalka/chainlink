@@ -109,12 +109,66 @@ func (fc *FakeEVMChain) WriteReport(ctx context.Context, metadata commonCap.Requ
 	fc.eng.Debugw("EVM Chain WriteReport Input", "input", input)
 	fc.eng.Infow("EVM Chain WriteReport Finished")
 
+	// Create authenticated transactor
+	chainID, err := fc.gethClient.ChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(fc.privateKey, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	signatures := make([][]byte, len(input.Report.Sigs))
+	for i, sig := range input.Report.Sigs {
+		signatures[i] = sig.Signature
+	}
+
+	reportTx, err := fc.mockKeystoneForwarder.Report(
+		auth,
+		common.Address(input.Receiver),
+		input.Report.RawReport,
+		input.Report.ReportContext,
+		signatures,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: should we wait for the transaction to be mined?
+	receipt, err := bind.WaitMined(ctx, fc.gethClient, reportTx)
+	if err != nil {
+		return nil, err
+	}
+
+	fc.eng.Debugw("EVM Chain WriteReport Receipt", "status", receipt.Status, "gasUsed", receipt.GasUsed, "txHash", receipt.TxHash.Hex())
+	txHash := receipt.TxHash.Bytes()
+
+	// Calculate transaction fee (gas used * effective gas price)
+	transactionFee := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), receipt.EffectiveGasPrice)
+
+	if receipt.Status == types.ReceiptStatusSuccessful {
+		fc.eng.Infow("EVM Chain WriteReport Successful", "txHash", receipt.TxHash.Hex(), "gasUsed", receipt.GasUsed, "fee", transactionFee.String())
+
+		receiverStatus := evmcappb.ReceiverContractExecutionStatus_RECEIVER_CONTRACT_EXECUTION_STATUS_SUCCESS
+		return &evmcappb.WriteReportReply{
+			TxStatus:                        evmcappb.TxStatus_TX_STATUS_SUCCESS,
+			ReceiverContractExecutionStatus: &receiverStatus,
+			TxHash:                          txHash,
+			TransactionFee:                  pb.NewBigIntFromInt(transactionFee),
+		}, nil
+	}
+
+	fc.eng.Infow("EVM Chain WriteReport Failed", "txHash", receipt.TxHash.Hex(), "gasUsed", receipt.GasUsed, "fee", transactionFee.String())
+	receiverStatus := evmcappb.ReceiverContractExecutionStatus_RECEIVER_CONTRACT_EXECUTION_STATUS_REVERTED
+	errorMsg := "Transaction reverted"
 	return &evmcappb.WriteReportReply{
-		TxStatus:                        evmcappb.TxStatus_TX_SUCCESS,
-		TxHash:                          []byte{},
-		ReceiverContractExecutionStatus: evmcappb.ReceiverContractExecutionStatus_SUCCESS.Enum(),
-		TransactionFee:                  pb.NewBigIntFromInt(big.NewInt(0)), // TODO: add transaction fee
-		ErrorMessage:                    nil,
+		TxStatus:                        evmcappb.TxStatus_TX_STATUS_FAILURE,
+		ReceiverContractExecutionStatus: &receiverStatus,
+		TxHash:                          txHash,
+		TransactionFee:                  pb.NewBigIntFromInt(transactionFee),
+		ErrorMessage:                    &errorMsg,
 	}, nil
 }
 
