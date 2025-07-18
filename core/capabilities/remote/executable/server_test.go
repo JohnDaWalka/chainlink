@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/evm"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	pb1 "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -243,10 +244,12 @@ func Test_Server_V2Request_ExcludesNonDeterministicInputAttributes(t *testing.T)
 	for idx, caller := range callers {
 		payload := &evm.WriteReportRequest{
 			Receiver: []byte("abcdef"),
-			Report: &evm.SignedReport{
+			Report: &pb1.ReportResponse{
 				RawReport: report,
-				Signatures: [][]byte{ // non-deterministic set of sigs that we want to ignore when hashing
-					[]byte("sig" + strconv.Itoa(idx)),
+				Sigs: []*pb1.AttributedSignature{ // non-deterministic set of sigs that we want to ignore when hashing
+					{
+						Signature: []byte("sig" + strconv.Itoa(idx)),
+					},
 				},
 			},
 		}
