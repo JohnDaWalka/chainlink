@@ -290,7 +290,7 @@ func (r *v2WriteChainMessageHasher) Hash(msg *remotetypes.MessageBody) ([32]byte
 	if err = req.Payload.UnmarshalTo(&writeReportRequest); err != nil {
 		return [32]byte{}, fmt.Errorf("failed to unmarshal payload to WriteReportRequest: %w", err)
 	}
-	writeReportRequest.Report.Signatures = nil // exclude signatures from the hash
+	writeReportRequest.Report.Sigs = nil // exclude signatures from the hash
 
 	req.Payload, err = anypb.New(&writeReportRequest)
 	if err != nil {
