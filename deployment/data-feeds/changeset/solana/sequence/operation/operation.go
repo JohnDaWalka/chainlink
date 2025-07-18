@@ -123,7 +123,6 @@ func confirmInstructionOrBuildProposal(
 	mcmsConfig *proposalutils.TimelockConfig,
 	proposalDescription string,
 ) ([]mcms.TimelockProposal, error) {
-	fmt.Printf("instruction: %+v\n", instruction)
 	if mcmsConfig == nil {
 		if err := deps.Chain.Confirm([]solana.Instruction{instruction}); err != nil {
 			return nil, fmt.Errorf("failed to confirm instructions: %w", err)
@@ -180,7 +179,6 @@ func getCurrentAuthority(deps Deps, chainSel uint64, mcmsConfig *proposalutils.T
 
 func initCache(b operations.Bundle, deps Deps, in InitCacheInput) (InitCacheOutput, error) {
 	var out InitCacheOutput
-	fmt.Printf("InitCacheInput: %+v\n", in)
 
 	if ks_cache.ProgramID.IsZero() {
 		ks_cache.SetProgramID(in.ProgramID)
@@ -250,9 +248,6 @@ func setUpgradeAuthority(b operations.Bundle, deps Deps, in SetUpgradeAuthorityI
 func initCacheDecimalReport(b operations.Bundle, deps Deps, in InitCacheDecimalReportInput) (ConfigureCacheOutput, error) {
 	var out ConfigureCacheOutput
 
-	fmt.Printf("DataIDs: %+v\n", in.DataIDs)
-	fmt.Printf("FeedAdmin: %+v\n", in.FeedAdmin)
-	fmt.Printf("State: %+v\n", in.State)
 	instruction := ks_cache.NewInitDecimalReportsInstruction(
 		in.DataIDs,
 		in.FeedAdmin,

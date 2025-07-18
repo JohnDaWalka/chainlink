@@ -154,13 +154,11 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first to get the cache state and program ID
-		var changesetOutput cldf.Environment
-        changesetOutput, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
-        env = changesetOutput
+        out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
 		require.NoError(t, err)
 
 		// Create remaining accounts for the decimal reports
-		remainingAccounts := createRemainingAccounts(t, env.DataStore, solSel, testQualifier, "1.0.0", DataIDs)
+		remainingAccounts := createRemainingAccounts(t, out.DataStore, solSel, testQualifier, "1.0.0", DataIDs)
 
 		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
 			&InitCacheDecimalReportRequest{
@@ -250,12 +248,11 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first to get the cache state and program ID
-        var env cldf.Environment
-		env, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
 		require.NoError(t, err)
 
 		// Now create remaining accounts after deployment
-		remainingAccounts := createConfigureRemainingAccounts(t, env.DataStore, solSel, testQualifier, "1.0.0", DataIDs, allowedSender, allowedWorkflowOwner, allowedWorkflowName)
+		remainingAccounts := createConfigureRemainingAccounts(t, out.DataStore, solSel, testQualifier, "1.0.0", DataIDs, allowedSender, allowedWorkflowOwner, allowedWorkflowName)
 
 		configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
 			&ConfigureCacheDecimalReportRequest{
@@ -273,7 +270,7 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply the configure changeset
-		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
+		_, _, err = commonchangeset.ApplyChangesets(t, out, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
 		require.NoError(t, err)
 	})
 
