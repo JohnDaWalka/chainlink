@@ -104,6 +104,25 @@ func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration,
 	return service, bridgeORM, jobORM, emitter
 }
 
+// setupTestServiceWithIgnoreFlags creates a test service with custom ignore flag settings
+func setupTestServiceWithIgnoreFlags(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client, ignoreInvalidBridges, ignoreJoblessBridges bool) (*Service, *bridgeMocks.ORM, *jobMocks.ORM, *mocks.MessageEmitter) {
+	t.Helper()
+
+	eaConfig := mocks.NewTestEAStatusReporterConfigWithSkip(enabled, testStatusPath, pollingInterval, ignoreInvalidBridges, ignoreJoblessBridges)
+
+	bridgeORM := bridgeMocks.NewORM(t)
+	jobORM := jobMocks.NewORM(t)
+	emitter := mocks.NewMessageEmitter()
+	lggr := logger.TestLogger(t)
+
+	// Reduce log noise
+	lggr.SetLogLevel(zapcore.ErrorLevel)
+
+	service := NewEaStatusReporter(eaConfig, bridgeORM, jobORM, httpClient, emitter, lggr)
+
+	return service, bridgeORM, jobORM, emitter
+}
+
 func TestNewEaStatusReporter(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
@@ -215,7 +234,10 @@ func TestService_pollBridge_Success(t *testing.T) {
 
 func TestService_pollBridge_HTTPError(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM call that now happens at the start of pollBridge
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -228,11 +250,15 @@ func TestService_pollBridge_HTTPError(t *testing.T) {
 	})
 
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	jobORM.AssertExpectations(t)
 }
 
 func TestService_pollBridge_InvalidJSON(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("invalid json", http.StatusOK)
-	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM call that now happens at the start of pollBridge
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -243,11 +269,15 @@ func TestService_pollBridge_InvalidJSON(t *testing.T) {
 		service.pollBridge(ctx, "test-bridge", "http://example.com")
 	})
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	jobORM.AssertExpectations(t)
 }
 
 func TestService_pollBridge_InvalidURL(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM call that now happens at the start of pollBridge
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -258,11 +288,15 @@ func TestService_pollBridge_InvalidURL(t *testing.T) {
 		service.pollBridge(ctx, "test-bridge", "://invalid-url")
 	})
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	jobORM.AssertExpectations(t)
 }
 
 func TestService_pollBridge_Non200Status(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("Not Found", http.StatusNotFound)
-	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM call that now happens at the start of pollBridge
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -273,6 +307,7 @@ func TestService_pollBridge_Non200Status(t *testing.T) {
 		service.pollBridge(ctx, "test-bridge", "http://example.com")
 	})
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	jobORM.AssertExpectations(t)
 }
 
 func TestService_emitEAStatus_Success(t *testing.T) {
@@ -509,7 +544,7 @@ func TestService_PollAllBridges_3000Bridges(t *testing.T) {
 
 func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
 	httpClient := &http.Client{}
-	service, mockORM, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, mockORM, jobORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	numBridges := 5
 	var allBridges []bridges.BridgeType
@@ -523,6 +558,12 @@ func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
 	}
 
 	mockORM.On("BridgeTypes", mock.Anything, 0, bridgePollPageSize).Return(allBridges, numBridges, nil).Once()
+
+	// Mock job ORM calls for each bridge
+	for i := 0; i < numBridges; i++ {
+		bridgeName := fmt.Sprintf("bridge%d", i)
+		jobORM.On("FindJobIDsWithBridge", mock.Anything, bridgeName).Return([]int32{}, nil).Maybe()
+	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Fail(t, "HTTP handler should not complete due to context cancellation")
@@ -647,6 +688,218 @@ func TestService_pollBridge_JobORMError(t *testing.T) {
 
 	ctx := context.Background()
 	service.pollBridge(ctx, "test-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+// Test ignoreJoblessBridges functionality
+func TestService_pollBridge_IgnoreJoblessBridges_Enabled(t *testing.T) {
+	// Use a nil httpClient since no HTTP request should be made when bridge is skipped for having no jobs
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, true)
+
+	// Mock job ORM to return no job IDs (jobless bridge)
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "jobless-bridge").Return([]int32{}, nil)
+
+	// Should NOT emit telemetry for jobless bridge when ignoreJoblessBridges is true
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "jobless-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_pollBridge_IgnoreJoblessBridges_Disabled(t *testing.T) {
+	// Use valid HTTP client with successful response since we want the full flow when ignoreJoblessBridges is false
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
+
+	// Mock job ORM to return no job IDs (jobless bridge)
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "jobless-bridge").Return([]int32{}, nil)
+
+	// Should emit telemetry for jobless bridge when ignoreJoblessBridges is false
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "jobless-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+// Test ignoreInvalidBridges functionality - HTTP error
+func TestService_pollBridge_IgnoreInvalidBridges_HTTPError_Enabled(t *testing.T) {
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
+
+	// Create test job and external job UUID for FindJob mock
+	testExternalJobID := uuid.New()
+	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
+
+	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://127.0.0.1:8080") // This will fail with HTTP error
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_pollBridge_IgnoreInvalidBridges_HTTPError_Disabled(t *testing.T) {
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
+
+	// Create test job and external job UUID for FindJob mock
+	testExternalJobID := uuid.New()
+	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
+
+	// Should emit empty telemetry for invalid bridge when ignoreInvalidBridges is false
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://127.0.0.1:8080") // This will fail with HTTP error
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+// Test ignoreInvalidBridges functionality - Non-200 status
+func TestService_pollBridge_IgnoreInvalidBridges_Non200Status_Enabled(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient("Not Found", http.StatusNotFound)
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
+
+	// Create test job and external job UUID for FindJob mock
+	testExternalJobID := uuid.New()
+	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
+
+	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_pollBridge_IgnoreInvalidBridges_Non200Status_Disabled(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient("Not Found", http.StatusNotFound)
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
+
+	// Create test job and external job UUID for FindJob mock
+	testExternalJobID := uuid.New()
+	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
+
+	// Should emit empty telemetry for invalid bridge when ignoreInvalidBridges is false
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+// Test ignoreInvalidBridges functionality - Invalid JSON
+func TestService_pollBridge_IgnoreInvalidBridges_InvalidJSON_Enabled(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient("invalid json", http.StatusOK)
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
+
+	// Create test job and external job UUID for FindJob mock
+	testExternalJobID := uuid.New()
+	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
+
+	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_pollBridge_IgnoreInvalidBridges_InvalidJSON_Disabled(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient("invalid json", http.StatusOK)
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
+
+	// Create test job and external job UUID for FindJob mock
+	testExternalJobID := uuid.New()
+	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
+
+	// Should emit empty telemetry for invalid bridge when ignoreInvalidBridges is false
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+// Test combined functionality
+func TestService_pollBridge_BothIgnoreFlags_Enabled(t *testing.T) {
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, true)
+
+	// Mock job ORM to return no job IDs (jobless bridge)
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "jobless-invalid-bridge").Return([]int32{}, nil)
+
+	// Should NOT emit telemetry - skipped because of no jobs (ignoreJoblessBridges)
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "jobless-invalid-bridge", "http://127.0.0.1:8080") // This would fail with HTTP error too
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_pollBridge_BothIgnoreFlags_Disabled(t *testing.T) {
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
+
+	// Mock job ORM to return no job IDs (jobless bridge)
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "jobless-invalid-bridge").Return([]int32{}, nil)
+
+	// Should emit empty telemetry even for jobless invalid bridge when both flags are false
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "jobless-invalid-bridge", "http://127.0.0.1:8080") // This will fail with HTTP error
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)

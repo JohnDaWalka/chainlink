@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
@@ -2229,9 +2230,11 @@ func (b *Billing) ValidateConfig() error {
 }
 
 type EAStatusReporter struct {
-	Enabled         *bool
-	StatusPath      *string
-	PollingInterval *commonconfig.Duration
+	Enabled              *bool
+	StatusPath           *string
+	PollingInterval      *commonconfig.Duration
+	IgnoreInvalidBridges *bool
+	IgnoreJoblessBridges *bool
 }
 
 func (e *EAStatusReporter) setFrom(f *EAStatusReporter) {
@@ -2244,17 +2247,38 @@ func (e *EAStatusReporter) setFrom(f *EAStatusReporter) {
 	if f.PollingInterval != nil {
 		e.PollingInterval = f.PollingInterval
 	}
+	if f.IgnoreInvalidBridges != nil {
+		e.IgnoreInvalidBridges = f.IgnoreInvalidBridges
+	}
+	if f.IgnoreJoblessBridges != nil {
+		e.IgnoreJoblessBridges = f.IgnoreJoblessBridges
+	}
 }
 
 func (e *EAStatusReporter) ValidateConfig() error {
 	if e.Enabled == nil || !*e.Enabled {
 		return nil
 	}
+
+	// Default values when enabled
 	if e.StatusPath == nil || *e.StatusPath == "" {
-		return configutils.ErrInvalid{Name: "StatusPath", Value: "", Msg: "status path must be set when EA Status Reporter is enabled"}
+		defaultPath := "/status"
+		e.StatusPath = &defaultPath
 	}
+
 	if e.PollingInterval == nil || e.PollingInterval.Duration() < config.MINIMUM_POLLING_INTERVAL {
-		return configutils.ErrInvalid{Name: "PollingInterval", Value: "", Msg: "polling interval must be at least 1 minute when EA Status Reporter is enabled"}
+		defaultInterval := *commonconfig.MustNewDuration(5 * time.Minute)
+		e.PollingInterval = &defaultInterval
+	}
+
+	if e.IgnoreInvalidBridges == nil {
+		defaultIgnoreInvalid := true
+		e.IgnoreInvalidBridges = &defaultIgnoreInvalid
+	}
+
+	if e.IgnoreJoblessBridges == nil {
+		defaultIgnoreJobless := false
+		e.IgnoreJoblessBridges = &defaultIgnoreJobless
 	}
 
 	return nil

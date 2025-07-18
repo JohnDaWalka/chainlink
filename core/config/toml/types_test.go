@@ -648,118 +648,124 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		{
 			name: "disabled with nil fields",
 			config: &EAStatusReporter{
-				Enabled:         ptr(false),
-				StatusPath:      nil,
-				PollingInterval: nil,
+				Enabled:              ptr(false),
+				StatusPath:           nil,
+				PollingInterval:      nil,
+				IgnoreInvalidBridges: nil,
+				IgnoreJoblessBridges: nil,
 			},
 			expectError: false,
 		},
 		{
 			name: "disabled with empty fields",
 			config: &EAStatusReporter{
-				Enabled:         ptr(false),
-				StatusPath:      ptr(""),
-				PollingInterval: durationPtr(0),
+				Enabled:              ptr(false),
+				StatusPath:           ptr(""),
+				PollingInterval:      durationPtr(0),
+				IgnoreInvalidBridges: ptr(false),
+				IgnoreJoblessBridges: ptr(true),
 			},
 			expectError: false,
 		},
 		{
 			name: "disabled with valid fields",
 			config: &EAStatusReporter{
-				Enabled:         ptr(false),
-				StatusPath:      ptr("/status"),
-				PollingInterval: durationPtr(5 * time.Minute),
+				Enabled:              ptr(false),
+				StatusPath:           ptr("/status"),
+				PollingInterval:      durationPtr(5 * time.Minute),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
 			expectError: false,
 		},
 		{
 			name: "nil enabled (defaults to disabled)",
 			config: &EAStatusReporter{
-				Enabled:         nil,
-				StatusPath:      ptr("/status"),
-				PollingInterval: durationPtr(5 * time.Minute),
+				Enabled:              nil,
+				StatusPath:           ptr("/status"),
+				PollingInterval:      durationPtr(5 * time.Minute),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
 			expectError: false,
 		},
-		// Enabled valid case
+		// Enabled valid cases with auto-defaulting
 		{
 			name: "enabled with valid config",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr("/status"),
-				PollingInterval: durationPtr(5 * time.Minute),
+				Enabled:              ptr(true),
+				StatusPath:           ptr("/status"),
+				PollingInterval:      durationPtr(5 * time.Minute),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
 			expectError: false,
 		},
-		// Enabled invalid cases
 		{
-			name: "enabled with nil status path",
+			name: "enabled with nil fields - should auto-default",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      nil,
-				PollingInterval: durationPtr(5 * time.Minute),
+				Enabled:              ptr(true),
+				StatusPath:           nil,
+				PollingInterval:      nil,
+				IgnoreInvalidBridges: nil,
+				IgnoreJoblessBridges: nil,
 			},
-			expectError: true,
-			errorMsg:    "status path must be set when EA Status Reporter is enabled",
+			expectError: false,
 		},
 		{
-			name: "enabled with empty status path",
+			name: "enabled with empty status path - should auto-default",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr(""),
-				PollingInterval: durationPtr(5 * time.Minute),
+				Enabled:              ptr(true),
+				StatusPath:           ptr(""),
+				PollingInterval:      durationPtr(5 * time.Minute),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
-			expectError: true,
-			errorMsg:    "status path must be set when EA Status Reporter is enabled",
+			expectError: false,
 		},
 		{
-			name: "enabled with nil polling interval",
+			name: "enabled with zero polling interval - should auto-default",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr("/status"),
-				PollingInterval: nil,
+				Enabled:              ptr(true),
+				StatusPath:           ptr("/status"),
+				PollingInterval:      durationPtr(0),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
-			expectError: true,
-			errorMsg:    "polling interval must be at least 1 minute when EA Status Reporter is enabled",
+			expectError: false,
 		},
 		{
-			name: "enabled with zero polling interval",
+			name: "enabled with polling interval less than 1 minute - should auto-default",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr("/status"),
-				PollingInterval: durationPtr(0),
+				Enabled:              ptr(true),
+				StatusPath:           ptr("/status"),
+				PollingInterval:      durationPtr(30 * time.Second),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
-			expectError: true,
-			errorMsg:    "polling interval must be at least 1 minute when EA Status Reporter is enabled",
-		},
-		{
-			name: "enabled with polling interval less than 1 minute",
-			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr("/status"),
-				PollingInterval: durationPtr(30 * time.Second),
-			},
-			expectError: true,
-			errorMsg:    "polling interval must be at least 1 minute when EA Status Reporter is enabled",
+			expectError: false,
 		},
 		{
 			name: "enabled with polling interval exactly 1 minute",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr("/status"),
-				PollingInterval: durationPtr(1 * time.Minute),
+				Enabled:              ptr(true),
+				StatusPath:           ptr("/status"),
+				PollingInterval:      durationPtr(1 * time.Minute),
+				IgnoreInvalidBridges: ptr(true),
+				IgnoreJoblessBridges: ptr(false),
 			},
 			expectError: false,
 		},
 		{
-			name: "enabled with both fields invalid",
+			name: "enabled with all fields missing - should auto-default",
 			config: &EAStatusReporter{
-				Enabled:         ptr(true),
-				StatusPath:      ptr(""),
-				PollingInterval: durationPtr(0),
+				Enabled:              ptr(true),
+				StatusPath:           ptr(""),
+				PollingInterval:      durationPtr(0),
+				IgnoreInvalidBridges: nil,
+				IgnoreJoblessBridges: nil,
 			},
-			expectError: true,
-			errorMsg:    "status path must be set when EA Status Reporter is enabled",
+			expectError: false,
 		},
 	}
 
@@ -771,6 +777,16 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 				assert.Contains(t, err.Error(), tc.errorMsg)
 			} else {
 				assert.NoError(t, err)
+
+				// Verify defaults are set when enabled
+				if tc.config.Enabled != nil && *tc.config.Enabled {
+					assert.NotNil(t, tc.config.StatusPath)
+					assert.NotEqual(t, "", *tc.config.StatusPath)
+					assert.NotNil(t, tc.config.PollingInterval)
+					assert.True(t, tc.config.PollingInterval.Duration() >= time.Minute)
+					assert.NotNil(t, tc.config.IgnoreInvalidBridges)
+					assert.NotNil(t, tc.config.IgnoreJoblessBridges)
+				}
 			}
 		})
 	}

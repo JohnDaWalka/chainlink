@@ -165,14 +165,37 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 	wg.Wait()
 }
 
+// handleBridgeError handles errors during bridge polling, either skipping or emitting empty telemetry
+func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, externalJobIDs []string, logMsg string, logFields ...interface{}) {
+	s.lggr.Debugw(logMsg, logFields...)
+	if s.config.IgnoreInvalidBridges() {
+		return
+	}
+	// If not ignoring invalid bridges, still emit empty telemetry
+	s.emitEAStatus(ctx, bridgeName, EAStatusResponse{}, externalJobIDs)
+}
+
 // pollBridge polls a single bridge's status endpoint
 func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL string) {
 	s.lggr.Debugw("Polling bridge", "bridge", bridgeName, "url", bridgeURL)
 
+	// Look up external job IDs associated with this bridge first
+	externalJobIDs, err := s.findExternalJobIDsForBridge(ctx, bridgeName)
+	if err != nil {
+		s.lggr.Warnw("Failed to find external job IDs for bridge", "bridge", bridgeName, "error", err)
+		externalJobIDs = []string{}
+	}
+
+	// Skip bridge if it has no jobs and ignoreJoblessBridges is enabled
+	if s.config.IgnoreJoblessBridges() && len(externalJobIDs) == 0 {
+		s.lggr.Debugw("Skipping bridge with no jobs", "bridge", bridgeName, "ignoreJoblessBridges", true)
+		return
+	}
+
 	// Parse bridge URL and construct status endpoint
 	parsedURL, err := url.Parse(bridgeURL)
 	if err != nil {
-		s.lggr.Debugw("Failed to parse bridge URL", "bridge", bridgeName, "url", bridgeURL, "error", err)
+		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to parse bridge URL", "bridge", bridgeName, "url", bridgeURL, "error", err)
 		return
 	}
 
@@ -186,37 +209,30 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 	// Make HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL.String(), nil)
 	if err != nil {
-		s.lggr.Debugw("Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		s.lggr.Debugw("Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		s.lggr.Debugw("EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
+		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
 		return
 	}
 
 	// Parse response
 	var status EAStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		s.lggr.Warnw("Failed to decode EA Status Reporter status response", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to decode EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	s.lggr.Debugw("Successfully fetched EA Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
-
-	// Look up external job IDs associated with this bridge
-	externalJobIDs, err := s.findExternalJobIDsForBridge(ctx, bridgeName)
-	if err != nil {
-		s.lggr.Warnw("Failed to find external job IDs for bridge", "bridge", bridgeName, "error", err)
-		externalJobIDs = []string{}
-	}
 
 	// Emit telemetry to Beholder
 	s.emitEAStatus(ctx, bridgeName, status, externalJobIDs)

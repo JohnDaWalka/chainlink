@@ -819,3 +819,7 @@ Enabled = true # Default
 StatusPath = "/status" # Default
 # PollingInterval is how often to poll bridge status endpoints for status.
 PollingInterval = "5m" # Default
+# IgnoreInvalidBridges skips bridges that return HTTP errors or invalid responses.
+IgnoreInvalidBridges = true # Default
+# IgnoreJoblessBridges skips bridges that have no associated jobs.
+IgnoreJoblessBridges = false # Default
