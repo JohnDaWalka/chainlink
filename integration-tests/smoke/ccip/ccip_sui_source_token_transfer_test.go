@@ -106,6 +106,8 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	t.Log("Commits confirmed.")
+
 	execStates := testhelpers.ConfirmExecWithSeqNrsForAll(
 		t,
 		e.Env,

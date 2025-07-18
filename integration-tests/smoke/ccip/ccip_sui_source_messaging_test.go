@@ -39,6 +39,7 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
+	t.Log("Onchain State: ", state)
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
 	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)

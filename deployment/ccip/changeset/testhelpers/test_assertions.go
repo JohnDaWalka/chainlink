@@ -489,7 +489,7 @@ func ConfirmCommitWithExpectedSeqNumRange(
 			}
 			for iter.Next() {
 				event := iter.Event
-				fmt.Printf("RECEIpVED COMMIT REPORt ACCEPTED: %v", *event)
+				fmt.Printf("RECEIVED COMMIT REPORT ACCEPTED: %v", *event)
 				verified := verifyCommitReport(event)
 				if verified {
 					return event, nil
@@ -862,6 +862,18 @@ func ConfirmExecWithSeqNrsForAll(
 				if err != nil {
 					return err
 				}
+			//case chainsel.FamilySui:
+			//	innerExecutionStates, err = ConfirmExecWithExpectedSeqNrsSui(
+			//		t,
+			//		srcChain,
+			//		e.BlockChains.SuiChains()[dstChain],
+			//		state.SuiChains[dstChain].CCIPAddress,
+			//		startBlock,
+			//		seqRange,
+			//	)
+			//	if err != nil {
+			//		return err
+			//	}
 			default:
 				return fmt.Errorf("unsupported chain family; %v", family)
 			}
@@ -1010,6 +1022,60 @@ func ConfirmExecWithSeqNrsSol(
 }
 
 func ConfirmExecWithExpectedSeqNrsAptos(
+	t *testing.T,
+	srcSelector uint64,
+	dest cldf_aptos.Chain,
+	offRampAddress aptos.AccountAddress,
+	startVersion *uint64,
+	expectedSeqNrs []uint64,
+) (executionStates map[uint64]int, err error) {
+	if len(expectedSeqNrs) == 0 {
+		return nil, errors.New("no expected sequence numbers provided")
+	}
+	boundOffRamp := aptos_ccip_offramp.Bind(offRampAddress, dest.Client)
+	offRampStateAddress, err := boundOffRamp.Offramp().GetStateAddress(nil)
+	require.NoError(t, err)
+
+	done := make(chan any)
+	defer close(done)
+	sink, errChan := AptosEventEmitter[module_offramp.ExecutionStateChanged](t, dest.Client, offRampStateAddress, offRampAddress.StringLong()+"::offramp::OffRampState", "execution_state_changed_events", startVersion, done)
+
+	executionStates = make(map[uint64]int)
+	seqNrsToWatch := make(map[uint64]bool)
+	for _, seqNr := range expectedSeqNrs {
+		seqNrsToWatch[seqNr] = true
+	}
+
+	timeout := time.NewTimer(tests.WaitTimeout(t))
+	defer timeout.Stop()
+
+	for {
+		select {
+		case event := <-sink:
+			if seqNrsToWatch[event.Event.SequenceNumber] && event.Event.SourceChainSelector == srcSelector {
+				t.Logf("(Aptos) received ExecutionStateChanged (state %s) on chain %d (offramp %s) with expected sequence number %d (tx %d)",
+					executionStateToString(event.Event.State), dest.Selector, offRampAddress.String(), event.Event.SequenceNumber, event.Version,
+				)
+				if event.Event.State == EXECUTION_STATE_INPROGRESS {
+					continue
+				}
+				executionStates[event.Event.SequenceNumber] = int(event.Event.State)
+				delete(seqNrsToWatch, event.Event.SequenceNumber)
+				if len(seqNrsToWatch) == 0 {
+					return executionStates, nil
+				}
+			}
+
+		case err := <-errChan:
+			require.NoError(t, err)
+		case <-timeout.C:
+			return nil, fmt.Errorf("(Aptos) timed out waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence numbers %+v",
+				dest.Selector, offRampAddress.String(), srcSelector, expectedSeqNrs)
+		}
+	}
+}
+
+func ConfirmExecWithExpectedSeqNrsSui(
 	t *testing.T,
 	srcSelector uint64,
 	dest cldf_aptos.Chain,
