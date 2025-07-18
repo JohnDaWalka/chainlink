@@ -55,8 +55,8 @@ func E2ETokenPool(e cldf.Environment, cfg E2ETokenPoolConfig) (cldf.ChangesetOut
 			cfg.MCMS = cfg.SetPool[0].MCMS
 		}
 	}
-	if cfg.CCIPSolanaContractVersion == Version011 {
-		initGlobalConfigErr := ProcessConfig(&e, cfg.InitializeGlobalTokenPoolConfig, InitGlobalConfigTokenPoolProgram, &finalOutput, addressBookToRemove)
+	if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
+		initGlobalConfigErr := ProcessConfig(&e, cfg.InitializeGlobalTokenPoolConfig, InitTokenPoolProgram, &finalOutput, addressBookToRemove)
 		if initGlobalConfigErr != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize global config for token pool: %w", initGlobalConfigErr)
 		}
@@ -194,8 +194,9 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 
 	// token pool and lookup table
 	tokenPoolAndLookupTableCfg := AddTokenPoolAndLookupTableConfig{
-		ChainSelector:    cfg.ChainSelector,
-		TokenPoolConfigs: make([]TokenPoolConfig, 0),
+		ChainSelector:             cfg.ChainSelector,
+		TokenPoolConfigs:          make([]TokenPoolConfig, 0),
+		CCIPSolanaContractVersion: cfg.CCIPSolanaContractVersion,
 	}
 
 	// register token admin registry
@@ -326,9 +327,9 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 		}
 	}
 	// Initialize global configs once for each unique token pool
-	if cfg.CCIPSolanaContractVersion == Version011 {
+	if cfg.CCIPSolanaContractVersion == SolanaContractV0_1_1 {
 		for _, tokenCfg := range uniquePoolTypeConfigs {
-			output, err := InitGlobalConfigTokenPoolProgram(e, TokenPoolConfigWithMCM{
+			output, err := InitTokenPoolProgram(e, TokenPoolConfigWithMCM{
 				ChainSelector: cfg.ChainSelector,
 				PoolType:      tokenCfg.PoolType,
 				TokenPubKey:   tokenCfg.TokenPubKey,
@@ -339,7 +340,7 @@ func E2ETokenPoolv2(env cldf.Environment, cfg E2ETokenPoolConfigv2) (cldf.Change
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to initialize global config for token pool: %w", err)
 			}
 			if err = cldf.MergeChangesetOutput(e, finalCSOut, output); err != nil {
-				return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after running InitGlobalConfigTokenPoolProgram: %w", err)
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to merge changeset output after running InitTokenPoolProgram: %w", err)
 			}
 		}
 	}

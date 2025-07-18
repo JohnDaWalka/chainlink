@@ -790,7 +790,7 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 		bnm := solTestTokenPool.BurnAndMint_PoolType
 		e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
 			// commonchangeset.Configure(
-			//	cldf.CreateLegacyChangeSet(changeset_solana.InitGlobalConfigTokenPoolProgram),
+			//	cldf.CreateLegacyChangeSet(changeset_solana.InitTokenPoolProgram),
 			//	changeset_solana.TokenPoolConfigWithMCM{
 			//		ChainSelector: selector,
 			//		TokenPubKey:   tokenAddress,
@@ -978,7 +978,7 @@ func TestValidateConfigureTokenPoolContractsForSolana(t *testing.T) {
 		for _, tokenAddress := range remoteTokenAddresses {
 			e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
 				// commonchangeset.Configure(
-				//	cldf.CreateLegacyChangeSet(changeset_solana.InitGlobalConfigTokenPoolProgram),
+				//	cldf.CreateLegacyChangeSet(changeset_solana.InitTokenPoolProgram),
 				//	changeset_solana.TokenPoolConfigWithMCM{
 				//		ChainSelector: selector,
 				//		TokenPubKey:   tokenAddress,
