@@ -33,17 +33,17 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250716223422-ad10be6eb584
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
-	github.com/smartcontractkit/chainlink-common v0.8.0
-	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250709160835-3dbd1ee373a2
+	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250716155550-5a0b5ac522b2
+	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250716113058-ebc5e77f06ba
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.2
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250715141457-bbd0d2aa9bc0
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250717140849-58bcb2816c08
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250717194512-57be786aa143
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250718152912-d5904f13a207
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/freeport v0.1.1
-	github.com/smartcontractkit/libocr v0.0.0-20250604151357-2fe8c61bbf2e
+	github.com/smartcontractkit/libocr v0.0.0-20250703184212-d054fa589c01
 	github.com/smartcontractkit/mcms v0.20.2
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945
 	github.com/spf13/cast v1.7.1
@@ -144,21 +144,20 @@ require (
 	github.com/cockroachdb/errors v1.11.3 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
-	github.com/cockroachdb/pebble v1.1.2 // indirect
+	github.com/cockroachdb/pebble v1.1.5 // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/coder/websocket v1.8.13 // indirect
 	github.com/cometbft/cometbft v0.38.17 // indirect
 	github.com/cometbft/cometbft-db v1.0.1 // indirect
-	github.com/consensys/bavard v0.1.27 // indirect
-	github.com/consensys/gnark-crypto v0.16.0 // indirect
+	github.com/consensys/gnark-crypto v0.18.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.1 // indirect
 	github.com/coreos/go-oidc/v3 v3.11.0 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-db v1.1.1 // indirect
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5 // indirect
-	github.com/cosmos/cosmos-sdk v0.50.13 // indirect
+	github.com/cosmos/cosmos-sdk v0.50.14 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gogoproto v1.7.0 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
@@ -227,7 +226,7 @@ require (
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -319,7 +318,6 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4 // indirect
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
-	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/spdystream v0.4.0 // indirect
@@ -380,11 +378,12 @@ require (
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250709160835-3dbd1ee373a2 // indirect
+	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
+	github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250715132921-fbb00f834ac8 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250702183345-3f9ae622e391 // indirect
-	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250715134218-10b17f312eae // indirect
+	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250717121125-2350c82883e2 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250618135814-7e3f79ab707e // indirect
 	github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250701181457-37bd0d618b58 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
@@ -485,7 +484,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20240709000822-3c01b740850f // indirect
 	k8s.io/kubectl v0.31.2 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
-	rsc.io/tmplfunc v0.0.3 // indirect
 	sigs.k8s.io/controller-runtime v0.19.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
