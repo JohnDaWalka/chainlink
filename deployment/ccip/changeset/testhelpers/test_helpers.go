@@ -988,6 +988,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	suiChains := e.BlockChains.SuiChains()
 	suiChain := suiChains[cfg.SourceChain]
+
+	e.Logger.Infof("Sending Sui request via ChainWriter for chain %d", cfg.SourceChain)
+	e.Logger.Infof("CCIP Send Request Config: %+v", cfg)
+	e.Logger.Infof("Onchain state: %+v", state)
+
 	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
 
 	keyString := base64.StdEncoding.EncodeToString(suiChain.DeployerKey)
@@ -1213,7 +1218,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, err
 	}
 
-	chainReader, err := chainreader.NewChainReader(ctx, e.Logger, relayerClient, chainReaderConfig, db)
+	chainReader, err := crReader.NewChainReader(ctx, e.Logger, relayerClient, chainReaderConfig, db)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
 	}
