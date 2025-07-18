@@ -28,6 +28,9 @@ message EAStatusEvent {
   
   // Event metadata
   string timestamp = 10;
+  
+  // External job IDs associated with this bridge
+  repeated string external_job_ids = 11;
 }
 
 message RuntimeInfo {

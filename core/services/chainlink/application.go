@@ -703,6 +703,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	eaStatusReporter := eastatusreporter.NewEaStatusReporter(
 		cfg.EAStatusReporter(),
 		bridgeORM,
+		jobORM,
 		unrestrictedHTTPClient,
 		custmsg.NewLabeler(),
 		globalLogger,

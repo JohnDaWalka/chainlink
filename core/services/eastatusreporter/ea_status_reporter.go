@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
 // Service polls EA status and pushes them to Beholder
@@ -24,6 +25,7 @@ type Service struct {
 
 	config     config.EAStatusReporter
 	bridgeORM  bridges.ORM
+	jobORM     job.ORM
 	httpClient *http.Client
 	emitter    custmsg.MessageEmitter
 	lggr       logger.Logger
@@ -42,6 +44,7 @@ const (
 func NewEaStatusReporter(
 	config config.EAStatusReporter,
 	bridgeORM bridges.ORM,
+	jobORM job.ORM,
 	httpClient *http.Client,
 	emitter custmsg.MessageEmitter,
 	lggr logger.Logger,
@@ -49,6 +52,7 @@ func NewEaStatusReporter(
 	return &Service{
 		config:     config,
 		bridgeORM:  bridgeORM,
+		jobORM:     jobORM,
 		httpClient: httpClient,
 		emitter:    emitter,
 		lggr:       lggr.Named(ServiceName),
@@ -207,12 +211,19 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 
 	s.lggr.Debugw("Successfully fetched EA Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
 
+	// Look up external job IDs associated with this bridge
+	externalJobIDs, err := s.findExternalJobIDsForBridge(ctx, bridgeName)
+	if err != nil {
+		s.lggr.Warnw("Failed to find external job IDs for bridge", "bridge", bridgeName, "error", err)
+		externalJobIDs = []string{}
+	}
+
 	// Emit telemetry to Beholder
-	s.emitEAStatus(ctx, bridgeName, status)
+	s.emitEAStatus(ctx, bridgeName, status, externalJobIDs)
 }
 
 // emitEAStatus sends EA Status Reporter data to Beholder
-func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse) {
+func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse, externalJobIDs []string) {
 	// Convert runtime info
 	runtime := &events.RuntimeInfo{
 		NodeVersion:  status.Runtime.NodeVersion,
@@ -262,6 +273,7 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 		Metrics:              metrics,
 		Endpoints:            endpointsProto,
 		Configuration:        configProto,
+		ExternalJobIds:       externalJobIDs,
 	}
 
 	// Emit the protobuf event through the configured emitter
@@ -275,4 +287,33 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 		"adapter", status.Adapter.Name,
 		"version", status.Adapter.Version,
 	)
+}
+
+// findExternalJobIDsForBridge finds external job IDs associated with a bridge name
+func (s *Service) findExternalJobIDsForBridge(ctx context.Context, bridgeName string) ([]string, error) {
+	// Find job IDs that use this bridge
+	jobIDs, err := s.jobORM.FindJobIDsWithBridge(ctx, bridgeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find jobs with bridge %s: %w", bridgeName, err)
+	}
+
+	if len(jobIDs) == 0 {
+		s.lggr.Debugw("No jobs found for bridge", "bridge", bridgeName)
+		return []string{}, nil
+	}
+
+	// Convert job IDs to external job IDs
+	var externalJobIDs []string
+	for _, jobID := range jobIDs {
+		job, err := s.jobORM.FindJob(ctx, jobID)
+		if err != nil {
+			s.lggr.Debugw("Failed to find job", "jobID", jobID, "bridge", bridgeName, "error", err)
+			continue
+		}
+		externalJobIDs = append(externalJobIDs, job.ExternalJobID.String())
+	}
+
+	s.lggr.Debugw("Found external job IDs for bridge", "bridge", bridgeName, "externalJobIDs", externalJobIDs, "count", len(externalJobIDs))
+
+	return externalJobIDs, nil
 }

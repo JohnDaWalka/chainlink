@@ -14,6 +14,7 @@ import (
 
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	jobMocks "github.com/smartcontractkit/chainlink/v2/core/services/job/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -83,26 +86,27 @@ var (
 )
 
 // setupTestService creates a test service with mocks
-func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client) (*Service, *bridgeMocks.ORM, *mocks.MessageEmitter) {
+func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client) (*Service, *bridgeMocks.ORM, *jobMocks.ORM, *mocks.MessageEmitter) {
 	t.Helper()
 
 	eaConfig := mocks.NewTestEAStatusReporterConfig(enabled, testStatusPath, pollingInterval)
 
 	bridgeORM := bridgeMocks.NewORM(t)
+	jobORM := jobMocks.NewORM(t)
 	emitter := mocks.NewMessageEmitter()
 	lggr := logger.TestLogger(t)
 
 	// Reduce log noise
 	lggr.SetLogLevel(zapcore.ErrorLevel)
 
-	service := NewEaStatusReporter(eaConfig, bridgeORM, httpClient, emitter, lggr)
+	service := NewEaStatusReporter(eaConfig, bridgeORM, jobORM, httpClient, emitter, lggr)
 
-	return service, bridgeORM, emitter
+	return service, bridgeORM, jobORM, emitter
 }
 
 func TestNewEaStatusReporter(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	assert.NotNil(t, service)
 	assert.Equal(t, ServiceName, service.Name())
@@ -110,7 +114,7 @@ func TestNewEaStatusReporter(t *testing.T) {
 
 func TestService_Start_Disabled(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _ := setupTestService(t, false, testPollingInterval, httpClient)
+	service, _, _, _ := setupTestService(t, false, testPollingInterval, httpClient)
 
 	ctx := context.Background()
 	err := service.Start(ctx)
@@ -122,7 +126,7 @@ func TestService_Start_Disabled(t *testing.T) {
 
 func TestService_Start_Enabled(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _ := setupTestService(t, true, 100*time.Millisecond, httpClient)
+	service, _, _, _ := setupTestService(t, true, 100*time.Millisecond, httpClient)
 
 	ctx := context.Background()
 	err := service.Start(ctx)
@@ -134,7 +138,7 @@ func TestService_Start_Enabled(t *testing.T) {
 
 func TestService_HealthReport(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	health := service.HealthReport()
 	assert.Contains(t, health, service.Name())
@@ -142,7 +146,7 @@ func TestService_HealthReport(t *testing.T) {
 
 func TestService_pollAllBridges_NoBridges(t *testing.T) {
 	httpClient := &http.Client{}
-	service, bridgeORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return([]bridges.BridgeType{}, 0, nil)
 
@@ -158,9 +162,12 @@ func TestService_pollAllBridges_NoBridges(t *testing.T) {
 
 func TestService_pollAllBridges_WithBridges(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
-	service, bridgeORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return(testBridges, len(testBridges), nil)
+
+	// Mock job ORM calls for finding external job IDs
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, mock.AnythingOfType("string")).Return([]int32{}, nil)
 
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
@@ -169,12 +176,13 @@ func TestService_pollAllBridges_WithBridges(t *testing.T) {
 	service.pollAllBridges(ctx)
 
 	bridgeORM.AssertExpectations(t)
+	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
 }
 
 func TestService_pollAllBridges_FetchError(t *testing.T) {
 	httpClient := &http.Client{}
-	service, bridgeORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return([]bridges.BridgeType{}, 0, assert.AnError)
 
@@ -190,7 +198,10 @@ func TestService_pollAllBridges_FetchError(t *testing.T) {
 
 func TestService_pollBridge_Success(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM calls for finding external job IDs
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
@@ -198,12 +209,13 @@ func TestService_pollBridge_Success(t *testing.T) {
 	ctx := context.Background()
 	service.pollBridge(ctx, "test-bridge", "http://example.com")
 
+	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
 }
 
 func TestService_pollBridge_HTTPError(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -220,7 +232,7 @@ func TestService_pollBridge_HTTPError(t *testing.T) {
 
 func TestService_pollBridge_InvalidJSON(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("invalid json", http.StatusOK)
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -235,7 +247,7 @@ func TestService_pollBridge_InvalidJSON(t *testing.T) {
 
 func TestService_pollBridge_InvalidURL(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -250,7 +262,7 @@ func TestService_pollBridge_InvalidURL(t *testing.T) {
 
 func TestService_pollBridge_Non200Status(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("Not Found", http.StatusNotFound)
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	emitter.On("With", mock.Anything).Return(emitter).Maybe()
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -265,27 +277,27 @@ func TestService_pollBridge_Non200Status(t *testing.T) {
 
 func TestService_emitEAStatus_Success(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
 	ctx := context.Background()
-	service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
+	service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []string{})
 
 	emitter.AssertExpectations(t)
 }
 
 func TestService_emitEAStatus_EmitError(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(assert.AnError)
 
 	ctx := context.Background()
 	assert.NotPanics(t, func() {
-		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"))
+		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []string{})
 	})
 
 	emitter.AssertExpectations(t)
@@ -293,7 +305,7 @@ func TestService_emitEAStatus_EmitError(t *testing.T) {
 
 func TestService_pollAllBridges_RefreshError(t *testing.T) {
 	httpClient := &http.Client{}
-	service, bridgeORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Setup bridge ORM mock to return error
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return([]bridges.BridgeType{}, 0, assert.AnError)
@@ -310,10 +322,13 @@ func TestService_pollAllBridges_RefreshError(t *testing.T) {
 
 func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
-	service, bridgeORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Setup bridge ORM mock to return our test bridges
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return(testBridges, len(testBridges), nil)
+
+	// Mock job ORM calls for finding external job IDs
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, mock.AnythingOfType("string")).Return([]int32{}, nil)
 
 	// Track emitted bridge names from protobuf events
 	var emittedBridgeNamesMutex sync.Mutex
@@ -336,6 +351,7 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	service.pollAllBridges(ctx)
 
 	bridgeORM.AssertExpectations(t)
+	jobORM.AssertExpectations(t)
 
 	// Verify we emitted events for both bridges
 	expectedBridgeNames := []string{testBridgeName1, testBridgeName2}
@@ -364,7 +380,7 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	// Load fixture and emit
 	ctx := context.Background()
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_response.json")
-	service.emitEAStatus(ctx, "test-bridge", status)
+	service.emitEAStatus(ctx, "test-bridge", status, []string{})
 
 	// Unmarshal and verify protobuf matches fixture values
 	require.NotEmpty(t, capturedProtobufBytes)
@@ -414,7 +430,7 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 
 func TestService_Start_AlreadyStarted(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	ctx := context.Background()
 
@@ -431,7 +447,7 @@ func TestService_Start_AlreadyStarted(t *testing.T) {
 
 func TestService_Close_AlreadyClosed(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	ctx := context.Background()
 
@@ -448,7 +464,7 @@ func TestService_Close_AlreadyClosed(t *testing.T) {
 
 func TestService_PollAllBridges_3000Bridges(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
-	service, mockORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+	service, mockORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	numBridges := 3000
 	var allBridges []bridges.BridgeType
@@ -476,6 +492,9 @@ func TestService_PollAllBridges_3000Bridges(t *testing.T) {
 	// Page 4: empty (end of results)
 	mockORM.On("BridgeTypes", mock.Anything, 3000, bridgePollPageSize).Return([]bridges.BridgeType{}, 3000, nil).Once()
 
+	// Mock job ORM calls for finding external job IDs for all bridges
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, mock.AnythingOfType("string")).Return([]int32{}, nil).Times(numBridges)
+
 	// Expect 3000 telemetry emissions
 	emitter.On("With", mock.Anything).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Times(numBridges)
@@ -484,12 +503,13 @@ func TestService_PollAllBridges_3000Bridges(t *testing.T) {
 
 	service.pollAllBridges(ctx)
 	mockORM.AssertExpectations(t)
+	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
 }
 
 func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
 	httpClient := &http.Client{}
-	service, mockORM, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, mockORM, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
 	numBridges := 5
 	var allBridges []bridges.BridgeType
@@ -541,7 +561,7 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 	// Load empty fixture and emit
 	ctx := context.Background()
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_empty.json")
-	service.emitEAStatus(ctx, "empty-bridge", status)
+	service.emitEAStatus(ctx, "empty-bridge", status, []string{})
 
 	// Unmarshal and verify protobuf handles empty values correctly
 	require.NotEmpty(t, capturedProtobufBytes)
@@ -571,5 +591,63 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 	assert.Empty(t, event.Endpoints)
 	assert.Empty(t, event.Configuration)
 
+	emitter.AssertExpectations(t)
+}
+
+// New test for external job IDs functionality
+func TestService_pollBridge_WithExternalJobIDs(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Create test job IDs and external job UUIDs
+	testJobIDs := []int32{1, 2}
+	testExternalJobID1 := uuid.New()
+	testExternalJobID2 := uuid.New()
+	testJob1 := job.Job{ID: 1, ExternalJobID: testExternalJobID1}
+	testJob2 := job.Job{ID: 2, ExternalJobID: testExternalJobID2}
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return(testJobIDs, nil)
+	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob1, nil)
+	jobORM.On("FindJob", mock.Anything, int32(2)).Return(testJob2, nil)
+
+	// Capture the emitted protobuf to verify external job IDs
+	var capturedProtobufBytes []byte
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
+		capturedProtobufBytes = []byte(args.Get(1).(string))
+	})
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "test-bridge", "http://example.com")
+
+	// Verify the external job IDs were included in the protobuf
+	require.NotEmpty(t, capturedProtobufBytes)
+	var event events.EAStatusEvent
+	err := proto.Unmarshal(capturedProtobufBytes, &event)
+	require.NoError(t, err)
+
+	expectedExternalJobIDs := []string{testExternalJobID1.String(), testExternalJobID2.String()}
+	assert.ElementsMatch(t, expectedExternalJobIDs, event.ExternalJobIds)
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+func TestService_pollBridge_JobORMError(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM to return error
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, assert.AnError)
+
+	// Should still emit telemetry with empty external job IDs
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "test-bridge", "http://example.com")
+
+	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
 }
