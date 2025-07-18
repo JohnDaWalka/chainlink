@@ -15,43 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events"
 )
-
-// EAStatusResponse represents the response schema from EA status endpoint
-type EAStatusResponse struct {
-	Adapter struct {
-		Name          string `json:"name"`
-		Version       string `json:"version"`
-		UptimeSeconds int64  `json:"uptimeSeconds"`
-	} `json:"adapter"`
-	Endpoints []struct {
-		Name       string   `json:"name"`
-		Aliases    []string `json:"aliases"`
-		Transports []string `json:"transports"`
-	} `json:"endpoints"`
-	DefaultEndpoint string `json:"defaultEndpoint"`
-	Configuration   []struct {
-		Name               string      `json:"name"`
-		Value              interface{} `json:"value"`
-		Type               string      `json:"type"`
-		Description        string      `json:"description"`
-		Required           bool        `json:"required"`
-		Default            interface{} `json:"default"`
-		CustomSetting      bool        `json:"customSetting"`
-		EnvDefaultOverride interface{} `json:"envDefaultOverride"`
-	} `json:"configuration"`
-	Runtime struct {
-		NodeVersion  string `json:"nodeVersion"`
-		Platform     string `json:"platform"`
-		Architecture string `json:"architecture"`
-		Hostname     string `json:"hostname"`
-	} `json:"runtime"`
-	Metrics struct {
-		Enabled  bool    `json:"enabled"`
-		Port     *int    `json:"port,omitempty"`
-		Endpoint *string `json:"endpoint,omitempty"`
-	} `json:"metrics"`
-}
 
 // Service polls EA status and pushes them to Beholder
 type Service struct {
@@ -248,54 +213,64 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 
 // emitEAStatus sends EA Status Reporter data to Beholder
 func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse) {
-	// Create human-readable message
-	message := fmt.Sprintf("EA Status - Bridge: %s, Adapter: %s, Version: %s",
-		bridgeName,
-		status.Adapter.Name,
-		status.Adapter.Version,
-	)
+	// Convert runtime info
+	runtime := &events.RuntimeInfo{
+		NodeVersion:  status.Runtime.NodeVersion,
+		Platform:     status.Runtime.Platform,
+		Architecture: status.Runtime.Architecture,
+		Hostname:     status.Runtime.Hostname,
+	}
 
-	// Build emitter with structured labels
-	emitter := s.emitter.With(
-		"bridge_name", bridgeName,
-		"adapter_name", status.Adapter.Name,
-		"adapter_version", status.Adapter.Version,
-		"adapter_uptime_seconds", fmt.Sprintf("%d", status.Adapter.UptimeSeconds),
-		"runtime_platform", status.Runtime.Platform,
-		"runtime_architecture", status.Runtime.Architecture,
-		"runtime_node_version", status.Runtime.NodeVersion,
-		"runtime_hostname", status.Runtime.Hostname,
-		"metrics_enabled", fmt.Sprintf("%t", status.Metrics.Enabled),
-		"default_endpoint", status.DefaultEndpoint,
-	)
+	// Convert metrics info
+	metrics := &events.MetricsInfo{
+		Enabled: status.Metrics.Enabled,
+	}
 
-	// Add endpoints information as structured data
-	if len(status.Endpoints) > 0 {
-		endpointsJSON, err := json.Marshal(status.Endpoints)
-		if err != nil {
-			s.lggr.Debugw("Failed to marshal endpoints", "bridge", bridgeName, "error", err)
-		} else {
-			emitter = emitter.With("endpoints", string(endpointsJSON))
+	// Convert endpoints
+	endpointsProto := make([]*events.EndpointInfo, len(status.Endpoints))
+	for i, endpoint := range status.Endpoints {
+		endpointsProto[i] = &events.EndpointInfo{
+			Name:       endpoint.Name,
+			Aliases:    endpoint.Aliases,
+			Transports: endpoint.Transports,
 		}
 	}
 
-	// Add configuration information as structured data
-	if len(status.Configuration) > 0 {
-		configJSON, err := json.Marshal(status.Configuration)
-		if err != nil {
-			s.lggr.Debugw("Failed to marshal configuration", "bridge", bridgeName, "error", err)
-		} else {
-			emitter = emitter.With("configuration", string(configJSON))
+	// Convert configuration including values
+	configProto := make([]*events.ConfigurationItem, len(status.Configuration))
+	for i, config := range status.Configuration {
+		configProto[i] = &events.ConfigurationItem{
+			Name:               config.Name,
+			Value:              fmt.Sprintf("%v", config.Value),
+			Type:               config.Type,
+			Description:        config.Description,
+			Required:           config.Required,
+			DefaultValue:       fmt.Sprintf("%v", config.Default),
+			CustomSetting:      config.CustomSetting,
+			EnvDefaultOverride: fmt.Sprintf("%v", config.EnvDefaultOverride),
 		}
 	}
 
-	// Emit to Beholder
-	if err := emitter.Emit(ctx, message); err != nil {
-		s.lggr.Warnw("Failed to emit EA Status Reporter data to Beholder", "bridge", bridgeName, "error", err)
+	// Create the protobuf event
+	event := &events.EAStatusEvent{
+		BridgeName:           bridgeName,
+		AdapterName:          status.Adapter.Name,
+		AdapterVersion:       status.Adapter.Version,
+		AdapterUptimeSeconds: status.Adapter.UptimeSeconds,
+		DefaultEndpoint:      status.DefaultEndpoint,
+		Runtime:              runtime,
+		Metrics:              metrics,
+		Endpoints:            endpointsProto,
+		Configuration:        configProto,
+	}
+
+	// Emit the protobuf event through the configured emitter
+	if err := events.EmitEAStatusEvent(ctx, s.emitter, event); err != nil {
+		s.lggr.Warnw("Failed to emit EA Status Reporter protobuf data to Beholder", "bridge", bridgeName, "error", err)
 		return
 	}
 
-	s.lggr.Debugw("Successfully emitted EA Status Reporter data to Beholder",
+	s.lggr.Debugw("Successfully emitted EA Status Reporter protobuf data to Beholder",
 		"bridge", bridgeName,
 		"adapter", status.Adapter.Name,
 		"version", status.Adapter.Version,

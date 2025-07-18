@@ -22,8 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	bridgeMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+	"google.golang.org/protobuf/proto"
 )
 
 // Test constants and fixtures
@@ -313,29 +315,21 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	// Setup bridge ORM mock to return our test bridges
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return(testBridges, len(testBridges), nil)
 
-	// Track emitted bridge names
+	// Track emitted bridge names from protobuf events
 	var emittedBridgeNamesMutex sync.Mutex
 	emittedBridgeNames := []string{}
 
-	var emittedMessagesMutex sync.Mutex
-	emittedMessages := []string{}
-
-	// Setup emitter mock to capture bridge names and messages
-	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter).Run(func(args mock.Arguments) {
-		kvs := args.Get(0).([]string)
-		for i := 0; i < len(kvs); i += 2 {
-			if i+1 < len(kvs) && kvs[i] == "bridge_name" {
-				emittedBridgeNamesMutex.Lock()
-				emittedBridgeNames = append(emittedBridgeNames, kvs[i+1])
-				emittedBridgeNamesMutex.Unlock()
-			}
-		}
-	})
-
+	// Setup emitter mock to capture protobuf events and extract bridge names
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
-		emittedMessagesMutex.Lock()
-		emittedMessages = append(emittedMessages, args.Get(1).(string))
-		emittedMessagesMutex.Unlock()
+		// Unmarshal protobuf to extract bridge name
+		protobufBytes := []byte(args.Get(1).(string))
+		var event events.EAStatusEvent
+		if err := proto.Unmarshal(protobufBytes, &event); err == nil {
+			emittedBridgeNamesMutex.Lock()
+			emittedBridgeNames = append(emittedBridgeNames, event.BridgeName)
+			emittedBridgeNamesMutex.Unlock()
+		}
 	})
 
 	ctx := context.Background()
@@ -343,39 +337,23 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 
 	bridgeORM.AssertExpectations(t)
 
+	// Verify we emitted events for both bridges
 	expectedBridgeNames := []string{testBridgeName1, testBridgeName2}
 	assert.ElementsMatch(t, expectedBridgeNames, emittedBridgeNames, "Should emit telemetry for each bridge")
-	assert.Len(t, emittedMessages, 2)
-	for _, msg := range emittedMessages {
-		assert.Contains(t, msg, "EA Status - Bridge:")
-		assert.Contains(t, msg, "Adapter: test-adapter")
-		assert.Contains(t, msg, "Version: 1.0.0")
-	}
 
 	emitter.AssertExpectations(t)
 }
 
 func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	emitter := mocks.NewMessageEmitter()
-	var capturedLabelsMutex sync.Mutex
-	capturedLabels := make(map[string]string)
+	var capturedProtobufBytes []byte
 
-	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter).Run(func(args mock.Arguments) {
-		kvs := args.Get(0).([]string)
-		// Process key-value pairs
-		capturedLabelsMutex.Lock()
-		for i := 0; i < len(kvs); i += 2 {
-			if i+1 < len(kvs) {
-				capturedLabels[kvs[i]] = kvs[i+1]
-			}
-		}
-		capturedLabelsMutex.Unlock()
-	})
-
-	capturedMessage := ""
+	// Capture protobuf metadata labels
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
-		capturedMessage = args.Get(1).(string)
+		capturedProtobufBytes = []byte(args.Get(1).(string))
 	})
+
 	config := mocks.NewTestEAStatusReporterConfig(true, "/status", 5*time.Minute)
 	service := &Service{
 		config:  config,
@@ -383,148 +361,53 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 		lggr:    logger.TestLogger(t),
 	}
 
-	// Call emitEAStatus with test fixture
+	// Load fixture and emit
 	ctx := context.Background()
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_response.json")
 	service.emitEAStatus(ctx, "test-bridge", status)
 
-	expectedMessage := "EA Status - Bridge: test-bridge, Adapter: test-adapter, Version: 1.0.0"
-	assert.Equal(t, expectedMessage, capturedMessage)
-	assert.Equal(t, "test-bridge", capturedLabels["bridge_name"])
-	assert.Equal(t, "test-adapter", capturedLabels["adapter_name"])
-	assert.Equal(t, "1.0.0", capturedLabels["adapter_version"])
-	assert.Equal(t, "3600", capturedLabels["adapter_uptime_seconds"])
-	assert.Equal(t, "linux", capturedLabels["runtime_platform"])
-	assert.Equal(t, "x64", capturedLabels["runtime_architecture"])
-	assert.Equal(t, "18.17.0", capturedLabels["runtime_node_version"])
-	assert.Equal(t, "ea-adapter-01", capturedLabels["runtime_hostname"])
-	assert.Equal(t, "true", capturedLabels["metrics_enabled"])
-
-	assert.Contains(t, capturedLabels, "endpoints")
-	assert.Contains(t, capturedLabels, "configuration")
-
-	// Parse and verify JSON endpoints
-	var endpoints []struct {
-		Name       string   `json:"name"`
-		Aliases    []string `json:"aliases"`
-		Transports []string `json:"transports"`
-	}
-	err := json.Unmarshal([]byte(capturedLabels["endpoints"]), &endpoints)
-	assert.NoError(t, err)
-	assert.Len(t, endpoints, 2)
-	assert.Equal(t, "price", endpoints[0].Name)
-	assert.Equal(t, "volume", endpoints[1].Name)
-
-	// Parse and verify JSON configurations
-	var configuration []struct {
-		Name               string      `json:"name"`
-		Value              interface{} `json:"value"`
-		Type               string      `json:"type"`
-		Description        string      `json:"description"`
-		Required           bool        `json:"required"`
-		Default            interface{} `json:"default"`
-		CustomSetting      bool        `json:"customSetting"`
-		EnvDefaultOverride interface{} `json:"envDefaultOverride"`
-	}
-	err = json.Unmarshal([]byte(capturedLabels["configuration"]), &configuration)
-	assert.NoError(t, err)
-	assert.Len(t, configuration, 3)
-	assert.Equal(t, "API_KEY", configuration[0].Name)
-	assert.Equal(t, "TIMEOUT", configuration[1].Name)
-	assert.Equal(t, "CACHE_ENABLED", configuration[2].Name)
-
-	emitter.AssertExpectations(t)
-}
-
-func TestService_emitEAStatus_MissingFields(t *testing.T) {
-	httpClient := &http.Client{}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
-
-	// Load the fixture and remove one field to test robustness
-	fixtureData := loadFixture(t, "ea_status_response.json")
-
-	var responseData map[string]interface{}
-	err := json.Unmarshal([]byte(fixtureData), &responseData)
+	// Unmarshal and verify protobuf matches fixture values
+	require.NotEmpty(t, capturedProtobufBytes)
+	var event events.EAStatusEvent
+	err := proto.Unmarshal(capturedProtobufBytes, &event)
 	require.NoError(t, err)
 
-	if adapter, ok := responseData["adapter"].(map[string]interface{}); ok {
-		delete(adapter, "version")
+	// Verify key fields match fixture
+	assert.Equal(t, "test-bridge", event.BridgeName)
+	assert.Equal(t, status.Adapter.Name, event.AdapterName)
+	assert.Equal(t, status.Adapter.Version, event.AdapterVersion)
+	assert.Equal(t, status.Adapter.UptimeSeconds, event.AdapterUptimeSeconds)
+
+	//Verify Endpoints
+	for i, endpoint := range status.Endpoints {
+		assert.Equal(t, endpoint.Name, event.Endpoints[i].Name)
+		assert.Equal(t, endpoint.Aliases, event.Endpoints[i].Aliases)
+		assert.Equal(t, endpoint.Transports, event.Endpoints[i].Transports)
 	}
 
-	// Marshal back to JSON and unmarshal into our struct
-	modifiedJSON, err := json.Marshal(responseData)
-	require.NoError(t, err)
+	//Verify Default Endpoint
+	assert.Equal(t, status.DefaultEndpoint, event.DefaultEndpoint)
 
-	var status EAStatusResponse
-	err = json.Unmarshal(modifiedJSON, &status)
-	require.NoError(t, err)
-
-	// Setup emitter mock - collect all fields from all With() calls
-	var allFieldsMutex sync.Mutex
-	var allFields []string
-
-	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter).Run(func(args mock.Arguments) {
-		kvs := args.Get(0).([]string)
-		allFieldsMutex.Lock()
-		allFields = append(allFields, kvs...)
-		allFieldsMutex.Unlock()
-	})
-
-	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
-
-	ctx := context.Background()
-
-	// Should emit successfully even with missing field
-	service.emitEAStatus(ctx, "test-bridge", status)
-
-	// Verify adapter_version field is present and empty
-	assert.Contains(t, allFields, "adapter_version", "Missing adapter_version field should be present in emission")
-	// Find the version value and verify it's empty
-	for i := 0; i < len(allFields)-1; i += 2 {
-		if allFields[i] == "adapter_version" {
-			assert.Equal(t, "", allFields[i+1], "Missing version field should be empty string")
-			break
-		}
+	// Verify configuration
+	for i, configuration := range status.Configuration {
+		assert.Equal(t, configuration.Name, event.Configuration[i].Name)
+		assert.Equal(t, fmt.Sprintf("%v", configuration.Value), event.Configuration[i].Value) // Values are converted to strings
+		assert.Equal(t, configuration.Type, event.Configuration[i].Type)
+		assert.Equal(t, configuration.Description, event.Configuration[i].Description)
+		assert.Equal(t, configuration.Required, event.Configuration[i].Required)
+		assert.Equal(t, fmt.Sprintf("%v", configuration.Default), event.Configuration[i].DefaultValue) // Defaults converted to strings
+		assert.Equal(t, configuration.CustomSetting, event.Configuration[i].CustomSetting)
+		assert.Equal(t, fmt.Sprintf("%v", configuration.EnvDefaultOverride), event.Configuration[i].EnvDefaultOverride) // Overrides converted to strings
 	}
 
-	emitter.AssertExpectations(t)
-}
+	//Verify Runtime
+	assert.Equal(t, status.Runtime.NodeVersion, event.Runtime.NodeVersion)
+	assert.Equal(t, status.Runtime.Platform, event.Runtime.Platform)
+	assert.Equal(t, status.Runtime.Architecture, event.Runtime.Architecture)
+	assert.Equal(t, status.Runtime.Hostname, event.Runtime.Hostname)
 
-func TestService_emitEAStatus_ExtraFields(t *testing.T) {
-	httpClient := &http.Client{}
-	service, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
-
-	// Load the fixture and add one extra field to test forward compatibility
-	fixtureData := loadFixture(t, "ea_status_response.json")
-
-	var responseData map[string]interface{}
-	err := json.Unmarshal([]byte(fixtureData), &responseData)
-	require.NoError(t, err)
-
-	if adapter, ok := responseData["adapter"].(map[string]interface{}); ok {
-		adapter["buildNumber"] = "12345"
-	}
-
-	// Marshal back to JSON and unmarshal into our struct - extra field should be ignored
-	modifiedJSON, err := json.Marshal(responseData)
-	require.NoError(t, err)
-
-	var status EAStatusResponse
-	err = json.Unmarshal(modifiedJSON, &status)
-	require.NoError(t, err)
-
-	// Setup emitter mock - should not include the extra field
-	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter).Run(func(args mock.Arguments) {
-		kvs := args.Get(0).([]string)
-		// Extra field (buildNumber) should not be in any emission
-		assert.NotContains(t, kvs, "buildNumber")
-	})
-	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
-
-	ctx := context.Background()
-
-	// Should emit successfully, ignoring extra field
-	service.emitEAStatus(ctx, "test-bridge", status)
+	// Verify Metrics
+	assert.Equal(t, status.Metrics.Enabled, event.Metrics.Enabled)
 
 	emitter.AssertExpectations(t)
 }
@@ -636,4 +519,57 @@ func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
 
 	service.pollAllBridges(ctx)
 	mockORM.AssertExpectations(t)
+}
+
+func TestService_emitEAStatus_EmptyFields(t *testing.T) {
+	emitter := mocks.NewMessageEmitter()
+	var capturedProtobufBytes []byte
+
+	// Capture protobuf metadata labels
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
+		capturedProtobufBytes = []byte(args.Get(1).(string))
+	})
+
+	config := mocks.NewTestEAStatusReporterConfig(true, "/status", 5*time.Minute)
+	service := &Service{
+		config:  config,
+		emitter: emitter,
+		lggr:    logger.TestLogger(t),
+	}
+
+	// Load empty fixture and emit
+	ctx := context.Background()
+	status := loadFixtureAsEAStatusResponse(t, "ea_status_empty.json")
+	service.emitEAStatus(ctx, "empty-bridge", status)
+
+	// Unmarshal and verify protobuf handles empty values correctly
+	require.NotEmpty(t, capturedProtobufBytes)
+	var event events.EAStatusEvent
+	err := proto.Unmarshal(capturedProtobufBytes, &event)
+	require.NoError(t, err)
+
+	// Verify empty/minimal values are handled correctly
+	assert.Equal(t, "empty-bridge", event.BridgeName)
+	assert.Equal(t, "", event.AdapterName)
+	assert.Equal(t, "", event.AdapterVersion)
+	assert.Equal(t, int64(0), event.AdapterUptimeSeconds)
+	assert.Equal(t, "", event.DefaultEndpoint)
+
+	// Verify empty runtime info
+	require.NotNil(t, event.Runtime)
+	assert.Equal(t, "", event.Runtime.NodeVersion)
+	assert.Equal(t, "", event.Runtime.Platform)
+	assert.Equal(t, "", event.Runtime.Architecture)
+	assert.Equal(t, "", event.Runtime.Hostname)
+
+	// Verify metrics with false enabled
+	require.NotNil(t, event.Metrics)
+	assert.False(t, event.Metrics.Enabled)
+
+	// Verify empty arrays
+	assert.Empty(t, event.Endpoints)
+	assert.Empty(t, event.Configuration)
+
+	emitter.AssertExpectations(t)
 }
