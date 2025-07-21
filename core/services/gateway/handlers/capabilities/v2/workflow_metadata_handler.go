@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +16,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common/aggregation"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
+
+const ecdsaPubKeyHexLen = 42 // 2 (0x prefix) + 40 (hex digits)
 
 type workflowReference struct {
 	workflowOwner string
@@ -54,9 +58,26 @@ func NewWorkflowMetadataHandler(lggr logger.Logger, cfg ServiceConfig, don handl
 	}
 }
 
-func (h *WorkflowMetadataHandler) Authorize(workflowID, payload, signature string) bool {
-	// TODO: PRODCRE-305 Implement authorization logic
-	return true
+func (h *WorkflowMetadataHandler) Authorize(workflowID string, token string, req *jsonrpc.Request[json.RawMessage]) (*gateway.AuthorizedKey, error) {
+	_, signer, err := utils.VerifyRequestJWT[json.RawMessage](token, *req)
+	if err != nil {
+		h.lggr.Errorw("Failed to verify JWT", "error", err)
+		return nil, err
+	}
+	keys, exists := h.authorizedKeys[workflowID]
+	if !exists {
+		h.lggr.Errorw("Workflow ID not found in authorized keys", "workflowID", workflowID)
+		return nil, errors.New("workflow ID not found in authorized keys")
+	}
+	key := gateway.AuthorizedKey{
+		KeyType:   gateway.KeyTypeECDSA,
+		PublicKey: strings.ToLower(signer.Hex()),
+	}
+	if _, exists = keys[key]; !exists {
+		h.lggr.Errorw("Signer not found in authorized keys", "signer", signer.Hex())
+		return nil, errors.New("signer not found in authorized keys")
+	}
+	return &key, nil
 }
 
 // syncAuthorizedKeys aggregates the authorized keys from the WorkflowMetadataAggregator and updates the local cache.
@@ -127,8 +148,12 @@ func (h *WorkflowMetadataHandler) OnAuthMetadataPush(ctx context.Context, resp *
 		return fmt.Errorf("failed to unmarshal auth metadata: %w", err)
 	}
 	h.lggr.Debugw("Received auth metadata push", "workflowID", metadata.WorkflowSelector.WorkflowID, "nodeAddr", nodeAddr)
+	err := h.validateAuthMetadata(metadata)
+	if err != nil {
+		return err
+	}
 	var combinedErr error
-	err := h.agg.Collect(&metadata, nodeAddr)
+	err = h.agg.Collect(&metadata, nodeAddr)
 	if err != nil {
 		combinedErr = errors.Join(combinedErr, fmt.Errorf("failed to collect auth observation: %w", err))
 	}
@@ -142,12 +167,61 @@ func (h *WorkflowMetadataHandler) OnAuthMetadataPullResponse(ctx context.Context
 		return fmt.Errorf("failed to unmarshal auth metadata pull response: %w", err)
 	}
 	h.lggr.Debugw("Received auth metadata pull response", "nodeAddr", nodeAddr)
+	for _, data := range metadata {
+		err := h.validateAuthMetadata(data)
+		if err != nil {
+			return err
+		}
+	}
 	var combinedErr error
 	for _, data := range metadata {
 		err := h.agg.Collect(&data, nodeAddr)
 		combinedErr = errors.Join(combinedErr, err)
 	}
 	return combinedErr
+}
+
+func (h *WorkflowMetadataHandler) validateAuthMetadata(metadata gateway.WorkflowMetadata) error {
+	if metadata.WorkflowSelector.WorkflowID == "" || metadata.WorkflowSelector.WorkflowOwner == "" || metadata.WorkflowSelector.WorkflowName == "" || metadata.WorkflowSelector.WorkflowTag == "" {
+		return errors.New("invalid workflow metadata")
+	}
+	if len(metadata.AuthorizedKeys) == 0 {
+		return errors.New("no authorized keys")
+	}
+	for _, key := range metadata.AuthorizedKeys {
+		if key.KeyType != gateway.KeyTypeECDSA {
+			return errors.New("invalid key type")
+		}
+		if key.PublicKey == "" || !strings.HasPrefix(key.PublicKey, "0x") || len(key.PublicKey) != ecdsaPubKeyHexLen {
+			return fmt.Errorf("invalid public key: %s", key.PublicKey)
+		}
+		if key.PublicKey != strings.ToLower(key.PublicKey) {
+			return errors.New("invalid public key: must be all lowercase")
+		}
+	}
+	return nil
+}
+
+func (h *WorkflowMetadataHandler) GetWorkflowID(workflowOwner, workflowName, workflowTag string) (string, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	workflowRef := workflowReference{
+		workflowOwner: workflowOwner,
+		workflowName:  workflowName,
+		workflowTag:   workflowTag,
+	}
+	workflowID, exists := h.workflowRefToID[workflowRef]
+	if !exists {
+		return "", false
+	}
+	return workflowID, true
+}
+
+func (h *WorkflowMetadataHandler) GetWorkflowReference(workflowID string) (workflowReference, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	workflowRef, exists := h.workflowIDToRef[workflowID]
+	return workflowRef, exists
 }
 
 // Start begins the periodic pull loop.

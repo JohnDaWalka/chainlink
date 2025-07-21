@@ -186,7 +186,7 @@ func (s *httpServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	if authHeader != "" {
 		jwtToken = strings.TrimPrefix(authHeader, "Bearer ")
 	}
-
+	fmt.Println("jwtToken", jwtToken)
 	rawResponse, httpStatusCode := s.handler.ProcessRequest(requestCtx, rawMessage, jwtToken)
 
 	w.Header().Set("Content-Type", s.config.ContentTypeHeader)

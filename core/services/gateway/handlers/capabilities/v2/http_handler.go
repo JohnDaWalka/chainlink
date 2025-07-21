@@ -87,8 +87,8 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 	if err != nil {
 		return nil, err
 	}
-	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don)
 	metadataHandler := NewWorkflowMetadataHandler(lggr, cfg, don, donConfig)
+	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don, metadataHandler, userRateLimiter)
 	return &gatewayHandler{
 		config:          cfg,
 		don:             don,
@@ -163,6 +163,7 @@ func (h *gatewayHandler) HandleLegacyUserMessage(context.Context, *api.Message, 
 }
 
 func (h *gatewayHandler) HandleJSONRPCUserMessage(ctx context.Context, req jsonrpc.Request[json.RawMessage], responseCh chan<- handlers.UserCallbackPayload) error {
+	fmt.Println("HandleJSONRPCUserMessage", req.Auth)
 	err := h.triggerHandler.HandleUserTriggerRequest(ctx, &req, responseCh)
 	if err != nil {
 		h.lggr.Errorw("failed to handle user trigger request", "requestID",
