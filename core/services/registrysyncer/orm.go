@@ -124,7 +124,7 @@ func (l *LocalRegistry) UnmarshalJSON(data []byte) error {
 			NodeOperatorID:      v.NodeOperatorID,
 			ConfigCount:         v.ConfigCount,
 			WorkflowDONId:       v.WorkflowDONId,
-			Signer:              [32]byte(v.Signer),
+			Signer:              v.Signer,
 			P2PID:               v.P2PID,
 			EncryptionPublicKey: v.EncryptionPublicKey,
 			HashedCapabilityIDs: hashedCapabilityIDs,

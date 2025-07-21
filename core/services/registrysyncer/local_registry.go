@@ -62,9 +62,12 @@ func NewLocalRegistry(
 }
 
 func (l *LocalRegistry) LocalNode(ctx context.Context) (capabilities.Node, error) {
+	// Load the current nodes PeerWrapper, this gets us the current node's
+	// PeerID, allowing us to contextualize registry information in terms of DON ownership
+	// (eg. get my current DON configuration, etc).
 	pid, err := l.getPeerID()
 	if err != nil {
-		return capabilities.Node{}, fmt.Errorf("failed to get peer ID: %w", err)
+		return capabilities.Node{}, errors.New("unable to get local node: peerWrapper hasn't started yet")
 	}
 
 	return l.NodeByPeerID(ctx, pid)
