@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -433,6 +432,7 @@ func NewNode(
 		Config:   cfg,
 		DS:       db,
 		KeyStore: master,
+		// TODO BCF-2513 Stop injecting ethClient via override, instead use httptest.
 		EVMFactoryConfigFn: func(fc *chainlink.EVMFactoryConfig) {
 			// Create ChainStores that always sign with 1337
 			fc.GenChainStore = func(ks core.Keystore, i *big.Int) keys.ChainStore {
