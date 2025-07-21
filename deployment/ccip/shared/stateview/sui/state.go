@@ -9,22 +9,24 @@ import (
 )
 
 type CCIPChainState struct {
-	CCIPRouterAddress       string
-	CCIPAddress             string
-	CCIPObjectRef           string
-	MCMsAddress             string
-	TokenPoolAddress        string
-	LockReleaseAddress      string
-	LockReleaseStateId      string
-	FeeQuoterCapId          string
-	OnRampAddress           string
-	OnRampStateObjectId     string
-	OffRampAddress          string
-	OffRampOwnerCapId       string
-	OffRampStateObjectId    string
-	LinkTokenAddress        string
-	LinkTokenCoinMetadataId string
-	LinkTokenTreasuryCapId  string
+	CCIPRouterAddress          string
+	CCIPAddress                string
+	CCIPObjectRef              string
+	MCMsAddress                string
+	TokenPoolAddress           string
+	LockReleaseAddress         string
+	LockReleaseStateId         string
+	FeeQuoterCapId             string
+	OnRampAddress              string
+	OnRampStateObjectId        string
+	OffRampAddress             string
+	OffRampOwnerCapId          string
+	OffRampStateObjectId       string
+	LinkTokenAddress           string
+	LinkTokenCoinMetadataId    string
+	LinkTokenTreasuryCapId     string
+	CCIPBurnMintTokenPool      string
+	CCIPBurnMintTokenPoolState string
 }
 
 // LoadOnchainStatesui loads chain state for sui chains from env
@@ -106,6 +108,12 @@ func loadsuiChainStateFromAddresses(addresses map[string]cldf.TypeAndVersion) (C
 
 		case shared.SuiLinkTokenTreasuryCapId:
 			chainState.LinkTokenTreasuryCapId = addr
+
+		case shared.SuiBnMTokenPoolType:
+			chainState.CCIPBurnMintTokenPool = addr
+
+		case shared.SuiBnMTokenPoolStateType:
+			chainState.CCIPBurnMintTokenPoolState = addr
 		}
 		// Set address based on type
 

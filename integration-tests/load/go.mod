@@ -11,6 +11,8 @@ replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
 // replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
+// replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
+
 // replace github.com/smartcontractkit/chainlink-deployments-framework => ../../../chainlink-deployments-framework
 
 // Using a separate `require` here to avoid surrounding line changes
@@ -31,7 +33,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/slack-go/slack v0.15.0
 	github.com/smartcontractkit/chain-selectors v1.0.62
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250703172708-3dacb811e668
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250721120650-1dbc1cd18d95
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250704143810-ee587a6c0562
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250710062234-1e64a19122f6
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.3-0.20250711225258-bceac2b92545
@@ -466,7 +468,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250619160901-79b609b1021c // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250708220600-853616d583f4 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250713062856-8e588ade17f7 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250721120903-8cd3656f68d7 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/sentinel v0.1.2 // indirect

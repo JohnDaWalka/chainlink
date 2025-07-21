@@ -93,6 +93,8 @@ var (
 	SuiLockReleaseTPStateType      deployment.ContractType = "SuiLockReleaseTokenState"
 	SuiMCMSType                    deployment.ContractType = "SuiManyChainMultisig"
 	SuiLinkTokenType               deployment.ContractType = "SuiLinkToken"
+	SuiBnMTokenPoolType            deployment.ContractType = "SuiBnMTokenPool"
+	SuiBnMTokenPoolStateType       deployment.ContractType = "SuiBnMTokenPoolState"
 	SuiLinkTokenObjectMetadataId   deployment.ContractType = "SuiLinkTokenObjectMetadataId"
 	SuiLinkTokenTreasuryCapId      deployment.ContractType = "SuiLinkTokenTreasuryCapId"
 	// TON, [NONEVM-1938] currently added necessary contract for unblocking e2e env setup

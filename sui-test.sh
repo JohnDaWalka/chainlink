@@ -2,7 +2,7 @@
 set -euox pipefail
 
 export CL_DIR=$(dirname $0)
-export SUI_DIR=$(realpath $CL_DIR/../chainlink-sui)
+export SUI_DIR=$(realpath $CL_DIR/../helpful-scripts/chainlink-sui)
 
 export TEST_LOG_LEVEL=debug
 export LOG_LEVEL=debug
@@ -23,7 +23,7 @@ go build -o chainlink-sui ./relayer/cmd/chainlink-sui/main.go
 popd
 
 cd integration-tests/smoke/ccip
-exec go test -v -tags=integration -count=1 -run Test_CCIPMessaging_Sui2EVM ./... -timeout=20m
+exec go test -v -tags=integration -count=1 -run Test_CCIP_Messaging_EVM2Sui ./...
 # if [ "${1:-}" = "dest" ]; then
 #   exec go test -v -tags=integration -count=1 -run Test_CCIPMessaging_EVM2Sui ./...
 # else

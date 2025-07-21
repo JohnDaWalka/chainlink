@@ -20,9 +20,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/block-vision/sui-go-sdk/models"
+	"github.com/block-vision/sui-go-sdk/sui"
+
 	aptos_ccip_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
+	sui_module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
+	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui/bindings/packages/offramp"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
@@ -1230,6 +1235,88 @@ func AssertTimelockOwnership(
 	}
 }
 
+func SuiEventEmitter[T any](
+	t *testing.T,
+	client sui.ISuiAPI,
+	packageId, moduleName, event string,
+	done chan any,
+) (<-chan struct {
+	Event   T
+	Version uint64
+}, <-chan error) {
+	ch := make(chan struct {
+		Event   T
+		Version uint64
+	}, 200)
+	errChan := make(chan error)
+	limit := uint64(50)
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 2)
+		defer ticker.Stop()
+
+		for {
+			for {
+				// As this can take a few iterations if there are many events, check for done before each request
+				select {
+				case <-done:
+					return
+				default:
+				}
+				events, err := client.SuiXQueryEvents(t.Context(), models.SuiXQueryEventsRequest{
+					SuiEventFilter: models.EventFilterByMoveEventModule{
+						MoveEventModule: models.MoveEventModule{
+							Package: packageId,
+							Module:  moduleName,
+							Event:   event,
+						},
+					},
+					Limit:           limit,
+					DescendingOrder: false,
+				})
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				if len(events.Data) == 0 {
+					// No new events found
+					break
+				}
+
+				for _, event := range events.Data {
+
+					fmt.Println("EVENTT SUII: ", event)
+					// seqNum = event.SequenceNumber + 1
+					// if startVersion != nil && event.Version < *startVersion {
+					// 	continue
+					// }
+					var out T
+					if err := codec.DecodeAptosJsonValue(event, &out); err != nil {
+						errChan <- err
+						continue
+					}
+					ch <- struct {
+						Event   T
+						Version uint64
+					}{
+						Event:   out,
+						Version: 1, // todo: change this
+					}
+				}
+
+			}
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				continue
+			}
+		}
+	}()
+	return ch, errChan
+}
+
 func ConfirmCommitWithExpectedSeqNumRangeSui(
 	t *testing.T,
 	srcSelector uint64,
@@ -1239,8 +1326,60 @@ func ConfirmCommitWithExpectedSeqNumRangeSui(
 	expectedSeqNumRange ccipocr3.SeqNumRange,
 	enforceSingleCommit bool,
 ) (any, error) {
-	// TODO
-	fmt.Println("CONFIRM COMMIT ON SUI")
+	// Bound the offRamp
+	boundOffRamp, err := sui_ccip_offramp.NewOfframp(offRampAddress, dest.Client)
+	require.NoError(t, err)
 
-	return nil, nil
+	done := make(chan any)
+	defer close(done)
+	sink, errChan := SuiEventEmitter[sui_module_offramp.CommitReportAccepted](t, dest.Client, boundOffRamp.Address(), "offramp", "CommitReportAccepted", done)
+
+	timeout := time.NewTimer(tests.WaitTimeout(t))
+	defer timeout.Stop()
+
+	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
+
+	verifyCommitReport := func(report sui_module_offramp.CommitReportAccepted) bool {
+		processRoots := func(roots []sui_module_offramp.MerkleRoot) bool {
+			for _, mr := range roots {
+				t.Logf("(Sui) Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
+					mr.MinSeqNr, mr.MaxSeqNr, dest.Selector, srcSelector, expectedSeqNumRange.String(), report.PriceUpdates.TokenPriceUpdates,
+				)
+				seenMessages.visitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
+
+				if mr.SourceChainSelector == srcSelector && uint64(expectedSeqNumRange.Start()) >= mr.MinSeqNr && uint64(expectedSeqNumRange.End()) <= mr.MaxSeqNr {
+					t.Logf("(Sui) All sequence numbers committed in a single report [%d, %d]",
+						expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+					)
+					return true
+				}
+
+				if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
+					t.Logf(
+						"(Sui) All sequence numbers already committed from range [%d, %d]",
+						expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+					)
+					return true
+				}
+			}
+			return false
+		}
+
+		return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
+	}
+
+	for {
+		select {
+		case event := <-sink:
+			verified := verifyCommitReport(event.Event)
+			if verified {
+				return &event.Event, nil
+			}
+		case err := <-errChan:
+			require.NoError(t, err)
+		case <-timeout.C:
+			return nil, fmt.Errorf("(sui) timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				dest.Selector, srcSelector, expectedSeqNumRange.String())
+		}
+	}
 }

@@ -34,6 +34,9 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	suicrcwconfig "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
+
+	crConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
 
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
@@ -90,12 +93,12 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	lockreleasetokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_lock_release_token_pool"
+	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_burn_mint_token_pool"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	chainreader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
 	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
 
@@ -472,9 +475,10 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 	msg := cfg.Message.(router.ClientEVM2AnyMessage)
 	var retryCount int
 	for {
+		fmt.Println("ABOUT TO SEND THIS MSG: ", msg, cfg.DestChain)
 		fee, err := r.GetFee(&bind.CallOpts{Context: context.Background()}, cfg.DestChain, msg)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get fee: %w", cldf.MaybeDataErr(err))
+			return nil, 0, fmt.Errorf("failed to get EVM fee: %w", cldf.MaybeDataErr(err))
 		}
 
 		cfg.Sender.Value = fee
@@ -1062,21 +1066,21 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	}
 
 	var (
-		LockReleaseTP    string
-		LockReleaseState string
-		ptbArgs          chainwriter.Arguments
+		BurnMintTP      string
+		BurnMintTPState string
+		ptbArgs         suicrcwconfig.Arguments
 	)
 	if len(msg.TokenAmounts) > 0 {
 		// Build PTB for token transfer
 
 		// TOKEN POOL SETUP
-		LockReleaseTP, LockReleaseState, err = handleTokenAndPoolDeploymentForSUI(e, cfg, deps)
+		BurnMintTP, BurnMintTPState, err = handleTokenAndPoolDeploymentForSUI(e, cfg, deps)
 		if err != nil {
 			return &AnyMsgSentEvent{}, fmt.Errorf("failed to setup tokenPool on SUI %d: %w", cfg.SourceChain, err)
 		}
-
+		fmt.Println("TOKEN AMOUNTS: ", msg.TokenAmounts)
 		extra := map[string]any{
-			"state": LockReleaseState,
+			"state": BurnMintTPState,
 			"c":     msg.TokenAmounts[0].Token,
 		}
 		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", extra)
@@ -1110,9 +1114,9 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("Failed to create SuiTxm: %v", err)
 	}
 
-	var chainWriterConfig chainwriter.ChainWriterConfig
-	if LockReleaseTP != "" {
-		chainWriterConfig = configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, LockReleaseTP)
+	var chainWriterConfig suicrcwconfig.ChainWriterConfig
+	if BurnMintTP != "" {
+		chainWriterConfig = configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, BurnMintTP)
 	} else {
 		chainWriterConfig = configureChainWriterForMsg(ccipPackageId, onRampPackageId, publicKeyBytes)
 	}
@@ -1131,9 +1135,9 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, err
 	}
 
-	txId := "ccip_send_test_arb_msg"
+	txId := "ccip_send_token_transfer"
 	err = chainWriter.SubmitTransaction(ctx,
-		chainwriter.PTBChainWriterModuleName,
+		suicrcwconfig.PTBChainWriterModuleName,
 		"ccip_send",
 		&ptbArgs,
 		txId,
@@ -1158,20 +1162,20 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	chainWriter.Close()
 
 	// Query the CCIPSend Event via chainReader
-	chainReaderConfig := chainreader.ChainReaderConfig{
+	chainReaderConfig := crConfig.ChainReaderConfig{
 		IsLoopPlugin: false,
-		EventsIndexer: chainreader.EventsIndexerConfig{
+		EventsIndexer: crConfig.EventsIndexerConfig{
 			PollingInterval: 10 * time.Second,
 			SyncTimeout:     10 * time.Second,
 		},
-		TransactionsIndexer: chainreader.TransactionsIndexerConfig{
+		TransactionsIndexer: crConfig.TransactionsIndexerConfig{
 			PollingInterval: 10 * time.Second,
 			SyncTimeout:     10 * time.Second,
 		},
-		Modules: map[string]*chainreader.ChainReaderModule{
+		Modules: map[string]*crConfig.ChainReaderModule{
 			"onramp": {
 				Name: "onramp",
-				Events: map[string]*chainreader.ChainReaderEvent{
+				Events: map[string]*crConfig.ChainReaderEvent{
 					"CCIPMessageSent": {
 						Name:      "CCIPMessageSent",
 						EventType: "CCIPMessageSent",
@@ -1253,7 +1257,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		return &AnyMsgSentEvent{}, fmt.Errorf("failed to fetch event sequence")
 	}
 	e.Logger.Debugw("Query results", "sequences", sequences)
-	rawevent := sequences[0].Data.(*CCIPMessageSent)
+	rawevent := sequences[3].Data.(*CCIPMessageSent)
 
 	return &AnyMsgSentEvent{
 		SequenceNumber: rawevent.SequenceNumber,
@@ -1282,6 +1286,11 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 	CCIPPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress
 	MCMsPackageId := state.SuiChains[cfg.SourceChain].MCMsAddress
 
+	suiSigner, err := deps.SuiChain.Signer.GetAddress()
+	if err != nil {
+		return "", "", err
+	}
+
 	// Deploy transferrable token on EVM
 	evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
 	if err != nil {
@@ -1293,33 +1302,29 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 		return "", "", fmt.Errorf("failed to attach token to registry for evm %d: %w", cfg.DestChain, err)
 	}
 
-	// // // Deploy LockRelease TP on SUI
-	deployLockReleaseTp, err := operations.ExecuteSequence(e.OperationsBundle, lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolSequence, deps.SuiChain,
-		lockreleasetokenpoolops.DeployAndInitLockReleaseTokenPoolInput{
-			LockReleaseTokenPoolDeployInput: lockreleasetokenpoolops.LockReleaseTokenPoolDeployInput{
+	// // // Deploy BurnMint TP on SUI
+	deployBurnMintTp, err := operations.ExecuteSequence(e.OperationsBundle, burnminttokenpoolops.DeployAndInitBurnMintTokenPoolSequence, deps.SuiChain,
+		burnminttokenpoolops.DeployAndInitBurnMintTokenPoolInput{
+			BurnMintTokenPoolDeployInput: burnminttokenpoolops.BurnMintTokenPoolDeployInput{
 				CCIPPackageId:          CCIPPackageId,
 				CCIPTokenPoolPackageId: tokenPoolAddress,
 				MCMSAddress:            MCMsPackageId,
-				MCMSOwnerAddress:       "0x2",
+				MCMSOwnerAddress:       suiSigner,
 			},
 
-			CoinObjectTypeArg:     linkTokenPkgId + "::link_token::LINK_TOKEN",
-			CCIPObjectRefObjectId: ccipObjectRefId,
-			CoinMetadataObjectId:  linkTokenObjectMetadataId,
-			TreasuryCapObjectId:   linkTokenTreasuryCapId,
-			TokenPoolPackageId:    tokenPoolAddress,
-			Rebalancer:            "",
+			CoinObjectTypeArg:      linkTokenPkgId + "::link_token::LINK_TOKEN",
+			CCIPObjectRefObjectId:  ccipObjectRefId,
+			CoinMetadataObjectId:   linkTokenObjectMetadataId,
+			TreasuryCapObjectId:    linkTokenTreasuryCapId,
+			TokenPoolPackageId:     tokenPoolAddress,
+			TokenPoolAdministrator: suiSigner,
 
 			// apply dest chain updates
 			RemoteChainSelectorsToRemove: []uint64{},
 			RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
-			RemotePoolAddressesToAdd: [][]string{
-				{
-					evmToken.Address().String(),
-				},
-			},
+			RemotePoolAddressesToAdd:     [][]string{{evmPool.Address().String()}},
 			RemoteTokenAddressesToAdd: []string{
-				evmPool.Address().String(),
+				evmToken.Address().String(),
 			},
 
 			// set chain rate limiter configs
@@ -1336,7 +1341,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 	}
 
 	suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
-	suiPoolBytes, _ := hex.DecodeString(deployLockReleaseTp.Output.LockReleaseTPPackageID)
+	suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.CCIPPackageId)
 
 	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
 	if err != nil {
@@ -1348,7 +1353,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 		return "", "", fmt.Errorf("failed to grant burnMint %d: %w", cfg.DestChain, err)
 	}
 
-	return deployLockReleaseTp.Output.LockReleaseTPPackageID, deployLockReleaseTp.Output.Objects.StateObjectId, nil
+	return deployBurnMintTp.Output.CCIPPackageId, deployBurnMintTp.Output.Objects.StateObjectId, nil
 }
 
 // Helper function to convert a string to a string pointer
@@ -1631,9 +1636,14 @@ func AddLane(
 		changesets = append(changesets, AddLaneAptosChangesets(t, from, to, gasPrices, nil)...)
 	case chainsel.FamilyTon:
 		changesets = append(changesets, AddLaneTONChangesets(e, from, to, fromFamily, toFamily))
+		// case chainsel.FamilySui:
+		// 	changesets = append(changesets, AddLaneSuiChangesets(t, from, to, gasPrices, nil)...)
 	}
+
+	fmt.Println("APPLY CHANGESETS: ", changesets)
 	e.Env, _, err = commoncs.ApplyChangesets(t, e.Env, changesets)
 	if err != nil {
+		fmt.Println("ERROR APPLYING CHANGESET", err)
 		return err
 	}
 	return nil
@@ -1756,6 +1766,7 @@ func AddEVMSrcChangesets(from, to uint64, isTestRouter bool, gasprice map[uint64
 			},
 		),
 	}
+
 	return evmSrcChangesets
 }
 

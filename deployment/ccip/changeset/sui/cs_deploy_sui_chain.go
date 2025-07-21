@@ -3,7 +3,6 @@ package sui
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -97,7 +96,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		// Run DeployAndInitCCIpSequence
 		ccipSeqInput := ccipops.DeployAndInitCCIPSeqInput{
 			LinkTokenCoinMetadataObjectId: config.ContractParamsPerChain[chainSel].FeeQuoterParams.LinkTokenCoinMetadataObjectId,
-			LocalChainSelector:            config.ContractParamsPerChain[chainSel].OnRampParams.ChainSelector,
+			LocalChainSelector:            chainSel,
 			DestChainSelector:             config.ContractParamsPerChain[chainSel].DestChainSelector,
 			MaxFeeJuelsPerMsg:             config.ContractParamsPerChain[chainSel].FeeQuoterParams.MaxFeeJuelsPerMsg,
 			TokenPriceStalenessThreshold:  config.ContractParamsPerChain[chainSel].FeeQuoterParams.TokenPriceStalenessThreshold,
@@ -223,7 +222,8 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save onRamp state object Id  %s for Sui chain %d: %w", ccipOnRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
 
-		onRampBytes := [][]byte{common.HexToAddress(ccipOnRampSeqReport.Output.CCIPOnRampPackageId).Bytes()}
+		fmt.Println("ETH ONRAMP: ", deps.CCIPOnChainState.Chains[ccipSeqInput.DestChainSelector].OnRamp.Address())
+		onRampBytes := [][]byte{deps.CCIPOnChainState.Chains[ccipSeqInput.DestChainSelector].OnRamp.Address().Bytes()} // ethereum chain onRamp bytes
 
 		// Run DeployAndInitCCIPOffRampSequence
 		ccipOffRampSeqInput := offrampops.DeployAndInitCCIPOffRampSeqInput{
@@ -247,6 +247,8 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
 		}
 		seqReports = append(seqReports, ccipOffRampSeqReport.ExecutionReports...)
+
+		fmt.Println("SUI OFFRAMP: ", ccipOffRampSeqReport.Output.CCIPOffRampPackageId)
 
 		// save offRamp address to the addressbook
 		typeAndVersionOffRamp := cldf.NewTypeAndVersion(shared.SuiOffRampType, deployment.Version1_6_0)

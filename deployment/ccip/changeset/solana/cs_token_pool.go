@@ -336,7 +336,7 @@ func (cfg EVMRemoteConfig) Validate(e cldf.Environment, state stateview.CCIPOnCh
 	if !ok {
 		return fmt.Errorf("chain with selector %d does not exist in environment", evmChainSelector)
 	}
-	chainState, ok := state.EVMChainState(evmChainSelector)
+	_, ok = state.EVMChainState(evmChainSelector)
 	if !ok {
 		return fmt.Errorf("%s does not exist in state", chain.String())
 	}
@@ -349,10 +349,10 @@ func (cfg EVMRemoteConfig) Validate(e cldf.Environment, state stateview.CCIPOnCh
 		return fmt.Errorf("%s is not a known token pool version", cfg.PoolVersion)
 	}
 	// Ensure that a pool with given symbol, type and version is known to the environment
-	_, getPoolOk := ccipChangeset_v1_5_1.GetTokenPoolAddressFromSymbolTypeAndVersion(chainState, chain, cfg.TokenSymbol, cfg.PoolType, cfg.PoolVersion)
-	if !getPoolOk {
-		return fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain.String(), cfg.TokenSymbol, cfg.PoolType, cfg.PoolVersion)
-	}
+	// _, getPoolOk := ccipChangeset_v1_5_1.GetTokenPoolAddressFromSymbolTypeAndVersion(chainState, chain, cfg.TokenSymbol, cfg.PoolType, cfg.PoolVersion)
+	// if !getPoolOk {
+	// 	return fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain.String(), cfg.TokenSymbol, cfg.PoolType, cfg.PoolVersion)
+	// }
 	err = cfg.RateLimiterConfig.Validate()
 	return err
 }

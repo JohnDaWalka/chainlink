@@ -6,7 +6,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
+	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	suicodec "github.com/smartcontractkit/chainlink-sui/relayer/codec"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink-sui/relayer/testutils"
@@ -31,7 +31,7 @@ type RampMessageHeader struct {
 	MessageId           []byte
 	SourceChainSelector uint64
 	DestChainSelector   uint64
-	SequenceNumber      uint64 `json:"seqNum"`
+	SequenceNumber      uint64
 	Nonce               uint64
 }
 
@@ -48,7 +48,7 @@ type Sui2AnyRampMessage struct {
 
 type CCIPMessageSent struct {
 	DestChainSelector uint64
-	SequenceNumber    uint64 `json:"sequenceNumber"`
+	SequenceNumber    uint64
 	Message           Sui2AnyRampMessage
 }
 
@@ -96,10 +96,10 @@ func NewSuiCtx(e cldf.Environment, src uint64) (*suiCtx, error) {
 func baseCCIPConfig(
 	ccipPkg string,
 	pubKey []byte,
-	extra []chainwriter.ChainWriterPTBCommand,
-) chainwriter.ChainWriterConfig {
+	extra []config.ChainWriterPTBCommand,
+) config.ChainWriterConfig {
 	// common PTB command 0: create_token_params
-	cmds := []chainwriter.ChainWriterPTBCommand{{
+	cmds := []config.ChainWriterPTBCommand{{
 		Type:      suicodec.SuiPTBCommandMoveCall,
 		PackageId: strPtr(ccipPkg),
 		ModuleId:  strPtr("dynamic_dispatcher"),
@@ -113,12 +113,12 @@ func baseCCIPConfig(
 	// append the variant commands
 	cmds = append(cmds, extra...)
 
-	return chainwriter.ChainWriterConfig{
-		Modules: map[string]*chainwriter.ChainWriterModule{
-			chainwriter.PTBChainWriterModuleName: {
-				Name:     chainwriter.PTBChainWriterModuleName,
+	return config.ChainWriterConfig{
+		Modules: map[string]*config.ChainWriterModule{
+			config.PTBChainWriterModuleName: {
+				Name:     config.PTBChainWriterModuleName,
 				ModuleID: "0x123",
-				Functions: map[string]*chainwriter.ChainWriterFunction{
+				Functions: map[string]*config.ChainWriterFunction{
 					"ccip_send": {
 						Name:        "ccip_send",
 						PublicKey:   pubKey,
@@ -135,8 +135,8 @@ func baseCCIPConfig(
 func configureChainWriterForMsg(
 	ccipPkg, onRampPkg string,
 	pubKey []byte,
-) chainwriter.ChainWriterConfig {
-	extra := []chainwriter.ChainWriterPTBCommand{{
+) config.ChainWriterConfig {
+	extra := []config.ChainWriterPTBCommand{{
 		Type:      suicodec.SuiPTBCommandMoveCall,
 		PackageId: strPtr(onRampPkg),
 		ModuleId:  strPtr("onramp"),
@@ -157,18 +157,18 @@ func configureChainWriterForMsg(
 	return baseCCIPConfig(ccipPkg, pubKey, extra)
 }
 
-// 2b) Message + LockReleasePool → EVM
+// 2b) Message + BurnMintTP → EVM
 func configureChainWriterForMultipleTokens(
 	ccipPkg, onRampPkg string,
 	pubKey []byte,
-	lockReleaseTokenPool string,
-) chainwriter.ChainWriterConfig {
-	extra := []chainwriter.ChainWriterPTBCommand{
+	tokenPool string,
+) config.ChainWriterConfig {
+	extra := []config.ChainWriterPTBCommand{
 		// lock-or-burn command
 		{
 			Type:      suicodec.SuiPTBCommandMoveCall,
-			PackageId: strPtr(lockReleaseTokenPool),
-			ModuleId:  strPtr("lock_release_token_pool"),
+			PackageId: strPtr(tokenPool),
+			ModuleId:  strPtr("burn_mint_token_pool"),
 			Function:  strPtr("lock_or_burn"),
 			Params: []suicodec.SuiFunctionParam{
 				{Name: "ref", Type: "object_id", Required: true},
@@ -202,7 +202,7 @@ func configureChainWriterForMultipleTokens(
 	return baseCCIPConfig(ccipPkg, pubKey, extra)
 }
 
-func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) chainwriter.Arguments {
+func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) config.Arguments {
 	args := make(map[string]any, len(baseArgs)+len(extraArgs))
 	for k, v := range baseArgs {
 		args[k] = v
@@ -218,7 +218,7 @@ func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string
 		argTypes["c"] = coinType
 	}
 
-	return chainwriter.Arguments{
+	return config.Arguments{
 		Args:     args,
 		ArgTypes: argTypes,
 	}
