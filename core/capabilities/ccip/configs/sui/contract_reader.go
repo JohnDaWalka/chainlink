@@ -184,7 +184,8 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Type:     "u64",
 								Required: true,
 							},
-						},
+						}, // is_enabled:true is_rmn_verification_disabled:true min_seq_nr:1 on_ramp
+						ResultTupleToStruct: []string{"Router", "IsEnabled", "IsRMNVerificationDisabled", "MinSeqNr", "OnRamp"},
 					},
 					// consts.MethodNameGetExecutionState:{
 					// 	"Name": "get_execution_state",
