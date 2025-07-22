@@ -13,8 +13,6 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../lib
 
-replace github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_0 => github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
-
 require (
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/gin-gonic/gin v1.10.0
@@ -201,7 +199,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gagliardetto/binary v0.8.0 // indirect
-	github.com/gagliardetto/solana-go v1.12.0 // indirect
+	github.com/gagliardetto/solana-go v1.13.0 // indirect
 	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/gagliardetto/utilz v0.1.1 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
@@ -454,7 +452,8 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250716191209-5639135b7716 // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250704143810-ee587a6c0562 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250718204720-0b2de278721f // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250715132921-fbb00f834ac8 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135 // indirect

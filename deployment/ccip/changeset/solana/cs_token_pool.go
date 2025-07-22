@@ -16,17 +16,17 @@ import (
 	"github.com/smartcontractkit/mcms"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
-	solBaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
-	solBurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/burnmint_token_pool"
-	solLockReleaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	solBaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/base_token_pool"
+	solBurnMintTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
+	solLockReleaseTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/lockrelease_token_pool"
+	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/test_token_pool"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
+	solBurnMintTokenPool_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/burnmint_token_pool"
+	solLockReleaseTokenPool_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/lockrelease_token_pool"
 	tokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
-	solBurnMintTokenPool_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_0/gobindings/burnmint_token_pool"
-	solLockReleaseTokenPool_v0_1_0 "github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_0/gobindings/lockrelease_token_pool"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 

@@ -13,7 +13,7 @@ import (
 
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
-	mcmBindings "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
+	mcmBindings "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/mcm"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	solanaUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"

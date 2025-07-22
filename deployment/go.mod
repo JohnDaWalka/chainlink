@@ -5,10 +5,6 @@ go 1.24.4
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
-replace github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_0 => github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
-
-require github.com/smartcontractkit/chainlink-ccip/chains/solana_v0_1_0 v0.0.0-20250609091505-5c8cd74b92ed // v0.1.0-solana
-
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250430150202-611699e34308
@@ -23,7 +19,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/gagliardetto/binary v0.8.0
-	github.com/gagliardetto/solana-go v1.12.0
+	github.com/gagliardetto/solana-go v1.13.0
 	github.com/go-resty/resty/v2 v2.16.3
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -36,7 +32,8 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.62
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250716191209-5639135b7716
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250704143810-ee587a6c0562
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250718204720-0b2de278721f
 	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250716155550-5a0b5ac522b2
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250716113058-ebc5e77f06ba
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.2

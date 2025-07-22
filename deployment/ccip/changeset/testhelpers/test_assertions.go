@@ -27,7 +27,7 @@ import (
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	solccip "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 

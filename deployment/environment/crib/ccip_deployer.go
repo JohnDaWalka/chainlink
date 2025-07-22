@@ -42,7 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/test_token_pool"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"

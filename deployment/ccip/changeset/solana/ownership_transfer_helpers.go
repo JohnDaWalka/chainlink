@@ -8,12 +8,12 @@ import (
 
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
-	burnmint "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/burnmint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	lockrelease "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/lockrelease_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
+	burnmint "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
+	lockrelease "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/lockrelease_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
