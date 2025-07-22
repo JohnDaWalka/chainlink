@@ -47,6 +47,10 @@ import (
 	datastreamsllo "github.com/smartcontractkit/chainlink-data-streams/llo"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
+	"github.com/smartcontractkit/sanmarino-dkg-impl/dummydkg"
+	"github.com/smartcontractkit/sanmarino-dkg-impl/tdh2shim"
+	"github.com/smartcontractkit/tdh2/go/tdh2/lib/group/nist"
+	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	gatewayconnector "github.com/smartcontractkit/chainlink/v2/core/capabilities/gateway_connector"
@@ -610,6 +614,29 @@ type connProvider interface {
 	ClientConn() grpc.ClientConnInterface
 }
 
+func dkgKeys(dkgConfig *vault.DKGConfig) (*tdh2easy.PublicKey, *tdh2easy.PrivateShare, error) {
+	group := nist.NewP256()
+	instanceID, recipCfg, recipSecKeys, err := dummydkg.NewDKGSetup(dkgConfig.N, dkgConfig.T, group)
+	if err != nil {
+		return nil, nil, err
+	}
+	result, err := dummydkg.NewDKGResult(instanceID, recipCfg, group)
+	if err != nil {
+		return nil, nil, err
+	}
+	pk, err := tdh2shim.TDH2PublicKeyFromDKGResult(result)
+	if err != nil {
+		return nil, nil, err
+	}
+	secKey := recipSecKeys[dkgConfig.Index]
+	secKeyShare, err := tdh2shim.TDH2PrivateShareFromDKGResult(result, secKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pk, secKeyShare, nil
+}
+
 func (d *Delegate) newServicesVaultPlugin(
 	ctx context.Context,
 	lggr logger.SugaredLogger,
@@ -738,8 +765,16 @@ func (d *Delegate) newServicesVaultPlugin(
 		OnchainKeyring:          onchainKeyringAdapter,
 		MetricsRegisterer:       prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
-	// TODO: use properly generated config
-	oracleArgs.ReportingPluginFactory = vault.NewReportingPluginFactory(lggr, store, &vault.ReportingPluginConfig{})
+	// TODO: use non-dummy implementation once it's available.
+	pk, secKeyShare, err := dkgKeys(cfg.DKG)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to get DKG keys: %w", err)
+	}
+	rpf, err := vault.NewReportingPluginFactory(lggr.Named("VaultPluginFactory"), store, pk, secKeyShare)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to create reporting plugin factory: %w", err)
+	}
+	oracleArgs.ReportingPluginFactory = rpf
 
 	oracle, err := libocr2.NewOracle(oracleArgs)
 	if err != nil {
