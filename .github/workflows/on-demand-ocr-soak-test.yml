@@ -123,15 +123,11 @@ jobs:
   run-e2e-tests-workflow:
     name: Run E2E Tests
     needs:
-      - wait-for-workflows
       - setup-test-parameters
     # Run this job only if:
     # - optional wait-for-workflows did not fail (published release image might not be required),
     # - and the other dependencies were successful.
-    if: >-
-      always() &&
-      needs.wait-for-workflows.result != 'failure' && 
-      needs.setup-test-parameters.result == 'success'
+    if: always() && needs.setup-test-parameters.result == 'success'
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@9c82f8c4d2599c4c7d4e5045bcc0a28f0bf34272
     with:
       chainlink_version: ${{ needs.setup-test-parameters.outputs.chainlink_image_version }}
