@@ -1,0 +1,48 @@
+
+[blockchain]
+  chain_id = "1337"
+  port = "8545"
+  type = "anvil"
+#  docker_cmd_params = ["-b", "5"]
+
+[custom_anvil_miner]
+  block_speed_seconds = 5
+
+[infra]
+  type = "docker"
+
+[dependencies]
+  # points to capabilities repository that's on the same level as chainlink repository
+  cron_capability_binary_path = "../../../../../capabilities/cron/cron"
+
+[jd]
+  csa_encryption_key = "d1093c0060d50a3c89c189b2e485da5a3ce57f3dcb38ab7e2c0d5f0bb2314a44" # any random 32 byte hex string
+  image = "job-distributor:0.12.7"
+
+[[nodesets]]
+  http_port_range_start = 10100
+  name = "workflow"
+  nodes = 5
+  override_mode = "all"
+
+  [nodesets.db]
+    image = "postgres:12.0"
+    port = 13000
+    volume_name = "workflow_volume"
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      image = "chainlink:cre-workshop"
+      user_config_overrides = """
+
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
+      """
+
+      [nodesets.node_specs.node.env_vars]
+      CL_EVM_CMD=""

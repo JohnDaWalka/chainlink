@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,9 +32,11 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -81,6 +84,7 @@ type SetupInput struct {
 	CustomBinariesPaths                  map[cretypes.CapabilityFlag]string
 	OCR3Config                           *keystone_changeset.OracleConfig
 	S3ProviderInput                      *s3provider.Input
+	CustomAnvilMiner                     *cretypes.CustomAnvilMiner
 }
 
 type backgroundStageResult struct {
@@ -124,21 +128,20 @@ func SetupTestEnvironment(
 		}
 	}()
 
-	stageGen := NewStageGen(8, "STAGE")
-
-	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting MinIO")))
+	stageGen := NewStageGen(7, "STAGE")
 
 	var s3ProviderOutput *s3provider.Output
 	if input.S3ProviderInput != nil {
+		stageGen = NewStageGen(8, "STAGE")
+		fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting MinIO")))
 		var s3ProviderErr error
 		s3ProviderOutput, s3ProviderErr = s3provider.NewMinioFactory().NewFrom(input.S3ProviderInput)
 		if s3ProviderErr != nil {
 			return nil, pkgerrors.Wrap(s3ProviderErr, "minio provider creation failed")
 		}
+		testLogger.Debug().Msgf("S3Provider.Output value: %#v", s3ProviderOutput)
+		fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("MinIO started in %.2f seconds", stageGen.Elapsed().Seconds())))
 	}
-	testLogger.Debug().Msgf("S3Provider.Output value: %#v", s3ProviderOutput)
-
-	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("MinIO started in %.2f seconds", stageGen.Elapsed().Seconds())))
 
 	bi := BlockchainsInput{
 		infra:    &input.InfraInput,
@@ -492,6 +495,22 @@ func SetupTestEnvironment(
 		configureKeystoneInput.OCR3Config = *ocr3Config
 	}
 
+	if input.CustomAnvilMiner != nil {
+		for _, bi := range input.BlockchainsInput {
+			if bi.Type == blockchain.TypeAnvil {
+				if slices.Contains(bi.DockerCmdParamsOverrides, "-b") {
+					return nil, pkgerrors.New("custom_anvil_miner was specified but Anvil has '-b' key set, remove that parameter from 'docker_cmd_params' to run deployments instantly or remove custom_anvil_miner key from TOML config")
+				}
+			}
+		}
+		for _, bo := range blockchainOutputs {
+			if bo.BlockchainOutput.Type == blockchain.TypeAnvil {
+				miner := rpc.NewRemoteAnvilMiner(bo.BlockchainOutput.Nodes[0].ExternalHTTPUrl, nil)
+				miner.MinePeriodically(time.Duration(input.CustomAnvilMiner.BlockSpeedSeconds) * time.Second)
+			}
+		}
+	}
+
 	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)
 	if keystoneErr != nil {
 		return nil, pkgerrors.Wrap(keystoneErr, "failed to configure keystone contracts")
@@ -501,7 +520,7 @@ func SetupTestEnvironment(
 
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Writing bootstrapping data into disk (address book, data store, etc...)")))
 
-	err = DumpArtifact(
+	artifactPath, artifactErr := DumpArtifact(
 		memoryDatastore.AddressRefStore,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		*jdOutput,
@@ -509,10 +528,11 @@ func SetupTestEnvironment(
 		fullCldOutput.Environment.Offchain,
 		input.CapabilitiesContractFactoryFunctions,
 	)
-	if err != nil {
-		testLogger.Error().Err(err).Msg("failed to generate artifact")
+	if artifactErr != nil {
+		testLogger.Error().Err(artifactErr).Msg("failed to generate artifact")
 		fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Failed to write bootstrapping data into disk in %.2f seconds", stageGen.Elapsed().Seconds())))
 	} else {
+		testLogger.Info().Msgf("Environment artifact saved to %s", artifactPath)
 		fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Wrote bootstrapping data into disk in %.2f seconds", stageGen.Elapsed().Seconds())))
 	}
 

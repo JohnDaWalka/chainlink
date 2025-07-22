@@ -33,7 +33,8 @@
 [extra_capabilities]
 # uncomment as needed and adjust paths to enable these capabilities and have them copied to containers/pods
 # these default paths assume that binaries are placed in core/scripts/cre/environment/ folder
-# cron_capability_binary_path = "./cron"
+  # points to capabilities repository that's on the same level as chainlink repository
+  cron_capability_binary_path = "../../../../../capabilities/cron/cron"
 # log_event_trigger_binary_path = "./logtrigger"
 # read_contract_capability_binary_path = "./readcontract"
 
@@ -49,11 +50,7 @@
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
+      image = "chainlink:cre-workshop"
       custom_ports = ["5002:5002"]
       user_config_overrides = """
       [Log]
@@ -66,17 +63,17 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
+      image = "chainlink:cre-workshop"
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -88,17 +85,17 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
+      image = "chainlink:cre-workshop"
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -110,17 +107,17 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
+      image = "chainlink:cre-workshop"
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -132,17 +129,17 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
-      docker_ctx = "../../../.."
-      docker_file = "core/chainlink.Dockerfile"
-      # image = "chainlink-tmp:latest"
-      # omitted on purpose, if not defined here it will be added by Go code if worker nodes from this DON have cron capability
-      # capabilities = ['./cron']
+      image = "chainlink:cre-workshop"
       user_config_overrides = """
       [Log]
       Level = 'debug'
@@ -154,6 +151,10 @@
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1
+      HeartbeatInterval = '30s'
+
+      [CRE.WorkflowFetcher]
+      URL = "file:///home/chainlink/workflows"
       """
       [nodesets.node_specs.node.env_vars]
       CL_EVM_CMD=""
