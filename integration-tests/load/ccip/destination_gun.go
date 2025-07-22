@@ -331,7 +331,7 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			ComputeUnits:             150000,
 		}
 	case selectors.FamilyAptos:
-		rcv = m.receiver
+		rcv = common.LeftPadBytes(m.receiver, 32)
 		// Aptos destinations require out-of-order execution to be enabled
 		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(100000), true)
 		if err != nil {
@@ -392,9 +392,17 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no state available for source chain %d", src)
 		}
 
+		m.l.Infow("Token addresses from state", "StaticLinkToken", srcChainState.StaticLinkToken.Address(), "LinkToken", srcChainState.LinkToken)
+		linkAddr, err := srcChainState.LinkTokenAddress()
+		if err != nil {
+			m.l.Error("Could not fetch Link or Static link from state")
+			return router.ClientEVM2AnyMessage{}, 0, err
+		}
+		m.l.Infow("Selected token address for CCIP message", "linkAddr", linkAddr.Hex())
+
 		message.TokenAmounts = []router.ClientEVMTokenAmount{
 			{
-				Token:  srcChainState.LinkToken.Address(),
+				Token:  linkAddr,
 				Amount: big.NewInt(1),
 			},
 		}
@@ -414,6 +422,27 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			}
 			svmExtraArgs.TokenReceiver = tokenReceiver
 		}
+	}
+
+	// Debug log the complete message structure
+	m.l.Debugw("CCIP Message Details",
+		"Receiver", fmt.Sprintf("%x", message.Receiver),
+		"Data", fmt.Sprintf("%x", message.Data),
+		"TokenAmounts", message.TokenAmounts,
+		"FeeToken", message.FeeToken.String(),
+		"ExtraArgs", fmt.Sprintf("%x", message.ExtraArgs),
+		"DestinationChainSelector", m.chainSelector,
+		"SourceChain", src,
+		"MessageType", selectedMsgDetails.MsgType,
+		"IsTokenTransfer", selectedMsgDetails.IsTokenTransfer(),
+		"IsDataTransfer", selectedMsgDetails.IsDataTransfer(),
+	)
+
+	// For token transfers to Aptos, set the fee token to the same token being transferred
+	if selectedMsgDetails.IsTokenTransfer() && len(message.TokenAmounts) > 0 {
+		// Use the first token as the fee token for token transfers to Aptos
+		message.FeeToken = message.TokenAmounts[0].Token
+		m.l.Debugw("Set fee token for Aptos token transfer", "feeToken", message.FeeToken.String())
 	}
 
 	gasLimit := int64(0)
@@ -594,11 +623,10 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 	}
 
 	return testhelpers.AptosSendRequest{
-		Receiver:      receiver,
-		Data:          data,
-		ExtraArgs:     extraArgs,
-		FeeToken:      feeToken,
-		FeeTokenStore: feeToken, // Set FeeTokenStore to same as FeeToken for messaging-only transactions
-		TokenAmounts:  tokenAmounts,
+		Receiver:     receiver,
+		Data:         data,
+		ExtraArgs:    extraArgs,
+		FeeToken:     feeToken,
+		TokenAmounts: tokenAmounts,
 	}, nil
 }

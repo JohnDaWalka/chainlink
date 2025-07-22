@@ -34,6 +34,7 @@ type LoadConfig struct {
 	GasLimit             *uint64
 	OOOExecution         *bool
 	SolanaDataSize       *int
+	Testnet              *bool
 }
 
 const (

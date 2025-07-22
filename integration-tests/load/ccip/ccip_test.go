@@ -33,10 +33,18 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig/ccip"
 )
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
 
 var (
 	CommonTestLabels = map[string]string{
@@ -48,21 +56,11 @@ var (
 
 // this key only works on simulated geth chains in crib
 var (
-	// Sim key - read from environment variables
+	// Deployer keys with support for env var loading in case of testnet runs
 	simChainTestKey = getEnvOrDefault("SIM_CHAIN_TEST_KEY", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-	// simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	solTestKey   = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
-	aptosTestKey = getEnvOrDefault("APTOS_TEST_KEY", "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366")
-	// aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
+	solTestKey      = getEnvOrDefault("SOL_TEST_KEY", "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC")
+	aptosTestKey    = getEnvOrDefault("APTOS_TEST_KEY", "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366")
 )
-
-// getEnvOrDefault returns the environment variable value or the default if not set
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 func runSafely(ops ...func()) {
 	for _, op := range ops {
@@ -118,7 +116,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 
 	// generate environment from crib-produced files
 	cribEnv := crib.NewDevspaceEnvFromStateDir(lggr, *userOverrides.CribEnvDirectory)
-	cribDeployOutput, err := cribEnv.GetConfig(simChainTestKey, solTestKey)
+	cribDeployOutput, err := cribEnv.GetConfig(simChainTestKey, solTestKey, aptosTestKey)
 	require.NoError(t, err)
 	env, err := crib.NewDeployEnvironmentFromCribOutput(lggr, cribDeployOutput)
 	require.NoError(t, err)
@@ -182,6 +180,14 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	startBlocks := make(map[uint64]*uint64)
 	state, err := stateview.LoadOnchainState(*env)
 	require.NoError(t, err)
+
+	// Deploy Aptos CCIP receiver contracts if Aptos chains are present
+	if len(aptosChains) > 0 {
+		testhelpers.DeployAptosCCIPReceiver(t, *env)
+		// Reload state to include the newly deployed receiver addresses
+		state, err = stateview.LoadOnchainState(*env)
+		require.NoError(t, err)
+	}
 
 	for chainSel := range state.SolChains {
 		SetProgramIDsSafe(state.SolChains[chainSel])
@@ -257,7 +263,10 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				finalSeqNrExecChannels)
 		case selectors.FamilyAptos:
 			client := env.BlockChains.AptosChains()[cs].Client
-			var version uint64 = 0 // tx version
+			nodeInfo, err := client.Info()
+			require.NoError(t, err)
+
+			var version uint64 = nodeInfo.LedgerVersion() // tx version
 			startBlocks[cs] = &version
 			go subscribeAptosTransmitEvents(
 				ctx,
@@ -286,6 +295,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 
 		// Initialize the map for this destination
 		evmSourceKeys[cs] = make(map[uint64]*bind.TransactOpts)
+		aptosSourceKeys[cs] = make(map[uint64]*aptos.Account)
 
 		for _, src := range srcChains {
 			selFamily, err := selectors.GetSelectorFamily(src)
@@ -345,14 +355,24 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
-					return nil
-					// return prepareAccountToSendLink(
-					// 	lggr,
-					// 	state,
-					// 	*env,
-					// 	src,
-					// 	evmSourceKeys[cs][src],
-					// )
+					if *userOverrides.Testnet {
+						return nil
+						return prepareAccountToSendLinkTestnet(
+							lggr,
+							state,
+							*env,
+							src,
+							evmSourceKeys[cs][src],
+						)
+					} else {
+						return prepareAccountToSendLink(
+							lggr,
+							state,
+							*env,
+							src,
+							evmSourceKeys[cs][src],
+						)
+					}
 				default:
 					return nil
 				}

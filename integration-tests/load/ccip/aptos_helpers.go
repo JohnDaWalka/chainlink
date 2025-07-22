@@ -141,6 +141,7 @@ func subscribeAptosTransmitEvents(
 				DestChainSelector:   event.DestChainSelector,
 			}
 
+			// Initialize the sequence number range if it doesn't exist
 			if seqNums[csPair].Start == nil {
 				lggr.Infow("Initializing sequence number range for new chain pair", "csPair", csPair)
 				seqNums[csPair] = SeqNumRange{
@@ -256,6 +257,13 @@ func subscribeAptosCommitEvents(
 			// Process both blessed and unblessed merkle roots
 			allRoots := append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...)
 			for _, mr := range allRoots {
+				// lggr.Infow("Received aptos commit report ",
+				// 	"sourceChain", mr.SourceChainSelector,
+				// 	"destChain", chainSelector,
+				// 	"minSeqNr", mr.MinSeqNr,
+				// 	"maxSeqNr", mr.MaxSeqNr,
+				// 	"version", eventWithVersion.Version)
+
 				// Push metrics for each sequence number in the range
 				for i := mr.MinSeqNr; i <= mr.MaxSeqNr; i++ {
 					data := messageData{

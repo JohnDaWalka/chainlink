@@ -29,6 +29,7 @@ func TestStaging_CCIP_Load(t *testing.T) {
 
 	evmSourceKey := simChainTestKey
 	solSourceKey := solTestKey
+	aptosSourceKey := aptosTestKey
 
 	// get user defined configurations
 	config, err := tc.GetConfig([]string{"Load"}, tc.CCIP)
@@ -37,7 +38,7 @@ func TestStaging_CCIP_Load(t *testing.T) {
 
 	// generate environment from crib-produced files
 	cribEnv := crib.NewDevspaceEnvFromStateDir(lggr, *userOverrides.CribEnvDirectory)
-	cribDeployOutput, err := cribEnv.GetConfig(evmSourceKey, solSourceKey)
+	cribDeployOutput, err := cribEnv.GetConfig(evmSourceKey, solSourceKey, aptosSourceKey)
 	require.NoError(t, err)
 	env, err := crib.NewDeployEnvironmentFromCribOutput(lggr, cribDeployOutput)
 	require.NoError(t, err)

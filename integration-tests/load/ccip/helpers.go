@@ -500,6 +500,8 @@ func fundAdditionalKeys(lggr logger.Logger, e cldf.Environment, destChains []uin
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert private key to ECDSA: %w", err)
 			}
+			fmt.Printf("Chain selector: %v, Private key: %s\n", chain, pk)
+
 			chainID, err := chainselectors.ChainIdFromSelector(chain)
 			if err != nil {
 				return nil, fmt.Errorf("could not get chain id from selector: %w", err)
@@ -628,6 +630,34 @@ func prepareAccountToSendLink(
 	lggr.Infow("Approving routers")
 	// Approve the router to spend the tokens and confirm the tx's
 	// To prevent having to approve the router for every transfer, we approve a sufficiently large amount
+	tx, err = srcLink.Approve(srcAccount, state.Chains[src].Router.Address(), big.NewInt(math.MaxInt64))
+	_, err = cldf.ConfirmIfNoError(e.BlockChains.EVMChains()[src], tx, err)
+	return err
+}
+
+func prepareAccountToSendLinkTestnet(
+	lggr logger.Logger,
+	state stateview.CCIPOnChainState,
+	e cldf.Environment,
+	src uint64,
+	srcAccount *bind.TransactOpts) error {
+	srcDeployer := e.BlockChains.EVMChains()[src].DeployerKey
+	lggr.Infow("Setting up link token for testnet", "src", src)
+	srcLink := state.Chains[src].StaticLinkToken
+
+	lggr.Infow("Transferring 1 LINK token from deployer to source account",
+		"deployer", srcDeployer.From,
+		"account", srcAccount.From)
+
+	// Transfer 50 LINK tokens from deployer to source account
+	tx, err := srcLink.Transfer(srcDeployer, srcAccount.From, new(big.Int).Mul(big.NewInt(50), big.NewInt(1e18)))
+	_, err = cldf.ConfirmIfNoError(e.BlockChains.EVMChains()[src], tx, err)
+	if err != nil {
+		return err
+	}
+
+	lggr.Infow("Approving router to spend tokens")
+	// Approve the router to spend the tokens
 	tx, err = srcLink.Approve(srcAccount, state.Chains[src].Router.Address(), big.NewInt(math.MaxInt64))
 	_, err = cldf.ConfirmIfNoError(e.BlockChains.EVMChains()[src], tx, err)
 	return err
