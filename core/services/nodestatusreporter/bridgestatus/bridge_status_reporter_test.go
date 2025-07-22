@@ -1,4 +1,4 @@
-package eastatusreporter
+package bridgestatus
 
 import (
 	"context"
@@ -24,10 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	bridgeMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events"
-	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	jobMocks "github.com/smartcontractkit/chainlink/v2/core/services/job/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/nodestatusreporter/bridgestatus/events"
+	"github.com/smartcontractkit/chainlink/v2/core/services/nodestatusreporter/bridgestatus/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -53,11 +53,11 @@ func loadFixture(t *testing.T, filename string) string {
 	return string(data)
 }
 
-// loadFixtureAsEAStatusResponse loads and unmarshals fixture data
-func loadFixtureAsEAStatusResponse(t *testing.T, filename string) EAStatusResponse {
+// loadFixtureAsBridgeStatusResponse loads and unmarshals fixture data
+func loadFixtureAsBridgeStatusResponse(t *testing.T, filename string) BridgeStatusResponse {
 	fixtureData := loadFixture(t, filename)
 
-	var status EAStatusResponse
+	var status BridgeStatusResponse
 	err := json.Unmarshal([]byte(fixtureData), &status)
 	require.NoError(t, err, "Failed to unmarshal test fixture")
 
@@ -90,7 +90,7 @@ var (
 func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client) (*Service, *bridgeMocks.ORM, *jobMocks.ORM, *mocks.MessageEmitter) {
 	t.Helper()
 
-	eaConfig := mocks.NewTestEAStatusReporterConfig(enabled, testStatusPath, pollingInterval)
+	bridgeStatusConfig := mocks.NewTestBridgeStatusReporterConfig(enabled, testStatusPath, pollingInterval)
 
 	bridgeORM := bridgeMocks.NewORM(t)
 	jobORM := jobMocks.NewORM(t)
@@ -100,7 +100,7 @@ func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration,
 	// Reduce log noise
 	lggr.SetLogLevel(zapcore.ErrorLevel)
 
-	service := NewEaStatusReporter(eaConfig, bridgeORM, jobORM, httpClient, emitter, lggr)
+	service := NewBridgeStatusReporter(bridgeStatusConfig, bridgeORM, jobORM, httpClient, emitter, lggr)
 
 	return service, bridgeORM, jobORM, emitter
 }
@@ -109,7 +109,7 @@ func setupTestService(t *testing.T, enabled bool, pollingInterval time.Duration,
 func setupTestServiceWithIgnoreFlags(t *testing.T, enabled bool, pollingInterval time.Duration, httpClient *http.Client, ignoreInvalidBridges, ignoreJoblessBridges bool) (*Service, *bridgeMocks.ORM, *jobMocks.ORM, *mocks.MessageEmitter) {
 	t.Helper()
 
-	eaConfig := mocks.NewTestEAStatusReporterConfigWithSkip(enabled, testStatusPath, pollingInterval, ignoreInvalidBridges, ignoreJoblessBridges)
+	bridgeStatusConfig := mocks.NewTestBridgeStatusReporterConfigWithSkip(enabled, testStatusPath, pollingInterval, ignoreInvalidBridges, ignoreJoblessBridges)
 
 	bridgeORM := bridgeMocks.NewORM(t)
 	jobORM := jobMocks.NewORM(t)
@@ -119,12 +119,12 @@ func setupTestServiceWithIgnoreFlags(t *testing.T, enabled bool, pollingInterval
 	// Reduce log noise
 	lggr.SetLogLevel(zapcore.ErrorLevel)
 
-	service := NewEaStatusReporter(eaConfig, bridgeORM, jobORM, httpClient, emitter, lggr)
+	service := NewBridgeStatusReporter(bridgeStatusConfig, bridgeORM, jobORM, httpClient, emitter, lggr)
 
 	return service, bridgeORM, jobORM, emitter
 }
 
-func TestNewEaStatusReporter(t *testing.T) {
+func TestNewBridgeStatusReporter(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -181,7 +181,7 @@ func TestService_pollAllBridges_NoBridges(t *testing.T) {
 }
 
 func TestService_pollAllBridges_WithBridges(t *testing.T) {
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, bridgeORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	bridgeORM.On("BridgeTypes", mock.Anything, 0, 1000).Return(testBridges, len(testBridges), nil)
@@ -217,7 +217,7 @@ func TestService_pollAllBridges_FetchError(t *testing.T) {
 }
 
 func TestService_pollBridge_Success(t *testing.T) {
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Mock job ORM calls for finding external job IDs
@@ -311,7 +311,7 @@ func TestService_pollBridge_Non200Status(t *testing.T) {
 	jobORM.AssertExpectations(t)
 }
 
-func TestService_emitEAStatus_Success(t *testing.T) {
+func TestService_emitBridgeStatus_Success(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -319,12 +319,12 @@ func TestService_emitEAStatus_Success(t *testing.T) {
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
 	ctx := context.Background()
-	service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []JobInfo{})
+	service.emitBridgeStatus(ctx, "test-bridge", loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json"), []JobInfo{})
 
 	emitter.AssertExpectations(t)
 }
 
-func TestService_emitEAStatus_EmitError(t *testing.T) {
+func TestService_emitBridgeStatus_EmitError(t *testing.T) {
 	httpClient := &http.Client{}
 	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
@@ -333,7 +333,7 @@ func TestService_emitEAStatus_EmitError(t *testing.T) {
 
 	ctx := context.Background()
 	assert.NotPanics(t, func() {
-		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []JobInfo{})
+		service.emitBridgeStatus(ctx, "test-bridge", loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json"), []JobInfo{})
 	})
 
 	emitter.AssertExpectations(t)
@@ -357,7 +357,7 @@ func TestService_pollAllBridges_RefreshError(t *testing.T) {
 }
 
 func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, bridgeORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Setup bridge ORM mock to return our test bridges
@@ -375,7 +375,7 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
 		// Unmarshal protobuf to extract bridge name
 		protobufBytes := []byte(args.Get(1).(string))
-		var event events.EAStatusEvent
+		var event events.BridgeStatusEvent
 		if err := proto.Unmarshal(protobufBytes, &event); err == nil {
 			emittedBridgeNamesMutex.Lock()
 			emittedBridgeNames = append(emittedBridgeNames, event.BridgeName)
@@ -396,7 +396,7 @@ func TestService_pollAllBridges_MultipleBridges(t *testing.T) {
 	emitter.AssertExpectations(t)
 }
 
-func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
+func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 	emitter := mocks.NewMessageEmitter()
 	var capturedProtobufBytes []byte
 
@@ -406,7 +406,7 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 		capturedProtobufBytes = []byte(args.Get(1).(string))
 	})
 
-	config := mocks.NewTestEAStatusReporterConfig(true, "/status", 5*time.Minute)
+	config := mocks.NewTestBridgeStatusReporterConfig(true, "/status", 5*time.Minute)
 	service := &Service{
 		config:  config,
 		emitter: emitter,
@@ -415,12 +415,12 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 
 	// Load fixture and emit
 	ctx := context.Background()
-	status := loadFixtureAsEAStatusResponse(t, "ea_status_response.json")
-	service.emitEAStatus(ctx, "test-bridge", status, []JobInfo{})
+	status := loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json")
+	service.emitBridgeStatus(ctx, "test-bridge", status, []JobInfo{})
 
 	// Unmarshal and verify protobuf matches fixture values
 	require.NotEmpty(t, capturedProtobufBytes)
-	var event events.EAStatusEvent
+	var event events.BridgeStatusEvent
 	err := proto.Unmarshal(capturedProtobufBytes, &event)
 	require.NoError(t, err)
 
@@ -499,7 +499,7 @@ func TestService_Close_AlreadyClosed(t *testing.T) {
 }
 
 func TestService_PollAllBridges_3000Bridges(t *testing.T) {
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, mockORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	numBridges := 3000
@@ -583,7 +583,7 @@ func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
 	mockORM.AssertExpectations(t)
 }
 
-func TestService_emitEAStatus_EmptyFields(t *testing.T) {
+func TestService_emitBridgeStatus_EmptyFields(t *testing.T) {
 	emitter := mocks.NewMessageEmitter()
 	var capturedProtobufBytes []byte
 
@@ -593,7 +593,7 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 		capturedProtobufBytes = []byte(args.Get(1).(string))
 	})
 
-	config := mocks.NewTestEAStatusReporterConfig(true, "/status", 5*time.Minute)
+	config := mocks.NewTestBridgeStatusReporterConfig(true, "/status", 5*time.Minute)
 	service := &Service{
 		config:  config,
 		emitter: emitter,
@@ -602,12 +602,12 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 
 	// Load empty fixture and emit
 	ctx := context.Background()
-	status := loadFixtureAsEAStatusResponse(t, "ea_status_empty.json")
-	service.emitEAStatus(ctx, "empty-bridge", status, []JobInfo{})
+	status := loadFixtureAsBridgeStatusResponse(t, "bridge_status_empty.json")
+	service.emitBridgeStatus(ctx, "empty-bridge", status, []JobInfo{})
 
 	// Unmarshal and verify protobuf handles empty values correctly
 	require.NotEmpty(t, capturedProtobufBytes)
-	var event events.EAStatusEvent
+	var event events.BridgeStatusEvent
 	err := proto.Unmarshal(capturedProtobufBytes, &event)
 	require.NoError(t, err)
 
@@ -638,7 +638,7 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 
 // Test for external job IDs and job names functionality
 func TestService_pollBridge_WithJobInfo(t *testing.T) {
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Create test job IDs and external job UUIDs
@@ -672,7 +672,7 @@ func TestService_pollBridge_WithJobInfo(t *testing.T) {
 
 	// Verify the job information (IDs and names) were included in the protobuf
 	require.NotEmpty(t, capturedProtobufBytes)
-	var event events.EAStatusEvent
+	var event events.BridgeStatusEvent
 	err := proto.Unmarshal(capturedProtobufBytes, &event)
 	require.NoError(t, err)
 
@@ -688,7 +688,7 @@ func TestService_pollBridge_WithJobInfo(t *testing.T) {
 }
 
 func TestService_pollBridge_JobORMError(t *testing.T) {
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Mock job ORM to return error
@@ -726,7 +726,7 @@ func TestService_pollBridge_IgnoreJoblessBridges_Enabled(t *testing.T) {
 
 func TestService_pollBridge_IgnoreJoblessBridges_Disabled(t *testing.T) {
 	// Use valid HTTP client with successful response since we want the full flow when ignoreJoblessBridges is false
-	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
+	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "bridge_status_response.json"), http.StatusOK)
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
 
 	// Mock job ORM to return no job IDs (jobless bridge)

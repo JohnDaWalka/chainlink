@@ -4,7 +4,7 @@ import "time"
 
 const MINIMUM_POLLING_INTERVAL = time.Minute
 
-type EAStatusReporter interface {
+type BridgeStatusReporter interface {
 	Enabled() bool
 	StatusPath() string
 	PollingInterval() time.Duration

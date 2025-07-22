@@ -638,16 +638,16 @@ func TestEthKeys_SetFrom(t *testing.T) {
 // ptr is a utility function for converting a value to a pointer to the value.
 func ptr[T any](t T) *T { return &t }
 
-func TestEAStatusReporter_ValidateConfig(t *testing.T) {
+func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 	testCases := []struct {
 		name        string
-		config      *EAStatusReporter
+		config      *BridgeStatusReporter
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "disabled with nil fields",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(false),
 				StatusPath:           nil,
 				PollingInterval:      nil,
@@ -658,7 +658,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "disabled with empty fields",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(false),
 				StatusPath:           ptr(""),
 				PollingInterval:      durationPtr(0),
@@ -669,7 +669,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "disabled with valid fields",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(false),
 				StatusPath:           ptr("/status"),
 				PollingInterval:      durationPtr(5 * time.Minute),
@@ -680,7 +680,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "nil enabled (defaults to disabled)",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              nil,
 				StatusPath:           ptr("/status"),
 				PollingInterval:      durationPtr(5 * time.Minute),
@@ -692,7 +692,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		// Enabled valid cases with auto-defaulting
 		{
 			name: "enabled with valid config",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr("/status"),
 				PollingInterval:      durationPtr(5 * time.Minute),
@@ -703,7 +703,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "enabled with nil fields - should auto-default",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           nil,
 				PollingInterval:      nil,
@@ -714,7 +714,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "enabled with empty status path - should auto-default",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr(""),
 				PollingInterval:      durationPtr(5 * time.Minute),
@@ -725,7 +725,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "enabled with zero polling interval - should auto-default",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr("/status"),
 				PollingInterval:      durationPtr(0),
@@ -736,7 +736,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "enabled with polling interval less than 1 minute - should auto-default",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr("/status"),
 				PollingInterval:      durationPtr(30 * time.Second),
@@ -747,7 +747,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "enabled with polling interval exactly 1 minute",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr("/status"),
 				PollingInterval:      durationPtr(1 * time.Minute),
@@ -758,7 +758,7 @@ func TestEAStatusReporter_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "enabled with all fields missing - should auto-default",
-			config: &EAStatusReporter{
+			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr(""),
 				PollingInterval:      durationPtr(0),

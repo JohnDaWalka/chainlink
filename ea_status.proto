@@ -1,6 +1,0 @@
-//go:generate protoc --proto_path=../../../ --go_out=../../../ --go_opt=paths=source_relative core/services/eastatusreporter/ea_status.proto
-syntax = "proto3";
-
-option go_package = "github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter";
-
-package ea_status.v1; 

@@ -41,30 +41,30 @@ type Core struct {
 	RootDir             *string
 	ShutdownGracePeriod *commonconfig.Duration
 
-	Feature          Feature          `toml:",omitempty"`
-	Database         Database         `toml:",omitempty"`
-	TelemetryIngress TelemetryIngress `toml:",omitempty"`
-	AuditLogger      AuditLogger      `toml:",omitempty"`
-	Log              Log              `toml:",omitempty"`
-	WebServer        WebServer        `toml:",omitempty"`
-	JobPipeline      JobPipeline      `toml:",omitempty"`
-	FluxMonitor      FluxMonitor      `toml:",omitempty"`
-	OCR2             OCR2             `toml:",omitempty"`
-	OCR              OCR              `toml:",omitempty"`
-	P2P              P2P              `toml:",omitempty"`
-	Keeper           Keeper           `toml:",omitempty"`
-	AutoPprof        AutoPprof        `toml:",omitempty"`
-	Pyroscope        Pyroscope        `toml:",omitempty"`
-	Sentry           Sentry           `toml:",omitempty"`
-	Insecure         Insecure         `toml:",omitempty"`
-	Tracing          Tracing          `toml:",omitempty"`
-	Mercury          Mercury          `toml:",omitempty"`
-	Capabilities     Capabilities     `toml:",omitempty"`
-	Telemetry        Telemetry        `toml:",omitempty"`
-	Workflows        Workflows        `toml:",omitempty"`
-	CRE              CreConfig        `toml:",omitempty"`
-	Billing          Billing          `toml:",omitempty"`
-	EAStatusReporter EAStatusReporter `toml:",omitempty"`
+	Feature              Feature              `toml:",omitempty"`
+	Database             Database             `toml:",omitempty"`
+	TelemetryIngress     TelemetryIngress     `toml:",omitempty"`
+	AuditLogger          AuditLogger          `toml:",omitempty"`
+	Log                  Log                  `toml:",omitempty"`
+	WebServer            WebServer            `toml:",omitempty"`
+	JobPipeline          JobPipeline          `toml:",omitempty"`
+	FluxMonitor          FluxMonitor          `toml:",omitempty"`
+	OCR2                 OCR2                 `toml:",omitempty"`
+	OCR                  OCR                  `toml:",omitempty"`
+	P2P                  P2P                  `toml:",omitempty"`
+	Keeper               Keeper               `toml:",omitempty"`
+	AutoPprof            AutoPprof            `toml:",omitempty"`
+	Pyroscope            Pyroscope            `toml:",omitempty"`
+	Sentry               Sentry               `toml:",omitempty"`
+	Insecure             Insecure             `toml:",omitempty"`
+	Tracing              Tracing              `toml:",omitempty"`
+	Mercury              Mercury              `toml:",omitempty"`
+	Capabilities         Capabilities         `toml:",omitempty"`
+	Telemetry            Telemetry            `toml:",omitempty"`
+	Workflows            Workflows            `toml:",omitempty"`
+	CRE                  CreConfig            `toml:",omitempty"`
+	Billing              Billing              `toml:",omitempty"`
+	BridgeStatusReporter BridgeStatusReporter `toml:",omitempty"`
 }
 
 // SetFrom updates c with any non-nil values from f. (currently TOML field only!)
@@ -108,7 +108,7 @@ func (c *Core) SetFrom(f *Core) {
 	c.Telemetry.setFrom(&f.Telemetry)
 	c.CRE.setFrom(&f.CRE)
 	c.Billing.setFrom(&f.Billing)
-	c.EAStatusReporter.setFrom(&f.EAStatusReporter)
+	c.BridgeStatusReporter.setFrom(&f.BridgeStatusReporter)
 }
 
 func (c *Core) ValidateConfig() (err error) {
@@ -2229,7 +2229,7 @@ func (b *Billing) ValidateConfig() error {
 	return nil
 }
 
-type EAStatusReporter struct {
+type BridgeStatusReporter struct {
 	Enabled              *bool
 	StatusPath           *string
 	PollingInterval      *commonconfig.Duration
@@ -2237,7 +2237,7 @@ type EAStatusReporter struct {
 	IgnoreJoblessBridges *bool
 }
 
-func (e *EAStatusReporter) setFrom(f *EAStatusReporter) {
+func (e *BridgeStatusReporter) setFrom(f *BridgeStatusReporter) {
 	if f.Enabled != nil {
 		e.Enabled = f.Enabled
 	}
@@ -2255,7 +2255,7 @@ func (e *EAStatusReporter) setFrom(f *EAStatusReporter) {
 	}
 }
 
-func (e *EAStatusReporter) ValidateConfig() error {
+func (e *BridgeStatusReporter) ValidateConfig() error {
 	if e.Enabled == nil || !*e.Enabled {
 		return nil
 	}

@@ -1,4 +1,4 @@
-package eastatusreporter
+package bridgestatus
 
 import (
 	"context"
@@ -15,15 +15,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/nodestatusreporter/bridgestatus/events"
 )
 
-// Service polls EA status and pushes them to Beholder
+// Service polls Bridge status and pushes them to Beholder
 type Service struct {
 	services.StateMachine
 
-	config     config.EAStatusReporter
+	config     config.BridgeStatusReporter
 	bridgeORM  bridges.ORM
 	jobORM     job.ORM
 	httpClient *http.Client
@@ -36,13 +36,13 @@ type Service struct {
 }
 
 const (
-	ServiceName        = "EAStatusReporter"
+	ServiceName        = "BridgeStatusReporter"
 	bridgePollPageSize = 1_000
 )
 
-// NewService creates a new EA Status Reporter Service
-func NewEaStatusReporter(
-	config config.EAStatusReporter,
+// NewBridgeStatusReporter creates a new Bridge Status Reporter Service
+func NewBridgeStatusReporter(
+	config config.BridgeStatusReporter,
 	bridgeORM bridges.ORM,
 	jobORM job.ORM,
 	httpClient *http.Client,
@@ -60,15 +60,15 @@ func NewEaStatusReporter(
 	}
 }
 
-// Start starts the EA Status Reporter Service
+// Start starts the Bridge Status Reporter Service
 func (s *Service) Start(ctx context.Context) error {
 	return s.StartOnce(ServiceName, func() error {
 		if !s.config.Enabled() {
-			s.lggr.Info("EA Status Reporter Service is disabled")
+			s.lggr.Info("Bridge Status Reporter Service is disabled")
 			return nil
 		}
 
-		s.lggr.Info("Starting EA Status Reporter Service")
+		s.lggr.Info("Starting Bridge Status Reporter Service")
 
 		// Start periodic polling
 		s.wg.Add(1)
@@ -78,7 +78,7 @@ func (s *Service) Start(ctx context.Context) error {
 	})
 }
 
-// Close stops the EA Status Reporter Service
+// Close stops the Bridge Status Reporter Service
 func (s *Service) Close() error {
 	return s.StopOnce(ServiceName, func() error {
 		s.lggr.Info("Stopping " + ServiceName)
@@ -144,11 +144,11 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 	}
 
 	if len(allBridges) == 0 {
-		s.lggr.Debug("No bridges configured for EA Status Reporter polling")
+		s.lggr.Debug("No bridges configured for Bridge Status Reporter polling")
 		return
 	}
 
-	s.lggr.Debugw("Polling EA Status Reporter for all bridges", "count", len(allBridges))
+	s.lggr.Debugw("Polling Bridge Status Reporter for all bridges", "count", len(allBridges))
 
 	// Poll each bridge concurrently and wait for completion
 	var wg sync.WaitGroup
@@ -172,7 +172,7 @@ func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, jobs
 		return
 	}
 	// If not ignoring invalid bridges, still emit empty telemetry
-	s.emitEAStatus(ctx, bridgeName, EAStatusResponse{}, jobs)
+	s.emitBridgeStatus(ctx, bridgeName, BridgeStatusResponse{}, jobs)
 }
 
 // pollBridge polls a single bridge's status endpoint
@@ -209,37 +209,37 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 	// Make HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL.String(), nil)
 	if err != nil {
-		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to create request for Bridge Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to fetch Bridge Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		s.handleBridgeError(ctx, bridgeName, jobs, "EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Bridge Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
 		return
 	}
 
 	// Parse response
-	var status EAStatusResponse
+	var status BridgeStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to decode EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to decode Bridge Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
-	s.lggr.Debugw("Successfully fetched EA Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
+	s.lggr.Debugw("Successfully fetched Bridge Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
 
 	// Emit telemetry to Beholder
-	s.emitEAStatus(ctx, bridgeName, status, jobs)
+	s.emitBridgeStatus(ctx, bridgeName, status, jobs)
 }
 
-// emitEAStatus sends EA Status Reporter data to Beholder
-func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse, jobs []JobInfo) {
+// emitBridgeStatus sends Bridge Status Reporter data to Beholder
+func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, status BridgeStatusResponse, jobs []JobInfo) {
 	// Convert runtime info
 	runtime := &events.RuntimeInfo{
 		NodeVersion:  status.Runtime.NodeVersion,
@@ -288,7 +288,7 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 	}
 
 	// Create the protobuf event
-	event := &events.EAStatusEvent{
+	event := &events.BridgeStatusEvent{
 		BridgeName:           bridgeName,
 		AdapterName:          status.Adapter.Name,
 		AdapterVersion:       status.Adapter.Version,
@@ -302,12 +302,12 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 	}
 
 	// Emit the protobuf event through the configured emitter
-	if err := events.EmitEAStatusEvent(ctx, s.emitter, event); err != nil {
-		s.lggr.Warnw("Failed to emit EA Status Reporter protobuf data to Beholder", "bridge", bridgeName, "error", err)
+	if err := events.EmitBridgeStatusEvent(ctx, s.emitter, event); err != nil {
+		s.lggr.Warnw("Failed to emit Bridge Status Reporter protobuf data to Beholder", "bridge", bridgeName, "error", err)
 		return
 	}
 
-	s.lggr.Debugw("Successfully emitted EA Status Reporter protobuf data to Beholder",
+	s.lggr.Debugw("Successfully emitted Bridge Status Reporter protobuf data to Beholder",
 		"bridge", bridgeName,
 		"adapter", status.Adapter.Name,
 		"version", status.Adapter.Version,

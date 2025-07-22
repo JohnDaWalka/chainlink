@@ -562,8 +562,8 @@ func (g *generalConfig) Billing() coreconfig.Billing {
 	return &billingConfig{t: g.c.Billing}
 }
 
-func (g *generalConfig) EAStatusReporter() coreconfig.EAStatusReporter {
-	return &eaStatusReporterConfig{c: g.c.EAStatusReporter}
+func (g *generalConfig) BridgeStatusReporter() coreconfig.BridgeStatusReporter {
+	return &bridgeStatusReporterConfig{c: g.c.BridgeStatusReporter}
 }
 
 var zeroSha256Hash = models.Sha256Hash{}

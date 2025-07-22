@@ -811,9 +811,9 @@ RestURL = "streams.url" # Example
 # URL is the locator for the Chainlink billing service.
 URL = "localhost:4319" # Default
 
-# EAStatusReporter holds settings for the External Adapter Status Reporter service.
-[EAStatusReporter]
-# Enabled enables the EA Status Reporter service that polls bridge status endpoints.
+# BridgeStatusReporter holds settings for the Bridge Status Reporter service.
+[BridgeStatusReporter]
+# Enabled enables the Bridge Status Reporter service that polls bridge status endpoints.
 Enabled = true # Default
 # StatusPath is the path to append to bridge URLs for status polling.
 StatusPath = "/status" # Default
