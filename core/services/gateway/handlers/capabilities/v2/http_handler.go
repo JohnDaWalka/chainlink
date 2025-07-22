@@ -133,9 +133,6 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 	if resp.ID == "" {
 		return fmt.Errorf("received response with empty request ID from node %s", nodeAddr)
 	}
-	if resp.Result == nil {
-		return fmt.Errorf("received response with nil result from node %s, error: %w", nodeAddr, resp.Error)
-	}
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
 	// Node messages follow the format "<methodName>/<workflowID>/<uuid>" or
 	// "<methodName>/<workflowID>/<workflowExecutionID>/<uuid>". Messages are routed

@@ -103,8 +103,8 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 	_, found = h.callbacks[req.ID]
 	if found {
 		h.callbacksMu.Unlock()
-		h.handleUserError(req.ID, jsonrpc.ErrInvalidRequest, "request ID already used: "+req.ID, callbackCh)
-		return errors.New("request ID already used: " + req.ID)
+		h.handleUserError(req.ID, jsonrpc.ErrConflict, "in-flight request ID", callbackCh)
+		return errors.New("in-flight request ID: " + req.ID)
 	}
 
 	// 2f + 1 is chosen to ensure that majority of honest nodes are executing the request
@@ -187,6 +187,7 @@ func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp
 		RawResponse: rawResp,
 		ErrorCode:   api.NoError,
 	}:
+		delete(h.callbacks, resp.ID)
 	}
 	return nil
 }
