@@ -30,7 +30,7 @@ checkout_broken_capability() {
 
 start_observability_stack() {
   echo "Starting observability stack..."
-  if ! ctf obs u; then
+  if ! ./bin/ctf obs u; then
     echo "Failed to start observability stack."
     exit 1
   fi

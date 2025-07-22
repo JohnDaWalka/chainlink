@@ -79,7 +79,24 @@ Changes to the capability code will require yoiu to compile the capability binar
 ./script.sh compile_cron_capability
 ```
 
-There is a second bug that you will stumble over that also has to be fixed… Good luck!
+There is a second bug that you will stumble over that also has to be fixed...
+
+We are checking [Chainlink Node Logs dashboard](http://localhost:3000/d/a7de535b-3e0f-4066-bed7-d505b6ec9ef1/cl-node-errors?orgId=1&refresh=5s) for clues.
+
+To fix this issue, you need to open `cron/trigger/trigger.go` again and delete this incorrect line, which is trying to call a function on nil pointer:
+```go
+s.lggr.Infof("schedule error: %s", err.Error())
+```
+
+Let's compile the capability binary again:
+```bash
+./script.sh compile_cron_capability
+```
+
+And run the test again:
+```bash
+./script.sh run_workflow_test
+```
 
 ## Usage
 
