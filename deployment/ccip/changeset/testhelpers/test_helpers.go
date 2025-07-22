@@ -781,6 +781,7 @@ func SendRequestSol(
 		allTokenPools := solana.PublicKeySlice{}
 		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.LockReleaseTokenPools))
 		allTokenPools = slices.AppendSeq(allTokenPools, maps.Values(s.BurnMintTokenPools))
+		allTokenPools = append(allTokenPools, s.CCTPTokenPool)
 
 		e.Logger.Infof("Found %d token pools in state - searching for matching token pool", len(allTokenPools))
 		tokenPoolPubKey, err := MatchTokenToTokenPool(ctx, client, tokenPubKey, allTokenPools)
