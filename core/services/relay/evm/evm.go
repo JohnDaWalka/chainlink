@@ -312,6 +312,10 @@ func (r *Relayer) Chain() legacyevm.Chain {
 	return r.chain
 }
 
+func (r *Relayer) TON() (commontypes.TONService, error) {
+	return nil, nil
+}
+
 func newOCR3CapabilityConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *types.RelayOpts) (*configWatcher, error) {
 	if !common.IsHexAddress(opts.ContractID) {
 		return nil, errors.New("invalid contractID, expected hex address")

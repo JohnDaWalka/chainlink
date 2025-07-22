@@ -44,6 +44,10 @@ func (r *relayer) EVM() (types.EVMService, error) {
 	return nil, nil
 }
 
+func (r *relayer) TON() (types.TONService, error) {
+	return nil, nil
+}
+
 func (r *relayer) NewConfigProvider(_ context.Context, rargs types.RelayArgs) (types.ConfigProvider, error) {
 	var cfg RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &cfg); err != nil {

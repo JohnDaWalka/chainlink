@@ -53,6 +53,11 @@ func (r *Registry) ConfigForCapability(ctx context.Context, capabilityID string,
 	return unmarshalCapabilityConfig(cfc.Config)
 }
 
+func (r *Registry) NodeByPeerID(ctx context.Context, peerID p2ptypes.PeerID) (capabilities.Node, error) {
+	// For now, we return the local node - this could be enhanced to support remote peer lookup
+	return r.LocalNode(ctx)
+}
+
 // SetLocalRegistry sets a local copy of the offchain registry for the registry to use.
 // This is only public for testing purposes; the only production use should be from the CapabilitiesLauncher.
 func (r *Registry) SetLocalRegistry(lr metadataRegistry) {
