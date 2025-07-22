@@ -499,9 +499,16 @@ func (lc *LaneConfiguration) isDestinationEnabledOnSolanaRouter(ctx context.Cont
 
 // isDestinationEnabledOnAptosRouter checks if a destination is enabled on the Aptos Router
 func (lc *LaneConfiguration) isDestinationEnabledOnAptosRouter(chainState aptosState.CCIPChainState, destinationChain uint64) (bool, error) {
-	// TODO: Implement proper Aptos router destination checking
-	// For now, return false to avoid panics during testing
-	return false, nil
+	// Prevent self-loops by checking if destination is the same as source
+	chainFamily, err := selectors.GetSelectorFamily(destinationChain)
+	if err != nil {
+		return false, err
+	}
+	if chainFamily == selectors.FamilyAptos {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // GetSourceChainsForDestination returns all source chains that can send to a specific destination

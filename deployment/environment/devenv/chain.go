@@ -26,6 +26,7 @@ import (
 	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	aptosCrypto "github.com/aptos-labs/aptos-go-sdk/crypto"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
@@ -328,6 +329,34 @@ func (c *ChainConfig) SetSolDeployerKey(keyString *string) error {
 	}
 
 	c.SolDeployerKey = solKey
+	return nil
+}
+
+func (c *ChainConfig) SetAptosDeployerKey(keyString *string) error {
+	if keyString == nil || *keyString == "" {
+		return errors.New("no Aptos private key provided")
+	}
+
+	// Remove the "0x" prefix if present
+	keyStr := *keyString
+	if strings.HasPrefix(keyStr, "0x") {
+		keyStr = keyStr[2:]
+	}
+
+	// Create Ed25519 private key from hex string
+	deployerKey := &aptosCrypto.Ed25519PrivateKey{}
+	err := deployerKey.FromHex(keyStr)
+	if err != nil {
+		return fmt.Errorf("invalid Aptos private key: %w", err)
+	}
+
+	// Create Aptos account from the private key
+	aptosAccount, err := aptos.NewAccountFromSigner(deployerKey)
+	if err != nil {
+		return fmt.Errorf("failed to create Aptos account from private key: %w", err)
+	}
+
+	c.AptosDeployerKey = *aptosAccount
 	return nil
 }
 
