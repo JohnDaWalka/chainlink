@@ -1,9 +1,15 @@
-//go:generate protoc --proto_path=../../../ --go_out=../../../ --go_opt=paths=source_relative core/services/eastatusreporter/ea_status.proto
+//go:generate protoc --proto_path=../../../ --go_out=../../../ --go_opt=paths=source_relative core/services/eastatusreporter/events/ea_status.proto
 syntax = "proto3";
 
 option go_package = "github.com/smartcontractkit/chainlink/v2/core/services/eastatusreporter/events";
 
 package ea_status.v1;
+
+// JobInfo represents job information associated with a bridge
+message JobInfo {
+  string external_job_id = 1;
+  string job_name = 2;
+}
 
 // EAStatusEvent represents the status data from an External Adapter
 message EAStatusEvent {
@@ -23,14 +29,14 @@ message EAStatusEvent {
   // Available endpoints as structured data  
   repeated EndpointInfo endpoints = 8;
   
-  // Configuration including values as requested
+  // Configuration items
   repeated ConfigurationItem configuration = 9;
   
-  // Event metadata
-  string timestamp = 10;
+  // Jobs associated with this bridge
+  repeated JobInfo jobs = 10;
   
-  // External job IDs associated with this bridge
-  repeated string external_job_ids = 11;
+  // Event metadata
+  string timestamp = 11;
 }
 
 message RuntimeInfo {

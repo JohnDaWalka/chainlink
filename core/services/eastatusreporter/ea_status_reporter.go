@@ -166,28 +166,28 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 }
 
 // handleBridgeError handles errors during bridge polling, either skipping or emitting empty telemetry
-func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, externalJobIDs []string, logMsg string, logFields ...interface{}) {
+func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, jobs []JobInfo, logMsg string, logFields ...interface{}) {
 	s.lggr.Debugw(logMsg, logFields...)
 	if s.config.IgnoreInvalidBridges() {
 		return
 	}
 	// If not ignoring invalid bridges, still emit empty telemetry
-	s.emitEAStatus(ctx, bridgeName, EAStatusResponse{}, externalJobIDs)
+	s.emitEAStatus(ctx, bridgeName, EAStatusResponse{}, jobs)
 }
 
 // pollBridge polls a single bridge's status endpoint
 func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL string) {
 	s.lggr.Debugw("Polling bridge", "bridge", bridgeName, "url", bridgeURL)
 
-	// Look up external job IDs associated with this bridge first
-	externalJobIDs, err := s.findExternalJobIDsForBridge(ctx, bridgeName)
+	// Look up jobs associated with this bridge first
+	jobs, err := s.findJobsForBridge(ctx, bridgeName)
 	if err != nil {
-		s.lggr.Warnw("Failed to find external job IDs for bridge", "bridge", bridgeName, "error", err)
-		externalJobIDs = []string{}
+		s.lggr.Warnw("Failed to find jobs for bridge", "bridge", bridgeName, "error", err)
+		jobs = []JobInfo{}
 	}
 
 	// Skip bridge if it has no jobs and ignoreJoblessBridges is enabled
-	if s.config.IgnoreJoblessBridges() && len(externalJobIDs) == 0 {
+	if s.config.IgnoreJoblessBridges() && len(jobs) == 0 {
 		s.lggr.Debugw("Skipping bridge with no jobs", "bridge", bridgeName, "ignoreJoblessBridges", true)
 		return
 	}
@@ -195,7 +195,7 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 	// Parse bridge URL and construct status endpoint
 	parsedURL, err := url.Parse(bridgeURL)
 	if err != nil {
-		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to parse bridge URL", "bridge", bridgeName, "url", bridgeURL, "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to parse bridge URL", "bridge", bridgeName, "url", bridgeURL, "error", err)
 		return
 	}
 
@@ -209,37 +209,37 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 	// Make HTTP request
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL.String(), nil)
 	if err != nil {
-		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to create request for EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to fetch EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
+		s.handleBridgeError(ctx, bridgeName, jobs, "EA Status Reporter status endpoint returned non-200 status", "bridge", bridgeName, "url", statusURL.String(), "status", resp.StatusCode)
 		return
 	}
 
 	// Parse response
 	var status EAStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		s.handleBridgeError(ctx, bridgeName, externalJobIDs, "Failed to decode EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
+		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to decode EA Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
 	}
 
 	s.lggr.Debugw("Successfully fetched EA Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
 
 	// Emit telemetry to Beholder
-	s.emitEAStatus(ctx, bridgeName, status, externalJobIDs)
+	s.emitEAStatus(ctx, bridgeName, status, jobs)
 }
 
 // emitEAStatus sends EA Status Reporter data to Beholder
-func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse, externalJobIDs []string) {
+func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EAStatusResponse, jobs []JobInfo) {
 	// Convert runtime info
 	runtime := &events.RuntimeInfo{
 		NodeVersion:  status.Runtime.NodeVersion,
@@ -278,6 +278,15 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 		}
 	}
 
+	// Convert jobs to protobuf JobInfo structs
+	var jobsProto []*events.JobInfo
+	for _, job := range jobs {
+		jobsProto = append(jobsProto, &events.JobInfo{
+			ExternalJobId: job.ExternalJobID,
+			JobName:       job.Name,
+		})
+	}
+
 	// Create the protobuf event
 	event := &events.EAStatusEvent{
 		BridgeName:           bridgeName,
@@ -289,7 +298,7 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 		Metrics:              metrics,
 		Endpoints:            endpointsProto,
 		Configuration:        configProto,
-		ExternalJobIds:       externalJobIDs,
+		Jobs:                 jobsProto,
 	}
 
 	// Emit the protobuf event through the configured emitter
@@ -305,8 +314,8 @@ func (s *Service) emitEAStatus(ctx context.Context, bridgeName string, status EA
 	)
 }
 
-// findExternalJobIDsForBridge finds external job IDs associated with a bridge name
-func (s *Service) findExternalJobIDsForBridge(ctx context.Context, bridgeName string) ([]string, error) {
+// findJobsForBridge finds jobs associated with a bridge name
+func (s *Service) findJobsForBridge(ctx context.Context, bridgeName string) ([]JobInfo, error) {
 	// Find job IDs that use this bridge
 	jobIDs, err := s.jobORM.FindJobIDsWithBridge(ctx, bridgeName)
 	if err != nil {
@@ -315,21 +324,31 @@ func (s *Service) findExternalJobIDsForBridge(ctx context.Context, bridgeName st
 
 	if len(jobIDs) == 0 {
 		s.lggr.Debugw("No jobs found for bridge", "bridge", bridgeName)
-		return []string{}, nil
+		return []JobInfo{}, nil
 	}
 
-	// Convert job IDs to external job IDs
-	var externalJobIDs []string
+	// Convert job IDs to job info
+	var jobs []JobInfo
 	for _, jobID := range jobIDs {
 		job, err := s.jobORM.FindJob(ctx, jobID)
 		if err != nil {
 			s.lggr.Debugw("Failed to find job", "jobID", jobID, "bridge", bridgeName, "error", err)
 			continue
 		}
-		externalJobIDs = append(externalJobIDs, job.ExternalJobID.String())
+
+		// Get job name, use a default if not set
+		jobName := "unknown"
+		if job.Name.Valid && job.Name.String != "" {
+			jobName = job.Name.String
+		}
+
+		jobs = append(jobs, JobInfo{
+			ExternalJobID: job.ExternalJobID.String(),
+			Name:          jobName,
+		})
 	}
 
-	s.lggr.Debugw("Found external job IDs for bridge", "bridge", bridgeName, "externalJobIDs", externalJobIDs, "count", len(externalJobIDs))
+	s.lggr.Debugw("Found jobs for bridge", "bridge", bridgeName, "count", len(jobs))
 
-	return externalJobIDs, nil
+	return jobs, nil
 }

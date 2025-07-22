@@ -35,3 +35,9 @@ type EAStatusResponse struct {
 		Endpoint *string `json:"endpoint,omitempty"`
 	} `json:"metrics"`
 }
+
+// JobInfo represents job information for a bridge
+type JobInfo struct {
+	ExternalJobID string
+	Name          string
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	bridgeMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
@@ -318,7 +319,7 @@ func TestService_emitEAStatus_Success(t *testing.T) {
 	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil)
 
 	ctx := context.Background()
-	service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []string{})
+	service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []JobInfo{})
 
 	emitter.AssertExpectations(t)
 }
@@ -332,7 +333,7 @@ func TestService_emitEAStatus_EmitError(t *testing.T) {
 
 	ctx := context.Background()
 	assert.NotPanics(t, func() {
-		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []string{})
+		service.emitEAStatus(ctx, "test-bridge", loadFixtureAsEAStatusResponse(t, "ea_status_response.json"), []JobInfo{})
 	})
 
 	emitter.AssertExpectations(t)
@@ -415,7 +416,7 @@ func TestService_emitEAStatus_CaptureOutput(t *testing.T) {
 	// Load fixture and emit
 	ctx := context.Background()
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_response.json")
-	service.emitEAStatus(ctx, "test-bridge", status, []string{})
+	service.emitEAStatus(ctx, "test-bridge", status, []JobInfo{})
 
 	// Unmarshal and verify protobuf matches fixture values
 	require.NotEmpty(t, capturedProtobufBytes)
@@ -602,7 +603,7 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 	// Load empty fixture and emit
 	ctx := context.Background()
 	status := loadFixtureAsEAStatusResponse(t, "ea_status_empty.json")
-	service.emitEAStatus(ctx, "empty-bridge", status, []string{})
+	service.emitEAStatus(ctx, "empty-bridge", status, []JobInfo{})
 
 	// Unmarshal and verify protobuf handles empty values correctly
 	require.NotEmpty(t, capturedProtobufBytes)
@@ -635,24 +636,31 @@ func TestService_emitEAStatus_EmptyFields(t *testing.T) {
 	emitter.AssertExpectations(t)
 }
 
-// New test for external job IDs functionality
-func TestService_pollBridge_WithExternalJobIDs(t *testing.T) {
+// Test for external job IDs and job names functionality
+func TestService_pollBridge_WithJobInfo(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient(loadFixture(t, "ea_status_response.json"), http.StatusOK)
 	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
 
 	// Create test job IDs and external job UUIDs
 	testJobIDs := []int32{1, 2}
-	testExternalJobID1 := uuid.New()
-	testExternalJobID2 := uuid.New()
-	testJob1 := job.Job{ID: 1, ExternalJobID: testExternalJobID1}
-	testJob2 := job.Job{ID: 2, ExternalJobID: testExternalJobID2}
+
+	testJob1 := job.Job{
+		ID:            1,
+		ExternalJobID: uuid.New(),
+		Name:          null.StringFrom("BTC/USD Price Feed"),
+	}
+	testJob2 := job.Job{
+		ID:            2,
+		ExternalJobID: uuid.New(),
+		Name:          null.StringFrom("ETH/USD Price Feed"),
+	}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return(testJobIDs, nil)
 	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob1, nil)
 	jobORM.On("FindJob", mock.Anything, int32(2)).Return(testJob2, nil)
 
-	// Capture the emitted protobuf to verify external job IDs
+	// Capture the emitted protobuf to verify job information
 	var capturedProtobufBytes []byte
 	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
@@ -662,14 +670,18 @@ func TestService_pollBridge_WithExternalJobIDs(t *testing.T) {
 	ctx := context.Background()
 	service.pollBridge(ctx, "test-bridge", "http://example.com")
 
-	// Verify the external job IDs were included in the protobuf
+	// Verify the job information (IDs and names) were included in the protobuf
 	require.NotEmpty(t, capturedProtobufBytes)
 	var event events.EAStatusEvent
 	err := proto.Unmarshal(capturedProtobufBytes, &event)
 	require.NoError(t, err)
 
-	expectedExternalJobIDs := []string{testExternalJobID1.String(), testExternalJobID2.String()}
-	assert.ElementsMatch(t, expectedExternalJobIDs, event.ExternalJobIds)
+	require.Len(t, event.Jobs, 2)
+	expectedJobs := []*events.JobInfo{
+		{ExternalJobId: testJob1.ExternalJobID.String(), JobName: "BTC/USD Price Feed"},
+		{ExternalJobId: testJob2.ExternalJobID.String(), JobName: "ETH/USD Price Feed"},
+	}
+	assert.ElementsMatch(t, expectedJobs, event.Jobs)
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
@@ -737,8 +749,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_HTTPError_Enabled(t *testing.T)
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
 
 	// Create test job and external job UUID for FindJob mock
-	testExternalJobID := uuid.New()
-	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+	testJob := job.Job{ID: 1, ExternalJobID: uuid.New(), Name: null.StringFrom("BTC/USD Price Feed")}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
@@ -759,8 +770,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_HTTPError_Disabled(t *testing.T
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
 
 	// Create test job and external job UUID for FindJob mock
-	testExternalJobID := uuid.New()
-	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+	testJob := job.Job{ID: 1, ExternalJobID: uuid.New(), Name: null.StringFrom("BTC/USD Price Feed")}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
@@ -783,8 +793,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_Non200Status_Enabled(t *testing
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
 
 	// Create test job and external job UUID for FindJob mock
-	testExternalJobID := uuid.New()
-	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+	testJob := job.Job{ID: 1, ExternalJobID: uuid.New(), Name: null.StringFrom("BTC/USD Price Feed")}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
@@ -805,8 +814,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_Non200Status_Disabled(t *testin
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
 
 	// Create test job and external job UUID for FindJob mock
-	testExternalJobID := uuid.New()
-	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+	testJob := job.Job{ID: 1, ExternalJobID: uuid.New(), Name: null.StringFrom("BTC/USD Price Feed")}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
@@ -829,8 +837,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_InvalidJSON_Enabled(t *testing.
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, true, false)
 
 	// Create test job and external job UUID for FindJob mock
-	testExternalJobID := uuid.New()
-	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+	testJob := job.Job{ID: 1, ExternalJobID: uuid.New(), Name: null.StringFrom("BTC/USD Price Feed")}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
@@ -851,8 +858,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_InvalidJSON_Disabled(t *testing
 	service, _, jobORM, emitter := setupTestServiceWithIgnoreFlags(t, true, testPollingInterval, httpClient, false, false)
 
 	// Create test job and external job UUID for FindJob mock
-	testExternalJobID := uuid.New()
-	testJob := job.Job{ID: 1, ExternalJobID: testExternalJobID}
+	testJob := job.Job{ID: 1, ExternalJobID: uuid.New(), Name: null.StringFrom("BTC/USD Price Feed")}
 
 	// Mock job ORM calls
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
