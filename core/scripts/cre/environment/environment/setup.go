@@ -323,11 +323,13 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt bool, purge bool
 	}
 
 	// Check if AWS CLI is installed
-	if !isCommandAvailable("aws") {
-		setupErr = errors.New("AWS CLI is not installed. Please install AWS CLI and try again")
-		return
+	if !noPrompt {
+		if !isCommandAvailable("aws") {
+			setupErr = errors.New("AWS CLI is not installed. Please install AWS CLI and try again")
+			return
+		}
+		logger.Info().Msg("✓ AWS CLI is installed")
 	}
-	logger.Info().Msg("✓ AWS CLI is installed")
 
 	ghCli, ghCliErr := checkGHCli(ctx, noPrompt)
 	if ghCliErr != nil {
