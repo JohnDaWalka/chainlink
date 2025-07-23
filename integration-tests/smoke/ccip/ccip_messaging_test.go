@@ -37,6 +37,9 @@ import (
 )
 
 func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
+	// enable evm loop mode.
+	t.Setenv("CL_EVM_CMD", "chainlink-evm")
+
 	// fix the chain ids for the test so we can appropriately set finality depth numbers on the destination chain.
 	chains := []chainsel.Chain{
 		chainsel.GETH_TESTNET,  // source
