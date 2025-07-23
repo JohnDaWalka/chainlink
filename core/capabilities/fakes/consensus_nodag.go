@@ -93,8 +93,8 @@ func (fc *fakeConsensusNoDAG) Report(ctx context.Context, metadata capabilities.
 		return &sdkpb.ReportResponse{
 			RawReport: rawMap,
 			// other fields are unused by mode-switch calls, use fake ones
-			ConfigDigest:  []byte("fake_config_digest"),
-			SeqNr:         uint64(fc.seqNr),
+			ConfigDigest: []byte("fake_config_digest"),
+			SeqNr:        uint64(fc.seqNr),
 			Sigs: []*sdkpb.AttributedSignature{
 				{
 					Signature: []byte("fake_signature"),
@@ -140,10 +140,10 @@ func (fc *fakeConsensusNoDAG) Report(ctx context.Context, metadata capabilities.
 		}
 
 		return &sdkpb.ReportResponse{
-			RawReport:     rawOutput,
-			ConfigDigest:  fc.configDigest[:],
-			SeqNr:         uint64(fc.seqNr),
-			Sigs:          sigs,
+			RawReport:    rawOutput,
+			ConfigDigest: fc.configDigest[:],
+			SeqNr:        uint64(fc.seqNr),
+			Sigs:         sigs,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported encoder name: %s", input.EncoderName)

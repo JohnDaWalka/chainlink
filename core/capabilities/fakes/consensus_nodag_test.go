@@ -44,8 +44,8 @@ func Test_Simple_EVMEncoder(t *testing.T) {
 	}
 
 	input := &sdkpb.ReportRequest{
-		EncoderName:     "evm",
-		EncodedPayload:  []byte("test_observation_value"),
+		EncoderName:    "evm",
+		EncodedPayload: []byte("test_observation_value"),
 	}
 	fakeConsensusNoDAG := NewFakeConsensusNoDAG(signers, logger.TestLogger(t))
 	outputs, err := fakeConsensusNoDAG.Report(context.Background(), metadata, input)
