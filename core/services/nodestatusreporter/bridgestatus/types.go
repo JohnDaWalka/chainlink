@@ -3,9 +3,9 @@ package bridgestatus
 // BridgeStatusResponse represents the response schema from Bridge status endpoint
 type BridgeStatusResponse struct {
 	Adapter struct {
-		Name          string `json:"name"`
-		Version       string `json:"version"`
-		UptimeSeconds int64  `json:"uptimeSeconds"`
+		Name          string  `json:"name"`
+		Version       string  `json:"version"`
+		UptimeSeconds float64 `json:"uptimeSeconds"`
 	} `json:"adapter"`
 	Endpoints []struct {
 		Name       string   `json:"name"`

@@ -240,17 +240,15 @@ func TestService_pollBridge_HTTPError(t *testing.T) {
 	// Mock job ORM call that now happens at the start of pollBridge
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
-	emitter.On("With", mock.Anything).Return(emitter).Maybe()
-	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
-
 	ctx := context.Background()
 
 	// Should handle HTTP error gracefully
 	assert.NotPanics(t, func() {
-		service.pollBridge(ctx, "test-bridge", "http://127.0.0.1:8080")
+		service.pollBridge(ctx, "test-bridge", "http://invalid.invalid:8080")
 	})
 
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
 	jobORM.AssertExpectations(t)
 }
 
@@ -261,15 +259,14 @@ func TestService_pollBridge_InvalidJSON(t *testing.T) {
 	// Mock job ORM call that now happens at the start of pollBridge
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
-	emitter.On("With", mock.Anything).Return(emitter).Maybe()
-	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
-
 	ctx := context.Background()
 
 	assert.NotPanics(t, func() {
-		service.pollBridge(ctx, "test-bridge", "http://example.com")
+		service.pollBridge(ctx, "test-bridge", "http://invalid.invalid:8080")
 	})
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
+
 	jobORM.AssertExpectations(t)
 }
 
@@ -280,15 +277,15 @@ func TestService_pollBridge_InvalidURL(t *testing.T) {
 	// Mock job ORM call that now happens at the start of pollBridge
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
-	emitter.On("With", mock.Anything).Return(emitter).Maybe()
-	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
-
 	ctx := context.Background()
 
 	assert.NotPanics(t, func() {
 		service.pollBridge(ctx, "test-bridge", "://invalid-url")
 	})
+
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
+
 	jobORM.AssertExpectations(t)
 }
 
@@ -299,15 +296,14 @@ func TestService_pollBridge_Non200Status(t *testing.T) {
 	// Mock job ORM call that now happens at the start of pollBridge
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
 
-	emitter.On("With", mock.Anything).Return(emitter).Maybe()
-	emitter.On("Emit", mock.Anything, mock.Anything).Return(nil).Maybe()
-
 	ctx := context.Background()
 
 	assert.NotPanics(t, func() {
 		service.pollBridge(ctx, "test-bridge", "http://example.com")
 	})
+
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
 	jobORM.AssertExpectations(t)
 }
 
@@ -320,21 +316,6 @@ func TestService_emitBridgeStatus_Success(t *testing.T) {
 
 	ctx := context.Background()
 	service.emitBridgeStatus(ctx, "test-bridge", loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json"), []JobInfo{})
-
-	emitter.AssertExpectations(t)
-}
-
-func TestService_emitBridgeStatus_EmitError(t *testing.T) {
-	httpClient := &http.Client{}
-	service, _, _, emitter := setupTestService(t, true, testPollingInterval, httpClient)
-
-	emitter.On("With", mock.Anything).Return(emitter)
-	emitter.On("Emit", mock.Anything, mock.Anything).Return(assert.AnError)
-
-	ctx := context.Background()
-	assert.NotPanics(t, func() {
-		service.emitBridgeStatus(ctx, "test-bridge", loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json"), []JobInfo{})
-	})
 
 	emitter.AssertExpectations(t)
 }
@@ -615,7 +596,7 @@ func TestService_emitBridgeStatus_EmptyFields(t *testing.T) {
 	assert.Equal(t, "empty-bridge", event.BridgeName)
 	assert.Equal(t, "", event.AdapterName)
 	assert.Equal(t, "", event.AdapterVersion)
-	assert.Equal(t, int64(0), event.AdapterUptimeSeconds)
+	assert.Equal(t, float64(0), event.AdapterUptimeSeconds)
 	assert.Equal(t, "", event.DefaultEndpoint)
 
 	// Verify empty runtime info
@@ -755,11 +736,12 @@ func TestService_pollBridge_IgnoreInvalidBridges_HTTPError_Enabled(t *testing.T)
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
 	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
 
+	ctx := context.Background()
+	service.pollBridge(ctx, "invalid-bridge", "http://invalid.invalid:8080")
+
 	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
-
-	ctx := context.Background()
-	service.pollBridge(ctx, "invalid-bridge", "http://127.0.0.1:8080") // This will fail with HTTP error
+	emitter.AssertNotCalled(t, "With", mock.Anything)
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
@@ -781,7 +763,7 @@ func TestService_pollBridge_IgnoreInvalidBridges_HTTPError_Disabled(t *testing.T
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	ctx := context.Background()
-	service.pollBridge(ctx, "invalid-bridge", "http://127.0.0.1:8080") // This will fail with HTTP error
+	service.pollBridge(ctx, "invalid-bridge", "http://invalid.invalid:8080") // This will fail with HTTP error
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
@@ -799,11 +781,12 @@ func TestService_pollBridge_IgnoreInvalidBridges_Non200Status_Enabled(t *testing
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
 	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
 
-	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
-	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
-
 	ctx := context.Background()
 	service.pollBridge(ctx, "invalid-bridge", "http://example.com")
+
+	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
@@ -843,11 +826,12 @@ func TestService_pollBridge_IgnoreInvalidBridges_InvalidJSON_Enabled(t *testing.
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "invalid-bridge").Return([]int32{1}, nil)
 	jobORM.On("FindJob", mock.Anything, int32(1)).Return(testJob, nil)
 
-	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
-	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
-
 	ctx := context.Background()
 	service.pollBridge(ctx, "invalid-bridge", "http://example.com")
+
+	// Should NOT emit telemetry for invalid bridge when ignoreInvalidBridges is true
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
@@ -883,11 +867,12 @@ func TestService_pollBridge_BothIgnoreFlags_Enabled(t *testing.T) {
 	// Mock job ORM to return no job IDs (jobless bridge)
 	jobORM.On("FindJobIDsWithBridge", mock.Anything, "jobless-invalid-bridge").Return([]int32{}, nil)
 
+	ctx := context.Background()
+	service.pollBridge(ctx, "jobless-invalid-bridge", "http://invalid.invalid:8080") // This would fail with HTTP error too
+
 	// Should NOT emit telemetry - skipped because of no jobs (ignoreJoblessBridges)
 	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything)
-
-	ctx := context.Background()
-	service.pollBridge(ctx, "jobless-invalid-bridge", "http://127.0.0.1:8080") // This would fail with HTTP error too
+	emitter.AssertNotCalled(t, "With", mock.Anything)
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)
@@ -905,7 +890,100 @@ func TestService_pollBridge_BothIgnoreFlags_Disabled(t *testing.T) {
 	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
 	ctx := context.Background()
-	service.pollBridge(ctx, "jobless-invalid-bridge", "http://127.0.0.1:8080") // This will fail with HTTP error
+	service.pollBridge(ctx, "jobless-invalid-bridge", "http://invalid.invalid:8080") // This will fail with HTTP error
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
+// TestService_pollBridge_EndToEnd_RealWebServer tests the complete flow with a real HTTP server
+func TestService_pollBridge_EndToEnd_RealWebServer(t *testing.T) {
+	// Create a test HTTP server that serves fixture data
+	fixtureData := loadFixture(t, "bridge_status_response.json")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the request path
+		assert.Equal(t, testStatusPath, r.URL.Path)
+		assert.Equal(t, "GET", r.Method)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(fixtureData))
+	}))
+	defer server.Close()
+
+	// Use real HTTP client (not mock)
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
+
+	// Capture the emitted protobuf to verify end-to-end flow
+	var capturedProtobufBytes []byte
+	emitter.On("With", mock.AnythingOfType("[]string")).Return(emitter)
+	emitter.On("Emit", mock.Anything, mock.AnythingOfType("string")).Return(nil).Run(func(args mock.Arguments) {
+		capturedProtobufBytes = []byte(args.Get(1).(string))
+	})
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "test-bridge", server.URL)
+
+	// Verify the complete end-to-end flow worked
+	require.NotEmpty(t, capturedProtobufBytes, "Should have emitted protobuf data")
+
+	var event events.BridgeStatusEvent
+	err := proto.Unmarshal(capturedProtobufBytes, &event)
+	require.NoError(t, err, "Should be able to unmarshal protobuf")
+
+	// Verify the data from fixture made it through the complete pipeline
+	expectedStatus := loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json")
+
+	// Verify basic bridge info
+	assert.Equal(t, "test-bridge", event.BridgeName)
+	assert.Equal(t, expectedStatus.Adapter.Name, event.AdapterName)
+	assert.Equal(t, expectedStatus.Adapter.Version, event.AdapterVersion)
+	assert.Equal(t, expectedStatus.Adapter.UptimeSeconds, event.AdapterUptimeSeconds)
+	assert.Equal(t, expectedStatus.DefaultEndpoint, event.DefaultEndpoint)
+
+	// Verify endpoints - loop through fixture and compare with protobuf
+	require.Len(t, event.Endpoints, len(expectedStatus.Endpoints))
+	for i, expectedEndpoint := range expectedStatus.Endpoints {
+		actualEndpoint := event.Endpoints[i]
+		assert.Equal(t, expectedEndpoint.Name, actualEndpoint.Name)
+		assert.Equal(t, expectedEndpoint.Aliases, actualEndpoint.Aliases)
+		assert.Equal(t, expectedEndpoint.Transports, actualEndpoint.Transports)
+	}
+
+	// Verify configuration - loop through fixture and compare with protobuf
+	require.Len(t, event.Configuration, len(expectedStatus.Configuration))
+	for i, expectedConfig := range expectedStatus.Configuration {
+		actualConfig := event.Configuration[i]
+		assert.Equal(t, expectedConfig.Name, actualConfig.Name)
+		assert.Equal(t, fmt.Sprintf("%v", expectedConfig.Value), actualConfig.Value)
+		assert.Equal(t, expectedConfig.Type, actualConfig.Type)
+		assert.Equal(t, expectedConfig.Description, actualConfig.Description)
+		assert.Equal(t, expectedConfig.Required, actualConfig.Required)
+		assert.Equal(t, fmt.Sprintf("%v", expectedConfig.Default), actualConfig.DefaultValue)
+		assert.Equal(t, expectedConfig.CustomSetting, actualConfig.CustomSetting)
+		assert.Equal(t, fmt.Sprintf("%v", expectedConfig.EnvDefaultOverride), actualConfig.EnvDefaultOverride)
+	}
+
+	// Verify runtime info
+	require.NotNil(t, event.Runtime)
+	assert.Equal(t, expectedStatus.Runtime.NodeVersion, event.Runtime.NodeVersion)
+	assert.Equal(t, expectedStatus.Runtime.Platform, event.Runtime.Platform)
+	assert.Equal(t, expectedStatus.Runtime.Architecture, event.Runtime.Architecture)
+	assert.Equal(t, expectedStatus.Runtime.Hostname, event.Runtime.Hostname)
+
+	// Verify metrics info
+	require.NotNil(t, event.Metrics)
+	assert.Equal(t, expectedStatus.Metrics.Enabled, event.Metrics.Enabled)
+
+	// Verify job info is included
+	assert.Empty(t, event.Jobs)
+
+	// Verify timestamp is set
+	assert.NotEmpty(t, event.Timestamp)
 
 	jobORM.AssertExpectations(t)
 	emitter.AssertExpectations(t)

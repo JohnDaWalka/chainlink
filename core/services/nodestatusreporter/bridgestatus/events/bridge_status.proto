@@ -17,7 +17,7 @@ message BridgeStatusEvent {
   string bridge_name = 1;
   string adapter_name = 2;
   string adapter_version = 3;
-  int64 adapter_uptime_seconds = 4;
+  double adapter_uptime_seconds = 4;
   string default_endpoint = 5;
   
   // Runtime information
