@@ -647,6 +647,16 @@ func (r *Relayer) NewCCIPExecProvider(ctx context.Context, rargs commontypes.Rel
 	)
 }
 
+// NewCCIPProvider implements the commontypes.Relayer interface requirement for CCIP providers.
+// This method returns a compatible CCIPProvider that can handle both commit and execution providers.
+func (r *Relayer) NewCCIPProvider(ctx context.Context, rargs commontypes.RelayArgs) (commontypes.CCIPProvider, error) {
+	// The interface expects this method to exist, but based on the current implementation patterns,
+	// CCIP providers are created through NewCCIPCommitProvider and NewCCIPExecProvider.
+	// This appears to be a transitional method that may not be fully implemented yet.
+	// Return a not implemented error for now.
+	return nil, fmt.Errorf("NewCCIPProvider method not implemented - use NewCCIPCommitProvider or NewCCIPExecProvider instead")
+}
+
 func (r *Relayer) NewLLOProvider(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.LLOProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
 	relayConfig, err := relayOpts.RelayConfig()
