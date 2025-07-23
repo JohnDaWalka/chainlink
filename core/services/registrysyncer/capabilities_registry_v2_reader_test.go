@@ -108,14 +108,14 @@ func TestParseCapabilityMetadata(t *testing.T) {
 			input:            []byte{},
 			expectedCapType:  0,
 			expectedRespType: 0,
-			shouldError:      false,
+			shouldError:      true,
 		},
 		{
 			name:             "invalid JSON",
 			input:            []byte(`{"capabilityType": 1, "responseType": 2`),
 			expectedCapType:  0,
 			expectedRespType: 0,
-			shouldError:      false, // Should not error, just return defaults
+			shouldError:      true,
 		},
 		{
 			name:             "missing fields",

@@ -3,6 +3,7 @@ package registrysyncer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -67,14 +68,12 @@ func parseCapabilityID(capabilityID string) (id, labelledName, version string, e
 // parseCapabilityMetadata extracts capability type and response type from V2 metadata
 func parseCapabilityMetadata(metadata []byte) (capabilityType, responseType uint8, err error) {
 	if len(metadata) == 0 {
-		// Default values if no metadata
-		return 0, 0, nil
+		return 0, 0, errors.New("metadata is empty")
 	}
 
 	var meta V2CapabilityMetadata
 	if err := json.Unmarshal(metadata, &meta); err != nil {
-		// If we can't parse the metadata, use default values
-		return 0, 0, nil
+		return 0, 0, fmt.Errorf("invalid metadata: %w", err)
 	}
 
 	return meta.CapabilityType, meta.ResponseType, nil
@@ -258,6 +257,10 @@ func (r *capabilitiesRegistryV2Reader) GetDONsInFamily(ctx context.Context, donF
 	// Convert []big.Int to []uint32
 	donIDs := make([]uint32, len(donIDsBig))
 	for i, bigID := range donIDsBig {
+		if bigID.Sign() < 0 {
+			return nil, fmt.Errorf("DON ID %s is negative and cannot be converted to uint32", bigID.String())
+		}
+
 		if bigID.Cmp(big.NewInt(math.MaxUint32)) > 0 {
 			return nil, fmt.Errorf("DON ID %s exceeds uint32 range", bigID.String())
 		}
