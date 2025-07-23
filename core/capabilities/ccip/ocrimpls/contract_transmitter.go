@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
@@ -200,6 +201,19 @@ func convertValue(value any) any {
 		}
 		return converted
 	default:
+		rt := reflect.TypeOf(value)
+
+		// If it's a struct, convert it to map[string]any
+		if rt != nil && rt.Kind() == reflect.Struct {
+			var structMap map[string]any
+			if err := mapstructure.Decode(value, &structMap); err != nil {
+				// If it can't be decoded as a struct, return the original value
+				return value
+			}
+			// If it was successfully decoded as a struct, recursively convert it
+			return convertBigIntValues(structMap)
+		}
+
 		return value
 	}
 }
