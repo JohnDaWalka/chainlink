@@ -417,15 +417,23 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 	assert.Equal(t, status.DefaultEndpoint, event.DefaultEndpoint)
 
 	// Verify configuration
+	// Helper function to safely convert values to strings, handling nil (same as in production code)
+	safeString := func(v interface{}) string {
+		if v == nil {
+			return ""
+		}
+		return fmt.Sprintf("%v", v)
+	}
+
 	for i, configuration := range status.Configuration {
 		assert.Equal(t, configuration.Name, event.Configuration[i].Name)
-		assert.Equal(t, fmt.Sprintf("%v", configuration.Value), event.Configuration[i].Value) // Values are converted to strings
+		assert.Equal(t, safeString(configuration.Value), event.Configuration[i].Value) // Values are converted to strings
 		assert.Equal(t, configuration.Type, event.Configuration[i].Type)
 		assert.Equal(t, configuration.Description, event.Configuration[i].Description)
 		assert.Equal(t, configuration.Required, event.Configuration[i].Required)
-		assert.Equal(t, fmt.Sprintf("%v", configuration.Default), event.Configuration[i].DefaultValue) // Defaults converted to strings
+		assert.Equal(t, safeString(configuration.Default), event.Configuration[i].DefaultValue) // Defaults converted to strings
 		assert.Equal(t, configuration.CustomSetting, event.Configuration[i].CustomSetting)
-		assert.Equal(t, fmt.Sprintf("%v", configuration.EnvDefaultOverride), event.Configuration[i].EnvDefaultOverride) // Overrides converted to strings
+		assert.Equal(t, safeString(configuration.EnvDefaultOverride), event.Configuration[i].EnvDefaultOverride) // Overrides converted to strings
 	}
 
 	//Verify Runtime
@@ -538,7 +546,7 @@ func TestService_PollAllBridges_ContextTimeout(t *testing.T) {
 	// Mock job ORM calls for each bridge
 	for i := 0; i < numBridges; i++ {
 		bridgeName := fmt.Sprintf("bridge%d", i)
-		jobORM.On("FindJobIDsWithBridge", mock.Anything, bridgeName).Return([]int32{}, nil).Maybe()
+		jobORM.On("FindJobIDsWithBridge", mock.Anything, bridgeName).Return([]int32{}, nil)
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -940,17 +948,25 @@ func TestService_pollBridge_EndToEnd_RealWebServer(t *testing.T) {
 	}
 
 	// Verify configuration - loop through fixture and compare with protobuf
+	// Helper function to safely convert values to strings, handling nil (same as in production code)
+	safeString := func(v interface{}) string {
+		if v == nil {
+			return ""
+		}
+		return fmt.Sprintf("%v", v)
+	}
+
 	require.Len(t, event.Configuration, len(expectedStatus.Configuration))
 	for i, expectedConfig := range expectedStatus.Configuration {
 		actualConfig := event.Configuration[i]
 		assert.Equal(t, expectedConfig.Name, actualConfig.Name)
-		assert.Equal(t, fmt.Sprintf("%v", expectedConfig.Value), actualConfig.Value)
+		assert.Equal(t, safeString(expectedConfig.Value), actualConfig.Value)
 		assert.Equal(t, expectedConfig.Type, actualConfig.Type)
 		assert.Equal(t, expectedConfig.Description, actualConfig.Description)
 		assert.Equal(t, expectedConfig.Required, actualConfig.Required)
-		assert.Equal(t, fmt.Sprintf("%v", expectedConfig.Default), actualConfig.DefaultValue)
+		assert.Equal(t, safeString(expectedConfig.Default), actualConfig.DefaultValue)
 		assert.Equal(t, expectedConfig.CustomSetting, actualConfig.CustomSetting)
-		assert.Equal(t, fmt.Sprintf("%v", expectedConfig.EnvDefaultOverride), actualConfig.EnvDefaultOverride)
+		assert.Equal(t, safeString(expectedConfig.EnvDefaultOverride), actualConfig.EnvDefaultOverride)
 	}
 
 	// Verify runtime info

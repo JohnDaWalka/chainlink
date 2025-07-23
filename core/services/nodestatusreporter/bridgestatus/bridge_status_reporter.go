@@ -266,15 +266,23 @@ func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, statu
 	// Convert configuration including values
 	configProto := make([]*events.ConfigurationItem, len(status.Configuration))
 	for i, config := range status.Configuration {
+		// Helper function to convert values to strings, handling nil (ternary-style)
+		safeString := func(v interface{}) string {
+			if v == nil {
+				return ""
+			}
+			return fmt.Sprintf("%v", v)
+		}
+
 		configProto[i] = &events.ConfigurationItem{
 			Name:               config.Name,
-			Value:              fmt.Sprintf("%v", config.Value),
+			Value:              safeString(config.Value),
 			Type:               config.Type,
 			Description:        config.Description,
 			Required:           config.Required,
-			DefaultValue:       fmt.Sprintf("%v", config.Default),
+			DefaultValue:       safeString(config.Default),
 			CustomSetting:      config.CustomSetting,
-			EnvDefaultOverride: fmt.Sprintf("%v", config.EnvDefaultOverride),
+			EnvDefaultOverride: safeString(config.EnvDefaultOverride),
 		}
 	}
 
