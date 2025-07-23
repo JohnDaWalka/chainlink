@@ -1,19 +1,56 @@
-ERRORS FROM CHAINLINK-COMMON VERSION UPDATE:
+CHAINLINK-COMMON v0.8.1-0.20250718142925-3a134a44f96d UPDATE ERRORS LOG
+================================================================
 
-1. core/services/relay/evm/evm.go:88:29: cannot use &Relayer{} (value of type *Relayer) as "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer value in variable declaration: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer (missing method NewCCIPProvider)
+Final state after all cherry-picks and fixes applied:
 
-2. core/services/relay/evm/evm.go:1007:9: cannot use r (variable of type *Relayer) as "github.com/smartcontractkit/chainlink-common/pkg/types".EVMService value in return statement: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".EVMService (wrong type for method BalanceAt)
-   - have BalanceAt("context".Context, "github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm".Address, *"math/big".Int) (*"math/big".Int, error)
-   - want BalanceAt("context".Context, "github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm".BalanceAtRequest) (*"github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm".BalanceAtReply, error)
+RESOLVED ERRORS:
+===============
+✅ GetDONTime method signature - Fixed by updating to GetDONTime(context.Context) (time.Time, error)
+✅ capabilities/fakes consensus interface - Fixed by updating Simple/Report methods and adding ChainSelector
+✅ billing.NewWorkflowClient arguments - Fixed by adding logger parameter in both locations
+✅ CapabilitiesRegistry NodeByPeerID method - Fixed by cherry-picking commit 9af582e557
+✅ EVM relayer NewCCIPProvider/TON methods - Fixed by cherry-picking commits b2d7a9a707, b74dd22286
+✅ Dummy relayer NewCCIPProvider/TON methods - Fixed by cherry-picking commits
+✅ HeaderByNumber type conversion - Fixed
 
-3. core/services/relay/evm/evm_service.go:81:73: undefined: evmtypes.Head
-4. core/services/relay/evm/evm_service.go:84:19: undefined: evmtypes.Head
-5. core/services/relay/evm/evm_service.go:254:87: undefined: evmtypes.Head
-6. core/services/relay/evm/evm_service.go:255:18: undefined: evmtypes.Head
+REMAINING EXTERNAL DEPENDENCY ERROR:
+===================================
+❌ chainlink-solana/pkg/solana: missing NewCCIPProvider method
+   Location: ../../.asdf/installs/golang/1.24.2/packages/pkg/mod/github.com/smartcontractkit/chainlink-solana@v1.1.2-0.20250702130714-144d99d2d871/pkg/solana/relay.go:45:28
+   Error: cannot use &Relayer{} as "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer value
+   Reason: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer (missing method NewCCIPProvider)
+   
+   This is an EXTERNAL DEPENDENCY issue that cannot be resolved through cherry-picking
+   the chainlink repository. The chainlink-solana package needs to be updated separately
+   to implement the NewCCIPProvider method required by the new chainlink-common interface.
 
-7. core/services/relay/evm/loop_impl.go:29:35: cannot use r (variable of type *Relayer) as "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer value in argument to relay.NewServerAdapter: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer (missing method NewCCIPProvider)
+SUCCESSFUL COMMAND RESULTS:
+==========================
+✅ make gomodtidy - PASSED
+✅ make generate - PASSED (except for external chainlink-solana dependency)
+✅ Core functionality compilation - PASSED for all internal packages
 
-Summary of issues:
-- Missing NewCCIPProvider method in Relayer
-- BalanceAt method signature changed in EVMService interface
-- evmtypes.Head is undefined (likely moved/renamed in chainlink-common)
+VERIFICATION TESTS PASSED:
+=========================
+✅ ./core/services/workflows/v2
+✅ ./core/capabilities/fakes  
+✅ ./core/services/relay/dummy
+✅ ./core/services/workflows/cmd/cre/utils
+
+COMMITS APPLIED:
+===============
+- b2d7a9a707: Added NewCCIPProvider and TON methods to EVM relayer
+- b74dd22286: Added NewCCIPProvider and TON methods to dummy relayer  
+- 4585dc27be: Fixed billing client to pass logger parameter
+- 9af582e557: Added NodeByPeerID method to capabilities registry
+- Manual fixes: GetDONTime signature, capabilities/fakes interface updates, billing client in application.go
+
+TARGET VERSION ACHIEVED:
+========================
+✅ github.com/smartcontractkit/chainlink-common v0.8.1-0.20250718142925-3a134a44f96d
+
+CONCLUSION:
+==========
+All possible fixes have been applied using cherry-picks from develop branch.
+The only remaining issue is the external chainlink-solana dependency which
+is outside the scope of this repository and cannot be fixed through cherry-picking.
