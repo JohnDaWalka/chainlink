@@ -55,14 +55,6 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 		CCIPOnChainState: state,
 	}
 
-	// "Digest": "3q2RCBXjNrs5B8CtsvEofJWPLh9tHhTR2do9JqnBNpcj",
-	// "PackageId": "0xfd58da048fbf8d9c2749bc1fdaccf479a3e66065f5ab4a9e45c47a96921b882d",
-	// "Objects": {
-	//   "CoinMetadataObjectId": "0xabe4fe817da6fbd92f02ebcdf355822ce50f116b57dc5a043a119214c26019c9",
-	//   "TreasuryCapObjectId": "0x93a630e91e6d517cf3594cc8a224305485ff10e052bf11704dd0c2ce74556f0d",
-	//   "UpgradeCapObjectId": "0x6d6b88a8a582386747ee773cc65a0e915745cdd8e906f0115a6faf17d1c300ec"
-	// }
-
 	tokenPoolAddress := state.SuiChains[config.ChainSelector].TokenPoolAddress // BurnMintTokenPoolPackage
 	ccipObjectRefId := state.SuiChains[config.ChainSelector].CCIPObjectRef
 
@@ -98,7 +90,6 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 			CCIPObjectRefObjectId:  ccipObjectRefId,
 			CoinMetadataObjectId:   linkTokenObjectMetadataId,
 			TreasuryCapObjectId:    linkTokenTreasuryCapId,
-			TokenPoolPackageId:     tokenPoolAddress,
 			TokenPoolAdministrator: signerAddr,
 
 			// apply dest chain updates
@@ -123,9 +114,9 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 
 	// save BnM TokenPool to addressbook
 	typeAndVersionBurnMintTokenPool := cldf.NewTypeAndVersion(shared.SuiBnMTokenPoolType, deployment.Version1_5_1)
-	err = deps.AB.Save(config.ChainSelector, deployBurnMintTp.Output.CCIPPackageId, typeAndVersionBurnMintTokenPool)
+	err = deps.AB.Save(config.ChainSelector, deployBurnMintTp.Output.BurnMintTPPackageId, typeAndVersionBurnMintTokenPool)
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save BurnMintTokenPool address %s for Sui chain %d: %w", deployBurnMintTp.Output.CCIPPackageId, config.ChainSelector, err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save BurnMintTokenPool address %s for Sui chain %d: %w", deployBurnMintTp.Output.BurnMintTPPackageId, config.ChainSelector, err)
 	}
 
 	// save BnM TokenPool State to addressbook

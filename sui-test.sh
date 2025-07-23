@@ -2,7 +2,7 @@
 set -euox pipefail
 
 export CL_DIR=$(dirname $0)
-export SUI_DIR=$(realpath $CL_DIR/../helpful-scripts/chainlink-sui)
+export SUI_DIR=$(realpath $CL_DIR/../chainlink-sui)
 
 export TEST_LOG_LEVEL=debug
 export LOG_LEVEL=debug
