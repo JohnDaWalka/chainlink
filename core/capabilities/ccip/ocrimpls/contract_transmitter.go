@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -148,6 +150,15 @@ func (c *ccipTransmitter) Transmit(
 		return errors.New("no calldata function")
 	}
 
+	// Convert args to map[string]any using mapstructure and handle BigInt conversion
+	var argsMap map[string]any
+	if err := mapstructure.Decode(args, &argsMap); err != nil {
+		return fmt.Errorf("failed to decode args to map: %w", err)
+	}
+
+	// Convert ccipocr3types.BigInt values to their underlying *big.Int
+	convertedArgs := convertBigIntValues(argsMap)
+
 	// TODO: no meta fields yet, what should we add?
 	// probably whats in the info part of the report?
 	meta := commontypes.TxMeta{}
@@ -157,11 +168,38 @@ func (c *ccipTransmitter) Transmit(
 	}
 	zero := big.NewInt(0)
 	c.lggr.Infow("Submitting transaction", "tx", txID)
-	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
+	if err := c.cw.SubmitTransaction(ctx, contract, method, convertedArgs,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {
 		return fmt.Errorf("failed to submit transaction via chain writer: %w", err)
 	}
 
 	return nil
+}
+
+// convertBigIntValues recursively traverses the map and converts ccipocr3types.BigInt values to *big.Int
+func convertBigIntValues(data map[string]any) map[string]any {
+	result := make(map[string]any)
+	for key, value := range data {
+		result[key] = convertValue(value)
+	}
+	return result
+}
+
+// convertValue converts a single value, handling nested structures
+func convertValue(value any) any {
+	switch v := value.(type) {
+	case ccipocr3.BigInt:
+		return v.Int
+	case map[string]any:
+		return convertBigIntValues(v)
+	case []any:
+		converted := make([]any, len(v))
+		for i, item := range v {
+			converted[i] = convertValue(item)
+		}
+		return converted
+	default:
+		return value
+	}
 }
