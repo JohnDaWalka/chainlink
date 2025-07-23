@@ -1,0 +1,19 @@
+ERRORS FROM CHAINLINK-COMMON VERSION UPDATE:
+
+1. core/services/relay/evm/evm.go:88:29: cannot use &Relayer{} (value of type *Relayer) as "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer value in variable declaration: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer (missing method NewCCIPProvider)
+
+2. core/services/relay/evm/evm.go:1007:9: cannot use r (variable of type *Relayer) as "github.com/smartcontractkit/chainlink-common/pkg/types".EVMService value in return statement: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".EVMService (wrong type for method BalanceAt)
+   - have BalanceAt("context".Context, "github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm".Address, *"math/big".Int) (*"math/big".Int, error)
+   - want BalanceAt("context".Context, "github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm".BalanceAtRequest) (*"github.com/smartcontractkit/chainlink-common/pkg/types/chains/evm".BalanceAtReply, error)
+
+3. core/services/relay/evm/evm_service.go:81:73: undefined: evmtypes.Head
+4. core/services/relay/evm/evm_service.go:84:19: undefined: evmtypes.Head
+5. core/services/relay/evm/evm_service.go:254:87: undefined: evmtypes.Head
+6. core/services/relay/evm/evm_service.go:255:18: undefined: evmtypes.Head
+
+7. core/services/relay/evm/loop_impl.go:29:35: cannot use r (variable of type *Relayer) as "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer value in argument to relay.NewServerAdapter: *Relayer does not implement "github.com/smartcontractkit/chainlink-common/pkg/types".Relayer (missing method NewCCIPProvider)
+
+Summary of issues:
+- Missing NewCCIPProvider method in Relayer
+- BalanceAt method signature changed in EVMService interface
+- evmtypes.Head is undefined (likely moved/renamed in chainlink-common)
