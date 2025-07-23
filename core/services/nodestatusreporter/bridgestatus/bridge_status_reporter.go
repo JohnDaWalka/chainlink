@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
@@ -27,7 +27,7 @@ type Service struct {
 	bridgeORM  bridges.ORM
 	jobORM     job.ORM
 	httpClient *http.Client
-	emitter    custmsg.MessageEmitter
+	emitter    beholder.Emitter
 	lggr       logger.Logger
 
 	// Service management
@@ -46,7 +46,7 @@ func NewBridgeStatusReporter(
 	bridgeORM bridges.ORM,
 	jobORM job.ORM,
 	httpClient *http.Client,
-	emitter custmsg.MessageEmitter,
+	emitter beholder.Emitter,
 	lggr logger.Logger,
 ) *Service {
 	return &Service{

@@ -7,11 +7,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 )
 
 // EmitBridgeStatusEvent emits a Bridge Status event through the provided custmsg.MessageEmitter
-func EmitBridgeStatusEvent(ctx context.Context, emitter custmsg.MessageEmitter, event *BridgeStatusEvent) error {
+func EmitBridgeStatusEvent(ctx context.Context, emitter beholder.Emitter, event *BridgeStatusEvent) error {
 	if event.Timestamp == "" {
 		event.Timestamp = time.Now().Format(time.RFC3339Nano)
 	}
@@ -21,11 +21,14 @@ func EmitBridgeStatusEvent(ctx context.Context, emitter custmsg.MessageEmitter, 
 		return fmt.Errorf("failed to marshal BridgeStatusEvent: %w", err)
 	}
 
-	enrichedEmitter := emitter.With(
+	err = emitter.Emit(ctx, eventBytes,
 		"beholder_data_schema", SchemaBridgeStatus,
 		"beholder_domain", "platform",
 		"beholder_entity", fmt.Sprintf("%s.%s", ProtoPkg, BridgeStatusEventEntity),
 	)
+	if err != nil {
+		return fmt.Errorf("failed to emit BridgeStatusEvent: %w", err)
+	}
 
-	return enrichedEmitter.Emit(ctx, string(eventBytes))
+	return nil
 }

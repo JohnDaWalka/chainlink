@@ -705,7 +705,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		bridgeORM,
 		jobORM,
 		unrestrictedHTTPClient,
-		custmsg.NewLabeler(),
+		beholder.GetClient().Emitter,
 		globalLogger,
 	)
 	srvcs = append(srvcs, bridgeStatusReporter)
