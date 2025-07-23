@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/freeport"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
 	ubig "github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
@@ -658,8 +657,8 @@ func TestJobsController_Update_HappyPath(t *testing.T) {
 
 	// BCF-2095
 	// disable fkey checks until the end of the test transaction
-	require.NoError(t, utils.JustError(
-		app.GetDB().ExecContext(ctx, `SET CONSTRAINTS job_spec_errors_v2_job_id_fkey DEFERRED`)))
+	_, err = app.GetDB().ExecContext(ctx, `SET CONSTRAINTS job_spec_errors_v2_job_id_fkey DEFERRED`)
+	require.NoError(t, err)
 
 	var ocrSpec job.OCROracleSpec
 	err = toml.Unmarshal([]byte(ocrspec.Toml()), &ocrSpec)

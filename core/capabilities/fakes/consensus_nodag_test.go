@@ -1,6 +1,7 @@
 package fakes
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +11,6 @@ import (
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -43,16 +43,12 @@ func Test_Simple_EVMEncoder(t *testing.T) {
 		ReferenceID:              testRefID,
 	}
 
-	input := &sdkpb.SimpleConsensusInputs{
-		Observation: &sdkpb.SimpleConsensusInputs_Value{
-			Value: values.Proto(values.NewBytes([]byte("test_observation_value"))),
-		},
-		Descriptors: &sdkpb.ConsensusDescriptor{
-			EncoderName: "evm",
-		},
+	input := &sdkpb.ReportRequest{
+		EncoderName:     "evm",
+		EncodedPayload:  []byte("test_observation_value"),
 	}
 	fakeConsensusNoDAG := NewFakeConsensusNoDAG(signers, logger.TestLogger(t))
-	outputs, err := fakeConsensusNoDAG.Simple(t.Context(), metadata, input)
+	outputs, err := fakeConsensusNoDAG.Report(context.Background(), metadata, input)
 	require.NoError(t, err)
 	require.Len(t, outputs.Sigs, nSigners)
 

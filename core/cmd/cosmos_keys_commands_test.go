@@ -63,7 +63,8 @@ func TestShell_CosmosKeys(t *testing.T) {
 		keys, err := ks.GetAll()
 		require.NoError(t, err)
 		for _, key := range keys {
-			require.NoError(t, utils.JustError(ks.Delete(ctx, key.ID())))
+			_, err := ks.Delete(ctx, key.ID())
+			require.NoError(t, err)
 		}
 		requireCosmosKeyCount(t, app, 0)
 	}
@@ -150,7 +151,8 @@ func TestShell_CosmosKeys(t *testing.T) {
 		require.NoError(t, tclient.ExportKey(c))
 		require.NoError(t, utils.JustError(os.Stat(keyName)))
 
-		require.NoError(t, utils.JustError(app.GetKeyStore().Cosmos().Delete(ctx, key.ID())))
+		_, err = app.GetKeyStore().Cosmos().Delete(ctx, key.ID())
+		require.NoError(t, err)
 		requireCosmosKeyCount(t, app, 0)
 
 		set = flag.NewFlagSet("test Cosmos import", 0)

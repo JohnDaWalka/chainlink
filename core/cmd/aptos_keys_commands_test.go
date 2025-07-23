@@ -63,7 +63,8 @@ func TestShell_AptosKeys(t *testing.T) {
 		keys, err := ks.GetAll()
 		require.NoError(t, err)
 		for _, key := range keys {
-			require.NoError(t, utils.JustError(ks.Delete(ctx, key.ID())))
+			_, err := ks.Delete(ctx, key.ID())
+			require.NoError(t, err)
 		}
 		requireAptosKeyCount(t, app, 0)
 	}
@@ -150,7 +151,8 @@ func TestShell_AptosKeys(t *testing.T) {
 		require.NoError(t, cmd.NewAptosKeysClient(client).ExportKey(c))
 		require.NoError(t, utils.JustError(os.Stat(keyName)))
 
-		require.NoError(t, utils.JustError(app.GetKeyStore().Aptos().Delete(ctx, key.ID())))
+		_, err = app.GetKeyStore().Aptos().Delete(ctx, key.ID())
+		require.NoError(t, err)
 		requireAptosKeyCount(t, app, 0)
 
 		set = flag.NewFlagSet("test Aptos import", 0)

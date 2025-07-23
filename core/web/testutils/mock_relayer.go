@@ -82,3 +82,11 @@ func (m MockRelayer) NewPluginProvider(ctx context.Context, args commontypes.Rel
 func (m MockRelayer) NewLLOProvider(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.LLOProvider, error) {
 	panic("not implemented")
 }
+
+func (m MockRelayer) NewCCIPProvider(ctx context.Context, args commontypes.RelayArgs) (commontypes.CCIPProvider, error) {
+	panic("not implemented")
+}
+
+func (m MockRelayer) TON() (commontypes.TONService, error) {
+	panic("not implemented")
+}

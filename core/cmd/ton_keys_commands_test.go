@@ -63,7 +63,8 @@ func TestShell_TONKeys(t *testing.T) {
 		keys, err := ks.GetAll()
 		require.NoError(t, err)
 		for _, key := range keys {
-			require.NoError(t, utils.JustError(ks.Delete(ctx, key.ID())))
+			_, err := ks.Delete(ctx, key.ID())
+			require.NoError(t, err)
 		}
 		requireTONKeyCount(t, app, 0)
 	}
@@ -150,7 +151,8 @@ func TestShell_TONKeys(t *testing.T) {
 		require.NoError(t, cmd.NewTONKeysClient(client).ExportKey(c))
 		require.NoError(t, utils.JustError(os.Stat(keyName)))
 
-		require.NoError(t, utils.JustError(app.GetKeyStore().TON().Delete(ctx, key.ID())))
+		_, err = app.GetKeyStore().TON().Delete(ctx, key.ID())
+		require.NoError(t, err)
 		requireTONKeyCount(t, app, 0)
 
 		set = flag.NewFlagSet("test TON import", 0)

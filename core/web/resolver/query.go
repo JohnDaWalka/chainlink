@@ -507,7 +507,8 @@ func (r *Resolver) ConfigV2(ctx context.Context) (*ConfigV2PayloadResolver, erro
 	}
 
 	cfg := r.App.GetConfig()
-	return NewConfigV2Payload(cfg.ConfigTOML()), nil
+	userConfig, effectiveConfig := cfg.ConfigTOML()
+	return NewConfigV2Payload(userConfig, effectiveConfig), nil
 }
 
 func (r *Resolver) EthTransaction(ctx context.Context, args struct {

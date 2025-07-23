@@ -490,17 +490,17 @@ func TestSetupStarkNetRelayer(t *testing.T) {
 	nEnabledChains := 2
 	tConfig := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Starknet = chainlink.RawConfigs{
-			{
+			map[string]any{
 				"ChainID":   "starknet-id-1",
 				"Enabled":   true,
 				"FeederURL": commoncfg.MustParseURL("https://feeder.url"),
 			},
-			{
+			map[string]any{
 				"ChainID":   "starknet-id-2",
 				"Enabled":   true,
 				"FeederURL": commoncfg.MustParseURL("https://feeder.url"),
 			},
-			{
+			map[string]any{
 				"ChainID":   "disabled-starknet-id-1",
 				"Enabled":   ptr(false),
 				"FeederURL": commoncfg.MustParseURL("https://feeder.url"),
@@ -510,7 +510,7 @@ func TestSetupStarkNetRelayer(t *testing.T) {
 
 	t2Config := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Starknet = chainlink.RawConfigs{
-			{
+			map[string]any{
 				"ChainID":   "starknet-id-3",
 				"Enabled":   true,
 				"FeederURL": commoncfg.MustParseURL("https://feeder.url"),
@@ -536,12 +536,12 @@ func TestSetupStarkNetRelayer(t *testing.T) {
 	// test that duplicate enabled chains is an error when
 	duplicateConfig := configtest.NewGeneralConfig(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Starknet = chainlink.RawConfigs{
-			{
+			map[string]any{
 				"ChainID":   "dupe",
 				"Enabled":   true,
 				"FeederURL": commoncfg.MustParseURL("https://feeder.url"),
 			},
-			{
+			map[string]any{
 				"ChainID":   "dupe",
 				"Enabled":   true,
 				"FeederURL": commoncfg.MustParseURL("https://feeder.url"),

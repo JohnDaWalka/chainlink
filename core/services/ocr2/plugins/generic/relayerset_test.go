@@ -193,3 +193,11 @@ func (t *TestRelayer) NewConfigProvider(ctx context.Context, args types.RelayArg
 func (t *TestRelayer) NewLLOProvider(ctx context.Context, args types.RelayArgs, args2 types.PluginArgs) (types.LLOProvider, error) {
 	panic("implement me")
 }
+
+func (t *TestRelayer) NewCCIPProvider(ctx context.Context, args types.RelayArgs) (types.CCIPProvider, error) {
+	panic("implement me")
+}
+
+func (t *TestRelayer) TON() (types.TONService, error) {
+	panic("implement me")
+}

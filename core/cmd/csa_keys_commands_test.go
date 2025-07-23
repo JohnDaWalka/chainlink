@@ -125,7 +125,8 @@ func TestShell_ImportExportCsaKey(t *testing.T) {
 	require.NoError(t, client.ExportCSAKey(c))
 	require.NoError(t, utils.JustError(os.Stat(keyName)))
 
-	require.NoError(t, utils.JustError(app.GetKeyStore().CSA().Delete(ctx, key.ID())))
+	_, err = app.GetKeyStore().CSA().Delete(ctx, key.ID())
+	require.NoError(t, err)
 	requireCSAKeyCount(t, app, 0)
 
 	// Import test

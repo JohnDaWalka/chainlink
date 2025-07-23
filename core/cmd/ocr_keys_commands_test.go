@@ -168,7 +168,8 @@ func TestShell_ImportExportOCRKey(t *testing.T) {
 	require.NoError(t, client.ExportOCRKey(c))
 	require.NoError(t, utils.JustError(os.Stat(keyName)))
 
-	require.NoError(t, utils.JustError(app.GetKeyStore().OCR().Delete(ctx, key.ID())))
+	_, err = app.GetKeyStore().OCR().Delete(ctx, key.ID())
+	require.NoError(t, err)
 	requireOCRKeyCount(t, app, 0)
 
 	set = flag.NewFlagSet("test OCR import", 0)
