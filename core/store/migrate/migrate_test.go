@@ -71,7 +71,7 @@ func getOCR2Spec100() OffchainReporting2OracleSpec100 {
 func TestMigrate_0100_BootstrapConfigs(t *testing.T) {
 	cfg, db := heavyweight.FullTestDBEmptyV2(t, nil)
 	lggr := logger.TestLogger(t)
-	p, err := migrate.NewProvider(testutils.Context(t), db.DB)
+	p, err := migrate.NewProvider(testutils.Context(t), db.DB, false)
 	require.NoError(t, err)
 	results, err := p.UpTo(testutils.Context(t), 99)
 	require.NoError(t, err)
@@ -343,7 +343,7 @@ ON jobs.offchainreporting2_oracle_spec_id = ocr2.id`
 func TestMigrate_101_GenericOCR2(t *testing.T) {
 	_, db := heavyweight.FullTestDBEmptyV2(t, nil)
 	ctx := testutils.Context(t)
-	p, err := migrate.NewProvider(ctx, db.DB)
+	p, err := migrate.NewProvider(ctx, db.DB, false)
 	require.NoError(t, err)
 	results, err := p.UpTo(ctx, 100)
 	require.NoError(t, err)
@@ -397,7 +397,7 @@ func TestMigrate(t *testing.T) {
 	ctx := testutils.Context(t)
 	_, db := heavyweight.FullTestDBEmptyV2(t, nil)
 
-	p, err := migrate.NewProvider(ctx, db.DB)
+	p, err := migrate.NewProvider(ctx, db.DB, false)
 	require.NoError(t, err)
 	results, err := p.UpTo(ctx, 100)
 	require.NoError(t, err)
@@ -453,7 +453,7 @@ func TestDatabaseBackFillWithMigration202(t *testing.T) {
 	_, db := heavyweight.FullTestDBEmptyV2(t, nil)
 	ctx := testutils.Context(t)
 
-	p, err := migrate.NewProvider(ctx, db.DB)
+	p, err := migrate.NewProvider(ctx, db.DB, false)
 	require.NoError(t, err)
 	results, err := p.UpTo(ctx, 201)
 	require.NoError(t, err)
@@ -544,7 +544,7 @@ func TestNoTriggers(t *testing.T) {
 
 	// version prior to removal of all triggers
 	v := int64(217)
-	p, err := migrate.NewProvider(testutils.Context(t), db.DB)
+	p, err := migrate.NewProvider(testutils.Context(t), db.DB, false)
 	require.NoError(t, err)
 	_, err = p.UpTo(testutils.Context(t), v)
 	require.NoError(t, err)
@@ -562,7 +562,7 @@ func BenchmarkBackfillingRecordsWithMigration202(b *testing.B) {
 	goose.SetLogger(goose.NopLogger())
 	_, db := heavyweight.FullTestDBEmptyV2(b, nil)
 
-	p, err := migrate.NewProvider(ctx, db.DB)
+	p, err := migrate.NewProvider(ctx, db.DB, false)
 	require.NoError(b, err)
 	results, err := p.UpTo(ctx, previousMigration)
 	require.NoError(b, err)
@@ -622,7 +622,7 @@ func BenchmarkBackfillingRecordsWithMigration202(b *testing.B) {
 func TestRollback_247_TxStateEnumUpdate(t *testing.T) {
 	ctx := testutils.Context(t)
 	_, db := heavyweight.FullTestDBV2(t, nil)
-	p, err := migrate.NewProvider(ctx, db.DB)
+	p, err := migrate.NewProvider(ctx, db.DB, false)
 	require.NoError(t, err)
 	_, err = p.DownTo(ctx, 54)
 	require.NoError(t, err)
