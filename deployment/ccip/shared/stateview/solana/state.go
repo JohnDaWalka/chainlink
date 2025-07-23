@@ -289,7 +289,7 @@ func (s CCIPChainState) GenerateView(e *cldf.Environment, selector uint64) (view
 		if tokenPool.IsZero() {
 			continue
 		}
-		tokenPoolView, err := solanaview.GenerateTokenPoolView(e.BlockChains.SolanaChains()[selector], tokenPool, remoteChains, allTokens, test_token_pool.BurnAndMint_PoolType.String(), metadata)
+		tokenPoolView, err := solanaview.GenerateTokenPoolView(e.BlockChains.SolanaChains()[selector], tokenPool, remoteChains, allTokens, shared.BurnMintTokenPool.String(), metadata)
 		if err != nil {
 			return chainView, fmt.Errorf("failed to generate burn mint token pool view %s: %w", tokenPool, err)
 		}
@@ -299,11 +299,19 @@ func (s CCIPChainState) GenerateView(e *cldf.Environment, selector uint64) (view
 		if tokenPool.IsZero() {
 			continue
 		}
-		tokenPoolView, err := solanaview.GenerateTokenPoolView(e.BlockChains.SolanaChains()[selector], tokenPool, remoteChains, allTokens, test_token_pool.LockAndRelease_PoolType.String(), metadata)
+		tokenPoolView, err := solanaview.GenerateTokenPoolView(e.BlockChains.SolanaChains()[selector], tokenPool, remoteChains, allTokens, shared.LockReleaseTokenPool.String(), metadata)
 		if err != nil {
 			return chainView, fmt.Errorf("failed to generate lock release token pool view %s: %w", tokenPool, err)
 		}
 		chainView.TokenPool[tokenPool.String()] = tokenPoolView
+	}
+	// Generate token pool view for USDC
+	if !s.CCTPTokenPool.IsZero() && !s.USDCToken.IsZero() {
+		tokenPoolView, err := solanaview.GenerateTokenPoolView(e.BlockChains.SolanaChains()[selector], s.CCTPTokenPool, remoteChains, []solana.PublicKey{s.USDCToken}, shared.CCTPTokenPool.String(), shared.CLLMetadata)
+		if err != nil {
+			return chainView, fmt.Errorf("failed to generate lock release token pool view %s: %w", s.CCTPTokenPool, err)
+		}
+		chainView.TokenPool[s.CCTPTokenPool.String()] = tokenPoolView
 	}
 	addresses, err := e.ExistingAddresses.AddressesForChain(selector)
 	if err != nil {
