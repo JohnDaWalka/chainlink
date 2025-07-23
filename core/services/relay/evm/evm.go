@@ -657,6 +657,12 @@ func (r *Relayer) NewCCIPProvider(ctx context.Context, rargs commontypes.RelayAr
 	return nil, fmt.Errorf("NewCCIPProvider method not implemented - use NewCCIPCommitProvider or NewCCIPExecProvider instead")
 }
 
+// TON implements the commontypes.Relayer interface requirement for TON blockchain support.
+// EVM relayer does not implement TON functionality as they are different blockchain platforms.
+func (r *Relayer) TON() (commontypes.TONService, error) {
+	return nil, fmt.Errorf("TON blockchain not supported by EVM relayer")
+}
+
 func (r *Relayer) NewLLOProvider(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.LLOProvider, error) {
 	relayOpts := types.NewRelayOpts(rargs)
 	relayConfig, err := relayOpts.RelayConfig()

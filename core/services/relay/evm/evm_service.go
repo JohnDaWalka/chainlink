@@ -37,7 +37,7 @@ type evmService struct {
 
 // Direct RPC
 func (e *evmService) CallContract(ctx context.Context, request evmtypes.CallContractRequest) (*evmtypes.CallContractReply, error) {
-	result, err := e.chain.Client().CallContractWithOpts(ctx, toEthMsg(request.Msg), request.BlockNumber, types.CallContractOpts{ConfidenceLevel: request.ConfidenceLevel})
+	result, err := e.chain.Client().CallContract(ctx, toEthMsg(request.Msg), request.BlockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (e *evmService) CallContract(ctx context.Context, request evmtypes.CallCont
 }
 
 func (e *evmService) FilterLogs(ctx context.Context, request evmtypes.FilterLogsRequest) (*evmtypes.FilterLogsReply, error) {
-	rawLogs, err := e.chain.Client().FilterLogsWithOpts(ctx, convertEthFilter(request.FilterQuery), types.FilterLogsOpts{ConfidenceLevel: request.ConfidenceLevel})
+	rawLogs, err := e.chain.Client().FilterLogs(ctx, convertEthFilter(request.FilterQuery))
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (e *evmService) FilterLogs(ctx context.Context, request evmtypes.FilterLogs
 }
 
 func (e *evmService) BalanceAt(ctx context.Context, request evmtypes.BalanceAtRequest) (*evmtypes.BalanceAtReply, error) {
-	balance, err := e.chain.Client().BalanceAtWithOpts(ctx, request.Address, request.BlockNumber, types.BalanceAtOpts{ConfidenceLevel: request.ConfidenceLevel})
+	balance, err := e.chain.Client().BalanceAt(ctx, request.Address, request.BlockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +104,9 @@ func (e *evmService) HeaderByNumber(ctx context.Context, request evmtypes.Header
 		h, _, err = e.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
 		// non-special block or larger that int64
 	case request.Number.Sign() >= 0 || request.Number.IsInt64():
-		var header *types.Header
-		header, err = e.chain.Client().HeaderByNumberWithOpts(ctx, request.Number, types.HeaderByNumberOpts{ConfidenceLevel: request.ConfidenceLevel})
-		h = (*types.Head)(header)
+		var header *types.Head
+		header, err = e.chain.Client().HeadByNumber(ctx, request.Number)
+		h = header
 	case request.Number.Int64() == rpc.FinalizedBlockNumber.Int64():
 		_, h, err = e.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
 	case request.Number.Int64() == rpc.SafeBlockNumber.Int64():

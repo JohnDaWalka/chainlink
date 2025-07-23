@@ -66,41 +66,43 @@ func (fc *fakeConsensusNoDAG) close() error {
 
 // NOTE: This fake capability currently bounces back the request payload, ignoring everything else.
 // When the real NoDAG consensus OCR plugin is ready, it should be used here, similarly to how the V1 fake works.
-func (fc *fakeConsensusNoDAG) Simple(ctx context.Context, metadata capabilities.RequestMetadata, input *sdkpb.SimpleConsensusInputs) (*sdkpb.ConsensusOutputs, error) {
+func (fc *fakeConsensusNoDAG) Simple(ctx context.Context, metadata capabilities.RequestMetadata, input *sdkpb.SimpleConsensusInputs) (*valuespb.Value, error) {
 	fc.eng.Infow("Executing Fake Consensus NoDAG", "input", input)
 	observation := input.GetValue()
 	if observation == nil {
 		return nil, errors.New("input value cannot be nil")
 	}
 
-	switch input.Descriptors.EncoderName {
+	return observation, nil
+}
+
+func (fc *fakeConsensusNoDAG) Report(ctx context.Context, metadata capabilities.RequestMetadata, input *sdkpb.ReportRequest) (*sdkpb.ReportResponse, error) {
+	switch input.EncoderName {
 	case "proto", "": // mode-switch (default)
 		mapProto := &valuespb.Map{
 			Fields: map[string]*valuespb.Value{
 				sdk.ConsensusResponseMapKeyMetadata: {Value: &valuespb.Value_StringValue{StringValue: "fake_metadata"}},
-				sdk.ConsensusResponseMapKeyPayload:  observation,
+				sdk.ConsensusResponseMapKeyPayload:  {Value: &valuespb.Value_BytesValue{BytesValue: input.EncodedPayload}},
 			},
 		}
 		rawMap, err := proto.Marshal(mapProto)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal input value: %w", err)
 		}
-		return &sdkpb.ConsensusOutputs{
+		return &sdkpb.ReportResponse{
 			RawReport: rawMap,
 			// other fields are unused by mode-switch calls, use fake ones
 			ConfigDigest:  []byte("fake_config_digest"),
-			SeqNr:         42,
-			ReportContext: []byte("fake_report_context"),
+			SeqNr:         uint64(fc.seqNr),
 			Sigs: []*sdkpb.AttributedSignature{
 				{
-					SignerId:  3,
-					Signature: []byte("fake_signature_value"),
+					Signature: []byte("fake_signature"),
+					SignerId:  0,
 				},
 			},
 		}, nil
 	case "evm": // report-gen for EVM
-		encodedBytes := observation.GetBytesValue()
-		if len(encodedBytes) == 0 {
+		if len(input.EncodedPayload) == 0 {
 			return nil, errors.New("input value for EVM encoder needs to be a byte array and cannot be empty or nil")
 		}
 
@@ -116,7 +118,7 @@ func (fc *fakeConsensusNoDAG) Simple(ctx context.Context, metadata capabilities.
 			WorkflowOwner:    metadata.WorkflowOwner,
 			ReportID:         "0001",
 		}
-		rawOutput, err := evm.PrependMetadataFields(meta, encodedBytes)
+		rawOutput, err := evm.PrependMetadataFields(meta, input.EncodedPayload)
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepend metadata fields: %w", err)
 		}
@@ -130,21 +132,20 @@ func (fc *fakeConsensusNoDAG) Simple(ctx context.Context, metadata capabilities.
 				return nil, fmt.Errorf("failed to sign with signer %s: %w", signer.ID(), err)
 			}
 			sigs = append(sigs, &sdkpb.AttributedSignature{
-				SignerId:  idx,
 				Signature: sig,
+				SignerId:  idx,
 			})
 			idx++
 		}
 
-		return &sdkpb.ConsensusOutputs{
+		return &sdkpb.ReportResponse{
 			RawReport:     rawOutput,
 			ConfigDigest:  fc.configDigest[:],
 			SeqNr:         uint64(fc.seqNr),
-			ReportContext: reportContext(fc.configDigest[:], fc.seqNr),
 			Sigs:          sigs,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported encoder name: %s", input.Descriptors.EncoderName)
+		return nil, fmt.Errorf("unsupported encoder name: %s", input.EncoderName)
 	}
 }
 

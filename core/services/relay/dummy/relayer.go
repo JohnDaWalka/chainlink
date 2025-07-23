@@ -3,6 +3,7 @@ package dummy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -53,6 +54,12 @@ func (r *relayer) NewConfigProvider(_ context.Context, rargs types.RelayArgs) (t
 }
 func (r *relayer) NewPluginProvider(context.Context, types.RelayArgs, types.PluginArgs) (types.PluginProvider, error) {
 	return nil, nil
+}
+func (r *relayer) NewCCIPProvider(ctx context.Context, rargs types.RelayArgs) (types.CCIPProvider, error) {
+	return nil, errors.New("CCIP not supported by dummy relayer")
+}
+func (r *relayer) TON() (types.TONService, error) {
+	return nil, errors.New("TON blockchain not supported by dummy relayer")
 }
 func (r *relayer) NewLLOProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.LLOProvider, error) {
 	cp, err := r.NewConfigProvider(ctx, rargs)

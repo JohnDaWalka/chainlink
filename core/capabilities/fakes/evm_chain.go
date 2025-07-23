@@ -326,6 +326,10 @@ func (fc *FakeEVMChain) UnregisterLogTracking(ctx context.Context, metadata comm
 	return nil, nil
 }
 
+func (fc *FakeEVMChain) ChainSelector() uint64 {
+	return 12345 // fake chain selector
+}
+
 func (fc *FakeEVMChain) Name() string {
 	return fc.ID
 }
