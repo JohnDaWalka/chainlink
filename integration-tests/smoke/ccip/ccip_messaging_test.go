@@ -36,10 +36,87 @@ import (
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 )
 
-func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
+func Test_CCIPMessaging_EVM2EVM_DockerOnly(t *testing.T) {
+	// docker only test.
+	t.Setenv("CCIP_V16_TEST_ENV", "docker")
 	// enable evm loop mode.
 	t.Setenv("CL_EVM_CMD", "chainlink-evm")
 
+	// Setup 2 chains and a single lane.
+	e, _, _ := testsetups.NewIntegrationEnvironment(
+		t,
+	)
+
+	state, err := stateview.LoadOnchainState(e.Env)
+	require.NoError(t, err)
+
+	allChainSelectors := maps.Keys(e.Env.BlockChains.EVMChains())
+	require.Len(t, allChainSelectors, 2)
+	sourceChain := allChainSelectors[0]
+	destChain := allChainSelectors[1]
+	require.Contains(t, allChainSelectors, sourceChain)
+	require.Contains(t, allChainSelectors, destChain)
+	t.Log("All chain selectors:", allChainSelectors,
+		", home chain selector:", e.HomeChainSel,
+		", feed chain selector:", e.FeedChainSel,
+		", source chain selector:", sourceChain,
+		", dest chain selector:", destChain,
+	)
+	// connect a single lane, source to dest
+	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+
+	var (
+		nonce  uint64
+		sender = common.LeftPadBytes(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey.From.Bytes(), 32)
+		setup  = mt.NewTestSetupWithDeployedEnv(
+			t,
+			e,
+			state,
+			sourceChain,
+			destChain,
+			sender,
+			false, // testRouter
+		)
+	)
+
+	// Wait for filter registration for CCIPMessageSent (onramp), CommitReportAccepted (offramp), and ExecutionStateChanged (offramp)
+	testhelpers.WaitForEventFilterRegistrationOnLane(t, state, e.Env.Offchain, sourceChain, destChain)
+
+	monitorCtx, monitorCancel := context.WithCancel(t.Context())
+	ms := &monitorState{}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		monitorReExecutions(monitorCtx, t, state, destChain, ms)
+	}()
+
+	t.Run("data message to eoa", func(t *testing.T) {
+		_ = mt.Run(
+			t,
+			mt.TestCase{
+				ValidationType:         mt.ValidationTypeExec,
+				TestSetup:              setup,
+				Nonce:                  &nonce,
+				Receiver:               common.HexToAddress("0xdead").Bytes(),
+				MsgData:                []byte("hello eoa"),
+				ExtraArgs:              nil,                                 // default extraArgs
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS, // success because offRamp won't call an EOA
+				ExtraAssertions: []func(t *testing.T){
+					func(t *testing.T) {
+					},
+				},
+			},
+		)
+	})
+
+	monitorCancel()
+	wg.Wait()
+	// there should be no re-executions.
+	require.Equal(t, int32(0), ms.reExecutionsObserved.Load())
+}
+
+func Test_CCIPMessaging_EVM2EVM(t *testing.T) {
 	// fix the chain ids for the test so we can appropriately set finality depth numbers on the destination chain.
 	chains := []chainsel.Chain{
 		chainsel.GETH_TESTNET,  // source
@@ -346,9 +423,6 @@ func Test_CCIPMessaging_MultiExecReports_EVM2Solana(t *testing.T) {
 }
 
 func Test_CCIPMessaging_EVM2Solana(t *testing.T) {
-	// enable solana loop mode.
-	t.Setenv("CL_SOLANA_CMD", "chainlink-solana")
-
 	// Setup 2 chains (EVM and Solana) and a single lane.
 	ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(t,
