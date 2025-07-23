@@ -3,7 +3,6 @@ package fakes
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -148,14 +147,6 @@ func (fc *fakeConsensusNoDAG) Report(ctx context.Context, metadata capabilities.
 	default:
 		return nil, fmt.Errorf("unsupported encoder name: %s", input.EncoderName)
 	}
-}
-
-func reportContext(configDigest []byte, seqNr uint32) []byte {
-	// report context is the config digest + the sequence number padded with zeros
-	seqToEpoch := make([]byte, 32)
-	binary.BigEndian.PutUint32(seqToEpoch[32-5:32-1], seqNr)
-	zeros := make([]byte, 32)
-	return append(append(configDigest, seqToEpoch...), zeros...)
 }
 
 func (fc *fakeConsensusNoDAG) Description() string {
