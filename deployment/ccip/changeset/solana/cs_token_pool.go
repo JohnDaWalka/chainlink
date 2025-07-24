@@ -23,7 +23,6 @@ import (
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -53,6 +52,8 @@ var _ cldf.ChangeSet[RemoveFromAllowListConfig] = RemoveFromTokenPoolAllowList
 
 // token pool ops
 var _ cldf.ChangeSet[TokenPoolOpsCfg] = TokenPoolOps
+
+var _ cldf.ChangeSet[SyncDomainConfig] = SyncDomain
 
 // append mcms txns generated from solanainstructions
 func appendTxs(instructions []solana.Instruction, tokenPool solana.PublicKey, poolType cldf.ContractType, txns *[]mcmsTypes.Transaction) error {
@@ -204,7 +205,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 		instructions := []solana.Instruction{createI}
 
 		// Global Configuration
-		configPDA, err := tokens.TokenPoolGlobalConfigPDA(tokenPool)
+		configPDA, err := solTokenUtil.TokenPoolGlobalConfigPDA(tokenPool)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool global config PDA: %w", err)
 		}
@@ -472,7 +473,7 @@ func InitGlobalConfigTokenPoolProgram(e cldf.Environment, cfg TokenPoolConfigWit
 
 	var configPDA solana.PublicKey
 	// Global Configuration
-	configPDA, err = tokens.TokenPoolGlobalConfigPDA(tokenPool)
+	configPDA, err = solTokenUtil.TokenPoolGlobalConfigPDA(tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get solana token pool global config PDA: %w", err)
 	}
@@ -584,7 +585,7 @@ func ModifyMintAuthority(e cldf.Environment, cfg NewMintTokenPoolConfig) (cldf.C
 	newMintAuthority := cfg.NewMintAuthority
 	tokenPoolSigner, _ := solTokenUtil.TokenPoolSignerAddress(tokenPubKey, tokenPool)
 
-	poolConfig, err := tokens.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	poolConfig, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate the pool configg: %w", err)
 	}
@@ -1838,7 +1839,7 @@ func LockReleaseLiquidityOps(e cldf.Environment, cfg LockReleaseLiquidityOpsConf
 		tokenAmount := uint64(cfg.LiquidityCfg.Amount) // #nosec G115 - we check the amount above
 		switch cfg.LiquidityCfg.Type {
 		case Provide:
-			outDec, outVal, err := tokens.TokenBalance(
+			outDec, outVal, err := solTokenUtil.TokenBalance(
 				e.GetContext(),
 				chain.Client,
 				cfg.LiquidityCfg.RemoteTokenAccount,
@@ -2196,7 +2197,7 @@ func InitializeStateVersion(e cldf.Environment, cfg TokenPoolConfigWithMCM) (cld
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
 	tokenPubKey := cfg.TokenPubKey
 	tokenPool := solChainState.GetActiveTokenPool(cfg.PoolType, cfg.Metadata)
-	poolConfig, err := tokens.TokenPoolConfigAddress(tokenPubKey, tokenPool)
+	poolConfig, err := solTokenUtil.TokenPoolConfigAddress(tokenPubKey, tokenPool)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate the pool configg: %w", err)
 	}
@@ -2250,6 +2251,124 @@ func InitializeStateVersion(e cldf.Environment, cfg TokenPoolConfigWithMCM) (cld
 	if len(txns) > 0 {
 		proposal, err := BuildProposalsForTxns(
 			e, cfg.ChainSelector, "proposal to init global config in Solana Token Pool", cfg.MCMS.MinDelay, txns)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
+		}
+		return cldf.ChangesetOutput{
+			MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
+		}, nil
+	}
+
+	return cldf.ChangesetOutput{}, nil
+}
+
+type SyncDomainConfig struct {
+	ChainSelector uint64
+	// cctpChainConfigMap maps chain selectors to their associated CctpChainConfig
+	CCTPChainConfigMap map[uint64]CctpChainConfig
+	MCMS               *proposalutils.TimelockConfig
+}
+
+type CctpChainConfig struct {
+	Domain uint32
+	DestinationCaller solana.PublicKey
+}
+
+func (cfg SyncDomainConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
+	// Validate map contains configs
+	if len(cfg.CCTPChainConfigMap) == 0 {
+		return errors.New("CCTP chain config map is empty")
+	}
+	// Validate USDC pool exists in state
+	if chainState.CCTPTokenPool.IsZero() {
+		return errors.New("CCTP token pool does not exist in state")
+	}
+	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
+	if err := solanastateview.ValidateOwnershipSolana(&e, chain, cfg.MCMS != nil, chainState.CCTPTokenPool, shared.CCTPTokenPool, chainState.USDCToken); err != nil {
+		return fmt.Errorf("failed to validate ownership for cctp token pool: %w", err)
+	}
+	// Validate chain configs are initialized for each chain selector
+	for chainSel := range cfg.CCTPChainConfigMap {
+		supported, _, err := isSupportedChain(chain, chainState.USDCToken, chainState.CCTPTokenPool, chainSel)
+		if err != nil {
+			return fmt.Errorf("failed to validate if remote chain %d is supported: %w", chainSel, err)
+		}
+		if !supported {
+			return fmt.Errorf("chain config not initialized for selector %d", chainSel)
+		}
+	}
+	return nil
+}
+
+// SyncDomain adds or removes CCTP domain configs from the Solana CCTP token pool
+func SyncDomain(e cldf.Environment, cfg SyncDomainConfig) (cldf.ChangesetOutput, error) {
+	e.Logger.Infow("Syncing USDC domains", "cfg", cfg)
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+	chainState := state.SolChains[cfg.ChainSelector]
+	if err := cfg.Validate(e, chainState); err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
+
+	cctpTokenPool := chainState.CCTPTokenPool
+	usdcToken := chainState.USDCToken
+
+	useMcms := solanastateview.IsSolanaProgramOwnedByTimelock(
+		&e,
+		chain,
+		chainState,
+		shared.CCTPTokenPool,
+		usdcToken,
+		shared.CLLMetadata,
+	)
+
+	statePDA, err := solTokenUtil.TokenPoolConfigAddress(usdcToken, cctpTokenPool)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token pool config PDA: %w", err) 
+	}
+
+	var txns []mcmsTypes.Transaction
+	cctp_token_pool.SetProgramID(cctpTokenPool)
+	for remoteChainSel, cctpConfig := range cfg.CCTPChainConfigMap {
+		e.Logger.Infow("Setting up USDC token pool CCTP config for remote chain", "remote_chain_selector", remoteChainSel, "domain", cctpConfig.Domain, "destination_caller", cctpConfig.DestinationCaller.String())
+		
+		chainConfigPDA, _, err := solTokenUtil.TokenPoolChainConfigPDA(remoteChainSel, usdcToken, cctpTokenPool)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to calculate token pool config PDA: %w", err) 
+		}
+
+		ix, err := cctp_token_pool.NewEditChainRemoteConfigCctpInstruction(
+			remoteChainSel,
+			usdcToken,
+			cctp_token_pool.CctpChain{
+				DomainId: cctpConfig.Domain,
+				DestinationCaller: cctpConfig.DestinationCaller,
+			},
+			statePDA,
+			chainConfigPDA,
+			chain.DeployerKey.PublicKey(),
+		).ValidateAndBuild()
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+		}
+		if useMcms {
+			err := appendTxs([]solana.Instruction{ix}, cctpTokenPool, shared.CCTPTokenPool, &txns)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate mcms txn: %w", err)
+			}
+		} else {
+			if err := chain.Confirm([]solana.Instruction{ix}); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+			}
+		}
+	}
+
+	if len(txns) > 0 {
+		proposal, err := BuildProposalsForTxns(
+			e, cfg.ChainSelector, "proposal to edit USDC token pool CCTP config in Solana", cfg.MCMS.MinDelay, txns)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
 		}

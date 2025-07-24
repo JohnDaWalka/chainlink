@@ -2,13 +2,18 @@ package solana
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
+
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/cctp_token_pool"
 	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
 	solTokenUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
+	ccipshared "github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/view/shared"
 )
 
@@ -45,6 +50,7 @@ type TokenPoolChainConfig struct {
 	Decimals          uint8                         `json:"decimals,omitempty"`
 	InboundRateLimit  TokenPoolRateLimitTokenBucket `json:"inboundRateLimit,omitempty"`
 	OutboundRateLimit TokenPoolRateLimitTokenBucket `json:"outboundRateLimit,omitempty"`
+	CCTPChainConfig   cctp_token_pool.CctpChain     `json:"cctpChainConfig,omitempty"`
 }
 
 type TokenPoolRateLimitTokenBucket struct {
@@ -105,29 +111,31 @@ func GenerateTokenPoolView(chain cldf_solana.Chain, program solana.PublicKey, re
 		// TODO: save the configured chains/tokens to the AB so we can reconstruct state without the loop
 		for _, token := range tokens {
 			remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(remote, token, program)
-			var remoteChainConfigAccount solTestTokenPool.ChainConfig
-			if err := chain.GetAccountDataBorshInto(context.Background(), remoteChainConfigPDA, &remoteChainConfigAccount); err == nil {
-				view.TokenPoolChainConfig[remote][token.String()] = TokenPoolChainConfig{
-					PDA:           remoteChainConfigPDA.String(),
-					PoolAddresses: make([]string, len(remoteChainConfigAccount.Base.Remote.PoolAddresses)),
-					TokenAddress:  shared.GetAddressFromBytes(remote, remoteChainConfigAccount.Base.Remote.TokenAddress.Address),
-					Decimals:      remoteChainConfigAccount.Base.Remote.Decimals,
-					InboundRateLimit: TokenPoolRateLimitTokenBucket{
-						Tokens:      remoteChainConfigAccount.Base.InboundRateLimit.Tokens,
-						LastUpdated: remoteChainConfigAccount.Base.InboundRateLimit.LastUpdated,
-						Enabled:     remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Enabled,
-						Capacity:    remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Capacity,
-						Rate:        remoteChainConfigAccount.Base.InboundRateLimit.Cfg.Rate},
-					OutboundRateLimit: TokenPoolRateLimitTokenBucket{
-						Tokens:      remoteChainConfigAccount.Base.OutboundRateLimit.Tokens,
-						LastUpdated: remoteChainConfigAccount.Base.OutboundRateLimit.LastUpdated,
-						Enabled:     remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Enabled,
-						Capacity:    remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Capacity,
-						Rate:        remoteChainConfigAccount.Base.OutboundRateLimit.Cfg.Rate},
-				}
-				for i, addr := range remoteChainConfigAccount.Base.Remote.PoolAddresses {
-					view.TokenPoolChainConfig[remote][token.String()].PoolAddresses[i] = shared.GetAddressFromBytes(remote, addr.Address)
-				}
+			baseConfig, cctpConfig, err := fetchChainConfig(chain, remoteChainConfigPDA, poolType)
+			if err != nil {
+				return view, fmt.Errorf("failed to fetch remote chain config for token pool: %w", err)
+			}
+			view.TokenPoolChainConfig[remote][token.String()] = TokenPoolChainConfig{
+				PDA:           remoteChainConfigPDA.String(),
+				PoolAddresses: make([]string, len(baseConfig.Remote.PoolAddresses)),
+				TokenAddress:  shared.GetAddressFromBytes(remote, baseConfig.Remote.TokenAddress.Address),
+				Decimals:      baseConfig.Remote.Decimals,
+				InboundRateLimit: TokenPoolRateLimitTokenBucket{
+					Tokens:      baseConfig.InboundRateLimit.Tokens,
+					LastUpdated: baseConfig.InboundRateLimit.LastUpdated,
+					Enabled:     baseConfig.InboundRateLimit.Cfg.Enabled,
+					Capacity:    baseConfig.InboundRateLimit.Cfg.Capacity,
+					Rate:        baseConfig.InboundRateLimit.Cfg.Rate},
+				OutboundRateLimit: TokenPoolRateLimitTokenBucket{
+					Tokens:      baseConfig.OutboundRateLimit.Tokens,
+					LastUpdated: baseConfig.OutboundRateLimit.LastUpdated,
+					Enabled:     baseConfig.OutboundRateLimit.Cfg.Enabled,
+					Capacity:    baseConfig.OutboundRateLimit.Cfg.Capacity,
+					Rate:        baseConfig.OutboundRateLimit.Cfg.Rate},
+				CCTPChainConfig: cctpConfig,
+			}
+			for i, addr := range baseConfig.Remote.PoolAddresses {
+				view.TokenPoolChainConfig[remote][token.String()].PoolAddresses[i] = shared.GetAddressFromBytes(remote, addr.Address)
 			}
 		}
 	}
@@ -160,4 +168,23 @@ func GenerateTokenPoolView(chain cldf_solana.Chain, program solana.PublicKey, re
 		}
 	}
 	return view, nil
+}
+
+func fetchChainConfig(chain cldf_solana.Chain, chainConfigPDA solana.PublicKey, poolType string) (base_token_pool.BaseChain, cctp_token_pool.CctpChain, error) {
+	switch poolType {
+	case ccipshared.BurnMintTokenPool.String(), ccipshared.LockReleaseTokenPool.String():
+		var remoteChainConfigAccount solTestTokenPool.ChainConfig
+		if err := chain.GetAccountDataBorshInto(context.Background(), chainConfigPDA, &remoteChainConfigAccount); err != nil {
+			return base_token_pool.BaseChain{}, cctp_token_pool.CctpChain{}, err
+		}
+		return remoteChainConfigAccount.Base, cctp_token_pool.CctpChain{}, nil
+	case ccipshared.CCTPTokenPool.String():
+		var remoteChainConfigAccount cctp_token_pool.ChainConfig
+		if err := chain.GetAccountDataBorshInto(context.Background(), chainConfigPDA, &remoteChainConfigAccount); err != nil {
+			return base_token_pool.BaseChain{}, cctp_token_pool.CctpChain{}, err
+		}
+		return remoteChainConfigAccount.Base, remoteChainConfigAccount.Cctp, nil
+	default:
+		return base_token_pool.BaseChain{}, cctp_token_pool.CctpChain{}, fmt.Errorf("unsupported token pool type %s", poolType)
+	}
 }
