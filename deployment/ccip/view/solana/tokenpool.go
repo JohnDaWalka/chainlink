@@ -50,7 +50,7 @@ type TokenPoolChainConfig struct {
 	Decimals          uint8                         `json:"decimals,omitempty"`
 	InboundRateLimit  TokenPoolRateLimitTokenBucket `json:"inboundRateLimit,omitempty"`
 	OutboundRateLimit TokenPoolRateLimitTokenBucket `json:"outboundRateLimit,omitempty"`
-	CCTPChainConfig   cctp_token_pool.CctpChain     `json:"cctpChainConfig,omitempty"`
+	CCTPChainConfig   *cctp_token_pool.CctpChain    `json:"cctpChainConfig,omitempty"`
 }
 
 type TokenPoolRateLimitTokenBucket struct {
@@ -111,34 +111,28 @@ func GenerateTokenPoolView(chain cldf_solana.Chain, program solana.PublicKey, re
 		// TODO: save the configured chains/tokens to the AB so we can reconstruct state without the loop
 		for _, token := range tokens {
 			remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(remote, token, program)
-			if baseConfig, cctpConfig, err := fetchChainConfig(chain, remoteChainConfigPDA, poolType); err == nil {
-				if baseConfig != nil {
-					view.TokenPoolChainConfig[remote][token.String()] = TokenPoolChainConfig{
-						PDA:           remoteChainConfigPDA.String(),
-						PoolAddresses: make([]string, len(baseConfig.Remote.PoolAddresses)),
-						TokenAddress:  shared.GetAddressFromBytes(remote, baseConfig.Remote.TokenAddress.Address),
-						Decimals:      baseConfig.Remote.Decimals,
-						InboundRateLimit: TokenPoolRateLimitTokenBucket{
-							Tokens:      baseConfig.InboundRateLimit.Tokens,
-							LastUpdated: baseConfig.InboundRateLimit.LastUpdated,
-							Enabled:     baseConfig.InboundRateLimit.Cfg.Enabled,
-							Capacity:    baseConfig.InboundRateLimit.Cfg.Capacity,
-							Rate:        baseConfig.InboundRateLimit.Cfg.Rate},
-						OutboundRateLimit: TokenPoolRateLimitTokenBucket{
-							Tokens:      baseConfig.OutboundRateLimit.Tokens,
-							LastUpdated: baseConfig.OutboundRateLimit.LastUpdated,
-							Enabled:     baseConfig.OutboundRateLimit.Cfg.Enabled,
-							Capacity:    baseConfig.OutboundRateLimit.Cfg.Capacity,
-							Rate:        baseConfig.OutboundRateLimit.Cfg.Rate},
-					}
-					for i, addr := range baseConfig.Remote.PoolAddresses {
-						view.TokenPoolChainConfig[remote][token.String()].PoolAddresses[i] = shared.GetAddressFromBytes(remote, addr.Address)
-					}
+			if baseConfig, cctpConfig, err := fetchChainConfig(chain, remoteChainConfigPDA, poolType); err == nil && baseConfig != nil {
+				view.TokenPoolChainConfig[remote][token.String()] = TokenPoolChainConfig{
+					PDA:           remoteChainConfigPDA.String(),
+					PoolAddresses: make([]string, len(baseConfig.Remote.PoolAddresses)),
+					TokenAddress:  shared.GetAddressFromBytes(remote, baseConfig.Remote.TokenAddress.Address),
+					Decimals:      baseConfig.Remote.Decimals,
+					InboundRateLimit: TokenPoolRateLimitTokenBucket{
+						Tokens:      baseConfig.InboundRateLimit.Tokens,
+						LastUpdated: baseConfig.InboundRateLimit.LastUpdated,
+						Enabled:     baseConfig.InboundRateLimit.Cfg.Enabled,
+						Capacity:    baseConfig.InboundRateLimit.Cfg.Capacity,
+						Rate:        baseConfig.InboundRateLimit.Cfg.Rate},
+					OutboundRateLimit: TokenPoolRateLimitTokenBucket{
+						Tokens:      baseConfig.OutboundRateLimit.Tokens,
+						LastUpdated: baseConfig.OutboundRateLimit.LastUpdated,
+						Enabled:     baseConfig.OutboundRateLimit.Cfg.Enabled,
+						Capacity:    baseConfig.OutboundRateLimit.Cfg.Capacity,
+						Rate:        baseConfig.OutboundRateLimit.Cfg.Rate},
+					CCTPChainConfig: cctpConfig,
 				}
-				if cctpConfig != nil {
-					chainConfig := view.TokenPoolChainConfig[remote][token.String()]
-					chainConfig.CCTPChainConfig = *cctpConfig
-					view.TokenPoolChainConfig[remote][token.String()] = chainConfig
+				for i, addr := range baseConfig.Remote.PoolAddresses {
+					view.TokenPoolChainConfig[remote][token.String()].PoolAddresses[i] = shared.GetAddressFromBytes(remote, addr.Address)
 				}
 			}
 		}
