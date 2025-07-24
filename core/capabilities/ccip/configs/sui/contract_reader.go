@@ -215,101 +215,21 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 					// 	},
 					// },
 				},
-				"Events": map[string]any{
-					consts.EventNameExecutionStateChanged: map[string]any{
-						"EventHandleStructName": "OffRampState",
-						"EventHandleFieldName":  "execution_state_changed_events",
-						"EventAccountAddress":   "offramp::get_state_address",
-						"EventFieldRenames": map[string]any{
-							"source_chain_selector": map[string]any{
-								"NewName": "SourceChainSelector",
-							},
-							"sequence_number": map[string]any{
-								"NewName": "SequenceNumber",
-							},
-							"message_id": map[string]any{
-								"NewName": "MessageId",
-							},
-							"message_hash": map[string]any{
-								"NewName": "MessageHash",
-							},
-							"state": map[string]any{
-								"NewName": "State",
-							},
+				"Events": map[string]*chainreaderConfig.ChainReaderEvent{
+					"ExecutionStateChanged": {
+						Name:      "ExecutionStateChanged",
+						EventType: "ExecutionStateChanged",
+						EventSelector: client.EventFilterByMoveEventModule{
+							Module: "offramp",
+							Event:  "ExecutionStateChanged",
 						},
 					},
-					consts.EventNameCommitReportAccepted: map[string]any{
-						"EventHandleStructName": "OffRampState",
-						"EventHandleFieldName":  "commit_report_accepted_events",
-						"EventAccountAddress":   "offramp::get_state_address",
-						"EventFieldRenames": map[string]any{
-							"blessed_merkle_roots": map[string]any{
-								"NewName": "BlessedMerkleRoots",
-								"SubFieldRenames": map[string]any{
-									"source_chain_selector": map[string]any{
-										"NewName": "SourceChainSelector",
-									},
-									"on_ramp_address": map[string]any{
-										"NewName": "OnRampAddress",
-									},
-									"min_seq_nr": map[string]any{
-										"NewName": "MinSeqNr",
-									},
-									"max_seq_nr": map[string]any{
-										"NewName": "MaxSeqNr",
-									},
-									"merkle_root": map[string]any{
-										"NewName": "MerkleRoot",
-									},
-								},
-							},
-							"unblessed_merkle_roots": map[string]any{
-								"NewName": "UnblessedMerkleRoots",
-								"SubFieldRenames": map[string]any{
-									"source_chain_selector": map[string]any{
-										"NewName": "SourceChainSelector",
-									},
-									"on_ramp_address": map[string]any{
-										"NewName": "OnRampAddress",
-									},
-									"min_seq_nr": map[string]any{
-										"NewName": "MinSeqNr",
-									},
-									"max_seq_nr": map[string]any{
-										"NewName": "MaxSeqNr",
-									},
-									"merkle_root": map[string]any{
-										"NewName": "MerkleRoot",
-									},
-								},
-							},
-							"price_updates": map[string]any{
-								"NewName": "PriceUpdates",
-								"SubFieldRenames": map[string]any{
-									"token_price_updates": map[string]any{
-										"NewName": "TokenPriceUpdates",
-										"SubFieldRenames": map[string]any{
-											"source_token": map[string]any{
-												"NewName": "SourceToken",
-											},
-											"usd_per_token": map[string]any{
-												"NewName": "UsdPerToken",
-											},
-										},
-									},
-									"gas_price_updates": map[string]any{
-										"NewName": "GasPriceUpdates",
-										"SubFieldRenames": map[string]any{
-											"dest_chain_selector": map[string]any{
-												"NewName": "DestChainSelector",
-											},
-											"usd_per_unit_gas": map[string]any{
-												"NewName": "UsdPerUnitGas",
-											},
-										},
-									},
-								},
-							},
+					"CommitReportAccepted": {
+						Name:      "CommitReportAccepted",
+						EventType: "CommitReportAccepted",
+						EventSelector: client.EventFilterByMoveEventModule{
+							Module: "offramp",
+							Event:  "CommitReportAccepted",
 						},
 					},
 				},
