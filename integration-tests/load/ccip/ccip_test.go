@@ -134,21 +134,24 @@ func TestCCIPLoad_RPS(t *testing.T) {
 
 	// initialize the block time for each chain
 	blockTimes := make(map[uint64]uint64)
+	// TODO - Adjust this
 	for _, cs := range evmChains {
-		// Get the first block
-		block1, err := env.BlockChains.EVMChains()[cs].Client.HeaderByNumber(context.Background(), big.NewInt(1))
-		require.NoError(t, err)
-		time1 := time.Unix(int64(block1.Time), 0) //nolint:gosec // G115
+		client := env.BlockChains.EVMChains()[cs].Client
 
-		// Get the second block
-		block2, err := env.BlockChains.EVMChains()[cs].Client.HeaderByNumber(context.Background(), big.NewInt(2))
-		require.NoError(t, err)
-		time2 := time.Unix(int64(block2.Time), 0) //nolint:gosec // G115
+		// 1. Get the latest block header
+		latestBlock, err := client.HeaderByNumber(context.Background(), nil)
+		require.NoError(t, err, "Failed to get latest block for chain %s", cs)
 
-		blockTimeDiff := int64(time2.Sub(time1))
-		blockNumberDiff := new(big.Int).Sub(block2.Number, block1.Number).Int64()
-		blockTime := blockTimeDiff / blockNumberDiff / int64(time.Second)
-		blockTimes[cs] = uint64(blockTime) //nolint:gosec // G115
+		// 2. Get the previous block's header
+		prevBlockNumber := new(big.Int).Sub(latestBlock.Number, big.NewInt(1))
+		prevBlock, err := client.HeaderByNumber(context.Background(), prevBlockNumber)
+		require.NoError(t, err, "Failed to get previous block for chain %s", cs)
+
+		// 3. Calculate the average block time using the two recent blocks
+		// The time difference is the block time, since the block number difference is 1.
+		blockTime := latestBlock.Time - prevBlock.Time // .Time is already a uint64 representing Unix seconds
+
+		blockTimes[cs] = blockTime
 		lggr.Infow("Chain block time", "chainSelector", cs, "blockTime", blockTime)
 	}
 	for _, cs := range solChains {
@@ -170,9 +173,11 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		require.NoError(t, deployerKey.FromHex(aptosTestKey))
 		deployerAccount, err := aptos.NewAccountFromSigner(deployerKey)
 		require.NoError(t, err)
+		pk, err := deployerAccount.PrivateKeyString()
+		lggr.Infow("Aptos deployer account created", "account", deployerAccount.Address, "privateKey", pk)
+		require.NoError(t, err)
 		// TMP for testnet
-		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 10_000_000)
-		// aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 100*1e8)
+		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 30_000_000)
 		require.NoError(t, err)
 	}
 
@@ -263,6 +268,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				finalSeqNrExecChannels)
 		case selectors.FamilyAptos:
 			client := env.BlockChains.AptosChains()[cs].Client
+			client.SetTimeout(1 * time.Minute)
 			nodeInfo, err := client.Info()
 			require.NoError(t, err)
 
@@ -355,15 +361,10 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
+
 					if *userOverrides.Testnet {
 						return nil
-						return prepareAccountToSendLinkTestnet(
-							lggr,
-							state,
-							*env,
-							src,
-							evmSourceKeys[cs][src],
-						)
+
 					} else {
 						return prepareAccountToSendLink(
 							lggr,

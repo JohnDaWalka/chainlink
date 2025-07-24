@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"math"
 	"slices"
@@ -40,6 +41,20 @@ func fundAdditionalAptosKeys(
 
 		for range numAccounts {
 			account, err := aptos.NewEd25519Account()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create new aptos account: %w", err)
+			}
+			pk, err := account.PrivateKeyString()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get private key string: %w", err)
+			}
+
+			t.Logf(
+				"Created new Aptos sender on Chain %d | Address: %s | PrivateKey: %s",
+				chain.ChainSelector(),
+				account.Address.String(),
+				pk,
+			)
 
 			memory.FundAptosAccount(t, signer, account.AccountAddress(), fundingAmount, chain.Client)
 			if err != nil {

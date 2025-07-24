@@ -197,9 +197,7 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 
 	var fee *big.Int
 	if dstSelFamily == selectors.FamilyAptos {
-		// For Aptos destinations, skip fee calculation as Router.GetFee rejects Aptos addresses
-		// Use a default fee instead
-		fee = big.NewInt(172725000000000000) // Default fee value
+		fee = big.NewInt(172725000000000000)
 		m.l.Infow("Using default fee for Aptos destination", "fee", fee)
 	} else {
 		// For EVM destinations, calculate fee normally
@@ -392,17 +390,9 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no state available for source chain %d", src)
 		}
 
-		m.l.Infow("Token addresses from state", "StaticLinkToken", srcChainState.StaticLinkToken.Address(), "LinkToken", srcChainState.LinkToken)
-		linkAddr, err := srcChainState.LinkTokenAddress()
-		if err != nil {
-			m.l.Error("Could not fetch Link or Static link from state")
-			return router.ClientEVM2AnyMessage{}, 0, err
-		}
-		m.l.Infow("Selected token address for CCIP message", "linkAddr", linkAddr.Hex())
-
 		message.TokenAmounts = []router.ClientEVMTokenAmount{
 			{
-				Token:  linkAddr,
+				Token:  srcChainState.LinkToken.Address(),
 				Amount: big.NewInt(1),
 			},
 		}
@@ -422,27 +412,6 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			}
 			svmExtraArgs.TokenReceiver = tokenReceiver
 		}
-	}
-
-	// Debug log the complete message structure
-	m.l.Debugw("CCIP Message Details",
-		"Receiver", fmt.Sprintf("%x", message.Receiver),
-		"Data", fmt.Sprintf("%x", message.Data),
-		"TokenAmounts", message.TokenAmounts,
-		"FeeToken", message.FeeToken.String(),
-		"ExtraArgs", fmt.Sprintf("%x", message.ExtraArgs),
-		"DestinationChainSelector", m.chainSelector,
-		"SourceChain", src,
-		"MessageType", selectedMsgDetails.MsgType,
-		"IsTokenTransfer", selectedMsgDetails.IsTokenTransfer(),
-		"IsDataTransfer", selectedMsgDetails.IsDataTransfer(),
-	)
-
-	// For token transfers to Aptos, set the fee token to the same token being transferred
-	if selectedMsgDetails.IsTokenTransfer() && len(message.TokenAmounts) > 0 {
-		// Use the first token as the fee token for token transfers to Aptos
-		message.FeeToken = message.TokenAmounts[0].Token
-		m.l.Debugw("Set fee token for Aptos token transfer", "feeToken", message.FeeToken.String())
 	}
 
 	gasLimit := int64(0)
@@ -556,6 +525,10 @@ func (m *DestinationGun) getSolanaMessage(src uint64) (ccip_router.SVM2AnyMessag
 }
 
 func (m *DestinationGun) sendAptosSourceMessage(src uint64) error {
+	senderAccount, senderExists := m.aptosSourceKeys[m.chainSelector][src]
+	if !senderExists || senderAccount == nil {
+		return fmt.Errorf("no Aptos source key available for source %d and destination %d", src, m.chainSelector)
+	}
 	msg, err := m.getAptosMessage(src)
 	if err != nil {
 		return fmt.Errorf("failed to build Aptos message: %w", err)
@@ -566,6 +539,7 @@ func (m *DestinationGun) sendAptosSourceMessage(src uint64) error {
 		DestChain:    m.chainSelector,
 		IsTestRouter: false,
 		Message:      msg,
+		AptosSender:  senderAccount,
 	}
 
 	_, err = testhelpers.SendRequestAptos(m.env, *m.state, cfg)
@@ -614,13 +588,13 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 	}
 
 	var tokenAmounts []testhelpers.AptosTokenAmount
-	if selectedMsg.IsTokenTransfer() {
-		srcState := m.state.AptosChains[src]
-		tokenAmounts = []testhelpers.AptosTokenAmount{{
-			Token:  srcState.LinkTokenAddress,
-			Amount: 1,
-		}}
-	}
+	// if selectedMsg.IsTokenTransfer() {
+	// 	srcState := m.state.AptosChains[src]
+	// 	tokenAmounts = []testhelpers.AptosTokenAmount{{
+	// 		Token:  srcState.LinkTokenAddress,
+	// 		Amount: 1,
+	// 	}}
+	// }
 
 	return testhelpers.AptosSendRequest{
 		Receiver:     receiver,

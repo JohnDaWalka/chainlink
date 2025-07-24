@@ -493,6 +493,65 @@ func TestSendRequest(
 	return msgSentEvent
 }
 
+<<<<<<< HEAD
+=======
+type CCIPSendReqConfig struct {
+	SourceChain  uint64
+	DestChain    uint64
+	IsTestRouter bool
+	Sender       *bind.TransactOpts
+	Message      any
+	MaxRetries   int // Number of retries for errors (excluding insufficient fee errors)
+	AptosSender  *aptos.Account
+}
+
+type SendReqOpts func(*CCIPSendReqConfig)
+
+// WithMaxRetries sets the maximum number of retries for the CCIP send request.
+func WithMaxRetries(maxRetries int) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.MaxRetries = maxRetries
+	}
+}
+
+func WithSender(sender *bind.TransactOpts) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.Sender = sender
+	}
+}
+
+// TODO: backwards compat, remove
+func WithEvm2AnyMessage(msg router.ClientEVM2AnyMessage) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.Message = msg
+	}
+}
+
+func WithMessage(msg any) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.Message = msg
+	}
+}
+
+func WithTestRouter(isTestRouter bool) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.IsTestRouter = isTestRouter
+	}
+}
+
+func WithSourceChain(sourceChain uint64) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.SourceChain = sourceChain
+	}
+}
+
+func WithDestChain(destChain uint64) SendReqOpts {
+	return func(c *CCIPSendReqConfig) {
+		c.DestChain = destChain
+	}
+}
+
+>>>>>>> f921dcb032 (Stash)
 // SendRequest similar to TestSendRequest but returns an error.
 func SendRequest(
 	e cldf.Environment,
@@ -867,9 +926,20 @@ type AptosTokenAmount struct {
 func SendRequestAptos(
 	e cldf.Environment,
 	state stateview.CCIPOnChainState,
+<<<<<<< HEAD
 	cfg *ccipclient.CCIPSendReqConfig,
 ) (*ccipclient.AnyMsgSentEvent, error) {
 	sender := e.BlockChains.AptosChains()[cfg.SourceChain].DeployerSigner
+=======
+	cfg *CCIPSendReqConfig,
+) (*AnyMsgSentEvent, error) {
+	var sender aptos.TransactionSigner
+	if cfg.AptosSender != nil {
+		sender = cfg.AptosSender
+	} else {
+		sender = e.BlockChains.AptosChains()[cfg.SourceChain].DeployerSigner
+	}
+>>>>>>> f921dcb032 (Stash)
 	senderAddress := sender.AccountAddress()
 	client := e.BlockChains.AptosChains()[cfg.SourceChain].Client
 
@@ -939,7 +1009,7 @@ func SendRequestAptos(
 		msg.ExtraArgs,
 	)
 	if err != nil {
-		e.Logger.Errorf("Estimating fee: %v", err)
+		return nil, fmt.Errorf("could not estimate fee: %w", err)
 	}
 	e.Logger.Infof("Estimated fee: %v", fee)
 
