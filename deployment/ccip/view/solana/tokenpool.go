@@ -112,27 +112,33 @@ func GenerateTokenPoolView(chain cldf_solana.Chain, program solana.PublicKey, re
 		for _, token := range tokens {
 			remoteChainConfigPDA, _, _ := solTokenUtil.TokenPoolChainConfigPDA(remote, token, program)
 			if baseConfig, cctpConfig, err := fetchChainConfig(chain, remoteChainConfigPDA, poolType); err == nil {
-				view.TokenPoolChainConfig[remote][token.String()] = TokenPoolChainConfig{
-					PDA:           remoteChainConfigPDA.String(),
-					PoolAddresses: make([]string, len(baseConfig.Remote.PoolAddresses)),
-					TokenAddress:  shared.GetAddressFromBytes(remote, baseConfig.Remote.TokenAddress.Address),
-					Decimals:      baseConfig.Remote.Decimals,
-					InboundRateLimit: TokenPoolRateLimitTokenBucket{
-						Tokens:      baseConfig.InboundRateLimit.Tokens,
-						LastUpdated: baseConfig.InboundRateLimit.LastUpdated,
-						Enabled:     baseConfig.InboundRateLimit.Cfg.Enabled,
-						Capacity:    baseConfig.InboundRateLimit.Cfg.Capacity,
-						Rate:        baseConfig.InboundRateLimit.Cfg.Rate},
-					OutboundRateLimit: TokenPoolRateLimitTokenBucket{
-						Tokens:      baseConfig.OutboundRateLimit.Tokens,
-						LastUpdated: baseConfig.OutboundRateLimit.LastUpdated,
-						Enabled:     baseConfig.OutboundRateLimit.Cfg.Enabled,
-						Capacity:    baseConfig.OutboundRateLimit.Cfg.Capacity,
-						Rate:        baseConfig.OutboundRateLimit.Cfg.Rate},
-					CCTPChainConfig: cctpConfig,
+				if baseConfig != nil {
+					view.TokenPoolChainConfig[remote][token.String()] = TokenPoolChainConfig{
+						PDA:           remoteChainConfigPDA.String(),
+						PoolAddresses: make([]string, len(baseConfig.Remote.PoolAddresses)),
+						TokenAddress:  shared.GetAddressFromBytes(remote, baseConfig.Remote.TokenAddress.Address),
+						Decimals:      baseConfig.Remote.Decimals,
+						InboundRateLimit: TokenPoolRateLimitTokenBucket{
+							Tokens:      baseConfig.InboundRateLimit.Tokens,
+							LastUpdated: baseConfig.InboundRateLimit.LastUpdated,
+							Enabled:     baseConfig.InboundRateLimit.Cfg.Enabled,
+							Capacity:    baseConfig.InboundRateLimit.Cfg.Capacity,
+							Rate:        baseConfig.InboundRateLimit.Cfg.Rate},
+						OutboundRateLimit: TokenPoolRateLimitTokenBucket{
+							Tokens:      baseConfig.OutboundRateLimit.Tokens,
+							LastUpdated: baseConfig.OutboundRateLimit.LastUpdated,
+							Enabled:     baseConfig.OutboundRateLimit.Cfg.Enabled,
+							Capacity:    baseConfig.OutboundRateLimit.Cfg.Capacity,
+							Rate:        baseConfig.OutboundRateLimit.Cfg.Rate},
+					}
+					for i, addr := range baseConfig.Remote.PoolAddresses {
+						view.TokenPoolChainConfig[remote][token.String()].PoolAddresses[i] = shared.GetAddressFromBytes(remote, addr.Address)
+					}
 				}
-				for i, addr := range baseConfig.Remote.PoolAddresses {
-					view.TokenPoolChainConfig[remote][token.String()].PoolAddresses[i] = shared.GetAddressFromBytes(remote, addr.Address)
+				if cctpConfig != nil {
+					chainConfig := view.TokenPoolChainConfig[remote][token.String()]
+					chainConfig.CCTPChainConfig = *cctpConfig
+					view.TokenPoolChainConfig[remote][token.String()] = chainConfig
 				}
 			}
 		}
@@ -168,21 +174,21 @@ func GenerateTokenPoolView(chain cldf_solana.Chain, program solana.PublicKey, re
 	return view, nil
 }
 
-func fetchChainConfig(chain cldf_solana.Chain, chainConfigPDA solana.PublicKey, poolType string) (base_token_pool.BaseChain, cctp_token_pool.CctpChain, error) {
+func fetchChainConfig(chain cldf_solana.Chain, chainConfigPDA solana.PublicKey, poolType string) (*base_token_pool.BaseChain, *cctp_token_pool.CctpChain, error) {
 	switch poolType {
 	case ccipshared.BurnMintTokenPool.String(), ccipshared.LockReleaseTokenPool.String():
 		var remoteChainConfigAccount solTestTokenPool.ChainConfig
 		if err := chain.GetAccountDataBorshInto(context.Background(), chainConfigPDA, &remoteChainConfigAccount); err != nil {
-			return base_token_pool.BaseChain{}, cctp_token_pool.CctpChain{}, err
+			return nil, nil, err
 		}
-		return remoteChainConfigAccount.Base, cctp_token_pool.CctpChain{}, nil
+		return &remoteChainConfigAccount.Base, nil, nil
 	case ccipshared.CCTPTokenPool.String():
 		var remoteChainConfigAccount cctp_token_pool.ChainConfig
 		if err := chain.GetAccountDataBorshInto(context.Background(), chainConfigPDA, &remoteChainConfigAccount); err != nil {
-			return base_token_pool.BaseChain{}, cctp_token_pool.CctpChain{}, err
+			return nil, nil, err
 		}
-		return remoteChainConfigAccount.Base, remoteChainConfigAccount.Cctp, nil
+		return &remoteChainConfigAccount.Base, &remoteChainConfigAccount.Cctp, nil
 	default:
-		return base_token_pool.BaseChain{}, cctp_token_pool.CctpChain{}, fmt.Errorf("unsupported token pool type %s", poolType)
+		return nil, nil, fmt.Errorf("unsupported token pool type %s", poolType)
 	}
 }
