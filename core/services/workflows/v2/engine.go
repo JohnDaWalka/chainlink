@@ -21,6 +21,7 @@ import (
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	protoevents "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
+
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
@@ -276,6 +277,11 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 					if !isOpen {
 						return
 					}
+					if event.Err != nil {
+						e.lggr.Errorw("Received a trigger event with error, dropping", "triggerID", subs.Subscriptions[idx].Id, "err", event.Err)
+						e.metrics.With(platform.KeyTriggerID, subs.Subscriptions[idx].Id).IncrementWorkflowTriggerEventErrorCounter(srvcCtx)
+						continue
+					}
 					select {
 					case e.allTriggerEventsQueueCh <- enqueuedTriggerEvent{
 						triggerCapID: subs.Subscriptions[idx].Id,
@@ -285,6 +291,7 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 					}:
 					default: // queue full, drop the event
 						e.lggr.Errorw("Trigger event queue is full, dropping event", "triggerID", subs.Subscriptions[idx].Id, "triggerIndex", idx)
+						e.metrics.With(platform.KeyTriggerID, subs.Subscriptions[idx].Id).IncrementWorkflowTriggerEventQueueFullCounter(srvcCtx)
 					}
 				}
 			}
@@ -434,6 +441,10 @@ func (e *Engine) close() error {
 
 	e.cfg.Module.Close()
 	e.cfg.GlobalLimits.Decrement(e.cfg.WorkflowOwner)
+
+	// reset metering mode metric so that a positive value does not persist
+	e.metrics.UpdateWorkflowMeteringModeGauge(ctx, false)
+
 	return nil
 }
 
@@ -481,17 +492,13 @@ func (e *Engine) deductStandardBalances(meteringReport *metering.Report) {
 	// Add an extra second of metering padding for context cancel propagation
 	ctxCancelPadding := (time.Millisecond * 1000).Milliseconds()
 	compMs := decimal.NewFromInt(int64(e.cfg.LocalLimits.WorkflowExecutionTimeoutMs) + ctxCancelPadding)
-	computeUnit := billing.ResourceType_name[int32(billing.ResourceType_RESOURCE_TYPE_COMPUTE)]
-	computeAmount, mrErr := meteringReport.ConvertToBalance(computeUnit, compMs)
-	if mrErr != nil {
-		e.lggr.Errorw("could not determine compute amount to meter", "err", mrErr)
-	}
+	computeUnit := billing.ResourceType_RESOURCE_TYPE_COMPUTE.String()
 
-	if mrErr = meteringReport.Deduct(
+	if _, err := meteringReport.Deduct(
 		computeUnit,
-		computeAmount,
-	); mrErr != nil {
-		e.lggr.Errorw("could not meter compute", "err", mrErr)
+		metering.ByResource(computeUnit, compMs),
+	); err != nil {
+		e.lggr.Errorw("could not deduct balance for capability request", "capReq", "standard-deduction-compute", "err", err)
 	}
 }
 

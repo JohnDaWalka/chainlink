@@ -2,6 +2,7 @@ package cre
 
 import (
 	"bytes"
+	"context"
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -18,9 +19,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -34,10 +38,10 @@ import (
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp/benchspy"
+
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
-	benchspy2 "github.com/smartcontractkit/chainlink/system-tests/lib/benchspy"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
@@ -45,6 +49,7 @@ import (
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
 	keystonetypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 	libtypes "github.com/smartcontractkit/chainlink/system-tests/lib/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -53,7 +58,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
@@ -70,15 +74,15 @@ type Chaos struct {
 }
 
 type TestConfigLoadTest struct {
-	Duration                      string                               `toml:"duration"`
-	Blockchains                   []*blockchain.Input                  `toml:"blockchains" validate:"required"`
-	NodeSets                      []*ns.Input                          `toml:"nodesets" validate:"required"`
-	JD                            *jd.Input                            `toml:"jd" validate:"required"`
-	WorkflowRegistryConfiguration *keystonetypes.WorkflowRegistryInput `toml:"workflow_registry_configuration"`
-	Infra                         *libtypes.InfraInput                 `toml:"infra" validate:"required"`
-	WorkflowDONLoad               *WorkflowLoad                        `toml:"workflow_load"`
-	MockCapabilities              []*MockCapabilities                  `toml:"mock_capabilities"`
-	Chaos                         *Chaos                               `toml:"chaos"`
+	Duration                      string                                  `toml:"duration"`
+	Blockchains                   []*keystonetypes.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
+	NodeSets                      []*ns.Input                             `toml:"nodesets" validate:"required"`
+	JD                            *jd.Input                               `toml:"jd" validate:"required"`
+	WorkflowRegistryConfiguration *keystonetypes.WorkflowRegistryInput    `toml:"workflow_registry_configuration"`
+	Infra                         *libtypes.InfraInput                    `toml:"infra" validate:"required"`
+	WorkflowDONLoad               *WorkflowLoad                           `toml:"workflow_load"`
+	MockCapabilities              []*MockCapabilities                     `toml:"mock_capabilities"`
+	Chaos                         *Chaos                                  `toml:"chaos"`
 }
 
 type MockCapabilities struct {
@@ -102,7 +106,7 @@ type FeedWithStreamID struct {
 type loadTestSetupOutput struct {
 	dataFeedsCacheAddress common.Address
 	forwarderAddress      common.Address
-	blockchainOutput      []*creenv.BlockchainOutput
+	blockchainOutput      []*keystonetypes.WrappedBlockchainOutput
 	donTopology           *keystonetypes.DonTopology
 	nodeOutput            []*keystonetypes.WrappedNodeOutput
 }
@@ -114,6 +118,7 @@ func setupLoadTestEnvironment(
 	mustSetCapabilitiesFn func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 	jobSpecFactoryFns []keystonetypes.JobSpecFactoryFn,
+	workflowJobsFn keystonetypes.JobSpecFactoryFn,
 ) *loadTestSetupOutput {
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
@@ -124,7 +129,8 @@ func setupLoadTestEnvironment(
 		JobSpecFactoryFunctions:              jobSpecFactoryFns,
 	}
 
-	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, cldlogger.NewSingleFileLogger(t), universalSetupInput)
+	singleFileLogger := cldlogger.NewSingleFileLogger(t)
+	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, singleFileLogger, universalSetupInput)
 	require.NoError(t, setupErr, "failed to setup test environment")
 
 	// Set inputs in the test config, so that they can be saved
@@ -133,6 +139,23 @@ func setupLoadTestEnvironment(
 
 	forwarderAddress, forwarderErr := crecontracts.FindAddressesForChain(universalSetupOutput.CldEnvironment.ExistingAddresses, universalSetupOutput.BlockchainOutput[0].ChainSelector, keystone_changeset.KeystoneForwarder.String()) //nolint:staticcheck // won't migrate now
 	require.NoError(t, forwarderErr, "failed to find forwarder address for chain %d", universalSetupOutput.BlockchainOutput[0].ChainSelector)
+
+	// Create workflow jobs only after capability registry configuration is complete to avoid initialization failures
+	createJobsInput := creenv.CreateJobsWithJdOpInput{}
+	createJobsDeps := creenv.CreateJobsWithJdOpDeps{
+		Logger:                    testLogger,
+		SingleFileLogger:          singleFileLogger,
+		HomeChainBlockchainOutput: universalSetupOutput.BlockchainOutput[0].BlockchainOutput,
+		AddressBook:               universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // will not migrate now
+		JobSpecFactoryFunctions:   []keystonetypes.JobSpecFactoryFn{workflowJobsFn},
+		FullCLDEnvOutput: &keystonetypes.FullCLDEnvironmentOutput{
+			Environment: universalSetupOutput.CldEnvironment,
+			DonTopology: universalSetupOutput.DonTopology,
+		},
+	}
+
+	_, createJobsErr := operations.ExecuteOperation(universalSetupOutput.CldEnvironment.OperationsBundle, creenv.CreateJobsWithJdOpFactory("load-test-jobs", "1.0.0"), createJobsDeps, createJobsInput)
+	require.NoError(t, createJobsErr, "failed to create jobs with Job Distributor")
 
 	return &loadTestSetupOutput{
 		forwarderAddress: forwarderAddress,
@@ -149,6 +172,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	in, err := framework.Load[TestConfigLoadTest](t)
 	require.NoError(t, err, "couldn't load test config")
 	require.Len(t, in.NodeSets, 2, "expected 2 node sets in the test config")
+	require.NotEmpty(t, os.Getenv("PROMETHEUS_URL"), "PROMETHEUS_URL must be set")
 
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*keystonetypes.CapabilitiesAwareNodeSet {
 		return []*keystonetypes.CapabilitiesAwareNodeSet{
@@ -177,6 +201,33 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 				StreamID: (in.WorkflowDONLoad.Streams * i) + streamID + 1,
 			})
 		}
+	}
+
+	mockJobSpecsFactoryFn := func(input *keystonetypes.JobSpecFactoryInput) (keystonetypes.DonsToJobSpecs, error) {
+		donTojobSpecs := make(keystonetypes.DonsToJobSpecs, 0)
+
+		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
+			jobSpecs := make(keystonetypes.DonJobs, 0)
+			workflowNodeSet, err2 := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &keystonetypes.Label{Key: node.NodeTypeKey, Value: keystonetypes.WorkerNode}, node.EqualLabels)
+			if err2 != nil {
+				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
+				return nil, errors.Wrap(err2, "failed to find worker nodes")
+			}
+			for _, workerNode := range workflowNodeSet {
+				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				if nodeIDErr != nil {
+					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				}
+
+				if flags.HasFlag(donWithMetadata.Flags, keystonetypes.MockCapability) && in.MockCapabilities != nil {
+					jobSpecs = append(jobSpecs, MockCapabilitiesJob(nodeID, "mock", in.MockCapabilities))
+				}
+			}
+
+			donTojobSpecs[donWithMetadata.ID] = jobSpecs
+		}
+
+		return donTojobSpecs, nil
 	}
 
 	loadTestJobSpecsFactoryFn := func(input *keystonetypes.JobSpecFactoryInput) (keystonetypes.DonsToJobSpecs, error) {
@@ -214,10 +265,6 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 
 						jobSpecs = append(jobSpecs, WorkflowsJob(nodeID, fmt.Sprintf("load_%d", i), feedConfig))
 					}
-				}
-
-				if flags.HasFlag(donWithMetadata.Flags, keystonetypes.MockCapability) && in.MockCapabilities != nil {
-					jobSpecs = append(jobSpecs, MockCapabilitiesJob(nodeID, "mock", in.MockCapabilities))
 				}
 			}
 
@@ -279,7 +326,8 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		in,
 		mustSetCapabilitiesFn,
 		[]func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig{WorkflowDONLoadTestCapabilitiesFactoryFn, crecontracts.ChainWriterCapabilityFactory(homeChainIDUint64)},
-		[]keystonetypes.JobSpecFactoryFn{loadTestJobSpecsFactoryFn, consensus.ConsensusJobSpecFactoryFn(homeChainIDUint64)},
+		[]keystonetypes.JobSpecFactoryFn{mockJobSpecsFactoryFn, consensus.ConsensusJobSpecFactoryFn(homeChainIDUint64)},
+		loadTestJobSpecsFactoryFn,
 	)
 
 	ctx := t.Context()
@@ -401,7 +449,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		CallTimeout: time.Minute * 2, // Give enough time for the workflow to execute
 		LoadType:    wasp.RPS,
 		Schedule: wasp.Combine(
-			wasp.Plain(4, 5*time.Minute),
+			wasp.Plain(4, 10*time.Minute),
 		),
 		Gun:                   NewStreamsGun(mocksClient, kb, feedsAddresses, "streams-trigger@2.0.0", receiveChannel, int(in.WorkflowDONLoad.Streams), int(in.WorkflowDONLoad.Jobs)),
 		Labels:                labels,
@@ -427,18 +475,19 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 
 	prometheusExecutor, err := benchspy.NewPrometheusQueryExecutor(
 		map[string]string{
-			"cpu_percent":          `avg (rate(container_cpu_usage_seconds_total{name=~"workflow-node[1-9][0-9]*"}[5m]) * 100)`,
-			"mem_peak_mb":          `avg (max_over_time(container_memory_working_set_bytes{name=~"workflow-node[1-9][0-9]*"}[5m]))`,
-			"mem_avg_mb":           `avg (avg_over_time(container_memory_working_set_bytes{name=~"workflow-node[1-9][0-9]*"}[5m]))`,
+			"cpu_percent":          `avg (rate(container_cpu_usage_seconds_total{name=~"workflow-node[1-9][0-9]*"}[10m]) * 100)`,
+			"mem_peak":             `avg (max_over_time(container_memory_working_set_bytes{name=~"workflow-node[1-9][0-9]*"}[10m]))`,
+			"mem_avg":              `avg (avg_over_time(container_memory_working_set_bytes{name=~"workflow-node[1-9][0-9]*"}[10m]))`,
 			"disk_io_time_seconds": `avg (container_fs_io_time_seconds_total{name=~"workflow-node[1-9][0-9]*"})`,
-			"network_tx_mb":        `avg (container_network_transmit_bytes_total{name=~"workflow-node[1-9][0-9]*"})`,
-			"network_rx_mb":        `avg (container_network_receive_bytes_total{name=~"workflow-node[1-9][0-9]*"})`,
+			"network_tx":           `avg (container_network_transmit_bytes_total{name=~"workflow-node[1-9][0-9]*"})`,
+			"network_rx":           `avg (container_network_receive_bytes_total{name=~"workflow-node[1-9][0-9]*"})`,
 		},
 		promConfig,
 	)
 	require.NoError(t, err)
 
-	benchmarkReport, err := benchspy.NewStandardReport(
+	benchmarkReport, baselineReport, err := benchspy.FetchNewStandardReportAndLoadLatestPrevious(
+		ctx,
 		tag,
 		benchspy.WithStandardQueries(benchspy.StandardQueryExecutor_Direct),
 		benchspy.WithQueryExecutors(prometheusExecutor),
@@ -453,23 +502,10 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	require.NoError(t, storeErr, "failed to store benchmark report", path)
 	require.NoError(t, err, "workflow load test did not finish successfully")
 
-	// Run chartGenerator
-	metricConfigs := map[string]benchspy2.MetricConfig{
-		"99th_percentile_latency": {Group: "Performance Metrics", UnitLabel: "s", ScaleFactor: 1000.0},
-		"95th_percentile_latency": {Group: "Performance Metrics", UnitLabel: "s", ScaleFactor: 1000.0},
-		"median_latency":          {Group: "Performance Metrics", UnitLabel: "s", ScaleFactor: 1000.0},
-		"max_latency":             {Group: "Performance Metrics", UnitLabel: "s", ScaleFactor: 1000.0},
-		"error_rate":              {Group: "Performance Metrics", UnitLabel: "", ScaleFactor: 1.0},
-		"cpu_percent":             {Group: "Resource Metrics", UnitLabel: "%", ScaleFactor: 1.0},
-		"mem_peak_mb":             {Group: "Resource Metrics", UnitLabel: "MB", ScaleFactor: 1048576},
-		"mem_avg_mb":              {Group: "Resource Metrics", UnitLabel: "MB", ScaleFactor: 1048576},
-		"disk_io_time_seconds":    {Group: "Resource Metrics", UnitLabel: "s", ScaleFactor: 1},
-		"network_tx_mb":           {Group: "Resource Metrics", UnitLabel: "MB", ScaleFactor: 1048576},
-		"network_rx_mb":           {Group: "Resource Metrics", UnitLabel: "MB", ScaleFactor: 1048576},
+	// Compare benchmark with baseline if available
+	if baselineReport != nil {
+		compareBenchmarkReports(t, benchmarkReport, baselineReport)
 	}
-
-	// Generate the markdown report
-	require.NoError(t, benchspy2.GenerateMarkdownReport("performance_reports", "performance_reports/chart.md", metricConfigs), "failed to generate markdown report")
 }
 
 // TestWithReconnect Re-runs the load test against an existing DON deployment. It expects feeds, OCR2 keys, and
@@ -531,9 +567,6 @@ type StreamsGun struct {
 	mu          sync.Mutex
 	feedLimit   int
 	jobLimit    int
-	event       *capabilities.OCRTriggerEvent
-	eventID     string
-	timestamp   time.Time
 }
 
 func NewStreamsGun(capProxy *mock_capability.Controller, keyBundles []ocr2key.KeyBundle, feeds [][]FeedWithStreamID, triggerID string, ch <-chan capabilities.CapabilityRequest, feedLimit int, jobLimit int) *StreamsGun {
@@ -546,43 +579,51 @@ func NewStreamsGun(capProxy *mock_capability.Controller, keyBundles []ocr2key.Ke
 		feedLimit:   feedLimit,
 		jobLimit:    jobLimit,
 	}
-	sg.precomputeReports()
-	go sg.waitHOOKloop()
+	go sg.waitLoop()
 	return sg
 }
 
 func (s *StreamsGun) Call(l *wasp.Generator) *wasp.Response {
-	workingTimestamp := s.timestamp.Unix()
-	err := s.prepareWaitHOOK(workingTimestamp)
+	event, eventID, timestamp, err := s.createReport()
 	if err != nil {
-		return &wasp.Response{Error: err.Error()}
+		return &wasp.Response{Failed: true, Error: err.Error()}
+	}
+	err = s.createWaitChannelForTimestamp(timestamp.Unix())
+	if err != nil {
+		return &wasp.Response{Failed: true, Error: err.Error()}
 	}
 
-	payload, err := s.event.ToMap()
+	outputs, err := event.ToMap()
 	if err != nil {
-		return &wasp.Response{Error: err.Error()}
+		return &wasp.Response{Failed: true, Error: err.Error()}
 	}
 
-	payloadBytes, err := mock_capability.MapToBytes(payload)
+	outputsBytes, err := mock_capability.MapToBytes(outputs)
 	if err != nil {
-		return &wasp.Response{Error: err.Error()}
+		return &wasp.Response{Failed: true, Error: err.Error()}
 	}
 
-	err = s.capProxy.SendTrigger(l.ResponsesCtx, s.triggerID, s.eventID, payloadBytes)
-	if err != nil {
-		return &wasp.Response{Error: err.Error()}
+	message := pb.SendTriggerEventRequest{
+		TriggerID: s.triggerID,
+		ID:        eventID,
+		Outputs:   outputsBytes,
 	}
 
-	go s.precomputeReports()
+	err = s.capProxy.SendTrigger(context.Background(), &message)
+	if err != nil {
+		framework.L.Error().Msgf("error sending trigger: %s", err.Error())
+		return &wasp.Response{Failed: true, Error: err.Error()}
+	}
+
 	// Wait for the DON to execute on the write target
-	err = s.waitForHOOK(workingTimestamp)
+	err = s.waitForReportWithTimestamp(timestamp.Unix())
 	if err != nil {
-		return &wasp.Response{Error: err.Error()}
+		return &wasp.Response{Failed: true, Error: err.Error()}
 	}
 	return &wasp.Response{}
 }
 
-func (s *StreamsGun) waitHOOKloop() {
+func (s *StreamsGun) waitLoop() {
 	for {
 		m, ok := <-s.receiveChan
 		if !ok {
@@ -604,8 +645,8 @@ func (s *StreamsGun) waitHOOKloop() {
 			framework.L.Error().Msg("error parsing timestamp")
 			return
 		}
-
 		s.mu.Lock()
+
 		// Check if exist
 		if ch, exist := s.waitChans[timestamp]; exist {
 			s.mu.Unlock()
@@ -616,33 +657,34 @@ func (s *StreamsGun) waitHOOKloop() {
 	}
 }
 
-func (s *StreamsGun) prepareWaitHOOK(reportTimestamp int64) error {
+func (s *StreamsGun) createWaitChannelForTimestamp(reportTimestamp int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.waitChans == nil {
 		s.waitChans = make(map[int64]chan interface{})
 	}
 	if _, exists := s.waitChans[reportTimestamp]; exists {
-		return fmt.Errorf("cannot prepare for HOOK, timestamp  %d already exits", reportTimestamp)
+		return fmt.Errorf("cannot create wait channel, timestamp  %d already exits", reportTimestamp)
 	}
 	s.waitChans[reportTimestamp] = make(chan interface{})
 	return nil
 }
 
-func (s *StreamsGun) waitForHOOK(timestamp int64) error {
+func (s *StreamsGun) waitForReportWithTimestamp(timestamp int64) error {
 	s.mu.Lock()
 	ch, exists := s.waitChans[timestamp]
 	if !exists {
 		s.mu.Unlock()
-		return fmt.Errorf("cannot wait for HOOK, timestamp  %q does not exist", timestamp)
+		return fmt.Errorf("cannot wait, timestamp  %q does not exist", timestamp)
 	}
 	s.mu.Unlock()
 	<-ch
 	delete(s.waitChans, timestamp)
+	framework.L.Info().Msgf("ACK report with timestamp %d", timestamp)
 	return nil
 }
 
-func (s *StreamsGun) precomputeReports() {
+func (s *StreamsGun) createReport() (capabilities.OCRTriggerEvent, string, time.Time, error) {
 	timestamp := time.Now()
 	start := time.Now()
 
@@ -664,14 +706,11 @@ func (s *StreamsGun) precomputeReports() {
 
 	event, eventID, err := createFeedReport(logger.Nop(), price, uint64(timestamp.UnixNano()), feeds, s.keyBundles) //nolint:gosec // G115 don't care in test code
 	if err != nil {
-		panic(err)
+		return capabilities.OCRTriggerEvent{}, "", time.Time{}, err
 	}
 
-	s.event = event
-	s.eventID = eventID
-	s.timestamp = timestamp
-
-	framework.L.Info().Msgf("create %d reports in %s", len(feeds), time.Since(start))
+	framework.L.Info().Msgf("create report with timestamp %d containing %d feeds in %s", timestamp.Unix(), len(feeds), time.Since(start))
+	return *event, eventID, timestamp, nil
 }
 
 func createFeedReport(lggr logger.Logger, price decimal.Decimal, timestamp uint64,
@@ -721,7 +760,7 @@ func createFeedReport(lggr logger.Logger, price decimal.Decimal, timestamp uint6
 	for i, key := range keyBundles {
 		sig, err2 := key.Sign3(ocrTypes.ConfigDigest(event.ConfigDigest), event.SeqNr, reportBytes)
 		if err2 != nil {
-			return nil, "", err
+			return nil, "", err2
 		}
 		event.Sigs = append(event.Sigs, capabilities.OCRAttributedOnchainSignature{
 			Signer:    uint32(i), //nolint:gosec // G115 don't care in test code
@@ -997,4 +1036,98 @@ func logTestInfo(l zerolog.Logger, feedID, workflowName, dataFeedsCacheAddr, for
 	l.Info().Msgf("Workflow name: %s", workflowName)
 	l.Info().Msgf("DataFeedsCache address: %s", dataFeedsCacheAddr)
 	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
+}
+
+func compareBenchmarkReports(t *testing.T, baselineReport, currentReport *benchspy.StandardReport) {
+	// Define threshold percentages for different metrics
+	thresholds := map[string]float64{
+		"cpu_percent":             10.0, // 10% increase
+		"mem_peak":                10.0,
+		"mem_avg":                 10.0,
+		"network_tx":              10.0,
+		"network_rx":              10.0,
+		"95th_percentile_latency": 10.0,
+		"99th_percentile_latency": 10.0,
+		"median_latency":          10.0,
+		"error_rate":              10.0,
+		"max_latency":             10.0,
+	}
+
+	// Fetch all metrics
+	require.Len(t, baselineReport.QueryExecutors, 2, "expected two query executors in baseline report")
+	require.Len(t, currentReport.QueryExecutors, 2, "expected two query executors in benchmark report")
+
+	baselineReportMetrics := make(map[string]float64)
+	for _, qe := range baselineReport.QueryExecutors {
+		for metricName, metricValue := range qe.Results() {
+			// Check if the metricValue is a slice
+			if sliceVal, ok := metricValue.([]float64); ok && len(sliceVal) > 0 {
+				// If it's a slice of float64, get the last element
+				baselineReportMetrics[metricName] = sliceVal[len(sliceVal)-1]
+			} else if floatVal, ok := metricValue.(float64); ok {
+				// If it's a single float64, use it directly
+				baselineReportMetrics[metricName] = floatVal
+			} else if vector, ok := metricValue.(model.Vector); ok {
+				if len(vector) > 0 {
+					// Use the most recent sample's value from the vector
+					baselineReportMetrics[metricName] = float64(vector[len(vector)-1].Value)
+				} else {
+					// Log the case where vector is empty
+					framework.L.Warn().Msgf("Metric %s has empty vector value", metricName)
+				}
+			} else {
+				// Log the case where the value is not a float64 or slice of float64
+				framework.L.Warn().Msgf("Metric %s has unsupported value type: %T", metricName, metricValue)
+			}
+		}
+	}
+
+	currentReportMetrics := make(map[string]float64)
+	for _, qe := range currentReport.QueryExecutors {
+		for metricName, metricValue := range qe.Results() {
+			// Check if the metricValue is a slice
+			if sliceVal, ok := metricValue.([]float64); ok && len(sliceVal) > 0 {
+				// If it's a slice of float64, get the last element
+				currentReportMetrics[metricName] = sliceVal[len(sliceVal)-1]
+			} else if floatVal, ok := metricValue.(float64); ok {
+				// If it's a single float64, use it directly
+				currentReportMetrics[metricName] = floatVal
+			} else if vector, ok := metricValue.(model.Vector); ok {
+				if len(vector) > 0 {
+					// Use the most recent sample's value from the vector
+					currentReportMetrics[metricName] = float64(vector[len(vector)-1].Value)
+				} else {
+					// Log the case where vector is empty
+					framework.L.Warn().Msgf("Metric %s has empty vector value", metricName)
+				}
+			} else {
+				// Log the case where the value is not a float64 or slice of float64
+				framework.L.Warn().Msgf("Metric %s has unsupported value type: %T", metricName, metricValue)
+			}
+		}
+	}
+
+	// 	// Compare metrics
+	var warnings []string
+	for metric, threshold := range thresholds {
+		if baselineReportMetrics[metric] > 0 {
+			percentIncrease := ((currentReportMetrics[metric] - baselineReportMetrics[metric]) / baselineReportMetrics[metric]) * 100
+			if percentIncrease > threshold {
+				warnings = append(warnings, fmt.Sprintf(
+					"PERFORMANCE REGRESSION: %s increased by %.2f%% (baseline: %.2f, current: %.2f, threshold: %.2f%%)",
+					metric, percentIncrease, baselineReportMetrics[metric], currentReportMetrics[metric], threshold,
+				))
+			}
+		}
+	}
+
+	// Log any warnings
+	if len(warnings) > 0 {
+		framework.L.Warn().Msgf("Performance regression detected compared to baseline %s", baselineReport.CommitOrTag)
+		for _, warning := range warnings {
+			framework.L.Warn().Msg(warning)
+		}
+	} else {
+		framework.L.Info().Msgf("No significant performance regressions detected compared to baseline %s", baselineReport.CommitOrTag)
+	}
 }

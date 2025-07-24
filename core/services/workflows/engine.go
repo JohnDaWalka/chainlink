@@ -145,11 +145,8 @@ type Engine struct {
 	meterReports   *metering.Reports
 }
 
-func (e *Engine) Start(_ context.Context) error {
+func (e *Engine) Start(ctx context.Context) error {
 	return e.StartOnce("Engine", func() error {
-		// create a new context, since the one passed in via Start is short-lived.
-		ctx, _ := e.stopCh.NewCtx()
-
 		// validate if adding another workflow would exceed either the global or per owner engine count limit
 		ownerAllow, globalAllow := e.workflowLimits.Allow(e.workflow.owner)
 		if !globalAllow {
@@ -168,14 +165,14 @@ func (e *Engine) Start(_ context.Context) error {
 
 		e.wg.Add(e.maxWorkerLimit)
 		for i := 0; i < e.maxWorkerLimit; i++ {
-			go e.worker(ctx)
+			go e.worker()
 		}
 
 		e.wg.Add(1)
-		go e.init(ctx)
+		go e.init()
 
 		e.wg.Add(1)
-		go e.heartbeat(ctx)
+		go e.heartbeat()
 
 		return nil
 	})
@@ -340,8 +337,10 @@ func (e *Engine) initializeCapability(ctx context.Context, step *step) error {
 //  4. Registers for trigger events now that all capabilities are resolved
 //
 // Steps 1-3 are retried every 5 seconds until successful.
-func (e *Engine) init(ctx context.Context) {
+func (e *Engine) init() {
 	defer e.wg.Done()
+	ctx, cancel := e.stopCh.NewCtx()
+	defer cancel()
 
 	retryErr := internal.RunWithRetries(ctx, e.logger, time.Millisecond*time.Duration(e.retryMs), e.maxRetries, func() error {
 		// first wait for localDON to return a non-error response; this depends
@@ -698,8 +697,10 @@ func (e *Engine) finishExecution(ctx context.Context, cma custmsg.MessageEmitter
 // worker is responsible for:
 //   - handling a `pendingStepRequests`
 //   - starting a new execution when a trigger emits a message on `triggerEvents`
-func (e *Engine) worker(ctx context.Context) {
+func (e *Engine) worker() {
 	defer e.wg.Done()
+	ctx, cancel := e.stopCh.NewCtx()
+	defer cancel()
 
 	for {
 		select {
@@ -783,23 +784,8 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 		l.Errorf("failed to resolve step in workflow; error %v", verr)
 	}
 
-	spendLimit := decimal.NewNullDecimal(decimal.Zero)
-	spendLimit.Valid = false
-
 	meteringReport, meteringOK := e.meterReports.Get(msg.state.ExecutionID)
-	if meteringOK {
-		// TODO: https://smartcontract-it.atlassian.net/browse/CRE-284 parse user max spend for step
-		userMaxSpend := decimal.NewNullDecimal(decimal.Zero)
-		userMaxSpend.Valid = false
-
-		var err error
-
-		// NOTE: e.maxWorkerLimit is a static number leading to the availability always being undercut.
-		spendLimit, err = meteringReport.GetMaxSpendForInvocation(userMaxSpend, e.maxWorkerLimit)
-		if err != nil {
-			l.Error(fmt.Sprintf("could not get available balance for %s: %s", stepState.Ref, err))
-		}
-	} else {
+	if !meteringOK {
 		e.metrics.With(platform.KeyWorkflowID, e.workflow.id).IncrementWorkflowMissingMeteringReport(ctx)
 		// TODO: to be bumped to error if all capabilities must implement metering
 		l.Warnf("no metering report found for %v", msg.state.ExecutionID)
@@ -811,7 +797,7 @@ func (e *Engine) workerForStepRequest(ctx context.Context, msg stepRequest) {
 	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-461
 	// convert balance to CapabilityInfo resource types for use in Capability call
 	// pass deducted amount as max spend to capability.Execute
-	inputs, response, sErr := e.executeStep(ctx, l, msg, spendLimit, meteringReport)
+	inputs, response, sErr := e.executeStep(ctx, l, msg, meteringReport)
 	stepExecutionDuration := time.Since(stepExecutionStartTime).Seconds()
 
 	e.metrics.With(platform.KeyCapabilityID, curStepID).UpdateWorkflowStepDurationHistogram(ctx, int64(stepExecutionDuration))
@@ -963,7 +949,6 @@ func (e *Engine) executeStep(
 	ctx context.Context,
 	lggr logger.Logger,
 	msg stepRequest,
-	spendLimit decimal.NullDecimal,
 	meteringReport *metering.Report,
 ) (*values.Map, capabilities.CapabilityResponse, error) {
 	curStep, err := e.workflow.Vertex(msg.stepRef)
@@ -1031,12 +1016,16 @@ func (e *Engine) executeStep(
 		},
 	}
 
-	if spendLimit.Valid {
-		if err = meteringReport.Deduct(curStep.Ref, spendLimit.Decimal); err != nil {
-			e.logger.Error(fmt.Sprintf("could not deduct balance for capability request %s: %s", curStep.Ref, err))
-		}
+	// TODO: https://smartcontract-it.atlassian.net/browse/CRE-284 parse user max spend for step
+	userMaxSpend := decimal.NewNullDecimal(decimal.Zero)
+	userMaxSpend.Valid = false
 
-		tr.Metadata.SpendLimits = meteringReport.CreditToSpendingLimits(info, config, spendLimit.Decimal)
+	// NOTE: e.maxWorkerLimit is a static number leading to the availability always being undercut.
+	if tr.Metadata.SpendLimits, err = meteringReport.Deduct(
+		curStep.Ref,
+		metering.ByDerivedAvailability(userMaxSpend, e.maxWorkerLimit, info, config),
+	); err != nil {
+		e.logger.Error(fmt.Sprintf("could not deduct balance for capability request %s: %s", curStep.Ref, err))
 	}
 
 	stepCtx, cancel := context.WithTimeout(ctx, stepTimeoutDuration)
@@ -1189,8 +1178,10 @@ func (e *Engine) isWorkflowFullyProcessed(_ context.Context, state store.Workflo
 }
 
 // heartbeat runs by default every defaultHeartbeatCadence minutes
-func (e *Engine) heartbeat(ctx context.Context) {
+func (e *Engine) heartbeat() {
 	defer e.wg.Done()
+	ctx, cancel := e.stopCh.NewCtx()
+	defer cancel()
 
 	ticker := time.NewTicker(e.heartbeatCadence)
 	defer ticker.Stop()
@@ -1278,6 +1269,9 @@ func (e *Engine) Close() error {
 		}
 		// decrement the global and per owner engine counter
 		e.workflowLimits.Decrement(e.workflow.owner)
+
+		// reset metering mode metric so that a positive value does not persist
+		e.metrics.UpdateWorkflowMeteringModeGauge(ctx, false)
 
 		logCustMsg(ctx, e.cma, "workflow unregistered", e.logger)
 		e.metrics.IncrementWorkflowUnregisteredCounter(ctx)
