@@ -24,6 +24,7 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/billing"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -648,7 +649,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		bridgeORM,
 		jobORM,
 		unrestrictedHTTPClient,
-		beholder.GetClient().Emitter,
+		beholder.GetEmitter(),
 		globalLogger,
 	)
 	srvcs = append(srvcs, bridgeStatusReporter)
