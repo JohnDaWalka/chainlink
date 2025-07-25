@@ -597,6 +597,13 @@ func TestConfig_Marshal(t *testing.T) {
 	full.Billing = toml.Billing{
 		URL: ptr("localhost:4319"),
 	}
+	full.BridgeStatusReporter = toml.BridgeStatusReporter{
+		Enabled:              ptr(true),
+		StatusPath:           ptr("/status"),
+		PollingInterval:      commoncfg.MustNewDuration(5 * time.Minute),
+		IgnoreInvalidBridges: ptr(true),
+		IgnoreJoblessBridges: ptr(false),
+	}
 	full.JobDistributor = toml.JobDistributor{
 		DisplayName: ptr("test-node"),
 	}

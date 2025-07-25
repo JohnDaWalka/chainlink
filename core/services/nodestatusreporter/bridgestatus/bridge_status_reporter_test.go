@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/guregu/null.v4"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
@@ -28,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/nodestatusreporter/bridgestatus/events"
 	"github.com/smartcontractkit/chainlink/v2/core/services/nodestatusreporter/bridgestatus/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"google.golang.org/protobuf/proto"
 )
 
 // Test constants and fixtures
