@@ -773,7 +773,7 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.config.ValidateConfig()
 			if tc.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errorMsg)
 			} else {
 				assert.NoError(t, err)
@@ -781,9 +781,9 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 				// Verify defaults are set when enabled
 				if tc.config.Enabled != nil && *tc.config.Enabled {
 					assert.NotNil(t, tc.config.StatusPath)
-					assert.NotEqual(t, "", *tc.config.StatusPath)
+					assert.NotEmpty(t, *tc.config.StatusPath)
 					assert.NotNil(t, tc.config.PollingInterval)
-					assert.True(t, tc.config.PollingInterval.Duration() >= time.Minute)
+					assert.GreaterOrEqual(t, tc.config.PollingInterval.Duration(), time.Minute)
 					assert.NotNil(t, tc.config.IgnoreInvalidBridges)
 					assert.NotNil(t, tc.config.IgnoreJoblessBridges)
 				}

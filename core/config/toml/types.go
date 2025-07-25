@@ -2304,7 +2304,7 @@ func (e *BridgeStatusReporter) ValidateConfig() error {
 		e.StatusPath = &defaultPath
 	}
 
-	if e.PollingInterval == nil || e.PollingInterval.Duration() < config.MINIMUM_POLLING_INTERVAL {
+	if e.PollingInterval == nil || e.PollingInterval.Duration() < config.MinimumPollingInterval {
 		defaultInterval := *commonconfig.MustNewDuration(5 * time.Minute)
 		e.PollingInterval = &defaultInterval
 	}

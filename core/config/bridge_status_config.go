@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-const MINIMUM_POLLING_INTERVAL = time.Minute
+const MinimumPollingInterval = time.Minute
 
 type BridgeStatusReporter interface {
 	Enabled() bool

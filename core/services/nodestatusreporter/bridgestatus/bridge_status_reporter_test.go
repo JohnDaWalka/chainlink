@@ -2,6 +2,7 @@ package bridgestatus
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -11,8 +12,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -53,11 +52,11 @@ func loadFixture(t *testing.T, filename string) string {
 	return string(data)
 }
 
-// loadFixtureAsBridgeStatusResponse loads and unmarshals fixture data
-func loadFixtureAsBridgeStatusResponse(t *testing.T, filename string) BridgeStatusResponse {
+// loadFixtureAsEAResponse loads and unmarshals fixture data
+func loadFixtureAsEAResponse(t *testing.T, filename string) EAResponse {
 	fixtureData := loadFixture(t, filename)
 
-	var status BridgeStatusResponse
+	var status EAResponse
 	err := json.Unmarshal([]byte(fixtureData), &status)
 	require.NoError(t, err, "Failed to unmarshal test fixture")
 
@@ -138,10 +137,10 @@ func TestService_Start_Disabled(t *testing.T) {
 
 	ctx := context.Background()
 	err := service.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = service.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestService_Start_Enabled(t *testing.T) {
@@ -150,10 +149,10 @@ func TestService_Start_Enabled(t *testing.T) {
 
 	ctx := context.Background()
 	err := service.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = service.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestService_HealthReport(t *testing.T) {
@@ -312,7 +311,7 @@ func TestService_emitBridgeStatus_Success(t *testing.T) {
 	emitter.On("Emit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	ctx := context.Background()
-	service.emitBridgeStatus(ctx, "test-bridge", loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json"), []JobInfo{})
+	service.emitBridgeStatus(ctx, "test-bridge", loadFixtureAsEAResponse(t, "bridge_status_response.json"), []JobInfo{})
 
 	emitter.AssertExpectations(t)
 }
@@ -391,7 +390,7 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 
 	// Load fixture and emit
 	ctx := context.Background()
-	status := loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json")
+	status := loadFixtureAsEAResponse(t, "bridge_status_response.json")
 	service.emitBridgeStatus(ctx, "test-bridge", status, []JobInfo{})
 
 	// Unmarshal and verify protobuf matches fixture values
@@ -404,16 +403,16 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 	assert.Equal(t, "test-bridge", event.BridgeName)
 	assert.Equal(t, status.Adapter.Name, event.AdapterName)
 	assert.Equal(t, status.Adapter.Version, event.AdapterVersion)
-	assert.Equal(t, status.Adapter.UptimeSeconds, event.AdapterUptimeSeconds)
+	assert.InDelta(t, status.Adapter.UptimeSeconds, event.AdapterUptimeSeconds, 0.001)
 
-	//Verify Endpoints
+	// Verify Endpoints
 	for i, endpoint := range status.Endpoints {
 		assert.Equal(t, endpoint.Name, event.Endpoints[i].Name)
 		assert.Equal(t, endpoint.Aliases, event.Endpoints[i].Aliases)
 		assert.Equal(t, endpoint.Transports, event.Endpoints[i].Transports)
 	}
 
-	//Verify Default Endpoint
+	// Verify Default Endpoint
 	assert.Equal(t, status.DefaultEndpoint, event.DefaultEndpoint)
 
 	// Verify configuration
@@ -436,7 +435,7 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 		assert.Equal(t, safeString(configuration.EnvDefaultOverride), event.Configuration[i].EnvDefaultOverride) // Overrides converted to strings
 	}
 
-	//Verify Runtime
+	// Verify Runtime
 	assert.Equal(t, status.Runtime.NodeVersion, event.Runtime.NodeVersion)
 	assert.Equal(t, status.Runtime.Platform, event.Runtime.Platform)
 	assert.Equal(t, status.Runtime.Architecture, event.Runtime.Architecture)
@@ -455,14 +454,14 @@ func TestService_Start_AlreadyStarted(t *testing.T) {
 	ctx := context.Background()
 
 	err := service.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = service.Start(ctx)
 	// services.StateMachine prevents double start, should return error
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// Clean up
 	err = service.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestService_Close_AlreadyClosed(t *testing.T) {
@@ -472,14 +471,14 @@ func TestService_Close_AlreadyClosed(t *testing.T) {
 	ctx := context.Background()
 
 	err := service.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = service.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	err = service.Close()
 
 	// services.StateMachine prevents double close, should return error
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestService_PollAllBridges_3000Bridges(t *testing.T) {
@@ -584,7 +583,7 @@ func TestService_emitBridgeStatus_EmptyFields(t *testing.T) {
 
 	// Load empty fixture and emit
 	ctx := context.Background()
-	status := loadFixtureAsBridgeStatusResponse(t, "bridge_status_empty.json")
+	status := loadFixtureAsEAResponse(t, "bridge_status_empty.json")
 	service.emitBridgeStatus(ctx, "empty-bridge", status, []JobInfo{})
 
 	// Unmarshal and verify protobuf handles empty values correctly
@@ -595,17 +594,17 @@ func TestService_emitBridgeStatus_EmptyFields(t *testing.T) {
 
 	// Verify empty/minimal values are handled correctly
 	assert.Equal(t, "empty-bridge", event.BridgeName)
-	assert.Equal(t, "", event.AdapterName)
-	assert.Equal(t, "", event.AdapterVersion)
-	assert.Equal(t, float64(0), event.AdapterUptimeSeconds)
-	assert.Equal(t, "", event.DefaultEndpoint)
+	assert.Empty(t, event.AdapterName)
+	assert.Empty(t, event.AdapterVersion)
+	assert.InDelta(t, float64(0), event.AdapterUptimeSeconds, 0.001)
+	assert.Empty(t, event.DefaultEndpoint)
 
 	// Verify empty runtime info
 	require.NotNil(t, event.Runtime)
-	assert.Equal(t, "", event.Runtime.NodeVersion)
-	assert.Equal(t, "", event.Runtime.Platform)
-	assert.Equal(t, "", event.Runtime.Architecture)
-	assert.Equal(t, "", event.Runtime.Hostname)
+	assert.Empty(t, event.Runtime.NodeVersion)
+	assert.Empty(t, event.Runtime.Platform)
+	assert.Empty(t, event.Runtime.Architecture)
+	assert.Empty(t, event.Runtime.Hostname)
 
 	// Verify metrics with false enabled
 	require.NotNil(t, event.Metrics)
@@ -901,7 +900,7 @@ func TestService_pollBridge_EndToEnd_RealWebServer(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fixtureData))
+		_, _ = w.Write([]byte(fixtureData))
 	}))
 	defer server.Close()
 
@@ -929,13 +928,13 @@ func TestService_pollBridge_EndToEnd_RealWebServer(t *testing.T) {
 	require.NoError(t, err, "Should be able to unmarshal protobuf")
 
 	// Verify the data from fixture made it through the complete pipeline
-	expectedStatus := loadFixtureAsBridgeStatusResponse(t, "bridge_status_response.json")
+	expectedStatus := loadFixtureAsEAResponse(t, "bridge_status_response.json")
 
 	// Verify basic bridge info
 	assert.Equal(t, "test-bridge", event.BridgeName)
 	assert.Equal(t, expectedStatus.Adapter.Name, event.AdapterName)
 	assert.Equal(t, expectedStatus.Adapter.Version, event.AdapterVersion)
-	assert.Equal(t, expectedStatus.Adapter.UptimeSeconds, event.AdapterUptimeSeconds)
+	assert.InDelta(t, expectedStatus.Adapter.UptimeSeconds, event.AdapterUptimeSeconds, 0.001)
 	assert.Equal(t, expectedStatus.DefaultEndpoint, event.DefaultEndpoint)
 
 	// Verify endpoints - loop through fixture and compare with protobuf

@@ -172,7 +172,7 @@ func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, jobs
 		return
 	}
 	// If not ignoring invalid bridges, still emit empty telemetry
-	s.emitBridgeStatus(ctx, bridgeName, BridgeStatusResponse{}, jobs)
+	s.emitBridgeStatus(ctx, bridgeName, EAResponse{}, jobs)
 }
 
 // pollBridge polls a single bridge's status endpoint
@@ -226,7 +226,7 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 	}
 
 	// Parse response
-	var status BridgeStatusResponse
+	var status EAResponse
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
 		s.handleBridgeError(ctx, bridgeName, jobs, "Failed to decode Bridge Status Reporter status", "bridge", bridgeName, "url", statusURL.String(), "error", err)
 		return
@@ -239,7 +239,7 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 }
 
 // emitBridgeStatus sends Bridge Status Reporter data to Beholder
-func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, status BridgeStatusResponse, jobs []JobInfo) {
+func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, status EAResponse, jobs []JobInfo) {
 	// Convert runtime info
 	runtime := &events.RuntimeInfo{
 		NodeVersion:  status.Runtime.NodeVersion,
@@ -287,7 +287,7 @@ func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, statu
 	}
 
 	// Convert jobs to protobuf JobInfo structs
-	var jobsProto []*events.JobInfo
+	jobsProto := make([]*events.JobInfo, 0, len(jobs))
 	for _, job := range jobs {
 		jobsProto = append(jobsProto, &events.JobInfo{
 			ExternalJobId: job.ExternalJobID,
@@ -336,7 +336,7 @@ func (s *Service) findJobsForBridge(ctx context.Context, bridgeName string) ([]J
 	}
 
 	// Convert job IDs to job info
-	var jobs []JobInfo
+	jobs := make([]JobInfo, 0, len(jobIDs))
 	for _, jobID := range jobIDs {
 		job, err := s.jobORM.FindJob(ctx, jobID)
 		if err != nil {

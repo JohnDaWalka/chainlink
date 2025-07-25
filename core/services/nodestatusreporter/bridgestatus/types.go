@@ -1,7 +1,7 @@
 package bridgestatus
 
-// BridgeStatusResponse represents the response schema from Bridge status endpoint
-type BridgeStatusResponse struct {
+// EAResponse represents the response schema from External Adapter status endpoint
+type EAResponse struct {
 	Adapter struct {
 		Name          string  `json:"name"`
 		Version       string  `json:"version"`
