@@ -1,11 +1,10 @@
-//go:build wasip1
+//go:build v2sdk && wasip1
 
 package main
 
 import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/protoc/pkg/test_capabilities/basictrigger"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/wasm/v2"
 	"gopkg.in/yaml.v3"
 )
@@ -29,11 +28,12 @@ func CreateWorkflow(env *sdk.Environment[*runtimeConfig]) (sdk.Workflow[*runtime
 }
 
 func onTrigger(env *sdk.Environment[*runtimeConfig], _ sdk.Runtime, _ *basictrigger.Outputs) (string, error) {
-	secret, err := env.GetSecret(&pb.SecretRequest{Namespace: "Default", Id: "Foo"}).Await()
+	env.Logger.Info("onTrigger called")
+	b, err := yaml.Marshal(env.Config)
 	if err != nil {
 		return "", err
 	}
-	return secret.Value, nil
+	return string(b), nil
 }
 
 func main() {
