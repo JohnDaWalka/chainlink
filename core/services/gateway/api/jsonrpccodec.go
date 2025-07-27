@@ -14,16 +14,16 @@ type JsonRPCCodec struct {
 var _ Codec = (*JsonRPCCodec)(nil)
 
 func (j *JsonRPCCodec) DecodeRawRequest(msgBytes []byte, jwtToken string) (*Message, error) {
-	jsonRequest, err := jsonrpc2.DecodeRequest(msgBytes, jwtToken)
+	jsonRequest, err := jsonrpc2.DecodeRequest[json.RawMessage](msgBytes, jwtToken)
 	if err != nil {
 		return nil, err
 	}
 	return j.DecodeJSONRequest(jsonRequest)
 }
 
-func (*JsonRPCCodec) DecodeJSONRequest(request jsonrpc2.Request) (*Message, error) {
+func (*JsonRPCCodec) DecodeJSONRequest(request jsonrpc2.Request[json.RawMessage]) (*Message, error) {
 	var msg Message
-	err := json.Unmarshal(request.Params, &msg)
+	err := json.Unmarshal(*request.Params, &msg)
 	if err != nil {
 		return nil, err
 	}
@@ -33,15 +33,11 @@ func (*JsonRPCCodec) DecodeJSONRequest(request jsonrpc2.Request) (*Message, erro
 }
 
 func (*JsonRPCCodec) EncodeLegacyRequest(msg *Message) ([]byte, error) {
-	params, err := json.Marshal(msg)
-	if err != nil {
-		return nil, err
-	}
-	request := jsonrpc2.Request{
+	request := jsonrpc2.Request[Message]{
 		Version: jsonrpc2.JsonRpcVersion,
 		ID:      msg.Body.MessageId,
 		Method:  msg.Body.Method,
-		Params:  params,
+		Params:  msg,
 	}
 	return json.Marshal(request)
 }
