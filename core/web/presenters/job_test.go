@@ -1004,6 +1004,80 @@ func TestJob(t *testing.T) {
 			}`,
 		},
 		{
+			name: "modsec spec",
+			job: job.Job{
+				ID: 1,
+				ModsecSpec: &job.ModsecSpec{
+					ID:                      1,
+					CreatedAt:               timestamp,
+					UpdatedAt:               timestamp,
+					SourceChainID:           "1338",
+					SourceChainFamily:       "evm",
+					DestChainID:             "1337",
+					DestChainFamily:         "evm",
+					OnRampAddress:           "0x1234567890123456789012345678901234567890",
+					OffRampAddress:          "0x0987654321098765432109876543210987654321",
+					CCIPMessageSentEventSig: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+				},
+				PipelineSpec: &pipeline.Spec{
+					ID:           1,
+					DotDagSource: "",
+				},
+				ExternalJobID: uuid.MustParse("0eec7e1d-d0d2-476c-a1a8-72dfb6633f46"),
+				Type:          job.Modsec,
+				SchemaVersion: 1,
+				Name:          null.StringFrom("modsec test"),
+			},
+			want: `
+			{
+				"data": {
+					"type": "jobs",
+					"id": "1",
+					"attributes": {
+						"name": "modsec test",
+						"type": "modsec",
+						"schemaVersion": 1,
+						"maxTaskDuration": "0s",
+						"externalJobID": "0eec7e1d-d0d2-476c-a1a8-72dfb6633f46",
+						"directRequestSpec": null,
+						"fluxMonitorSpec": null,
+						"gasLimit": null,
+						"forwardingAllowed": false,
+						"cronSpec": null,
+						"offChainReportingOracleSpec": null,
+						"offChainReporting2OracleSpec": null,
+						"keeperSpec": null,
+						"vrfSpec": null,
+						"webhookSpec": null,
+						"workflowSpec": null,
+						"blockhashStoreSpec": null,
+						"blockHeaderFeederSpec": null,
+						"bootstrapSpec": null,
+						"gatewaySpec": null,
+						"standardCapabilitiesSpec": null,
+						"ccipSpec": null,
+						"modsecSpec": {
+							"sourceChainID": "1338",
+							"sourceChainFamily": "evm",
+							"destChainID": "1337",
+							"destChainFamily": "evm",
+							"onRampAddress": "0x1234567890123456789012345678901234567890",
+							"offRampAddress": "0x0987654321098765432109876543210987654321",
+							"ccipMessageSentEventSig": "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+							"createdAt": "2000-01-01T00:00:00Z",
+							"updatedAt": "2000-01-01T00:00:00Z"
+						},
+						"pipelineSpec": {
+							"id": 1,
+							"jobID": 0,
+							"dotDagSource": ""
+						},
+						"errors": []
+					}
+				}
+			}`,
+		},
+		{
 			name: "ccip spec",
 			job: job.Job{
 				ID: 1,

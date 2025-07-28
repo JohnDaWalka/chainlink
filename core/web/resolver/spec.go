@@ -1086,6 +1086,46 @@ func (r *StreamSpecResolver) StreamID() *string {
 	return r.streamID
 }
 
+type ModsecSpecResolver struct {
+	spec job.ModsecSpec
+}
+
+func (r *ModsecSpecResolver) CreatedAt() graphql.Time {
+	return graphql.Time{Time: r.spec.CreatedAt}
+}
+
+func (r *ModsecSpecResolver) ID() graphql.ID {
+	return graphql.ID(stringutils.FromInt32(r.spec.ID))
+}
+
+func (r *ModsecSpecResolver) SourceChainID() string {
+	return r.spec.SourceChainID
+}
+
+func (r *ModsecSpecResolver) SourceChainFamily() string {
+	return r.spec.SourceChainFamily
+}
+
+func (r *ModsecSpecResolver) DestChainID() string {
+	return r.spec.DestChainID
+}
+
+func (r *ModsecSpecResolver) DestChainFamily() string {
+	return r.spec.DestChainFamily
+}
+
+func (r *ModsecSpecResolver) OnRampAddress() string {
+	return r.spec.OnRampAddress
+}
+
+func (r *ModsecSpecResolver) OffRampAddress() string {
+	return r.spec.OffRampAddress
+}
+
+func (r *ModsecSpecResolver) CCIPMessageSentEventSig() string {
+	return r.spec.CCIPMessageSentEventSig
+}
+
 type CCIPSpecResolver struct {
 	spec job.CCIPSpec
 }

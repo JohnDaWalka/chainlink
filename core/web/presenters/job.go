@@ -492,6 +492,32 @@ func NewCCIPSpec(spec *job.CCIPSpec) *CCIPSpec {
 	}
 }
 
+type ModsecSpec struct {
+	CreatedAt               time.Time `json:"createdAt"`
+	UpdatedAt               time.Time `json:"updatedAt"`
+	SourceChainID           string    `json:"sourceChainID"`
+	SourceChainFamily       string    `json:"sourceChainFamily"`
+	DestChainID             string    `json:"destChainID"`
+	DestChainFamily         string    `json:"destChainFamily"`
+	OnRampAddress           string    `json:"onRampAddress"`
+	OffRampAddress          string    `json:"offRampAddress"`
+	CCIPMessageSentEventSig string    `json:"ccipMessageSentEventSig"`
+}
+
+func NewModsecSpec(spec *job.ModsecSpec) *ModsecSpec {
+	return &ModsecSpec{
+		CreatedAt:               spec.CreatedAt,
+		UpdatedAt:               spec.UpdatedAt,
+		SourceChainID:           spec.SourceChainID,
+		SourceChainFamily:       spec.SourceChainFamily,
+		DestChainID:             spec.DestChainID,
+		DestChainFamily:         spec.DestChainFamily,
+		OnRampAddress:           spec.OnRampAddress,
+		OffRampAddress:          spec.OffRampAddress,
+		CCIPMessageSentEventSig: spec.CCIPMessageSentEventSig,
+	}
+}
+
 // JobError represents errors on the job
 type JobError struct {
 	ID          int64     `json:"id"`
@@ -537,6 +563,7 @@ type JobResource struct {
 	WorkflowSpec             *WorkflowSpec             `json:"workflowSpec"`
 	StandardCapabilitiesSpec *StandardCapabilitiesSpec `json:"standardCapabilitiesSpec"`
 	CCIPSpec                 *CCIPSpec                 `json:"ccipSpec"`
+	ModsecSpec               *ModsecSpec               `json:"modsecSpec"`
 	PipelineSpec             PipelineSpec              `json:"pipelineSpec"`
 	Errors                   []JobError                `json:"errors"`
 }
@@ -589,6 +616,8 @@ func NewJobResource(j job.Job) *JobResource {
 		resource.StandardCapabilitiesSpec = NewStandardCapabilitiesSpec(j.StandardCapabilitiesSpec)
 	case job.CCIP:
 		resource.CCIPSpec = NewCCIPSpec(j.CCIPSpec)
+	case job.Modsec:
+		resource.ModsecSpec = NewModsecSpec(j.ModsecSpec)
 	case job.LegacyGasStationServer, job.LegacyGasStationSidecar:
 		// unsupported
 	}

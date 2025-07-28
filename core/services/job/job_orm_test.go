@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	pkgworkflows "github.com/smartcontractkit/chainlink-common/pkg/workflows"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/artifacts"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
@@ -479,6 +480,62 @@ func TestORM_DeleteJob_DeletesAssociatedRecords(t *testing.T) {
 		_, err = db.Exec(`DELETE FROM external_initiators`)
 		require.EqualError(t, err, "ERROR: update or delete on table \"external_initiators\" violates foreign key constraint \"external_initiator_webhook_specs_external_initiator_id_fkey\" on table \"external_initiator_webhook_specs\" (SQLSTATE 23503)")
 	})
+}
+
+func TestORM_CreateJob_Modsec(t *testing.T) {
+	ctx := testutils.Context(t)
+	config := configtest.NewTestGeneralConfig(t)
+	db := pgtest.NewSqlxDB(t)
+	keyStore := cltest.NewKeyStore(t, db)
+	require.NoError(t, keyStore.OCR().Add(ctx, cltest.DefaultOCRKey))
+
+	lggr := logger.TestLogger(t)
+	pipelineORM := pipeline.NewORM(db, lggr, config.JobPipeline().MaxSuccessfulRuns())
+	bridgesORM := bridges.NewORM(db)
+
+	jobORM := NewTestORM(t, db, pipelineORM, bridgesORM, keyStore)
+
+	params := testspecs.ModsecSpecParams{
+		SourceChainID:           "1",
+		SourceChainFamily:       "evm",
+		DestinationChainID:      "2",
+		DestinationChainFamily:  "evm",
+		OnRampAddress:           "0x1234567890123456789012345678901234567890",
+		CCIPMessageSentEventSig: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+		OffRampAddress:          "0x0987654321098765432109876543210987654321",
+	}
+	jb, err := modsec.ValidatedModsecSpec(testspecs.GenerateModsecSpec(params).Toml())
+	require.NoError(t, err)
+
+	require.NoError(t, jobORM.CreateJob(ctx, &jb))
+	cltest.AssertCount(t, db, "modsec_specs", 1)
+	cltest.AssertCount(t, db, "jobs", 1)
+
+	var sourceChainID string
+	require.NoError(t, db.Get(&sourceChainID, `SELECT source_chain_id FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.SourceChainID, sourceChainID)
+	var sourceChainFamily string
+	require.NoError(t, db.Get(&sourceChainFamily, `SELECT source_chain_family FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.SourceChainFamily, sourceChainFamily)
+	var destinationChainID string
+	require.NoError(t, db.Get(&destinationChainID, `SELECT dest_chain_id FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.DestinationChainID, destinationChainID)
+	var destinationChainFamily string
+	require.NoError(t, db.Get(&destinationChainFamily, `SELECT dest_chain_family FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.DestinationChainFamily, destinationChainFamily)
+	var onRampAddress string
+	require.NoError(t, db.Get(&onRampAddress, `SELECT on_ramp_address FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.OnRampAddress, onRampAddress)
+	var ccipMessageSentEventSig string
+	require.NoError(t, db.Get(&ccipMessageSentEventSig, `SELECT ccip_message_sent_event_sig FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.CCIPMessageSentEventSig, ccipMessageSentEventSig)
+	var offRampAddress string
+	require.NoError(t, db.Get(&offRampAddress, `SELECT off_ramp_address FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.OffRampAddress, offRampAddress)
+
+	require.NoError(t, jobORM.DeleteJob(ctx, jb.ID, jb.Type))
+	cltest.AssertCount(t, db, "modsec_specs", 0)
+	cltest.AssertCount(t, db, "jobs", 0)
 }
 
 func TestORM_CreateJob_VRFV2(t *testing.T) {

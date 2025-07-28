@@ -64,6 +64,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
@@ -637,6 +638,14 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 			telemetryManager,
 			cfg.Capabilities(),
 			cfg.EVMConfigs(),
+		)
+		delegates[job.Modsec] = modsec.NewDelegate(
+			cfg,
+			globalLogger,
+			opts.KeyStore,
+			opts.DS,
+			cfg.EVMConfigs(),
+			legacyEVMChains,
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")

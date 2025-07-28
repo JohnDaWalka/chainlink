@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
@@ -261,6 +262,8 @@ func (jc *JobsController) validateJobSpec(ctx context.Context, tomlString string
 		jb, err = standardcapabilities.ValidatedStandardCapabilitiesSpec(tomlString)
 	case job.CCIP:
 		jb, err = ccip.ValidatedCCIPSpec(tomlString)
+	case job.Modsec:
+		jb, err = modsec.ValidatedModsecSpec(tomlString)
 	default:
 		return jb, http.StatusUnprocessableEntity, errors.Errorf("unknown job type: %s", jobType)
 	}

@@ -41,6 +41,7 @@ const (
 	Bootstrap               Type = (Type)(pipeline.BootstrapJobType)
 	Cron                    Type = (Type)(pipeline.CronJobType)
 	CCIP                    Type = (Type)(pipeline.CCIPJobType)
+	Modsec                  Type = (Type)(pipeline.ModsecJobType)
 	DirectRequest           Type = (Type)(pipeline.DirectRequestJobType)
 	FluxMonitor             Type = (Type)(pipeline.FluxMonitorJobType)
 	Gateway                 Type = (Type)(pipeline.GatewayJobType)
@@ -82,6 +83,7 @@ var (
 		Bootstrap:               false,
 		Cron:                    true,
 		CCIP:                    false,
+		Modsec:                  false,
 		DirectRequest:           true,
 		FluxMonitor:             true,
 		Gateway:                 false,
@@ -102,6 +104,7 @@ var (
 		Bootstrap:               false,
 		Cron:                    true,
 		CCIP:                    false,
+		Modsec:                  false,
 		DirectRequest:           true,
 		FluxMonitor:             false,
 		Gateway:                 false,
@@ -122,6 +125,7 @@ var (
 		Bootstrap:               1,
 		Cron:                    1,
 		CCIP:                    1,
+		Modsec:                  1,
 		DirectRequest:           1,
 		FluxMonitor:             1,
 		Gateway:                 1,
@@ -184,6 +188,8 @@ type Job struct {
 	CCIPSpecID                    *int32
 	CCIPSpec                      *CCIPSpec
 	CCIPBootstrapSpecID           *int32
+	ModsecSpecID                  *int32
+	ModsecSpec                    *ModsecSpec
 	JobSpecErrors                 []SpecError
 	Type                          Type          `toml:"type"`
 	SchemaVersion                 uint32        `toml:"schemaVersion"`
@@ -1113,4 +1119,32 @@ type CCIPSpec struct {
 	// PluginConfig contains plugin-specific config, like token price pipelines
 	// and RMN network info for offchain blessing.
 	PluginConfig JSONConfig `toml:"pluginConfig"`
+}
+
+type ModsecSpec struct {
+	ID        int32
+	CreatedAt time.Time `toml:"-"`
+	UpdatedAt time.Time `toml:"-"`
+
+	// SourceChainID is the chain ID of the source chain.
+	SourceChainID string `toml:"sourceChainID" db:"source_chain_id"`
+
+	// SourceChainFamily is the family of the source chain.
+	SourceChainFamily string `toml:"sourceChainFamily" db:"source_chain_family"`
+
+	// DestChainID is the chain ID of the destination chain.
+	DestChainID string `toml:"destChainID" db:"dest_chain_id"`
+
+	// DestChainFamily is the family of the destination chain.
+	DestChainFamily string `toml:"destChainFamily" db:"dest_chain_family"`
+
+	// OnRampAddress is the address of the Commit OnRamp contract.
+	OnRampAddress string `toml:"onRampAddress" db:"on_ramp_address"`
+
+	// CCIPMessageSentEventSig is the event signature of the CCIPMessageSent event, emitted on the
+	// source chain onramp contract.
+	CCIPMessageSentEventSig string `toml:"ccipMessageSentEventSig" db:"ccip_message_sent_event_sig"`
+
+	// OffRampAddress is the address of the OffRamp contract.
+	OffRampAddress string `toml:"offRampAddress" db:"off_ramp_address"`
 }

@@ -31,6 +31,7 @@ const (
 	BootstrapJobType               string = "bootstrap"
 	CronJobType                    string = "cron"
 	CCIPJobType                    string = "ccip"
+	ModsecJobType                  string = "modsec"
 	DirectRequestJobType           string = "directrequest"
 	FluxMonitorJobType             string = "fluxmonitor"
 	GatewayJobType                 string = "gateway"

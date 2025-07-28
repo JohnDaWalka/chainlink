@@ -319,6 +319,85 @@ observationSource = """%s"""
 	}
 }
 
+type ModsecSpecParams struct {
+	JobID                   string
+	Name                    string
+	SourceChainID           string
+	SourceChainFamily       string
+	DestinationChainID      string
+	DestinationChainFamily  string
+	OnRampAddress           string
+	CCIPMessageSentEventSig string
+	OffRampAddress          string
+}
+
+type ModsecSpec struct {
+	ModsecSpecParams
+	toml string
+}
+
+func (ms ModsecSpec) Toml() string {
+	return ms.toml
+}
+
+func GenerateModsecSpec(params ModsecSpecParams) ModsecSpec {
+	jobID := params.JobID
+	if jobID == "" {
+		jobID = uuid.New().String()
+	}
+	name := params.Name
+	if name == "" {
+		name = "modsec-primary"
+	}
+	sourceChainID := params.SourceChainID
+	if sourceChainID == "" {
+		sourceChainID = "1"
+	}
+	sourceChainFamily := params.SourceChainFamily
+	if sourceChainFamily == "" {
+		sourceChainFamily = "evm"
+	}
+	destinationChainID := params.DestinationChainID
+	if destinationChainID == "" {
+		destinationChainID = "2"
+	}
+	destinationChainFamily := params.DestinationChainFamily
+	if destinationChainFamily == "" {
+		destinationChainFamily = "evm"
+	}
+	onRampAddress := params.OnRampAddress
+	if onRampAddress == "" {
+		onRampAddress = "0x1234567890123456789012345678901234567890"
+	}
+	ccipMessageSentEventSig := params.CCIPMessageSentEventSig
+	if ccipMessageSentEventSig == "" {
+		ccipMessageSentEventSig = "0x1234567890123456789012345678901234567890"
+	}
+	offRampAddress := params.OffRampAddress
+	if offRampAddress == "" {
+		offRampAddress = "0x1234567890123456789012345678901234567890"
+	}
+
+	template := `
+type = "modsec"
+schemaVersion = 1
+externalJobID = "%s"
+name = "%s"
+sourceChainID = "%s"
+sourceChainFamily = "%s"
+destChainID = "%s"
+destChainFamily = "%s"
+onRampAddress = "%s"
+ccipMessageSentEventSig = "%s"
+offRampAddress = "%s"
+`
+
+	return ModsecSpec{
+		ModsecSpecParams: params,
+		toml:             fmt.Sprintf(template, jobID, name, sourceChainID, sourceChainFamily, destinationChainID, destinationChainFamily, onRampAddress, ccipMessageSentEventSig, offRampAddress),
+	}
+}
+
 type VRFSpecParams struct {
 	JobID                         string
 	Name                          string
