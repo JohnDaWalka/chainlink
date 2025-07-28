@@ -34,6 +34,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 
 	offRampStatePointer := "_::offramp::OffRampStatePointer::off_ramp_state_id"
 	onRampStatePointer := "_::onramp::OnRampStatePointer::on_ramp_state_id"
+	ccipObjectRefStatePointer := "_::ccip::CCIPObjectRefPointer::object_ref_id"
 
 	return map[string]any{
 		"IsLoopPlugin": true,
@@ -49,17 +50,35 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			// TODO: more offramp config and other modules
 			consts.ContractNameRMNRemote: map[string]any{
 				"Name": "rmn_remote",
-				"Functions": map[string]any{
-					consts.MethodNameGetReportDigestHeader: map[string]any{
-						"Name": "get_report_digest_header",
+				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
+					"GetReportDigestHeader": {
+						Name: "get_report_digest_header",
 					},
-					consts.MethodNameGetVersionedConfig: map[string]any{
-						"Name": "get_versioned_config",
+					"GetVersionedConfig": {
+						Name:          "get_versioned_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
+							{
+								Name:       "object_ref_id",
+								Type:       "object_id",
+								PointerTag: &ccipObjectRefStatePointer,
+								Required:   true,
+							},
+						},
 						// ref: https://github.com/smartcontractkit/chainlink-ccip/blob/bee7c32c71cf0aec594c051fef328b4a7281a1fc/pkg/reader/ccip.go#L1440
-						"ResultTupleToStruct": []string{"version", "config"},
+						ResultTupleToStruct: []string{"version", "config"},
 					},
-					consts.MethodNameGetCursedSubjects: map[string]any{
-						"Name": "get_cursed_subjects",
+					"GetCursedSubjects": {
+						Name:          "get_cursed_subjects",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
+							{
+								Name:       "object_ref_id",
+								Type:       "object_id",
+								PointerTag: &ccipObjectRefStatePointer,
+								Required:   true,
+							},
+						},
 					},
 				},
 			},
@@ -73,37 +92,68 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			},
 			consts.ContractNameFeeQuoter: map[string]any{
 				"Name": "fee_quoter",
-				"Functions": map[string]any{
-					consts.MethodNameFeeQuoterGetTokenPrice: map[string]any{
-						"Name": "get_token_price",
-						"Params": []map[string]any{
+				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
+					"GetTokenPrice": {
+						Name:          "get_token_price",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "token",
-								"Type":     "address",
-								"Required": true,
+								Name:       "object_ref_id",
+								Type:       "object_id",
+								PointerTag: &ccipObjectRefStatePointer,
+								Required:   true,
+							},
+							{
+								Name:     "token",
+								Type:     "address",
+								Required: true,
 							},
 						},
 					},
-					consts.MethodNameFeeQuoterGetTokenPrices: map[string]any{
-						"Name": "get_token_prices",
-						"Params": []map[string]any{
+					"GetTokenPrices": {
+						Name:          "get_token_prices",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "tokens",
-								"Type":     "vector<address>",
-								"Required": true,
+								Name:       "object_ref_id",
+								Type:       "object_id",
+								PointerTag: &ccipObjectRefStatePointer,
+								Required:   true,
+							},
+							{
+								Name:     "tokens",
+								Type:     "vector<address>",
+								Required: true,
 							},
 						},
 					},
-					consts.MethodNameFeeQuoterGetStaticConfig: map[string]any{
-						"Name": "get_static_config",
-					},
-					consts.MethodNameGetFeePriceUpdate: map[string]any{
-						"Name": "get_dest_chain_gas_price",
-						"Params": []map[string]any{
+					"GetStaticConfig": {
+						Name:          "get_static_config",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
 							{
-								"Name":     "destChainSelector",
-								"Type":     "u64",
-								"Required": true,
+								Name:       "object_ref_id",
+								Type:       "object_id",
+								PointerTag: &ccipObjectRefStatePointer,
+								Required:   true,
+							},
+						},
+						ResultTupleToStruct: []string{"static_config"},
+					},
+					"GetDestinationChainGasPrice": {
+						Name:          "get_dest_chain_gas_price",
+						SignerAddress: fromAddress,
+						Params: []codec.SuiFunctionParam{
+							{
+								Name:       "object_ref_id",
+								Type:       "object_id",
+								PointerTag: &ccipObjectRefStatePointer,
+								Required:   true,
+							},
+							{
+								Name:     "destChainSelector",
+								Type:     "u64",
+								Required: true,
 							},
 						},
 					},
