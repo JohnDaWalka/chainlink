@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/rmn_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	evmChain "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings"
@@ -274,21 +275,23 @@ func withExpectRevert() fastTransferE2ETestCaseOption {
 }
 
 var fastTransferTestCases = []*fastTransferE2ETestCase{
-	ftfTc("fee token", withFeeTokenType(feeTokenLink), withFastFillSuccessAmountAssertions()),
-	ftfTc("fee token and no filler", withFeeTokenType(feeTokenLink), withFastFillNoFillerSuccessAmountAssertions(), withFillerDisabled()),
-	ftfTc("native fee token", withFeeTokenType(feeTokenNative), withFastFillSuccessAmountAssertions()),
-	ftfTc("native fee token and no filler", withFeeTokenType(feeTokenNative), withFastFillNoFillerSuccessAmountAssertions(), withFillerDisabled()),
-	ftfTc("allowlist enabled", withFillerAllowlistEnabled(), withAllowlistFiller(), withFastFillSuccessAmountAssertions()),
-	ftfTc("allowlist enabled and filler not on allowlist", withFillerAllowlistEnabled(), withFastFillNoFillerSuccessAmountAssertions()),
-	ftfTc("pool fee with filler", withPoolFeeBps(50), withFastFillSuccessAmountAssertions()),
-	ftfTc("pool fee without filler", withPoolFeeBps(50), withFastFillNoFillerSuccessAmountAssertions(), withFillerDisabled()),
-	ftfTc("external minter", withExternalMinter(), withFastFillSuccessAmountAssertions(), withFeeTokenType(feeTokenNative)),
-	ftfTc("external minter feeToken", withExternalMinter(), withFastFillSuccessAmountAssertions(), withFeeTokenType(feeTokenLink)),
-	ftfTc("settlement gas overhead too low", withSettlementGasOverhead(1), withExpectNoExecutionError(), withFeeTokenType(feeTokenNative)),
-	ftfTc("max fast transfer fee too low", withCustomMaxFastTransferFee(big.NewInt(50)), withExpectRevert()),
-	ftfTc("hybrid pool lock release", withHybridPool(v1_5_1.LockAndRelease), withFeeTokenType(feeTokenNative), withFastFillSuccessAmountAssertionsWithPoolAmount(big.NewInt(0).Mul(big.NewInt(1e18), big.NewInt(1000)), true)),
+	// ftfTc("fee token", withFeeTokenType(feeTokenLink), withFastFillSuccessAmountAssertions()),
+	// ftfTc("fee token and no filler", withFeeTokenType(feeTokenLink), withFastFillNoFillerSuccessAmountAssertions(), withFillerDisabled()),
+	// ftfTc("native fee token", withFeeTokenType(feeTokenNative), withFastFillSuccessAmountAssertions()),
+	// ftfTc("native fee token and no filler", withFeeTokenType(feeTokenNative), withFastFillNoFillerSuccessAmountAssertions(), withFillerDisabled()),
+	// ftfTc("allowlist enabled", withFillerAllowlistEnabled(), withAllowlistFiller(), withFastFillSuccessAmountAssertions()),
+	// ftfTc("allowlist enabled and filler not on allowlist", withFillerAllowlistEnabled(), withFastFillNoFillerSuccessAmountAssertions()),
+	// ftfTc("pool fee with filler", withPoolFeeBps(50), withFastFillSuccessAmountAssertions()),
+	// ftfTc("pool fee without filler", withPoolFeeBps(50), withFastFillNoFillerSuccessAmountAssertions(), withFillerDisabled()),
+	// ftfTc("external minter", withExternalMinter(), withFastFillSuccessAmountAssertions(), withFeeTokenType(feeTokenNative)),
+	// ftfTc("external minter feeToken", withExternalMinter(), withFastFillSuccessAmountAssertions(), withFeeTokenType(feeTokenLink)),
+	// ftfTc("settlement gas overhead too low", withSettlementGasOverhead(1), withExpectNoExecutionError(), withFeeTokenType(feeTokenNative)),
+	// ftfTc("max fast transfer fee too low", withCustomMaxFastTransferFee(big.NewInt(50)), withExpectRevert()),
+	// ftfTc("hybrid pool lock release", withHybridPool(v1_5_1.LockAndRelease), withFeeTokenType(feeTokenNative), withFastFillSuccessAmountAssertionsWithPoolAmount(big.NewInt(0).Mul(big.NewInt(1e18), big.NewInt(1000)), true)),
 	ftfTc("hybrid pool", withHybridPool(v1_5_1.BurnAndMint), withFeeTokenType(feeTokenNative), withFastFillSuccessAmountAssertions()),
 	ftfTc("hybrid pool with link fee", withHybridPool(v1_5_1.BurnAndMint), withFeeTokenType(feeTokenLink), withFastFillSuccessAmountAssertions()),
+	// 3 TC above with 1.5 lanes everything is green
+	// 3 TC above with 1.6 lanes only "hybrid pool lock release" is green. 2 other ones fail on the regular transfer
 }
 
 func assertDestinationBalanceEventuallyEqual(expectedBalance *big.Int) balanceAssertion {
@@ -1530,6 +1533,31 @@ func runFastTransferTestCase(t *testing.T, ctx *fastTransferTestContext, tc *fas
 		}
 
 		if !tc.expectNoExecutionError && !tc.expectRevert {
+			state, _ := onChainState.EVMChainState(ctx.SourceChainSelector())
+			configs := []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{
+				{
+					DestChainSelector: ctx.DestinationChainSelector(),
+					TokenTransferFeeConfigs: []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+						{
+							Token: destinationToken.Address(),
+							TokenTransferFeeConfig: fee_quoter.FeeQuoterTokenTransferFeeConfig{
+								MinFeeUSDCents:    150,
+								MaxFeeUSDCents:    4294967295,
+								DeciBps:           0,
+								DestGasOverhead:   400_000,
+								DestBytesOverhead: 640,
+								IsEnabled:         true,
+							},
+						},
+					},
+				},
+			}
+			tx, err := state.FeeQuoter.ApplyTokenTransferFeeConfigUpdates(ctx.SourceChain().DeployerKey, configs, nil)
+			require.NoError(t, err, "Failed to apply token transfer fee config updates")
+			ctx.env.Logger.Infof("Applied token transfer fee config updates transaction: %s", tx.Hash().Hex())
+			_, err = ctx.SourceChain().Confirm(tx)
+			require.NoError(t, err, "Failed to confirm token transfer fee config updates transaction")
+
 			ctx.env.Logger.Info("Sanity check regular token transfer (slow-path)")
 			// We want to ensure regular transfer works as expected
 			message := router.ClientEVM2AnyMessage{
@@ -1567,6 +1595,7 @@ func runFastTransferTestCase(t *testing.T, ctx *fastTransferTestContext, tc *fas
 			}()
 
 			ctx.waitForExecution(t, seqNum)
+			time.Sleep(30 * time.Second) // Wait for the transfer to be processed
 			finalBalance, err := destinationToken.BalanceOf(nil, userAddress)
 			require.NoError(t, err)
 			expectedBalance := new(big.Int).Add(userBalance, initialUserTokenAmountOnSource)

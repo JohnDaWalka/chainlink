@@ -913,6 +913,12 @@ func ConfirmExecWithSeqNrs(
 				sourceSelector,
 			)
 
+			if execEvent.State == 3 {
+				returnData := execEvent.ReturnData
+				returnDataHex := common.Bytes2Hex(returnData)
+				t.Logf("Failed reason: %s", returnDataHex)
+			}
+
 			_, found := seqNrsToWatch[execEvent.SequenceNumber]
 			if found && execEvent.SourceChainSelector == sourceSelector {
 				t.Logf("Received ExecutionStateChanged (state %s) on chain %d (offramp %s) from chain %d with expected sequence number %d",
