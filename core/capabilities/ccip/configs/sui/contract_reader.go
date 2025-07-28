@@ -52,6 +52,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 				"Name": "rmn_remote",
 				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
 					"GetReportDigestHeader": {
+						SignerAddress: fromAddress,
 						Name: "get_report_digest_header",
 					},
 					"GetVersionedConfig": {
@@ -84,9 +85,10 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 			},
 			consts.ContractNameRMNProxy: map[string]any{
 				"Name": "rmn_remote",
-				"Functions": map[string]any{
-					consts.MethodNameGetARM: map[string]any{
-						"Name": "get_arm",
+				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
+					consts.MethodNameGetARM: {
+						Name: "get_arm",
+						SignerAddress: fromAddress,
 					},
 				},
 			},
