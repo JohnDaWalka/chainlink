@@ -23,8 +23,8 @@ import (
 )
 
 var (
-	_ job.ServiceCtx          = (*launcher)(nil)
-	_ registrysyncer.Launcher = (*launcher)(nil)
+	_ job.ServiceCtx         = (*launcher)(nil)
+	_ registrysyncer.Listener = (*launcher)(nil)
 )
 
 // New creates a new instance of the CCIP launcher.
@@ -87,6 +87,11 @@ func (l *launcher) Launch(ctx context.Context, state *registrysyncer.LocalRegist
 	l.lggr.Debugw("Received new state from syncer", "dons", state.IDsToDONs)
 	l.latestState = *state
 	return nil
+}
+
+// OnNewRegistry implements registrysyncer.Listener.
+func (l *launcher) OnNewRegistry(ctx context.Context, state *registrysyncer.LocalRegistry) error {
+	return l.Launch(ctx, state)
 }
 
 func (l *launcher) getLatestState() registrysyncer.LocalRegistry {
