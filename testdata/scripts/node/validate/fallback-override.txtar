@@ -499,6 +499,7 @@ URL = ''
 
 [Billing]
 URL = 'localhost:4319'
+TLSEnabled = true
 
 [[EVM]]
 ChainID = '1'

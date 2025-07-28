@@ -345,3 +345,4 @@ URL = ''
 
 [Billing]
 URL = 'localhost:4319'
+TLSEnabled = true
