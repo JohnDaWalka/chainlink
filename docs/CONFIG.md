@@ -2303,7 +2303,7 @@ URL is the locator for the Chainlink billing service.
 ## BridgeStatusReporter
 ```toml
 [BridgeStatusReporter]
-Enabled = true # Default
+Enabled = false # Default
 StatusPath = "/status" # Default
 PollingInterval = "5m" # Default
 IgnoreInvalidBridges = true # Default

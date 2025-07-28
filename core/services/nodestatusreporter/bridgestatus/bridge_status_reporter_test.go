@@ -382,11 +382,14 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 	})
 
 	config := mocks.NewTestBridgeStatusReporterConfig(true, "/status", 5*time.Minute)
-	service := &Service{
-		config:  config,
-		emitter: emitter,
-		lggr:    logger.TestLogger(t),
-	}
+	service := NewBridgeStatusReporter(
+		config,
+		nil, // bridgeORM not needed for this test
+		nil, // jobORM not needed for this test
+		nil, // httpClient not needed for this test
+		emitter,
+		logger.TestLogger(t),
+	)
 
 	// Load fixture and emit
 	ctx := context.Background()
@@ -417,7 +420,7 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 
 	// Verify configuration
 	// Helper function to safely convert values to strings, handling nil (same as in production code)
-	safeString := func(v interface{}) string {
+	safeString := func(v any) string {
 		if v == nil {
 			return ""
 		}
@@ -575,11 +578,14 @@ func TestService_emitBridgeStatus_EmptyFields(t *testing.T) {
 	})
 
 	config := mocks.NewTestBridgeStatusReporterConfig(true, "/status", 5*time.Minute)
-	service := &Service{
-		config:  config,
-		emitter: emitter,
-		lggr:    logger.TestLogger(t),
-	}
+	service := NewBridgeStatusReporter(
+		config,
+		nil, // bridgeORM not needed for this test
+		nil, // jobORM not needed for this test
+		nil, // httpClient not needed for this test
+		emitter,
+		logger.TestLogger(t),
+	)
 
 	// Load empty fixture and emit
 	ctx := context.Background()
@@ -948,7 +954,7 @@ func TestService_pollBridge_EndToEnd_RealWebServer(t *testing.T) {
 
 	// Verify configuration - loop through fixture and compare with protobuf
 	// Helper function to safely convert values to strings, handling nil (same as in production code)
-	safeString := func(v interface{}) string {
+	safeString := func(v any) string {
 		if v == nil {
 			return ""
 		}

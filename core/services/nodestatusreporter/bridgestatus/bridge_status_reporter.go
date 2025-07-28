@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -21,18 +20,14 @@ import (
 
 // Service polls Bridge status and pushes them to Beholder
 type Service struct {
-	services.StateMachine
+	services.Service
+	eng *services.Engine
 
 	config     config.BridgeStatusReporter
 	bridgeORM  bridges.ORM
 	jobORM     job.ORM
 	httpClient *http.Client
 	emitter    beholder.Emitter
-	lggr       logger.Logger
-
-	// Service management
-	chStop services.StopChan
-	wg     sync.WaitGroup
 }
 
 const (
@@ -49,75 +44,39 @@ func NewBridgeStatusReporter(
 	emitter beholder.Emitter,
 	lggr logger.Logger,
 ) *Service {
-	return &Service{
+	s := &Service{
 		config:     config,
 		bridgeORM:  bridgeORM,
 		jobORM:     jobORM,
 		httpClient: httpClient,
 		emitter:    emitter,
-		lggr:       lggr.Named(ServiceName),
-		chStop:     make(services.StopChan),
 	}
+	s.Service, s.eng = services.Config{
+		Name:  ServiceName,
+		Start: s.start,
+	}.NewServiceEngine(lggr)
+	return s
 }
 
-// Start starts the Bridge Status Reporter Service
-func (s *Service) Start(ctx context.Context) error {
-	return s.StartOnce(ServiceName, func() error {
-		if !s.config.Enabled() {
-			s.lggr.Info("Bridge Status Reporter Service is disabled")
-			return nil
-		}
-
-		s.lggr.Info("Starting Bridge Status Reporter Service")
-
-		// Start periodic polling
-		s.wg.Add(1)
-		go s.pollLoop()
-
+// start starts the Bridge Status Reporter Service
+func (s *Service) start(ctx context.Context) error {
+	if !s.config.Enabled() {
+		s.eng.Info("Bridge Status Reporter Service is disabled")
 		return nil
-	})
-}
+	}
 
-// Close stops the Bridge Status Reporter Service
-func (s *Service) Close() error {
-	return s.StopOnce(ServiceName, func() error {
-		s.lggr.Info("Stopping " + ServiceName)
-		close(s.chStop)
-		s.wg.Wait()
+	s.eng.Info("Starting Bridge Status Reporter Service")
 
-		return nil
-	})
-}
+	// Start periodic polling using Engine's ticker support
+	ticker := services.NewTicker(s.config.PollingInterval())
+	s.eng.GoTick(ticker, s.pollAllBridges)
 
-// Name returns the service name
-func (s *Service) Name() string {
-	return s.lggr.Name()
+	return nil
 }
 
 // HealthReport returns the service health
 func (s *Service) HealthReport() map[string]error {
-	return map[string]error{s.Name(): s.Healthy()}
-}
-
-// pollLoop runs the main polling loop
-func (s *Service) pollLoop() {
-	defer s.wg.Done()
-
-	ticker := time.NewTicker(s.config.PollingInterval())
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			// Create a context with polling interval timeout
-			ctx, cancel := s.chStop.CtxWithTimeout(s.config.PollingInterval())
-			s.pollAllBridges(ctx)
-			cancel()
-
-		case <-s.chStop:
-			return
-		}
-	}
+	return map[string]error{ServiceName: s.Ready()}
 }
 
 // pollAllBridges polls all registered bridges using pagination
@@ -129,7 +88,7 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 	for {
 		bridgeList, _, err := s.bridgeORM.BridgeTypes(ctx, offset, bridgePollPageSize)
 		if err != nil {
-			s.lggr.Debugw("Failed to fetch bridges", "error", err, "offset", offset)
+			s.eng.Debugw("Failed to fetch bridges", "error", err, "offset", offset)
 			return
 		}
 
@@ -144,11 +103,11 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 	}
 
 	if len(allBridges) == 0 {
-		s.lggr.Debug("No bridges configured for Bridge Status Reporter polling")
+		s.eng.Debug("No bridges configured for Bridge Status Reporter polling")
 		return
 	}
 
-	s.lggr.Debugw("Polling Bridge Status Reporter for all bridges", "count", len(allBridges))
+	s.eng.Debugw("Polling Bridge Status Reporter for all bridges", "count", len(allBridges))
 
 	// Poll each bridge concurrently and wait for completion
 	var wg sync.WaitGroup
@@ -166,8 +125,8 @@ func (s *Service) pollAllBridges(ctx context.Context) {
 }
 
 // handleBridgeError handles errors during bridge polling, either skipping or emitting empty telemetry
-func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, jobs []JobInfo, logMsg string, logFields ...interface{}) {
-	s.lggr.Debugw(logMsg, logFields...)
+func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, jobs []JobInfo, logMsg string, logFields ...any) {
+	s.eng.Debugw(logMsg, logFields...)
 	if s.config.IgnoreInvalidBridges() {
 		return
 	}
@@ -177,18 +136,18 @@ func (s *Service) handleBridgeError(ctx context.Context, bridgeName string, jobs
 
 // pollBridge polls a single bridge's status endpoint
 func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL string) {
-	s.lggr.Debugw("Polling bridge", "bridge", bridgeName, "url", bridgeURL)
+	s.eng.Debugw("Polling bridge", "bridge", bridgeName, "url", bridgeURL)
 
 	// Look up jobs associated with this bridge first
 	jobs, err := s.findJobsForBridge(ctx, bridgeName)
 	if err != nil {
-		s.lggr.Warnw("Failed to find jobs for bridge", "bridge", bridgeName, "error", err)
+		s.eng.Warnw("Failed to find jobs for bridge", "bridge", bridgeName, "error", err)
 		jobs = []JobInfo{}
 	}
 
 	// Skip bridge if it has no jobs and ignoreJoblessBridges is enabled
 	if s.config.IgnoreJoblessBridges() && len(jobs) == 0 {
-		s.lggr.Debugw("Skipping bridge with no jobs", "bridge", bridgeName, "ignoreJoblessBridges", true)
+		s.eng.Debugw("Skipping bridge with no jobs", "bridge", bridgeName, "ignoreJoblessBridges", true)
 		return
 	}
 
@@ -232,7 +191,7 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 		return
 	}
 
-	s.lggr.Debugw("Successfully fetched Bridge Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
+	s.eng.Debugw("Successfully fetched Bridge Status Reporter status", "bridge", bridgeName, "adapter", status.Adapter.Name, "version", status.Adapter.Version)
 
 	// Emit telemetry to Beholder
 	s.emitBridgeStatus(ctx, bridgeName, status, jobs)
@@ -267,7 +226,7 @@ func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, statu
 	configProto := make([]*events.ConfigurationItem, len(status.Configuration))
 	for i, config := range status.Configuration {
 		// Helper function to convert values to strings, handling nil (ternary-style)
-		safeString := func(v interface{}) string {
+		safeString := func(v any) string {
 			if v == nil {
 				return ""
 			}
@@ -311,11 +270,11 @@ func (s *Service) emitBridgeStatus(ctx context.Context, bridgeName string, statu
 
 	// Emit the protobuf event through the configured emitter
 	if err := events.EmitBridgeStatusEvent(ctx, s.emitter, event); err != nil {
-		s.lggr.Warnw("Failed to emit Bridge Status Reporter protobuf data to Beholder", "bridge", bridgeName, "error", err)
+		s.eng.Warnw("Failed to emit Bridge Status Reporter protobuf data to Beholder", "bridge", bridgeName, "error", err)
 		return
 	}
 
-	s.lggr.Debugw("Successfully emitted Bridge Status Reporter protobuf data to Beholder",
+	s.eng.Debugw("Successfully emitted Bridge Status Reporter protobuf data to Beholder",
 		"bridge", bridgeName,
 		"adapter", status.Adapter.Name,
 		"version", status.Adapter.Version,
@@ -331,7 +290,7 @@ func (s *Service) findJobsForBridge(ctx context.Context, bridgeName string) ([]J
 	}
 
 	if len(jobIDs) == 0 {
-		s.lggr.Debugw("No jobs found for bridge", "bridge", bridgeName)
+		s.eng.Debugw("No jobs found for bridge", "bridge", bridgeName)
 		return []JobInfo{}, nil
 	}
 
@@ -340,7 +299,7 @@ func (s *Service) findJobsForBridge(ctx context.Context, bridgeName string) ([]J
 	for _, jobID := range jobIDs {
 		job, err := s.jobORM.FindJob(ctx, jobID)
 		if err != nil {
-			s.lggr.Debugw("Failed to find job", "jobID", jobID, "bridge", bridgeName, "error", err)
+			s.eng.Debugw("Failed to find job", "jobID", jobID, "bridge", bridgeName, "error", err)
 			continue
 		}
 
@@ -356,7 +315,7 @@ func (s *Service) findJobsForBridge(ctx context.Context, bridgeName string) ([]J
 		})
 	}
 
-	s.lggr.Debugw("Found jobs for bridge", "bridge", bridgeName, "count", len(jobs))
+	s.eng.Debugw("Found jobs for bridge", "bridge", bridgeName, "count", len(jobs))
 
 	return jobs, nil
 }

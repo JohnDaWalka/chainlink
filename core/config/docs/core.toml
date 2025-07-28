@@ -826,7 +826,7 @@ URL = "localhost:4319" # Default
 # BridgeStatusReporter holds settings for the Bridge Status Reporter service.
 [BridgeStatusReporter]
 # Enabled enables the Bridge Status Reporter service that polls bridge status endpoints.
-Enabled = true # Default
+Enabled = false # Default
 # StatusPath is the path to append to bridge URLs for status polling.
 StatusPath = "/status" # Default
 # PollingInterval is how often to poll bridge status endpoints for status.
