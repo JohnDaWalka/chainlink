@@ -28,12 +28,16 @@ import (
 )
 
 // Direct RPC
-func (r *Relayer) CallContract(ctx context.Context, msg *evmtypes.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	return r.chain.Client().CallContract(ctx, toEthMsg(msg), blockNumber)
+func (r *Relayer) CallContract(ctx context.Context, request evmtypes.CallContractRequest) (*evmtypes.CallContractReply, error) {
+	result, err := r.chain.Client().CallContract(ctx, toEthMsg(request.Msg), request.BlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	return &evmtypes.CallContractReply{Data: result}, nil
 }
 
-func (r *Relayer) FilterLogs(ctx context.Context, filterQuery evmtypes.FilterQuery) ([]*evmtypes.Log, error) {
-	logs, err := r.chain.Client().FilterLogs(ctx, convertEthFilter(filterQuery))
+func (r *Relayer) FilterLogs(ctx context.Context, request evmtypes.FilterLogsRequest) (*evmtypes.FilterLogsReply, error) {
+	logs, err := r.chain.Client().FilterLogs(ctx, convertEthFilter(request.FilterQuery))
 	if err != nil {
 		return nil, err
 	}
@@ -44,11 +48,15 @@ func (r *Relayer) FilterLogs(ctx context.Context, filterQuery evmtypes.FilterQue
 		ret = append(ret, convertLog(&l))
 	}
 
-	return ret, nil
+	return &evmtypes.FilterLogsReply{Logs: ret}, nil
 }
 
-func (r *Relayer) BalanceAt(ctx context.Context, account evmtypes.Address, blockNumber *big.Int) (*big.Int, error) {
-	return r.chain.Client().BalanceAt(ctx, account, blockNumber)
+func (r *Relayer) BalanceAt(ctx context.Context, request evmtypes.BalanceAtRequest) (*evmtypes.BalanceAtReply, error) {
+	balance, err := r.chain.Client().BalanceAt(ctx, request.Address, request.BlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	return &evmtypes.BalanceAtReply{Balance: balance}, nil
 }
 
 func (r *Relayer) EstimateGas(ctx context.Context, call *evmtypes.CallMsg) (uint64, error) {
@@ -78,10 +86,46 @@ func (r *Relayer) GetTransactionFee(ctx context.Context, transactionID commontyp
 	return r.chain.TxManager().GetTransactionFee(ctx, transactionID)
 }
 
-func (r *Relayer) LatestAndFinalizedHead(ctx context.Context) (evmtypes.Head, evmtypes.Head, error) {
+func (r *Relayer) HeaderByNumber(ctx context.Context, request evmtypes.HeaderByNumberRequest) (*evmtypes.HeaderByNumberReply, error) {
+	var err error
+	var h *types.Head
+	switch {
+	// latest block
+	case request.Number == nil || request.Number.Int64() == -1: // rpc.LatestBlockNumber
+		h, _, err = r.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
+	// finalized block
+	case request.Number.Int64() == -3: // rpc.FinalizedBlockNumber
+		_, h, err = r.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
+	// safe block (treat as latest for compatibility)
+	case request.Number.Int64() == -4: // rpc.SafeBlockNumber
+		h, _, err = r.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
+	// specific block number
+	case request.Number.Sign() >= 0:
+		// For compatibility, get latest and return error if requesting specific historical block
+		h, _, err = r.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
+		if err == nil && h != nil && h.Number != request.Number.Int64() {
+			return nil, fmt.Errorf("historical block lookup not supported in this version")
+		}
+	default:
+		return nil, fmt.Errorf("unexpected block number %s", request.Number.String())
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if h == nil {
+		return nil, fmt.Errorf("block not found")
+	}
+
+	header := convertHeadToHeader(h)
+	return &evmtypes.HeaderByNumberReply{Header: header}, nil
+}
+
+func (r *Relayer) LatestAndFinalizedHead(ctx context.Context) (types.Head, types.Head, error) {
 	latest, finalized, err := r.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
 	if err != nil {
-		return evmtypes.Head{}, evmtypes.Head{}, err
+		return types.Head{}, types.Head{}, err
 	}
 
 	return convertHead(latest), convertHead(finalized), nil
@@ -100,6 +144,16 @@ func (r *Relayer) QueryTrackedLogs(ctx context.Context, filterQuery []query.Expr
 	}
 
 	return convertLPLogs(logs), nil
+}
+
+func (r *Relayer) GetFiltersNames(_ context.Context) ([]string, error) {
+	// TODO PLEX-1465: once code is moved away, remove this GetFiltersNames method
+	filters := r.chain.LogPoller().GetFilters()
+	filterNames := make([]string, 0, len(filters))
+	for name := range filters {
+		filterNames = append(filterNames, name)
+	}
+	return filterNames, nil
 }
 
 func (r *Relayer) RegisterLogTracking(ctx context.Context, filter evmtypes.LPFilterQuery) error {
@@ -251,12 +305,24 @@ func queryNameFromFilter(filterQuery []query.Expression) string {
 	return address + "-" + eventSig
 }
 
-func convertHead[H chains.Head[BLOCK_HASH], BLOCK_HASH chains.Hashable](h H) evmtypes.Head {
-	return evmtypes.Head{
-		Timestamp:  uint64(h.GetTimestamp().Unix()),
+func convertHead[H chains.Head[BLOCK_HASH], BLOCK_HASH chains.Hashable](h H) types.Head {
+	return types.Head{
+		Timestamp:  time.Unix(h.GetTimestamp().Unix(), 0),
 		Hash:       bytesToHash(h.BlockHash().Bytes()),
-		Number:     big.NewInt(h.BlockNumber()),
+		Number:     h.BlockNumber(),
 		ParentHash: bytesToHash(h.GetParentHash().Bytes()),
+	}
+}
+
+func convertHeadToHeader(h *types.Head) *evmtypes.Header {
+	if h == nil {
+		return nil
+	}
+	return &evmtypes.Header{
+		Hash:       h.Hash,
+		Number:     big.NewInt(h.Number),
+		ParentHash: h.ParentHash,
+		Timestamp:  uint64(h.Timestamp.Unix()),
 	}
 }
 
