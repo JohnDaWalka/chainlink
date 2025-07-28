@@ -598,7 +598,7 @@ func TestConfig_Marshal(t *testing.T) {
 		URL: ptr("localhost:4319"),
 	}
 	full.BridgeStatusReporter = toml.BridgeStatusReporter{
-		Enabled:              ptr(true),
+		Enabled:              ptr(false),
 		StatusPath:           ptr("/status"),
 		PollingInterval:      commoncfg.MustNewDuration(5 * time.Minute),
 		IgnoreInvalidBridges: ptr(true),
