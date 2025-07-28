@@ -2313,7 +2313,7 @@ BridgeStatusReporter holds settings for the Bridge Status Reporter service.
 
 ### Enabled
 ```toml
-Enabled = true # Default
+Enabled = false # Default
 ```
 Enabled enables the Bridge Status Reporter service that polls bridge status endpoints.
 

@@ -14,14 +14,14 @@ type EAResponse struct {
 	} `json:"endpoints"`
 	DefaultEndpoint string `json:"defaultEndpoint"`
 	Configuration   []struct {
-		Name               string      `json:"name"`
-		Value              any         `json:"value"`
-		Type               string      `json:"type"`
-		Description        string      `json:"description"`
-		Required           bool        `json:"required"`
-		Default            any         `json:"default"`
-		CustomSetting      bool        `json:"customSetting"`
-		EnvDefaultOverride any         `json:"envDefaultOverride"`
+		Name               string `json:"name"`
+		Value              any    `json:"value"`
+		Type               string `json:"type"`
+		Description        string `json:"description"`
+		Required           bool   `json:"required"`
+		Default            any    `json:"default"`
+		CustomSetting      bool   `json:"customSetting"`
+		EnvDefaultOverride any    `json:"envDefaultOverride"`
 	} `json:"configuration"`
 	Runtime struct {
 		NodeVersion  string `json:"nodeVersion"`

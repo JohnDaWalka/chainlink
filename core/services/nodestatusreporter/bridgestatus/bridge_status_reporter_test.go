@@ -145,7 +145,12 @@ func TestService_Start_Disabled(t *testing.T) {
 
 func TestService_Start_Enabled(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _, _ := setupTestService(t, true, 100*time.Millisecond, httpClient)
+	service, bridgeORM, jobORM, emitter := setupTestService(t, true, 100*time.Millisecond, httpClient)
+
+	// Mock the calls that will be triggered by the polling ticker
+	bridgeORM.On("BridgeTypes", mock.Anything, mock.Anything, mock.Anything).Return([]bridges.BridgeType{}, 0, nil).Maybe()
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, mock.AnythingOfType("string")).Return([]int32{}, nil).Maybe()
+	emitter.On("Emit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 	err := service.Start(ctx)
@@ -452,7 +457,12 @@ func TestService_emitBridgeStatus_CaptureOutput(t *testing.T) {
 
 func TestService_Start_AlreadyStarted(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock the calls that will be triggered by the polling ticker
+	bridgeORM.On("BridgeTypes", mock.Anything, mock.Anything, mock.Anything).Return([]bridges.BridgeType{}, 0, nil).Maybe()
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, mock.AnythingOfType("string")).Return([]int32{}, nil).Maybe()
+	emitter.On("Emit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 
@@ -469,7 +479,12 @@ func TestService_Start_AlreadyStarted(t *testing.T) {
 
 func TestService_Close_AlreadyClosed(t *testing.T) {
 	httpClient := &http.Client{}
-	service, _, _, _ := setupTestService(t, true, testPollingInterval, httpClient)
+	service, bridgeORM, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock the calls that will be triggered by the polling ticker
+	bridgeORM.On("BridgeTypes", mock.Anything, mock.Anything, mock.Anything).Return([]bridges.BridgeType{}, 0, nil).Maybe()
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, mock.AnythingOfType("string")).Return([]int32{}, nil).Maybe()
+	emitter.On("Emit", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	ctx := context.Background()
 
