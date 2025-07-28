@@ -514,6 +514,14 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 				pipelineRunner,
 				cfg.JobPipeline(),
 			),
+			job.Modsec: modsec.NewDelegate(
+				cfg,
+				globalLogger,
+				opts.KeyStore,
+				opts.DS,
+				cfg.EVMConfigs(),
+				legacyEVMChains,
+			),
 		}
 		webhookJobRunner = delegates[job.Webhook].(*webhook.Delegate).WebhookJobRunner()
 	)
@@ -638,14 +646,6 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 			telemetryManager,
 			cfg.Capabilities(),
 			cfg.EVMConfigs(),
-		)
-		delegates[job.Modsec] = modsec.NewDelegate(
-			cfg,
-			globalLogger,
-			opts.KeyStore,
-			opts.DS,
-			cfg.EVMConfigs(),
-			legacyEVMChains,
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")
