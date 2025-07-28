@@ -3,19 +3,40 @@ package v2
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
+	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	vaultMock "github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault/mock"
 	"github.com/smartcontractkit/chainlink-common/pkg/metrics"
 	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
+
+	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+
 	coreCap "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/monitoring"
 )
+
+// randomUTF8BytesWord generates a unique PeerID for testing
+var peerIDCounter uint64
+
+func randomUTF8BytesWord() ragetypes.PeerID {
+	// Generate unique, valid bytes for testing using a counter
+	var result ragetypes.PeerID
+	counter := atomic.AddUint64(&peerIDCounter, 1)
+	for i := range result {
+		result[i] = byte((counter + uint64(i)) % 256)
+	}
+	return result
+}
 
 func MetricsLabelerTest(t *testing.T) *monitoring.WorkflowsMetricLabeler {
 	m, err := monitoring.InitMonitoringResources()
@@ -27,6 +48,8 @@ func MetricsLabelerTest(t *testing.T) *monitoring.WorkflowsMetricLabeler {
 func TestSecretsFetcher_BulkFetchesSecretsFromCapability(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	reg := coreCap.NewRegistry(lggr)
+	peer := randomUTF8BytesWord()
+	reg.SetLocalRegistry(CreateLocalRegistry(t, peer))
 
 	mc := vaultMock.Vault{
 		Fn: func(ctx context.Context, req *vault.GetSecretsRequest) (*vault.GetSecretsResponse, error) {
@@ -69,7 +92,7 @@ func TestSecretsFetcher_BulkFetchesSecretsFromCapability(t *testing.T) {
 			return resp, nil
 		},
 	}
-	err := reg.Add(t.Context(), mc)
+	err := reg.Add(context.Background(), mc)
 	require.NoError(t, err)
 
 	sf := NewSecretsFetcher(
@@ -91,7 +114,7 @@ func TestSecretsFetcher_BulkFetchesSecretsFromCapability(t *testing.T) {
 		},
 	)
 
-	resp, err := sf.GetSecrets(t.Context(), &sdkpb.GetSecretsRequest{
+	resp, err := sf.GetSecrets(context.Background(), &sdkpb.GetSecretsRequest{
 		Requests: []*sdkpb.SecretRequest{
 			{
 				Id:        "Foo",
@@ -120,6 +143,8 @@ func TestSecretsFetcher_BulkFetchesSecretsFromCapability(t *testing.T) {
 func TestSecretsFetcher_ReturnsErrorIfCapabilityNoFound(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	reg := coreCap.NewRegistry(lggr)
+	peer := randomUTF8BytesWord()
+	reg.SetLocalRegistry(CreateLocalRegistry(t, peer))
 	sf := NewSecretsFetcher(
 		MetricsLabelerTest(t),
 		reg,
@@ -130,7 +155,7 @@ func TestSecretsFetcher_ReturnsErrorIfCapabilityNoFound(t *testing.T) {
 		func(shares []string) (string, error) { return "", nil },
 	)
 
-	_, err := sf.GetSecrets(t.Context(), &sdkpb.GetSecretsRequest{
+	_, err := sf.GetSecrets(context.Background(), &sdkpb.GetSecretsRequest{
 		Requests: []*sdkpb.SecretRequest{
 			{
 				Id:        "Foo",
@@ -144,13 +169,14 @@ func TestSecretsFetcher_ReturnsErrorIfCapabilityNoFound(t *testing.T) {
 func TestSecretsFetcher_ReturnsErrorIfCapabilityErrors(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	reg := coreCap.NewRegistry(lggr)
-
+	peer := randomUTF8BytesWord()
+	reg.SetLocalRegistry(CreateLocalRegistry(t, peer))
 	mc := vaultMock.Vault{
 		Fn: func(ctx context.Context, req *vault.GetSecretsRequest) (*vault.GetSecretsResponse, error) {
 			return nil, errors.New("could not authorize the request")
 		},
 	}
-	err := reg.Add(t.Context(), mc)
+	err := reg.Add(context.Background(), mc)
 	require.NoError(t, err)
 
 	sf := NewSecretsFetcher(
@@ -165,7 +191,7 @@ func TestSecretsFetcher_ReturnsErrorIfCapabilityErrors(t *testing.T) {
 		},
 	)
 
-	_, err = sf.GetSecrets(t.Context(), &sdkpb.GetSecretsRequest{
+	_, err = sf.GetSecrets(context.Background(), &sdkpb.GetSecretsRequest{
 		Requests: []*sdkpb.SecretRequest{
 			{
 				Id:        "Foo",
@@ -179,7 +205,8 @@ func TestSecretsFetcher_ReturnsErrorIfCapabilityErrors(t *testing.T) {
 func TestSecretsFetcher_ReturnsErrorIfNoResponseForRequest(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	reg := coreCap.NewRegistry(lggr)
-
+	peer := randomUTF8BytesWord()
+	reg.SetLocalRegistry(CreateLocalRegistry(t, peer))
 	mc := vaultMock.Vault{
 		Fn: func(ctx context.Context, req *vault.GetSecretsRequest) (*vault.GetSecretsResponse, error) {
 			return &vault.GetSecretsResponse{
@@ -187,7 +214,7 @@ func TestSecretsFetcher_ReturnsErrorIfNoResponseForRequest(t *testing.T) {
 			}, nil
 		},
 	}
-	err := reg.Add(t.Context(), mc)
+	err := reg.Add(context.Background(), mc)
 	require.NoError(t, err)
 
 	sf := NewSecretsFetcher(
@@ -201,8 +228,7 @@ func TestSecretsFetcher_ReturnsErrorIfNoResponseForRequest(t *testing.T) {
 			return "", nil
 		},
 	)
-
-	resp, err := sf.GetSecrets(t.Context(), &sdkpb.GetSecretsRequest{
+	resp, err := sf.GetSecrets(context.Background(), &sdkpb.GetSecretsRequest{
 		Requests: []*sdkpb.SecretRequest{
 			{
 				Id:        "Foo",
@@ -221,7 +247,8 @@ func TestSecretsFetcher_ReturnsErrorIfNoResponseForRequest(t *testing.T) {
 func TestSecretsFetcher_ReturnsErrorIfTooManyDecryptionShares(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	reg := coreCap.NewRegistry(lggr)
-
+	peer := randomUTF8BytesWord()
+	reg.SetLocalRegistry(CreateLocalRegistry(t, peer))
 	mc := vaultMock.Vault{
 		Fn: func(ctx context.Context, req *vault.GetSecretsRequest) (*vault.GetSecretsResponse, error) {
 			return &vault.GetSecretsResponse{
@@ -249,7 +276,7 @@ func TestSecretsFetcher_ReturnsErrorIfTooManyDecryptionShares(t *testing.T) {
 			}, nil
 		},
 	}
-	err := reg.Add(t.Context(), mc)
+	err := reg.Add(context.Background(), mc)
 	require.NoError(t, err)
 
 	sf := NewSecretsFetcher(
@@ -264,7 +291,7 @@ func TestSecretsFetcher_ReturnsErrorIfTooManyDecryptionShares(t *testing.T) {
 		},
 	)
 
-	resp, err := sf.GetSecrets(t.Context(), &sdkpb.GetSecretsRequest{
+	resp, err := sf.GetSecrets(context.Background(), &sdkpb.GetSecretsRequest{
 		Requests: []*sdkpb.SecretRequest{
 			{
 				Id:        "Foo",
@@ -283,7 +310,8 @@ func TestSecretsFetcher_ReturnsErrorIfTooManyDecryptionShares(t *testing.T) {
 func TestSecretsFetcher_ReturnsErrorIfCantCombineShares(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	reg := coreCap.NewRegistry(lggr)
-
+	peer := randomUTF8BytesWord()
+	reg.SetLocalRegistry(CreateLocalRegistry(t, peer))
 	mc := vaultMock.Vault{
 		Fn: func(ctx context.Context, req *vault.GetSecretsRequest) (*vault.GetSecretsResponse, error) {
 			return &vault.GetSecretsResponse{
@@ -308,7 +336,7 @@ func TestSecretsFetcher_ReturnsErrorIfCantCombineShares(t *testing.T) {
 			}, nil
 		},
 	}
-	err := reg.Add(t.Context(), mc)
+	err := reg.Add(context.Background(), mc)
 	require.NoError(t, err)
 
 	sf := NewSecretsFetcher(
@@ -323,7 +351,7 @@ func TestSecretsFetcher_ReturnsErrorIfCantCombineShares(t *testing.T) {
 		},
 	)
 
-	resp, err := sf.GetSecrets(t.Context(), &sdkpb.GetSecretsRequest{
+	resp, err := sf.GetSecrets(context.Background(), &sdkpb.GetSecretsRequest{
 		Requests: []*sdkpb.SecretRequest{
 			{
 				Id:        "Foo",
@@ -337,4 +365,68 @@ func TestSecretsFetcher_ReturnsErrorIfCantCombineShares(t *testing.T) {
 	assert.NotNil(t, resp[0].GetError())
 	errVal := resp[0].GetError()
 	assert.Equal(t, "unexpected error when getting secret for owner::Bar::Foo", errVal.Error)
+}
+
+func CreateLocalRegistry(t *testing.T, pid ragetypes.PeerID) *registrysyncer.LocalRegistry {
+	workflowDonNodes := []p2ptypes.PeerID{
+		pid,
+		randomUTF8BytesWord(),
+		randomUTF8BytesWord(),
+		randomUTF8BytesWord(),
+	}
+
+	dID := uint32(1)
+	localRegistry := registrysyncer.NewLocalRegistry(
+		logger.TestLogger(t),
+		func() (p2ptypes.PeerID, error) { return pid, nil },
+		map[registrysyncer.DonID]registrysyncer.DON{
+			registrysyncer.DonID(dID): {
+				DON: capabilities.DON{
+					ID:               dID,
+					ConfigVersion:    uint32(2),
+					F:                uint8(1),
+					IsPublic:         true,
+					AcceptsWorkflows: true,
+					Members:          workflowDonNodes,
+				},
+			},
+		},
+		map[p2ptypes.PeerID]kcr.INodeInfoProviderNodeInfo{
+			workflowDonNodes[0]: {
+				NodeOperatorId:      1,
+				WorkflowDONId:       dID,
+				Signer:              randomUTF8BytesWord(),
+				P2pId:               workflowDonNodes[0],
+				EncryptionPublicKey: randomUTF8BytesWord(),
+			},
+			workflowDonNodes[1]: {
+				NodeOperatorId:      1,
+				WorkflowDONId:       dID,
+				Signer:              randomUTF8BytesWord(),
+				P2pId:               workflowDonNodes[1],
+				EncryptionPublicKey: randomUTF8BytesWord(),
+			},
+			workflowDonNodes[2]: {
+				NodeOperatorId:      1,
+				WorkflowDONId:       dID,
+				Signer:              randomUTF8BytesWord(),
+				P2pId:               workflowDonNodes[2],
+				EncryptionPublicKey: randomUTF8BytesWord(),
+			},
+			workflowDonNodes[3]: {
+				NodeOperatorId:      1,
+				WorkflowDONId:       dID,
+				Signer:              randomUTF8BytesWord(),
+				P2pId:               workflowDonNodes[3],
+				EncryptionPublicKey: randomUTF8BytesWord(),
+			},
+		},
+		map[string]registrysyncer.Capability{
+			"test-target@1.0.0": {
+				CapabilityType: capabilities.CapabilityTypeTarget,
+				ID:             "write-chain@1.0.1",
+			},
+		},
+	)
+	return &localRegistry
 }

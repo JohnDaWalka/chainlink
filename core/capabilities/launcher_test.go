@@ -197,7 +197,7 @@ func TestLauncher(t *testing.T) {
 		dispatcher.On("SetReceiver", fullTriggerCapID, dID, mock.AnythingOfType("*remote.triggerPublisher")).Return(nil)
 		dispatcher.On("SetReceiver", fullTargetID, dID, mock.AnythingOfType("*executable.server")).Return(nil)
 
-		err = launcher.Launch(t.Context(), state)
+		err = launcher.OnNewRegistry(t.Context(), state)
 		require.NoError(t, err)
 		defer launcher.Close()
 	})
@@ -304,7 +304,7 @@ func TestLauncher(t *testing.T) {
 			&mockDonNotifier{},
 		)
 
-		err = launcher.Launch(t.Context(), state)
+		err = launcher.OnNewRegistry(t.Context(), state)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, observedLogs.FilterMessage("failed to add server-side receiver for a trigger capability - it won't be exposed remotely").Len())
@@ -409,7 +409,7 @@ func TestLauncher(t *testing.T) {
 			&mockDonNotifier{},
 		)
 
-		err = launcher.Launch(t.Context(), state)
+		err = launcher.OnNewRegistry(t.Context(), state)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, observedLogs.FilterMessage("failed to add server-side receiver for a target capability - it won't be exposed remotely").Len())
@@ -613,7 +613,7 @@ func TestLauncher_RemoteTriggerModeAggregatorShim(t *testing.T) {
 		}
 	})
 
-	err = launcher.Launch(ctx, state)
+	err = launcher.OnNewRegistry(ctx, state)
 	require.NoError(t, err)
 	defer launcher.Close()
 
@@ -758,7 +758,7 @@ func TestSyncer_IgnoresCapabilitiesForPrivateDON(t *testing.T) {
 	// If the DON were public, this would fail with two errors:
 	// - error fetching the capabilities from the registry since they haven't been added
 	// - erroneous calls to dispatcher.SetReceiver, since the call hasn't been registered.
-	err = launcher.Launch(t.Context(), state)
+	err = launcher.OnNewRegistry(t.Context(), state)
 	require.NoError(t, err)
 	defer launcher.Close()
 
@@ -924,7 +924,7 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDON(t *testing.T) {
 	dispatcher.On("SetReceiver", fullTriggerCapID, capDonID, mock.AnythingOfType("*remote.triggerSubscriber")).Return(nil)
 	dispatcher.On("SetReceiver", fullTargetID, capDonID, mock.AnythingOfType("*executable.client")).Return(nil)
 
-	err = launcher.Launch(t.Context(), state)
+	err = launcher.OnNewRegistry(t.Context(), state)
 	require.NoError(t, err)
 	defer launcher.Close()
 
@@ -1089,7 +1089,7 @@ func TestLauncher_WiresUpClientsForPublicWorkflowDONButIgnoresPrivateCapabilitie
 
 	dispatcher.On("SetReceiver", fullTriggerCapID, triggerCapDonID, mock.AnythingOfType("*remote.triggerSubscriber")).Return(nil)
 
-	err = launcher.Launch(t.Context(), state)
+	err = launcher.OnNewRegistry(t.Context(), state)
 	require.NoError(t, err)
 	defer launcher.Close()
 
@@ -1155,7 +1155,7 @@ func TestLauncher_SucceedsEvenIfDispatcherAlreadyHasReceiver(t *testing.T) {
 		&mockDonNotifier{},
 	)
 
-	err = launcher.Launch(t.Context(), state)
+	err = launcher.OnNewRegistry(t.Context(), state)
 	require.NoError(t, err)
 	defer launcher.Close()
 }
@@ -1244,7 +1244,7 @@ func TestLauncher_SuccessfullyFilterDon2Don(t *testing.T) {
 		require.Len(t, allPeers, expectedPeerCount[i])
 	}
 
-	err = launcher.Launch(t.Context(), localRegistry)
+	err = launcher.OnNewRegistry(t.Context(), localRegistry)
 	require.NoError(t, err)
 	defer launcher.Close()
 }

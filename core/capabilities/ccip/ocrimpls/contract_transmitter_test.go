@@ -597,7 +597,7 @@ func makeTestEvmTxm(t *testing.T, db *sqlx.DB, ethClient client.Client, keyStore
 	chainID := big.NewInt(1337)
 	headSaver := heads.NewSaver(
 		logger.NullLogger,
-		heads.NewORM(*chainID, db),
+		heads.NewORM(*chainID, db, 0),
 		evmConfig,
 		evmConfig.HeadTrackerConfig,
 	)
@@ -715,6 +715,10 @@ func (t *TestHeadTrackerConfig) PersistenceEnabled() bool {
 	return true
 }
 
+func (t *TestHeadTrackerConfig) PersistenceBatchSize() int64 {
+	return 0
+}
+
 var _ evmconfig.HeadTracker = (*TestHeadTrackerConfig)(nil)
 
 type TestEvmConfig struct {
@@ -737,6 +741,10 @@ func (e *TestEvmConfig) FinalityTagEnabled() bool {
 }
 
 func (e *TestEvmConfig) FinalityDepth() uint32 {
+	return 42
+}
+
+func (e *TestEvmConfig) SafeDepth() uint32 {
 	return 42
 }
 

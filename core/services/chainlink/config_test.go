@@ -1437,6 +1437,9 @@ func TestConfig_full(t *testing.T) {
 		if got.EVM[c].GasEstimator.SenderAddress == nil {
 			got.EVM[c].GasEstimator.SenderAddress = new(types.EIP55Address)
 		}
+		if got.EVM[c].HeadTracker.PersistenceBatchSize == nil {
+			got.EVM[c].HeadTracker.PersistenceBatchSize = ptr(int64(100))
+		}
 	}
 
 	cfgtest.AssertFieldsNotNil(t, got)
@@ -1591,6 +1594,8 @@ var (
 	emptyEffectiveTOML string
 	//go:embed testdata/config-multi-chain-effective.toml
 	multiChainEffectiveTOML string
+	//go:embed testdata/config-full-effective.toml
+	fullEffectiveTOML string
 
 	//go:embed testdata/secrets-full.toml
 	secretsFullTOML string
@@ -1624,7 +1629,7 @@ func Test_generalConfig_LogConfiguration(t *testing.T) {
 	}{
 		{name: "empty", wantEffective: emptyEffectiveTOML, wantSecrets: emptyEffectiveSecretsTOML},
 		{name: "full", inputSecrets: secretsFullTOML, inputConfig: fullTOML,
-			wantConfig: fullTOML, wantEffective: fullTOML, wantSecrets: secretsFullRedactedTOML, wantWarning: deprecated},
+			wantConfig: fullTOML, wantEffective: fullEffectiveTOML, wantSecrets: secretsFullRedactedTOML, wantWarning: deprecated},
 		{name: "multi-chain", inputSecrets: secretsMultiTOML, inputConfig: multiChainTOML,
 			wantConfig: multiChainTOML, wantEffective: multiChainEffectiveTOML, wantSecrets: secretsMultiRedactedTOML},
 	}

@@ -97,7 +97,6 @@ func Test_ValidatedStandardCapabilitiesSpec(t *testing.T) {
 					},
 					OCRContractAddress: "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
 					ChainID:            "31337",
-					Network:            "evm",
 				},
 			},
 		},

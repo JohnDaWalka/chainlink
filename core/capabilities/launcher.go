@@ -568,14 +568,13 @@ func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.Pee
 				return executable.NewServer(
 					remoteConfig,
 					myPeerID,
-					actionCapability,
+					actionCapability.(capabilities.ExecutableCapability),
 					info,
 					don.DON,
 					idsToDONs,
 					w.dispatcher,
 					defaultTargetRequestTimeout,
 					defaultMaxParallelCapabilityExecuteRequests,
-					nil, // TODO: create a capability-specific hasher
 					w.lggr,
 				), nil
 			}
@@ -602,14 +601,13 @@ func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.Pee
 				return executable.NewServer(
 					remoteConfig,
 					myPeerID,
-					targetCapability,
+					targetCapability.(capabilities.ExecutableCapability),
 					info,
 					don.DON,
 					idsToDONs,
 					w.dispatcher,
 					defaultTargetRequestTimeout,
 					defaultMaxParallelCapabilityExecuteRequests,
-					nil, // TODO: create a capability-specific hasher
 					w.lggr,
 				), nil
 			}

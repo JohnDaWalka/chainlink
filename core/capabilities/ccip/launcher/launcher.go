@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	_ job.ServiceCtx         = (*launcher)(nil)
+	_ job.ServiceCtx          = (*launcher)(nil)
 	_ registrysyncer.Listener = (*launcher)(nil)
 )
 

@@ -56,7 +56,7 @@ func TestIntegration_Launcher(t *testing.T) {
 		1*time.Second,
 		oracleCreator,
 	)
-	regSyncer.AddLauncher(launcher)
+	regSyncer.AddListener(launcher)
 
 	require.NoError(t, launcher.Start(ctx))
 	require.NoError(t, regSyncer.Start(ctx))

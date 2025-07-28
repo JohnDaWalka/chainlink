@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/values/pb"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -26,13 +27,15 @@ type FakeEVMChain struct {
 	services.Service
 	eng *services.Engine
 
-	gethClient *ethclient.Client
-	privateKey *ecdsa.PrivateKey
+	gethClient            *ethclient.Client
+	privateKey            *ecdsa.PrivateKey
+	mockKeystoneForwarder *MockKeystoneForwarder
+	chainSelector         uint64
 
 	lggr logger.Logger
 
 	// log trigger callback channel
-	callbackCh chan commonCap.TriggerAndId[*evmcappb.Log]
+	callbackCh map[string]chan commonCap.TriggerAndId[*evmcappb.Log]
 }
 
 var evmExecInfo = commonCap.MustNewCapabilityInfo(
@@ -45,13 +48,27 @@ var _ services.Service = (*FakeEVMChain)(nil)
 var _ evmserver.ClientCapability = (*FakeEVMChain)(nil)
 var _ commonCap.ExecutableCapability = (*FakeEVMChain)(nil)
 
-func NewFakeEvmChain(lggr logger.Logger, gethClient *ethclient.Client, privateKey *ecdsa.PrivateKey) *FakeEVMChain {
+func NewFakeEvmChain(
+	lggr logger.Logger,
+	gethClient *ethclient.Client,
+	privateKey *ecdsa.PrivateKey,
+	mockKeystoneForwarderAddress common.Address,
+	chainSelector uint64,
+) *FakeEVMChain {
+	mockKeystoneForwarder, err := NewMockKeystoneForwarder(mockKeystoneForwarderAddress, gethClient)
+	if err != nil {
+		lggr.Errorw("Failed to create mock keystone forwarder", "error", err)
+		return nil
+	}
+
 	fc := &FakeEVMChain{
-		CapabilityInfo: evmExecInfo,
-		lggr:           lggr,
-		gethClient:     gethClient,
-		privateKey:     privateKey,
-		callbackCh:     make(chan commonCap.TriggerAndId[*evmcappb.Log]),
+		CapabilityInfo:        evmExecInfo,
+		lggr:                  lggr,
+		gethClient:            gethClient,
+		privateKey:            privateKey,
+		mockKeystoneForwarder: mockKeystoneForwarder,
+		chainSelector:         chainSelector,
+		callbackCh:            make(map[string]chan commonCap.TriggerAndId[*evmcappb.Log]),
 	}
 	fc.Service, fc.eng = services.Config{
 		Name:  "FakeEVMChain",
@@ -67,7 +84,8 @@ func (fc *FakeEVMChain) Initialise(ctx context.Context, config string, _ core.Te
 	_ core.PipelineRunnerService,
 	_ core.RelayerSet,
 	_ core.OracleFactory,
-	_ core.GatewayConnector) error {
+	_ core.GatewayConnector,
+	_ core.Keystore) error {
 	// TODO: do validation of config here
 
 	err := fc.Start(ctx)
@@ -92,7 +110,8 @@ func (fc *FakeEVMChain) CallContract(ctx context.Context, metadata commonCap.Req
 	}
 
 	// Call contract
-	data, err := fc.gethClient.CallContract(ctx, msg, nil)
+	blockNumber := pb.NewIntFromBigInt(input.BlockNumber)
+	data, err := fc.gethClient.CallContract(ctx, msg, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +128,6 @@ func (fc *FakeEVMChain) CallContract(ctx context.Context, metadata commonCap.Req
 func (fc *FakeEVMChain) WriteReport(ctx context.Context, metadata commonCap.RequestMetadata, input *evmcappb.WriteReportRequest) (*evmcappb.WriteReportReply, error) {
 	fc.eng.Infow("EVM Chain WriteReport Started")
 	fc.eng.Debugw("EVM Chain WriteReport Input", "input", input)
-	fc.eng.Infow("EVM Chain WriteReport Finished")
 
 	// Create authenticated transactor
 	chainID, err := fc.gethClient.ChainID(ctx)
@@ -122,9 +140,10 @@ func (fc *FakeEVMChain) WriteReport(ctx context.Context, metadata commonCap.Requ
 		return nil, err
 	}
 
-	signatures := make([][]byte, len(input.Report.Sigs))
+	// Convert []*AttributedSignature to [][]byte
+	sigs := make([][]byte, len(input.Report.Sigs))
 	for i, sig := range input.Report.Sigs {
-		signatures[i] = sig.Signature
+		sigs[i] = sig.Signature
 	}
 
 	reportTx, err := fc.mockKeystoneForwarder.Report(
@@ -132,7 +151,7 @@ func (fc *FakeEVMChain) WriteReport(ctx context.Context, metadata commonCap.Requ
 		common.Address(input.Receiver),
 		input.Report.RawReport,
 		input.Report.ReportContext,
-		signatures,
+		sigs,
 	)
 	if err != nil {
 		return nil, err
@@ -166,7 +185,7 @@ func (fc *FakeEVMChain) WriteReport(ctx context.Context, metadata commonCap.Requ
 	receiverStatus := evmcappb.ReceiverContractExecutionStatus_RECEIVER_CONTRACT_EXECUTION_STATUS_REVERTED
 	errorMsg := "Transaction reverted"
 	return &evmcappb.WriteReportReply{
-		TxStatus:                        evmcappb.TxStatus_TX_STATUS_FAILURE,
+		TxStatus:                        evmcappb.TxStatus_TX_STATUS_REVERTED,
 		ReceiverContractExecutionStatus: &receiverStatus,
 		TxHash:                          txHash,
 		TransactionFee:                  pb.NewBigIntFromInt(transactionFee),
@@ -175,19 +194,20 @@ func (fc *FakeEVMChain) WriteReport(ctx context.Context, metadata commonCap.Requ
 }
 
 func (fc *FakeEVMChain) RegisterLogTrigger(ctx context.Context, triggerID string, metadata commonCap.RequestMetadata, input *evmcappb.FilterLogTriggerRequest) (<-chan commonCap.TriggerAndId[*evmcappb.Log], error) {
-	return fc.callbackCh, nil
+	fc.callbackCh[triggerID] = make(chan commonCap.TriggerAndId[*evmcappb.Log])
+	return fc.callbackCh[triggerID], nil
 }
 
 func (fc *FakeEVMChain) UnregisterLogTrigger(ctx context.Context, triggerID string, metadata commonCap.RequestMetadata, input *evmcappb.FilterLogTriggerRequest) error {
 	return nil
 }
 
-func (fc *FakeEVMChain) ManualTrigger(ctx context.Context, log *evmcappb.Log) error {
+func (fc *FakeEVMChain) ManualTrigger(ctx context.Context, triggerID string, log *evmcappb.Log) error {
 	fc.eng.Debugf("ManualTrigger: %s", log.String())
 
 	go func() {
 		select {
-		case fc.callbackCh <- fc.createManualTriggerEvent(log):
+		case fc.callbackCh[triggerID] <- fc.createManualTriggerEvent(log):
 			// Successfully sent trigger response
 		case <-ctx.Done():
 			// Context cancelled, cleanup goroutine
@@ -349,25 +369,30 @@ func (fc *FakeEVMChain) GetTransactionReceipt(ctx context.Context, metadata comm
 	}, nil
 }
 
-func (fc *FakeEVMChain) LatestAndFinalizedHead(ctx context.Context, metadata commonCap.RequestMetadata, input *emptypb.Empty) (*evmcappb.LatestAndFinalizedHeadReply, error) {
-	fc.eng.Infow("EVM Chain latest and finalized head", "input", input)
+func (fc *FakeEVMChain) HeaderByNumber(ctx context.Context, metadata commonCap.RequestMetadata, input *evmcappb.HeaderByNumberRequest) (*evmcappb.HeaderByNumberReply, error) {
+	fc.eng.Infow("EVM Chain HeaderByNumber Started", "input", input)
 
-	// Get latest and finalized head
-	head, err := fc.gethClient.HeaderByNumber(ctx, nil)
+	// Prepare header by number request
+	blockNumber := new(big.Int).SetBytes(input.BlockNumber.AbsVal)
+
+	// Get header by number
+	header, err := fc.gethClient.HeaderByNumber(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert head to protobuf
-	headPb := &evmcappb.LatestAndFinalizedHeadReply{
-		Latest: &evmcappb.Head{
-			Timestamp:   head.Time,
-			BlockNumber: pb.NewBigIntFromInt(head.Number),
-			Hash:        head.Hash().Bytes(),
-			ParentHash:  head.ParentHash.Bytes(),
+	// Convert header to protobuf
+	headerPb := &evmcappb.HeaderByNumberReply{
+		Header: &evmcappb.Header{
+			Timestamp:   header.Time,
+			BlockNumber: pb.NewBigIntFromInt(header.Number),
+			Hash:        header.Hash().Bytes(),
+			ParentHash:  header.ParentHash.Bytes(),
 		},
 	}
-	return headPb, nil
+
+	fc.eng.Infow("EVM Chain HeaderByNumber Finished", "header", headerPb)
+	return headerPb, nil
 }
 
 func (fc *FakeEVMChain) RegisterLogTracking(ctx context.Context, metadata commonCap.RequestMetadata, input *evmcappb.RegisterLogTrackingRequest) (*emptypb.Empty, error) {
@@ -415,4 +440,8 @@ func (fc *FakeEVMChain) Execute(ctx context.Context, request commonCap.Capabilit
 
 func (fc *FakeEVMChain) Description() string {
 	return "EVM Chain"
+}
+
+func (fc *FakeEVMChain) ChainSelector() uint64 {
+	return fc.chainSelector
 }

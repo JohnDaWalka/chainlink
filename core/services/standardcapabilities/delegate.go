@@ -187,17 +187,20 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) ([]job.Ser
 		}
 
 		oracleFactory, err = generic.NewOracleFactory(generic.OracleFactoryParams{
-			Logger:                 log,
-			JobORM:                 d.jobORM,
-			JobID:                  spec.ID,
-			JobName:                spec.Name.ValueOrZero(),
-			KB:                     ocrEvmKeyBundle,
-			Config:                 spec.StandardCapabilitiesSpec.OracleFactory,
-			OnchainSigningStrategy: spec.StandardCapabilitiesSpec.OracleFactory.OnchainSigning,
-			PeerWrapper:            d.ocrPeerWrapper,
-			RelayerSet:             relayerSet,
-			OcrKeystore:            d.ks.OCR2(),
-			EthKeystore:            d.ks.Eth(),
+			Logger:  log,
+			JobORM:  d.jobORM,
+			JobID:   spec.ID,
+			JobName: spec.Name.ValueOrZero(),
+			KB:      ocrEvmKeyBundle,
+			Config:  spec.StandardCapabilitiesSpec.OracleFactory,
+			OnchainSigningStrategy: job.JSONConfig{
+				"strategyName": spec.StandardCapabilitiesSpec.OracleFactory.OnchainSigning.StrategyName,
+				"config":       spec.StandardCapabilitiesSpec.OracleFactory.OnchainSigning.Config,
+			},
+			PeerWrapper: d.ocrPeerWrapper,
+			RelayerSet:  relayerSet,
+			OcrKeystore: d.ks.OCR2(),
+			EthKeystore: d.ks.Eth(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create oracle factory: %w", err)

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder/beholdertest"
@@ -36,7 +36,6 @@ import (
 	billing "github.com/smartcontractkit/chainlink-protos/billing/go"
 	"github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 
-	coreCap "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	capmocks "github.com/smartcontractkit/chainlink/v2/core/capabilities/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/wasmtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -50,11 +49,23 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/internal_testing/capabilities/basicaction"
 	basicactionmock "github.com/smartcontractkit/cre-sdk-go/internal_testing/capabilities/basicaction/mock"
 	"github.com/smartcontractkit/cre-sdk-go/internal_testing/capabilities/basictrigger"
+	basictriggermock "github.com/smartcontractkit/cre-sdk-go/internal_testing/capabilities/basictrigger/mock"
 	"github.com/smartcontractkit/cre-sdk-go/sdk/testutils/registry"
 	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
-const triggerID = "basic-test-trigger@1.0.0"
+// randomUTF8BytesWord generates a unique PeerID for testing
+var peerIDCounter uint64
+
+func randomUTF8BytesWord() ragetypes.PeerID {
+	// Generate unique, valid bytes for testing using a counter
+	var result ragetypes.PeerID
+	counter := atomic.AddUint64(&peerIDCounter, 1)
+	for i := range result {
+		result[i] = byte((counter + uint64(i)) % 256)
+	}
+	return result
+}
 
 func TestEngine_Init(t *testing.T) {
 	t.Parallel()
@@ -79,7 +90,7 @@ func TestEngine_Init(t *testing.T) {
 
 	module.EXPECT().Start().Once()
 	module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(0), nil).Once()
-	require.NoError(t, engine.Start(t.Context()))
+	require.NoError(t, engine.Start(context.Background()))
 
 	require.NoError(t, <-initDoneCh)
 
@@ -118,14 +129,14 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 	t.Run("engine 1 inits successfully", func(t *testing.T) {
 		engine1, err = v2.NewEngine(cfg)
 		require.NoError(t, err)
-		require.NoError(t, engine1.Start(t.Context()))
+		require.NoError(t, engine1.Start(context.Background()))
 		require.NoError(t, <-initDoneCh)
 	})
 
 	t.Run("engine 2 gets rate-limited by per-owner limit", func(t *testing.T) {
 		engine2, err = v2.NewEngine(cfg)
 		require.NoError(t, err)
-		require.NoError(t, engine2.Start(t.Context()))
+		require.NoError(t, engine2.Start(context.Background()))
 		initErr := <-initDoneCh
 		require.Equal(t, types.ErrPerOwnerWorkflowCountLimitReached, initErr)
 	})
@@ -134,7 +145,7 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 		cfg.WorkflowOwner = testWorkflowOwnerB
 		engine3, err = v2.NewEngine(cfg)
 		require.NoError(t, err)
-		require.NoError(t, engine3.Start(t.Context()))
+		require.NoError(t, engine3.Start(context.Background()))
 		require.NoError(t, <-initDoneCh)
 	})
 
@@ -142,7 +153,7 @@ func TestEngine_Start_RateLimited(t *testing.T) {
 		cfg.WorkflowOwner = testWorkflowOwnerC
 		engine4, err = v2.NewEngine(cfg)
 		require.NoError(t, err)
-		require.NoError(t, engine4.Start(t.Context()))
+		require.NoError(t, engine4.Start(context.Background()))
 		initErr := <-initDoneCh
 		require.Equal(t, types.ErrGlobalWorkflowCountLimitReached, initErr)
 	})
@@ -182,7 +193,7 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 		engine, err := v2.NewEngine(cfg)
 		require.NoError(t, err)
 		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(2), nil).Once()
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 		require.ErrorContains(t, <-initDoneCh, "too many trigger subscriptions")
 		require.NoError(t, engine.Close())
 		cfg.LocalLimits.MaxTriggerSubscriptions = 10
@@ -193,7 +204,7 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 		require.NoError(t, err)
 		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(2), nil).Once()
 		capreg.EXPECT().GetTrigger(matches.AnyContext, "id_0").Return(nil, errors.New("not found")).Once()
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 		require.ErrorContains(t, <-initDoneCh, "trigger capability not found")
 		require.NoError(t, engine.Close())
 	})
@@ -210,7 +221,7 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 		trigger1.EXPECT().RegisterTrigger(matches.AnyContext, mock.Anything).Return(tr1Ch, nil).Once()
 		trigger0.EXPECT().UnregisterTrigger(matches.AnyContext, mock.Anything).Return(nil).Once()
 		trigger1.EXPECT().UnregisterTrigger(matches.AnyContext, mock.Anything).Return(nil).Once()
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 		require.NoError(t, <-initDoneCh)
 		require.Equal(t, []string{"id_0", "id_1"}, <-subscribedToTriggersCh)
 		require.NoError(t, engine.Close())
@@ -227,7 +238,7 @@ func TestEngine_TriggerSubscriptions(t *testing.T) {
 		trigger0.EXPECT().RegisterTrigger(matches.AnyContext, mock.Anything).Return(tr0Ch, nil).Once()
 		trigger1.EXPECT().RegisterTrigger(matches.AnyContext, mock.Anything).Return(nil, errors.New("failure ABC")).Once()
 		trigger0.EXPECT().UnregisterTrigger(matches.AnyContext, mock.Anything).Return(nil).Once()
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 		require.ErrorContains(t, <-initDoneCh, "failed to register trigger: failure ABC")
 		require.NoError(t, engine.Close())
 	})
@@ -290,7 +301,7 @@ func TestEngine_Execution(t *testing.T) {
 		trigger.EXPECT().RegisterTrigger(matches.AnyContext, mock.Anything).Return(eventCh, nil).Once()
 		trigger.EXPECT().UnregisterTrigger(matches.AnyContext, mock.Anything).Return(nil).Once()
 
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 
 		require.NoError(t, <-initDoneCh) // successful trigger registration
 		require.Equal(t, []string{"id_0"}, <-subscribedToTriggersCh)
@@ -404,7 +415,7 @@ func TestEngine_ExecutionTimeout(t *testing.T) {
 		Once()
 
 	// Start the engine and wait for initialization and trigger subscription
-	require.NoError(t, engine.Start(t.Context()))
+	require.NoError(t, engine.Start(context.Background()))
 	require.NoError(t, <-initDoneCh)
 	require.Equal(t, []string{"id_0"}, <-subscribedToTriggersCh)
 
@@ -476,7 +487,7 @@ func TestEngine_Metering_ValidBillingClient(t *testing.T) {
 	trigger.EXPECT().RegisterTrigger(matches.AnyContext, mock.Anything).Return(eventCh, nil).Once()
 	trigger.EXPECT().UnregisterTrigger(matches.AnyContext, mock.Anything).Return(nil).Once()
 
-	require.NoError(t, engine.Start(t.Context()))
+	require.NoError(t, engine.Start(context.Background()))
 	require.NoError(t, <-initDoneCh)
 	require.Equal(t, []string{"id_0"}, <-subscribedToTriggersCh)
 
@@ -903,7 +914,7 @@ func TestEngine_CapabilityCallTimeout(t *testing.T) {
 		Return(capabilities.CapabilityResponse{}, context.DeadlineExceeded).
 		Once()
 
-	require.NoError(t, engine.Start(t.Context()))
+	require.NoError(t, engine.Start(context.Background()))
 	require.NoError(t, <-initDoneCh)
 	require.Equal(t, []string{"id_0"}, <-subscribedToTriggersCh)
 
@@ -983,9 +994,11 @@ func TestEngine_WASMBinary_Simple(t *testing.T) {
 		},
 	}
 
-	basicActionMock := setupExpectedCalls(t)
-	wrappedTriggerMock := &TriggerCapabilityWrapper{}
-	wrappedActionMock := &MockCapabilityWrapper{
+	triggerMock, basicActionMock := setupExpectedCalls(t)
+	wrappedTriggerMock := &CapabilityWrapper{
+		Capability: triggerMock,
+	}
+	wrappedActionMock := &CapabilityWrapper{
 		Capability: basicActionMock,
 	}
 
@@ -995,7 +1008,7 @@ func TestEngine_WASMBinary_Simple(t *testing.T) {
 		require.NoError(t, err)
 
 		capreg.EXPECT().
-			GetTrigger(matches.AnyContext, triggerID).
+			GetTrigger(matches.AnyContext, wrappedTriggerMock.ID()).
 			Return(wrappedTriggerMock, nil).
 			Once()
 
@@ -1017,9 +1030,9 @@ func TestEngine_WASMBinary_Simple(t *testing.T) {
 				RestrictedConfig: testConf,
 			}, nil)
 
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 		require.NoError(t, <-initDoneCh)
-		require.Equal(t, []string{triggerID}, <-subscribedToTriggersCh)
+		require.Equal(t, []string{wrappedTriggerMock.ID()}, <-subscribedToTriggersCh)
 
 		// Read the result from the hook and assert that the wanted response was
 		// received.
@@ -1093,9 +1106,15 @@ func TestEngine_WASMBinary_With_Config(t *testing.T) {
 		},
 	}
 
-	wrappedTriggerMock := &TriggerCapabilityWrapper{
-		giveName:   giveName,
-		giveNumber: giveNum,
+	triggerMock := &basictriggermock.BasicCapability{}
+	triggerMock.Trigger = func(ctx context.Context, input *basictrigger.Config) (*basictrigger.Outputs, error) {
+		// Validate that config is as expected during subscription phase
+		require.Equal(t, giveName, input.Name)
+		require.Equal(t, giveNum, input.Number)
+		return &basictrigger.Outputs{CoolOutput: "Hello, "}, nil
+	}
+	wrappedTriggerMock := &CapabilityWrapper{
+		Capability: triggerMock,
 	}
 	beholderObserver := beholdertest.NewObserver(t)
 
@@ -1104,13 +1123,13 @@ func TestEngine_WASMBinary_With_Config(t *testing.T) {
 		require.NoError(t, err)
 
 		capreg.EXPECT().
-			GetTrigger(matches.AnyContext, triggerID).
+			GetTrigger(matches.AnyContext, wrappedTriggerMock.ID()).
 			Return(wrappedTriggerMock, nil).
 			Once()
 
-		require.NoError(t, engine.Start(t.Context()))
+		require.NoError(t, engine.Start(context.Background()))
 		require.NoError(t, <-initDoneCh)
-		require.Equal(t, []string{triggerID}, <-subscribedToTriggersCh)
+		require.Equal(t, []string{wrappedTriggerMock.ID()}, <-subscribedToTriggersCh)
 
 		// Read the result from the hook and assert that the wanted response was
 		// received.
@@ -1159,13 +1178,13 @@ func TestSecretsFetcher_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	capreg := regmocks.NewCapabilitiesRegistry(t)
-	peer := coreCap.RandomUTF8BytesWord()
+	peer := randomUTF8BytesWord()
 	localRegistry := v2.CreateLocalRegistry(t, peer)
-	localNode, err := localRegistry.LocalNode(t.Context())
+	localNode, err := localRegistry.LocalNode(context.Background())
 	require.NoError(t, err)
 	capreg.EXPECT().LocalNode(matches.AnyContext).Return(localNode, nil)
 	for _, peerID := range localNode.WorkflowDON.Members {
-		node, err2 := localRegistry.NodeByPeerID(t.Context(), peerID)
+		node, err2 := localRegistry.NodeByPeerID(context.Background(), peerID)
 		require.NoError(t, err2)
 		capreg.EXPECT().NodeByPeerID(matches.AnyContext, peerID).Return(node, nil)
 	}
@@ -1223,9 +1242,15 @@ func TestSecretsFetcher_Integration(t *testing.T) {
 		},
 	}
 
-	wrappedTriggerMock := &TriggerCapabilityWrapper{
-		giveName:   giveName,
-		giveNumber: giveNum,
+	triggerMock := &basictriggermock.BasicCapability{}
+	triggerMock.Trigger = func(ctx context.Context, input *basictrigger.Config) (*basictrigger.Outputs, error) {
+		// Validate that config is as expected during subscription phase
+		require.Equal(t, giveName, input.Name)
+		require.Equal(t, giveNum, input.Number)
+		return &basictrigger.Outputs{CoolOutput: "Hello, "}, nil
+	}
+	wrappedTriggerMock := &CapabilityWrapper{
+		Capability: triggerMock,
 	}
 
 	secretsFetcher := v2.NewSecretsFetcher(
@@ -1248,13 +1273,13 @@ func TestSecretsFetcher_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	capreg.EXPECT().
-		GetTrigger(matches.AnyContext, triggerID).
+		GetTrigger(matches.AnyContext, wrappedTriggerMock.ID()).
 		Return(wrappedTriggerMock, nil).
 		Once()
 
-	require.NoError(t, engine.Start(t.Context()))
+	require.NoError(t, engine.Start(context.Background()))
 	require.NoError(t, <-initDoneCh)
-	require.Equal(t, []string{triggerID}, <-subscribedToTriggersCh)
+	require.Equal(t, []string{wrappedTriggerMock.ID()}, <-subscribedToTriggersCh)
 
 	// Read the result from the hook and assert that the wanted response was
 	// received.
@@ -1325,7 +1350,15 @@ func setupMockBillingClient(t *testing.T) *metmocks.BillingClient {
 
 // setupExpectedCalls mocks single call to trigger and two calls to the basic action
 // mock capability
-func setupExpectedCalls(t *testing.T) *basicactionmock.BasicActionCapability {
+func setupExpectedCalls(t *testing.T) (
+	*basictriggermock.BasicCapability,
+	*basicactionmock.BasicActionCapability,
+) {
+	triggerMock := &basictriggermock.BasicCapability{}
+	triggerMock.Trigger = func(ctx context.Context, input *basictrigger.Config) (*basictrigger.Outputs, error) {
+		return &basictrigger.Outputs{CoolOutput: "Hello, "}, nil
+	}
+
 	basicAction := &basicactionmock.BasicActionCapability{}
 
 	firstCall := true
@@ -1340,7 +1373,7 @@ func setupExpectedCalls(t *testing.T) *basicactionmock.BasicActionCapability {
 		}
 		return &basicaction.Outputs{AdaptedThing: "world"}, nil
 	}
-	return basicAction
+	return triggerMock, basicAction
 }
 
 func requireEventsLabels(t *testing.T, beholderObserver beholdertest.Observer, want map[string]string) {
@@ -1410,21 +1443,51 @@ func newNode(t *testing.T) capabilities.Node {
 	}
 }
 
-type MockCapabilityWrapper struct {
+type CapabilityWrapper struct {
 	registry.Capability
 }
 
-var _ capabilities.ExecutableCapability = (*MockCapabilityWrapper)(nil)
+var _ capabilities.ExecutableAndTriggerCapability = (*CapabilityWrapper)(nil)
 
-func (c *MockCapabilityWrapper) RegisterToWorkflow(_ context.Context, _ capabilities.RegisterToWorkflowRequest) error {
+func (c *CapabilityWrapper) RegisterTrigger(ctx context.Context, request capabilities.TriggerRegistrationRequest) (<-chan capabilities.TriggerResponse, error) {
+	ch := make(chan capabilities.TriggerResponse, 1)
+	defer close(ch)
+	trigger, err := c.InvokeTrigger(ctx, &sdkpb.TriggerSubscription{
+		Id:      request.TriggerID,
+		Payload: request.Payload,
+		Method:  request.Method,
+	})
+	if err != nil {
+		ch <- capabilities.TriggerResponse{Err: err}
+	}
+
+	if trigger == nil {
+		return nil, nil
+	}
+
+	ch <- capabilities.TriggerResponse{
+		Event: capabilities.TriggerEvent{
+			TriggerType: request.TriggerID,
+			Payload:     trigger.Payload,
+		},
+	}
+
+	return ch, nil
+}
+
+func (c *CapabilityWrapper) UnregisterTrigger(_ context.Context, _ capabilities.TriggerRegistrationRequest) error {
 	return nil
 }
 
-func (c *MockCapabilityWrapper) UnregisterFromWorkflow(_ context.Context, _ capabilities.UnregisterFromWorkflowRequest) error {
+func (c *CapabilityWrapper) RegisterToWorkflow(_ context.Context, _ capabilities.RegisterToWorkflowRequest) error {
 	return nil
 }
 
-func (c *MockCapabilityWrapper) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
+func (c *CapabilityWrapper) UnregisterFromWorkflow(_ context.Context, _ capabilities.UnregisterFromWorkflowRequest) error {
+	return nil
+}
+
+func (c *CapabilityWrapper) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
 	v1Request := capabilitiespb.CapabilityRequestToProto(request)
 	v2Request := &sdkpb.CapabilityRequest{
 		Id:      v1Request.Metadata.ReferenceId,
@@ -1445,60 +1508,7 @@ func (c *MockCapabilityWrapper) Execute(ctx context.Context, request capabilitie
 	}
 }
 
-func (c *MockCapabilityWrapper) Info(_ context.Context) (capabilities.CapabilityInfo, error) {
+func (c *CapabilityWrapper) Info(_ context.Context) (capabilities.CapabilityInfo, error) {
 	return capabilities.NewCapabilityInfo(
 		c.ID(), capabilities.CapabilityTypeCombined, "Mock of capability %s"+c.ID())
-}
-
-type TriggerCapabilityWrapper struct {
-	giveName   string
-	giveNumber int32
-}
-
-var _ capabilities.TriggerCapability = &TriggerCapabilityWrapper{}
-
-func (c *TriggerCapabilityWrapper) RegisterTrigger(ctx context.Context, request capabilities.TriggerRegistrationRequest) (<-chan capabilities.TriggerResponse, error) {
-	ch := make(chan capabilities.TriggerResponse, 1)
-	defer close(ch)
-
-	config := &basictrigger.Config{}
-	if err := request.Payload.UnmarshalTo(config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal trigger config: %w", err)
-	}
-
-	if c.giveName != "" {
-		if config.Name != c.giveName {
-			return nil, fmt.Errorf("expected trigger name %s, got %s", c.giveName, config.Name)
-		}
-
-		if config.Number != c.giveNumber {
-			return nil, fmt.Errorf("expected trigger number %d, got %d", c.giveNumber, config.Number)
-		}
-	}
-
-	trigger := &basictrigger.Outputs{CoolOutput: "Hello, "}
-	payload, err := anypb.New(trigger)
-	if err != nil {
-		return nil, err
-	}
-	ch <- capabilities.TriggerResponse{
-		Event: capabilities.TriggerEvent{
-			TriggerType: request.TriggerID,
-			Payload:     payload,
-		},
-	}
-
-	return ch, nil
-}
-
-func (c *TriggerCapabilityWrapper) UnregisterTrigger(_ context.Context, _ capabilities.TriggerRegistrationRequest) error {
-	return nil
-}
-
-func (c *TriggerCapabilityWrapper) Info(ctx context.Context) (capabilities.CapabilityInfo, error) {
-	return capabilities.NewCapabilityInfo(
-		triggerID,
-		capabilities.CapabilityTypeTrigger,
-		"Mock of trigger capability for testing",
-	)
 }

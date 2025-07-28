@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/v2/chain-capabilities/evm"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
-	sdkpb "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
+	pb1 "github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -242,16 +242,12 @@ func Test_Server_V2Request_ExcludesNonDeterministicInputAttributes(t *testing.T)
 
 	report := []byte("report01234")
 	for idx, caller := range callers {
-		if idx < 0 || idx > 4294967295 { // Check bounds for uint32
-			require.Fail(t, "idx out of range for uint32")
-		}
 		payload := &evm.WriteReportRequest{
 			Receiver: []byte("abcdef"),
-			Report: &sdkpb.ReportResponse{
+			Report: &pb1.ReportResponse{
 				RawReport: report,
-				Sigs: []*sdkpb.AttributedSignature{ // non-deterministic set of sigs that we want to ignore when hashing
+				Sigs: []*pb1.AttributedSignature{ // non-deterministic set of sigs that we want to ignore when hashing
 					{
-						SignerId:  uint32(idx), // Now safe after bounds check
 						Signature: []byte("sig" + strconv.Itoa(idx)),
 					},
 				},
@@ -362,7 +358,7 @@ func testRemoteExecutableCapabilityServer(ctx context.Context, t *testing.T,
 		capabilityPeer := capabilityPeers[i]
 		capabilityDispatcher := broker.NewDispatcherForNode(capabilityPeer)
 		capabilityNode := executable.NewServer(config, capabilityPeer, underlying, capInfo, capDonInfo, workflowDONs, capabilityDispatcher,
-			capabilityNodeResponseTimeout, 10, messageHasher, lggr)
+			capabilityNodeResponseTimeout, 10, lggr)
 		require.NoError(t, capabilityNode.Start(ctx))
 		broker.RegisterReceiverNode(capabilityPeer, capabilityNode)
 		capabilityNodes[i] = capabilityNode

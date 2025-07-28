@@ -8,7 +8,7 @@ FeedsManager = true
 LogPoller = true
 UICSAKeys = true
 CCIP = true
-MultiFeedsManagers = false
+MultiFeedsManagers = true
 
 [Database]
 DefaultIdleInTxSessionTimeout = '1m0s'
@@ -47,8 +47,8 @@ UseBatchSend = true
 [[TelemetryIngress.Endpoints]]
 Network = 'EVM'
 ChainID = '1'
-URL = 'endpoint-1.test'
-ServerPubKey = 'test-pub-key-1'
+URL = 'prom.test'
+ServerPubKey = 'test-pub-key'
 
 [AuditLogger]
 Enabled = true
@@ -86,11 +86,11 @@ ServerTLS = true
 SessionTimeout = '15m0s'
 QueryTimeout = '2m0s'
 BaseUserAttr = 'uid'
-BaseDN = ''
+BaseDN = 'dc=custom,dc=example,dc=com'
 UsersDN = 'ou=users'
 GroupsDN = 'ou=groups'
-ActiveAttribute = ''
-ActiveAttributeAllowedValue = ''
+ActiveAttribute = 'organizationalStatus'
+ActiveAttributeAllowedValue = 'ACTIVE'
 AdminUserGroupCN = 'NodeAdmins'
 EditUserGroupCN = 'NodeEditors'
 RunUserGroupCN = 'NodeRunners'
@@ -101,9 +101,9 @@ UpstreamSyncInterval = '0s'
 UpstreamSyncRateLimit = '2m0s'
 
 [WebServer.OIDC]
-ClientID = ''
-ProviderURL = ''
-RedirectURL = ''
+ClientID = 'abcd1234'
+ProviderURL = 'https://id.provider.com/oauth2/default'
+RedirectURL = 'http://localhost:3000/signin'
 ClaimName = 'groups'
 AdminClaim = 'NodeAdmins'
 EditClaim = 'NodeEditors'
@@ -129,10 +129,7 @@ ForceRedirect = true
 Host = 'tls-host'
 HTTPSPort = 6789
 KeyPath = 'tls/key/path'
-ListenIP = '192.158.1.37'
-
-[JobDistributor]
-DisplayName = 'test-node'
+ListenIP = '192.158.1.38'
 
 [JobPipeline]
 ExternalInitiatorsEnabled = true
@@ -241,9 +238,9 @@ InfiniteDepthQueries = false
 DisableRateLimiting = false
 
 [Tracing]
-Enabled = false
+Enabled = true
 CollectorTarget = 'localhost:4317'
-NodeID = 'NodeID'
+NodeID = 'clc-ocr-sol-devnet-node-1'
 SamplingRatio = 1.0
 Mode = 'tls'
 TLSCertPath = '/path/to/cert.pem'
@@ -261,7 +258,7 @@ MaxStaleAge = '1m41s'
 LatestReportDeadline = '1m42s'
 
 [Mercury.TLS]
-CertFile = ''
+CertFile = '/path/to/cert.pem'
 
 [Mercury.Transmitter]
 Protocol = 'grpc'
@@ -337,7 +334,6 @@ TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
 EmitterExportTimeout = '1s'
 ChipIngressEndpoint = 'example.com/chip-ingress'
-HeartbeatInterval = '1s'
 
 [Telemetry.ResourceAttributes]
 Baz = 'test'
@@ -352,9 +348,6 @@ PerOwner = 200
 [CRE.Streams]
 WsURL = 'streams.url'
 RestURL = 'streams.url'
-
-[CRE.WorkflowFetcher]
-URL = 'https://workflow.fetcher.url'
 
 [Billing]
 URL = 'localhost:4319'
@@ -375,7 +368,7 @@ LogBackfillBatchSize = 17
 LogPollInterval = '1m0s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 0
-BackupLogPollerBlockDelay = 100
+BackupLogPollerBlockDelay = 532
 MinIncomingConfirmations = 13
 MinContractPayment = '9.223372036854775807 link'
 NonceAutoSync = true
@@ -384,8 +377,8 @@ OperatorFactoryAddress = '0xa5B85635Be42F21f94F28034B7DA440EeFF0F418'
 LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 17
 RPCBlockQueryDelay = 10
-FinalizedBlockOffset = 0
-NoNewFinalizedHeadsThreshold = '15m0s'
+FinalizedBlockOffset = 16
+NoNewFinalizedHeadsThreshold = '1h0m0s'
 
 [EVM.Transactions]
 Enabled = true
@@ -427,6 +420,7 @@ TipCapMin = '1 wei'
 
 [EVM.GasEstimator.LimitJobType]
 OCR = 1001
+OCR2 = 1006
 DR = 1002
 VRF = 1003
 FM = 1004
@@ -447,9 +441,10 @@ CacheTimeout = '1s'
 HistoryDepth = 15
 MaxBufferSize = 17
 SamplingInterval = '1h0m0s'
-MaxAllowedFinalityDepth = 10000
+MaxAllowedFinalityDepth = 1500
 FinalityTagBypass = false
 PersistenceEnabled = false
+PersistenceBatchSize = 100
 
 [[EVM.KeySpecific]]
 Key = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292'
@@ -463,8 +458,8 @@ PollInterval = '1m0s'
 SelectionMode = 'HighestHead'
 SyncThreshold = 13
 LeaseDuration = '0s'
-NodeIsSyncingEnabled = false
-FinalizedBlockPollInterval = '5s'
+NodeIsSyncingEnabled = true
+FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
@@ -477,7 +472,7 @@ ReplacementTransactionUnderpriced = '(: |^)replacement transaction underpriced'
 LimitReached = '(: |^)limit reached'
 TransactionAlreadyInMempool = '(: |^)transaction already in mempool'
 TerminallyUnderpriced = '(: |^)terminally underpriced'
-InsufficientEth = '(: |^)infufficient Eth'
+InsufficientEth = '(: |^)insufficient eth'
 TxFeeExceedsCap = '(: |^)tx fee exceeds cap'
 L2FeeTooLow = '(: |^)l2 fee too low'
 L2FeeTooHigh = '(: |^)l2 fee too high'
@@ -510,6 +505,7 @@ AcceptanceTimeout = '30s'
 Name = 'foo'
 WSURL = 'wss://web.socket/test/foo'
 HTTPURL = 'https://foo.web'
+HTTPURLExtraWrite = 'https://foo.web/extra'
 
 [[EVM.Nodes]]
 Name = 'bar'
@@ -538,14 +534,14 @@ SkipPreflight = true
 Commitment = 'banana'
 MaxRetries = 7
 FeeEstimatorMode = 'fixed'
-ComputeUnitPriceMax = 1000000
-ComputeUnitPriceMin = 0
-ComputeUnitPriceDefault = 0
-FeeBumpPeriod = '3s'
-BlockHistoryPollPeriod = '5s'
+ComputeUnitPriceMax = 1000
+ComputeUnitPriceMin = 10
+ComputeUnitPriceDefault = 100
+FeeBumpPeriod = '1m0s'
+BlockHistoryPollPeriod = '1m0s'
 BlockHistorySize = 1
 BlockHistoryBatchLoadSize = 20
-ComputeUnitLimitDefault = 200000
+ComputeUnitLimitDefault = 100000
 EstimateComputeUnitLimit = false
 LogPollerStartingLookback = '24h0m0s'
 
@@ -557,6 +553,7 @@ SelectionMode = 'HighestHead'
 SyncThreshold = 5
 NodeIsSyncingEnabled = false
 LeaseDuration = '1m0s'
+NewHeadsPollInterval = '1s'
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
@@ -571,13 +568,16 @@ FinalizedBlockOffset = 0
 Name = 'primary'
 URL = 'http://solana.web'
 SendOnly = false
+Order = 1
 
 [[Solana.Nodes]]
 Name = 'foo'
 URL = 'http://solana.foo'
-SendOnly = false
+SendOnly = true
+Order = 2
 
 [[Solana.Nodes]]
 Name = 'bar'
 URL = 'http://solana.bar'
-SendOnly = false
+SendOnly = true
+Order = 3

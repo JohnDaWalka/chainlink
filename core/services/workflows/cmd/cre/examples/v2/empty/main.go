@@ -1,4 +1,4 @@
-//go:build v2sdk && wasip1
+//go:build wasip1
 
 package main
 
