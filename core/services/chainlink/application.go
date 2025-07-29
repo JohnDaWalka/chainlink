@@ -24,6 +24,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/billing"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -64,6 +65,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
+	"github.com/smartcontractkit/chainlink/v2/core/services/nodestatusreporter/bridgestatus"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
@@ -648,6 +650,16 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")
 	}
+
+	bridgeStatusReporter := bridgestatus.NewBridgeStatusReporter(
+		cfg.BridgeStatusReporter(),
+		bridgeORM,
+		jobORM,
+		unrestrictedHTTPClient,
+		beholder.GetEmitter(),
+		globalLogger,
+	)
+	srvcs = append(srvcs, bridgeStatusReporter)
 
 	healthChecker := commonservices.NewChecker(static.Version, static.Sha)
 

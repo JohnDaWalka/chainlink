@@ -39,30 +39,31 @@ type Core struct {
 	RootDir             *string
 	ShutdownGracePeriod *commonconfig.Duration
 
-	Feature          Feature          `toml:",omitempty"`
-	Database         Database         `toml:",omitempty"`
-	TelemetryIngress TelemetryIngress `toml:",omitempty"`
-	AuditLogger      AuditLogger      `toml:",omitempty"`
-	Log              Log              `toml:",omitempty"`
-	WebServer        WebServer        `toml:",omitempty"`
-	JobDistributor   JobDistributor   `toml:",omitempty"`
-	JobPipeline      JobPipeline      `toml:",omitempty"`
-	FluxMonitor      FluxMonitor      `toml:",omitempty"`
-	OCR2             OCR2             `toml:",omitempty"`
-	OCR              OCR              `toml:",omitempty"`
-	P2P              P2P              `toml:",omitempty"`
-	Keeper           Keeper           `toml:",omitempty"`
-	AutoPprof        AutoPprof        `toml:",omitempty"`
-	Pyroscope        Pyroscope        `toml:",omitempty"`
-	Sentry           Sentry           `toml:",omitempty"`
-	Insecure         Insecure         `toml:",omitempty"`
-	Tracing          Tracing          `toml:",omitempty"`
-	Mercury          Mercury          `toml:",omitempty"`
-	Capabilities     Capabilities     `toml:",omitempty"`
-	Telemetry        Telemetry        `toml:",omitempty"`
-	Workflows        Workflows        `toml:",omitempty"`
-	CRE              CreConfig        `toml:",omitempty"`
-	Billing          Billing          `toml:",omitempty"`
+	Feature              Feature              `toml:",omitempty"`
+	Database             Database             `toml:",omitempty"`
+	TelemetryIngress     TelemetryIngress     `toml:",omitempty"`
+	AuditLogger          AuditLogger          `toml:",omitempty"`
+	Log                  Log                  `toml:",omitempty"`
+	WebServer            WebServer            `toml:",omitempty"`
+	JobDistributor       JobDistributor       `toml:",omitempty"`
+	JobPipeline          JobPipeline          `toml:",omitempty"`
+	FluxMonitor          FluxMonitor          `toml:",omitempty"`
+	OCR2                 OCR2                 `toml:",omitempty"`
+	OCR                  OCR                  `toml:",omitempty"`
+	P2P                  P2P                  `toml:",omitempty"`
+	Keeper               Keeper               `toml:",omitempty"`
+	AutoPprof            AutoPprof            `toml:",omitempty"`
+	Pyroscope            Pyroscope            `toml:",omitempty"`
+	Sentry               Sentry               `toml:",omitempty"`
+	Insecure             Insecure             `toml:",omitempty"`
+	Tracing              Tracing              `toml:",omitempty"`
+	Mercury              Mercury              `toml:",omitempty"`
+	Capabilities         Capabilities         `toml:",omitempty"`
+	Telemetry            Telemetry            `toml:",omitempty"`
+	Workflows            Workflows            `toml:",omitempty"`
+	CRE                  CreConfig            `toml:",omitempty"`
+	Billing              Billing              `toml:",omitempty"`
+	BridgeStatusReporter BridgeStatusReporter `toml:",omitempty"`
 }
 
 // SetFrom updates c with any non-nil values from f. (currently TOML field only!)
@@ -107,6 +108,7 @@ func (c *Core) SetFrom(f *Core) {
 	c.Telemetry.setFrom(&f.Telemetry)
 	c.CRE.setFrom(&f.CRE)
 	c.Billing.setFrom(&f.Billing)
+	c.BridgeStatusReporter.setFrom(&f.BridgeStatusReporter)
 }
 
 func (c *Core) ValidateConfig() (err error) {
@@ -2268,6 +2270,64 @@ func (b *Billing) ValidateConfig() error {
 
 	if b.TLSEnabled == nil {
 		return configutils.ErrInvalid{Name: "TLSEnabled", Value: "", Msg: "billing service TLS option must be set"}
+	}
+
+	return nil
+}
+
+type BridgeStatusReporter struct {
+	Enabled              *bool
+	StatusPath           *string
+	PollingInterval      *commonconfig.Duration
+	IgnoreInvalidBridges *bool
+	IgnoreJoblessBridges *bool
+}
+
+func (e *BridgeStatusReporter) setFrom(f *BridgeStatusReporter) {
+	if f.Enabled != nil {
+		e.Enabled = f.Enabled
+	}
+	if f.StatusPath != nil {
+		e.StatusPath = f.StatusPath
+	}
+	if f.PollingInterval != nil {
+		e.PollingInterval = f.PollingInterval
+	}
+	if f.IgnoreInvalidBridges != nil {
+		e.IgnoreInvalidBridges = f.IgnoreInvalidBridges
+	}
+	if f.IgnoreJoblessBridges != nil {
+		e.IgnoreJoblessBridges = f.IgnoreJoblessBridges
+	}
+}
+
+func (e *BridgeStatusReporter) ValidateConfig() error {
+	if e.Enabled == nil || !*e.Enabled {
+		return nil
+	}
+
+	// Default values when enabled
+	if e.StatusPath == nil || *e.StatusPath == "" {
+		defaultPath := "/status"
+		e.StatusPath = &defaultPath
+	}
+
+	if e.PollingInterval == nil {
+		return configutils.ErrInvalid{Name: "PollingInterval", Value: nil, Msg: "must be set"}
+	}
+
+	if e.PollingInterval.Duration() < config.MinimumPollingInterval {
+		return configutils.ErrInvalid{Name: "PollingInterval", Value: e.PollingInterval.Duration(), Msg: "must be greater than or equal to: " + config.MinimumPollingInterval.String()}
+	}
+
+	if e.IgnoreInvalidBridges == nil {
+		defaultIgnoreInvalid := true
+		e.IgnoreInvalidBridges = &defaultIgnoreInvalid
+	}
+
+	if e.IgnoreJoblessBridges == nil {
+		defaultIgnoreJobless := false
+		e.IgnoreJoblessBridges = &defaultIgnoreJobless
 	}
 
 	return nil
