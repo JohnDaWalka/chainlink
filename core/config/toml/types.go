@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
@@ -2304,9 +2303,12 @@ func (e *BridgeStatusReporter) ValidateConfig() error {
 		e.StatusPath = &defaultPath
 	}
 
-	if e.PollingInterval == nil || e.PollingInterval.Duration() < config.MinimumPollingInterval {
-		defaultInterval := *commonconfig.MustNewDuration(5 * time.Minute)
-		e.PollingInterval = &defaultInterval
+	if e.PollingInterval == nil {
+		return configutils.ErrInvalid{Name: "PollingInterval", Value: nil, Msg: "must be set"}
+	}
+
+	if e.PollingInterval.Duration() < config.MinimumPollingInterval {
+		return configutils.ErrInvalid{Name: "PollingInterval", Value: e.PollingInterval.Duration(), Msg: "must be greater than or equal to: " + config.MinimumPollingInterval.String()}
 	}
 
 	if e.IgnoreInvalidBridges == nil {

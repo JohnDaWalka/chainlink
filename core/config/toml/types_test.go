@@ -702,7 +702,7 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "enabled with nil fields - should auto-default",
+			name: "enabled with nil fields - should fail validation",
 			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           nil,
@@ -710,7 +710,8 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 				IgnoreInvalidBridges: nil,
 				IgnoreJoblessBridges: nil,
 			},
-			expectError: false,
+			expectError: true,
+			errorMsg:    "must be set",
 		},
 		{
 			name: "enabled with empty status path - should auto-default",
@@ -724,7 +725,7 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "enabled with zero polling interval - should auto-default",
+			name: "enabled with zero polling interval - should fail validation",
 			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr("/status"),
@@ -732,10 +733,11 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 				IgnoreInvalidBridges: ptr(true),
 				IgnoreJoblessBridges: ptr(false),
 			},
-			expectError: false,
+			expectError: true,
+			errorMsg:    "must be greater than or equal to: 1m",
 		},
 		{
-			name: "enabled with polling interval less than 1 minute - should auto-default",
+			name: "enabled with polling interval less than 1 minute - should fail validation",
 			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr("/status"),
@@ -743,7 +745,8 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 				IgnoreInvalidBridges: ptr(true),
 				IgnoreJoblessBridges: ptr(false),
 			},
-			expectError: false,
+			expectError: true,
+			errorMsg:    "must be greater than or equal to: 1m",
 		},
 		{
 			name: "enabled with polling interval exactly 1 minute",
@@ -757,7 +760,7 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "enabled with all fields missing - should auto-default",
+			name: "enabled with all fields missing - should fail validation",
 			config: &BridgeStatusReporter{
 				Enabled:              ptr(true),
 				StatusPath:           ptr(""),
@@ -765,7 +768,8 @@ func TestBridgeStatusReporter_ValidateConfig(t *testing.T) {
 				IgnoreInvalidBridges: nil,
 				IgnoreJoblessBridges: nil,
 			},
-			expectError: false,
+			expectError: true,
+			errorMsg:    "must be greater than or equal to: 1m",
 		},
 	}
 
