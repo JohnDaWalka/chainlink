@@ -1,4 +1,4 @@
-package modsecrelayer
+package modsecexecutor
 
 import (
 	"context"
@@ -9,11 +9,12 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
 )
 
-// relayer is a service that monitors the source chain for CCIPMessageSent events,
+// executor is a service that monitors the source chain for CCIPMessageSent events,
 // observes attestations for them on offchain storage, and executes them on the destination chain.
-type relayer struct {
+type executor struct {
 	lggr           logger.Logger
 	lp             logpoller.LogPoller
 	txm            txmgr.TxManager
@@ -23,22 +24,32 @@ type relayer struct {
 	eventSig       string
 	onRampAddress  string
 	offRampAddress string
+	storage        modsecstorage.Storage
 }
 
-var _ job.ServiceCtx = &relayer{}
+var _ job.ServiceCtx = &executor{}
 
-func NewRelayer(lggr logger.Logger, lp logpoller.LogPoller, txm txmgr.TxManager, eventSig string, onRampAddress string, offRampAddress string) *relayer {
-	return &relayer{
+func New(
+	lggr logger.Logger,
+	lp logpoller.LogPoller,
+	txm txmgr.TxManager,
+	eventSig string,
+	onRampAddress string,
+	offRampAddress string,
+	storage modsecstorage.Storage,
+) *executor {
+	return &executor{
 		lggr:           lggr,
 		lp:             lp,
 		txm:            txm,
 		eventSig:       eventSig,
 		onRampAddress:  onRampAddress,
 		offRampAddress: offRampAddress,
+		storage:        storage,
 	}
 }
 
-func (r *relayer) run(ctx context.Context) error {
+func (r *executor) run(ctx context.Context) error {
 	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 
@@ -53,14 +64,14 @@ func (r *relayer) run(ctx context.Context) error {
 }
 
 // Close implements job.ServiceCtx.
-func (r *relayer) Close() error {
+func (r *executor) Close() error {
 	r.runCtxCancel()
 	r.wg.Wait()
 	return nil
 }
 
 // Start implements job.ServiceCtx.
-func (r *relayer) Start(context.Context) error {
+func (r *executor) Start(context.Context) error {
 	r.wg.Add(1)
 	r.runCtx, r.runCtxCancel = context.WithCancel(context.Background())
 	go func() {

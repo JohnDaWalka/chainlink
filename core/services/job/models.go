@@ -1147,4 +1147,10 @@ type ModsecSpec struct {
 
 	// OffRampAddress is the address of the OffRamp contract.
 	OffRampAddress string `toml:"offRampAddress" db:"off_ramp_address"`
+
+	// StorageEndpoint is the endpoint of the storage service.
+	StorageEndpoint string `toml:"storageEndpoint" db:"storage_endpoint"`
+
+	// StorageType is the type of storage to use.
+	StorageType string `toml:"storageType" db:"storage_type"`
 }

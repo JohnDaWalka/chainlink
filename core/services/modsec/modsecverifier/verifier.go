@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
 )
 
 var _ job.ServiceCtx = &verifier{}
@@ -22,14 +23,16 @@ type verifier struct {
 	runCtxCancel  context.CancelFunc
 	eventSig      string
 	onRampAddress string
+	storage       modsecstorage.Storage
 }
 
-func NewVerifier(lggr logger.Logger, lp logpoller.LogPoller, eventSig string, onRampAddress string) *verifier {
+func New(lggr logger.Logger, lp logpoller.LogPoller, eventSig string, onRampAddress string, storage modsecstorage.Storage) *verifier {
 	return &verifier{
 		lggr:          lggr,
 		lp:            lp,
 		eventSig:      eventSig,
 		onRampAddress: onRampAddress,
+		storage:       storage,
 	}
 }
 

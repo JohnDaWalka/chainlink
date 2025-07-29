@@ -329,6 +329,8 @@ type ModsecSpecParams struct {
 	OnRampAddress           string
 	CCIPMessageSentEventSig string
 	OffRampAddress          string
+	StorageEndpoint         string
+	StorageType             string
 }
 
 type ModsecSpec struct {
@@ -377,7 +379,14 @@ func GenerateModsecSpec(params ModsecSpecParams) ModsecSpec {
 	if offRampAddress == "" {
 		offRampAddress = "0x1234567890123456789012345678901234567890"
 	}
-
+	storageEndpoint := params.StorageEndpoint
+	if storageEndpoint == "" {
+		storageEndpoint = "http://localhost:8080"
+	}
+	storageType := params.StorageType
+	if storageType == "" {
+		storageType = "std"
+	}
 	template := `
 type = "modsec"
 schemaVersion = 1
@@ -390,11 +399,13 @@ destChainFamily = "%s"
 onRampAddress = "%s"
 ccipMessageSentEventSig = "%s"
 offRampAddress = "%s"
+storageEndpoint = "%s"
+storageType = "%s"
 `
 
 	return ModsecSpec{
 		ModsecSpecParams: params,
-		toml:             fmt.Sprintf(template, jobID, name, sourceChainID, sourceChainFamily, destinationChainID, destinationChainFamily, onRampAddress, ccipMessageSentEventSig, offRampAddress),
+		toml:             fmt.Sprintf(template, jobID, name, sourceChainID, sourceChainFamily, destinationChainID, destinationChainFamily, onRampAddress, ccipMessageSentEventSig, offRampAddress, storageEndpoint, storageType),
 	}
 }
 

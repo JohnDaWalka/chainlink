@@ -512,6 +512,8 @@ func (o *orm) CreateJob(ctx context.Context, jb *Job) error {
 				on_ramp_address,
 				ccip_message_sent_event_sig,
 				off_ramp_address,
+				storage_endpoint,
+				storage_type,
 				created_at,
 				updated_at
 			) VALUES (
@@ -522,6 +524,8 @@ func (o *orm) CreateJob(ctx context.Context, jb *Job) error {
 				:on_ramp_address,
 				:ccip_message_sent_event_sig,
 				:off_ramp_address,
+				:storage_endpoint,
+				:storage_type,
 				NOW(),
 				NOW()
 			)

@@ -26,6 +26,12 @@ CREATE TABLE modsec_specs(
     -- The offramp address.
     off_ramp_address TEXT NOT NULL,
 
+    -- The storage endpoint.
+    storage_endpoint TEXT NOT NULL,
+
+    -- The storage type.
+    storage_type TEXT NOT NULL,
+
     -- The created at timestamp.
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 

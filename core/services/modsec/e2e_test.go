@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
 	"github.com/smartcontractkit/chainlink/v2/core/testdata/testspecs"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
@@ -305,6 +306,9 @@ func TestModsec_E2E(t *testing.T) {
 		require.NoError(t, app.Stop())
 	})
 
+	storageServer, cleanup := modsecstorage.NewTestServer()
+	t.Cleanup(cleanup)
+
 	jb, err := modsec.ValidatedModsecSpec(testspecs.GenerateModsecSpec(
 		testspecs.ModsecSpecParams{
 			Name:                    "modsec-test-e2e",
@@ -315,6 +319,8 @@ func TestModsec_E2E(t *testing.T) {
 			OnRampAddress:           deployments.source.routerAddr.Hex(),
 			OffRampAddress:          deployments.dest.routerAddr.Hex(),
 			CCIPMessageSentEventSig: common.HexToHash("0x1").String(),
+			StorageEndpoint:         storageServer.URL,
+			StorageType:             "std",
 		},
 	).Toml())
 	require.NoError(t, err)

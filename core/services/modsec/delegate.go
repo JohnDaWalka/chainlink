@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -17,7 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
-	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecrelayer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecexecutor"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecverifier"
 )
 
@@ -123,6 +125,22 @@ func validate(spec *job.ModsecSpec) error {
 		return fmt.Errorf("ccip message sent event sig is not 32 bytes")
 	}
 
+	if spec.StorageEndpoint == "" {
+		return fmt.Errorf("storage endpoint is empty")
+	}
+
+	if !strings.HasPrefix(spec.StorageEndpoint, "http") {
+		return fmt.Errorf("storage endpoint (%s) is not a valid http endpoint", spec.StorageEndpoint)
+	}
+
+	if spec.StorageType == "" {
+		return fmt.Errorf("storage type is empty")
+	}
+
+	if spec.StorageType != "std" {
+		return fmt.Errorf("storage type (%s) is not supported", spec.StorageType)
+	}
+
 	return nil
 }
 
@@ -165,20 +183,24 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		return nil, fmt.Errorf("dest chain (%s) is not an EVM chain", spec.ModsecSpec.DestChainID)
 	}
 
-	verifier := modsecverifier.NewVerifier(
+	storageClient := modsecstorage.NewStdClient(spec.ModsecSpec.StorageEndpoint)
+
+	verifier := modsecverifier.New(
 		d.lggr,
 		legacySourceChain.LogPoller(),
 		spec.ModsecSpec.CCIPMessageSentEventSig,
 		spec.ModsecSpec.OnRampAddress,
+		storageClient,
 	)
 
-	relayer := modsecrelayer.NewRelayer(
+	relayer := modsecexecutor.New(
 		d.lggr,
 		legacyDestChain.LogPoller(),
 		legacyDestChain.TxManager(),
 		spec.ModsecSpec.CCIPMessageSentEventSig,
 		spec.ModsecSpec.OnRampAddress,
 		spec.ModsecSpec.OffRampAddress,
+		storageClient,
 	)
 
 	services = append(services, verifier, relayer)

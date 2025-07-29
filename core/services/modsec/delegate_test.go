@@ -18,6 +18,8 @@ func validSpec() *job.ModsecSpec {
 		OnRampAddress:           "0x1234567890123456789012345678901234567890",
 		OffRampAddress:          "0x0987654321098765432109876543210987654321",
 		CCIPMessageSentEventSig: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+		StorageEndpoint:         "http://localhost:8080",
+		StorageType:             "std",
 	}
 }
 
@@ -111,6 +113,34 @@ func TestValidate(t *testing.T) {
 			},
 			expectedErr: "ccip message sent event sig is not 32 bytes",
 		},
+		{
+			name: "empty storage endpoint",
+			modifier: func(spec *job.ModsecSpec) {
+				spec.StorageEndpoint = ""
+			},
+			expectedErr: "storage endpoint is empty",
+		},
+		{
+			name: "invalid storage endpoint",
+			modifier: func(spec *job.ModsecSpec) {
+				spec.StorageEndpoint = "not-a-url"
+			},
+			expectedErr: "storage endpoint (not-a-url) is not a valid http endpoint",
+		},
+		{
+			name: "empty storage type",
+			modifier: func(spec *job.ModsecSpec) {
+				spec.StorageType = ""
+			},
+			expectedErr: "storage type is empty",
+		},
+		{
+			name: "invalid storage type",
+			modifier: func(spec *job.ModsecSpec) {
+				spec.StorageType = "not-std"
+			},
+			expectedErr: "storage type (not-std) is not supported",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -141,6 +171,8 @@ func TestValidatedModsecSpec(t *testing.T) {
 		onRampAddress = "0x1234567890123456789012345678901234567890"
 		offRampAddress = "0x0987654321098765432109876543210987654321"
 		ccipMessageSentEventSig = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+		storageEndpoint = "http://localhost:8080"
+		storageType = "std"
 	`
 
 	testCases := []struct {

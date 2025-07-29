@@ -503,6 +503,8 @@ func TestORM_CreateJob_Modsec(t *testing.T) {
 		OnRampAddress:           "0x1234567890123456789012345678901234567890",
 		CCIPMessageSentEventSig: "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
 		OffRampAddress:          "0x0987654321098765432109876543210987654321",
+		StorageEndpoint:         "http://localhost:8080",
+		StorageType:             "std",
 	}
 	jb, err := modsec.ValidatedModsecSpec(testspecs.GenerateModsecSpec(params).Toml())
 	require.NoError(t, err)
@@ -532,6 +534,12 @@ func TestORM_CreateJob_Modsec(t *testing.T) {
 	var offRampAddress string
 	require.NoError(t, db.Get(&offRampAddress, `SELECT off_ramp_address FROM modsec_specs LIMIT 1`))
 	require.Equal(t, params.OffRampAddress, offRampAddress)
+	var storageEndpoint string
+	require.NoError(t, db.Get(&storageEndpoint, `SELECT storage_endpoint FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.StorageEndpoint, storageEndpoint)
+	var storageType string
+	require.NoError(t, db.Get(&storageType, `SELECT storage_type FROM modsec_specs LIMIT 1`))
+	require.Equal(t, params.StorageType, storageType)
 
 	require.NoError(t, jobORM.DeleteJob(ctx, jb.ID, jb.Type))
 	cltest.AssertCount(t, db, "modsec_specs", 0)
