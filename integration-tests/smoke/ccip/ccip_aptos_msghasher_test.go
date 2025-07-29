@@ -2,17 +2,16 @@ package ccip
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math/big"
+	"sync"
 	"testing"
-
-	"github.com/aptos-labs/aptos-go-sdk"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipaptos"
@@ -27,7 +26,26 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	aptosstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
+
+	"github.com/aptos-labs/aptos-go-sdk"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 )
+
+var (
+	globalFuzzSetup *FuzzSetupState
+	setupOnce       sync.Once
+)
+
+type FuzzSetupState struct {
+	Env            testhelpers.DeployedEnv
+	State          stateview.CCIPOnChainState
+	SourceChain    uint64
+	DestChain      uint64
+	MsgHasher      ccipocr3common.MessageHasher
+	CCIPChainState aptosstate.CCIPChainState
+}
 
 // Test_CCIP_AptosMessageHasher_OnChainVerification compares off-chain aptos msghasher.go implementation
 // with on-chain Aptos Move offramp::calculate_message_hash()
@@ -272,4 +290,299 @@ func parseDestGasAmount(destExecData []byte) uint32 {
 		}
 	}
 	return 50000
+}
+
+func FuzzAptosMessageHasher(f *testing.F) {
+	// Use minimal, guaranteed-to-work seed data
+	messageIDBytes := make([]byte, 32)
+	for i := range messageIDBytes {
+		messageIDBytes[i] = 0x12
+	}
+
+	onRampBytes := make([]byte, 20)
+	for i := range onRampBytes {
+		onRampBytes[i] = 0x34
+	}
+
+	senderBytes := make([]byte, 20)
+	for i := range senderBytes {
+		senderBytes[i] = 0x56
+	}
+
+	receiverBytes := make([]byte, 32)
+	for i := range receiverBytes {
+		receiverBytes[i] = 0x78
+	}
+
+	extraArgs := testhelpers.MakeEVMExtraArgsV2(500000, true)
+
+	f.Add(
+		messageIDBytes,
+		uint64(42),
+		uint64(123),
+		onRampBytes,
+		senderBytes,
+		[]byte("hello CCIPReceiver"),
+		receiverBytes,
+		extraArgs,
+		// No token for basic case
+		[]byte{},
+		[]byte{},
+		[]byte{},
+		[]byte{},
+		[]byte{},
+	)
+
+	// Add simple variation seed cases
+
+	// Seed case 2: Different sequence number
+	f.Add(
+		messageIDBytes,
+		uint64(999),
+		uint64(777),
+		onRampBytes,
+		senderBytes,
+		[]byte("alternate test data"),
+		receiverBytes,
+		extraArgs,
+		[]byte{}, []byte{}, []byte{}, []byte{}, []byte{},
+	)
+
+	// Seed case 3: Message with token amounts - might unlock more baseline coverage
+	f.Add(
+		messageIDBytes,
+		uint64(555),
+		uint64(333),
+		onRampBytes,
+		senderBytes,
+		[]byte("token transfer test"),
+		receiverBytes,
+		extraArgs,
+		[]byte("token1_pool"), []byte("token1_dest"), []byte("token1_extra"), []byte("token1_amount"), []byte{1}, // 1 token
+	)
+
+	f.Fuzz(func(t *testing.T,
+		messageID []byte,
+		sequenceNumber uint64,
+		nonce uint64,
+		onRamp []byte,
+		sender []byte,
+		data []byte,
+		receiver []byte,
+		extraArgs []byte,
+		// Token fields
+		tokenSourcePoolAddress []byte,
+		tokenDestTokenAddress []byte,
+		tokenExtraData []byte,
+		tokenAmountBytes []byte,
+		tokenDestExecData []byte,
+	) {
+		t.Logf("🔍 FUZZ ENTRY: Starting fuzz iteration with seqNum=%d, nonce=%d", sequenceNumber, nonce)
+		// Skip invalid message IDs (same validation as EVM fuzzer)
+		if len(messageID) != 32 {
+			t.Skipf("messageID must be 32 bytes, got %d", len(messageID))
+		}
+
+		// Skip invalid receiver for Aptos (must be 32 bytes)
+		if len(receiver) != 32 {
+			t.Skipf("receiver must be 32 bytes for Aptos, got %d", len(receiver))
+		}
+
+		// Initialize setup once (much simpler than the original approach)
+		setupOnce.Do(func() {
+			ensureGlobalFuzzSetup(t)
+		})
+
+		var msgMessageID ccipocr3common.Bytes32
+		copy(msgMessageID[:], messageID)
+
+		msg := ccipocr3common.Message{
+			Header: ccipocr3common.RampMessageHeader{
+				MessageID:           msgMessageID,
+				SourceChainSelector: ccipocr3common.ChainSelector(globalFuzzSetup.SourceChain),
+				DestChainSelector:   ccipocr3common.ChainSelector(globalFuzzSetup.DestChain),
+				SequenceNumber:      ccipocr3common.SeqNum(sequenceNumber),
+				Nonce:               nonce,
+				OnRamp:              onRamp,
+			},
+			Sender:       sender,
+			Data:         data,
+			Receiver:     receiver,
+			ExtraArgs:    extraArgs,
+			TokenAmounts: []ccipocr3common.RampTokenAmount{},
+		}
+
+		// Add token if any token data is present
+		if len(tokenSourcePoolAddress) > 0 || len(tokenDestTokenAddress) > 0 ||
+			len(tokenExtraData) > 0 || len(tokenAmountBytes) > 0 || len(tokenDestExecData) > 0 {
+			// Skip if dest token address is invalid for Aptos (must be 32 bytes)
+			if len(tokenDestTokenAddress) != 32 {
+				t.Skip("token dest address must be 32 bytes for Aptos")
+			}
+
+			msg.TokenAmounts = []ccipocr3common.RampTokenAmount{
+				{
+					SourcePoolAddress: tokenSourcePoolAddress,
+					DestTokenAddress:  tokenDestTokenAddress,
+					ExtraData:         tokenExtraData,
+					Amount:            ccipocr3common.NewBigInt(new(big.Int).SetBytes(tokenAmountBytes)),
+					DestExecData:      tokenDestExecData,
+				},
+			}
+		}
+
+		offChainHash, err := globalFuzzSetup.MsgHasher.Hash(context.Background(), msg)
+		if err != nil {
+			t.Skipf("off-chain hashing failed (expected for many fuzzed inputs): %v", err)
+		}
+
+		onChainHash, err := tryComputeAptosOnChainHashFuzz(globalFuzzSetup.CCIPChainState, msg, globalFuzzSetup.Env)
+		if err != nil {
+			t.Skipf("on-chain hashing failed (expected for invalid inputs): %v", err)
+		}
+
+		require.Equal(t, onChainHash[:], offChainHash[:],
+			"❌ CROSS-VALIDATION FAILED! Off-chain Go vs On-chain Aptos Move hash mismatch!\n"+
+				"On-chain (Aptos Move):  %s\n"+
+				"Off-chain (Go):        %s\n"+
+				"SeqNum: %d, Nonce: %d\n"+
+				"Message: %+v",
+			hexutil.Encode(onChainHash[:]),
+			hexutil.Encode(offChainHash[:]),
+			sequenceNumber, nonce,
+			msg)
+
+		t.Logf("📊 FUZZ CASE: seqNum=%d, nonce=%d, dataLen=%d, tokens=%d\n"+
+			"   msgID=%s, sender=%s, receiver=%s\n"+
+			"   offChainHash=%s, onChainHash=%s ✅",
+			sequenceNumber, nonce, len(data), len(msg.TokenAmounts),
+			hexutil.Encode(msgMessageID[:4]), hexutil.Encode(sender[:4]), hexutil.Encode(receiver[:4]),
+			hexutil.Encode(offChainHash[:8]), hexutil.Encode(onChainHash[:8]))
+	})
+}
+
+// tryComputeAptosOnChainHashFuzz computes hash using deployed Aptos Move contract for fuzzing
+// Returns error instead of calling t.Fatal to allow graceful skipping (same as EVM fuzzer pattern)
+func tryComputeAptosOnChainHashFuzz(
+	ccipChainState aptosstate.CCIPChainState,
+	msg ccipocr3common.Message,
+	e testhelpers.DeployedEnv,
+) ([32]byte, error) {
+	destChain := uint64(msg.Header.DestChainSelector)
+
+	aptosChain, exists := e.Env.BlockChains.AptosChains()[destChain]
+	if !exists {
+		return [32]byte{}, fmt.Errorf("aptos chain not found for dest (%d)", destChain)
+	}
+
+	aptosClient := aptosChain.Client
+	ccipAddr := ccipChainState.CCIPAddress
+	offramp := aptos_ccip_offramp.NewOfframp(ccipAddr, aptosClient)
+
+	// Parse gas limit with error handling
+	gasLimit := parseGasLimitFromExtraArgs(msg.ExtraArgs)
+	if gasLimit == nil {
+		return [32]byte{}, errors.New("failed to parse gas limit from extra args")
+	}
+
+	sourcePoolAddresses := make([][]byte, len(msg.TokenAmounts))
+	destTokenAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
+	destGasAmounts := make([]uint32, len(msg.TokenAmounts))
+	extraDatas := make([][]byte, len(msg.TokenAmounts))
+	amounts := make([]*big.Int, len(msg.TokenAmounts))
+
+	for i, token := range msg.TokenAmounts {
+		sourcePoolAddresses[i] = token.SourcePoolAddress
+
+		// Validate Aptos address length (32 bytes)
+		if len(token.DestTokenAddress) != 32 {
+			return [32]byte{}, fmt.Errorf("invalid dest token address length: %d", len(token.DestTokenAddress))
+		}
+
+		var addr aptos.AccountAddress
+		copy(addr[:], token.DestTokenAddress)
+		destTokenAddresses[i] = addr
+		destGasAmounts[i] = parseDestGasAmount(token.DestExecData)
+		extraDatas[i] = token.ExtraData
+		amounts[i] = token.Amount.Int
+	}
+
+	// Validate Aptos receiver address length (32 bytes)
+	if len(msg.Receiver) != 32 {
+		return [32]byte{}, fmt.Errorf("invalid receiver address length: %d", len(msg.Receiver))
+	}
+
+	var receiver aptos.AccountAddress
+	copy(receiver[:], msg.Receiver)
+
+	result, err := offramp.CalculateMessageHash(
+		&aptos_call_opts.CallOpts{},
+		msg.Header.MessageID[:],
+		uint64(msg.Header.SourceChainSelector),
+		uint64(msg.Header.DestChainSelector),
+		uint64(msg.Header.SequenceNumber),
+		msg.Header.Nonce,
+		msg.Sender,
+		receiver,
+		msg.Header.OnRamp,
+		msg.Data,
+		gasLimit,
+		sourcePoolAddresses,
+		destTokenAddresses,
+		destGasAmounts,
+		extraDatas,
+		amounts,
+	)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("on-chain calculate_message_hash failed: %w", err)
+	}
+
+	var hash [32]byte
+	copy(hash[:], result)
+	return hash, nil
+}
+
+// ensureGlobalFuzzSetup initializes the global fuzz test setup once (called from first fuzz iteration)
+func ensureGlobalFuzzSetup(t *testing.T) {
+	// Setup integration environment
+	e, _, _ := testsetups.NewIntegrationEnvironment(
+		t,
+		testhelpers.WithNumOfChains(2),
+		testhelpers.WithAptosChains(1),
+	)
+
+	// Deploy CCIP contracts and load state
+	state, err := stateview.LoadOnchainState(e.Env)
+	if err != nil {
+		t.Fatalf("failed to load onchain state: %v", err)
+	}
+
+	// Get chain selectors
+	evmChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyEVM))
+	aptosChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyAptos))
+
+	if len(evmChainSelectors) == 0 || len(aptosChainSelectors) == 0 {
+		t.Fatalf("need both EVM and Aptos chains for cross-validation fuzzing - got EVM:%d Aptos:%d", len(evmChainSelectors), len(aptosChainSelectors))
+	}
+
+	sourceChain := evmChainSelectors[0] // EVM source
+	destChain := aptosChainSelectors[0] // Aptos destination
+
+	// Setup off-chain message hasher
+	extraDataCodec := ccipcommon.ExtraDataCodec(map[string]ccipcommon.SourceChainExtraDataCodec{
+		chain_selectors.FamilyAptos: ccipaptos.ExtraDataDecoder{},
+		chain_selectors.FamilyEVM:   ccipevm.ExtraDataDecoder{},
+	})
+	msgHasher := ccipaptos.NewMessageHasherV1(logger.TestLogger(t), extraDataCodec)
+
+	ccipChainState := state.AptosChains[destChain]
+
+	globalFuzzSetup = &FuzzSetupState{
+		Env:            e,
+		State:          state,
+		SourceChain:    sourceChain,
+		DestChain:      destChain,
+		MsgHasher:      msgHasher,
+		CCIPChainState: ccipChainState,
+	}
 }

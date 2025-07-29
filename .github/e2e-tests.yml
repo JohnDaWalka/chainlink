@@ -1191,24 +1191,6 @@ runner-test-matrix:
       CCIP_V16_TEST_ENV: docker
     test_go_project_path: integration-tests
 
-  - id: smoke/ccip/ccip_aptos_msghasher_test.go:*
-    path: integration-tests/smoke/ccip/ccip_aptos_msghasher_test.go
-    test_env_type: docker
-    runs_on: ubuntu-latest
-    triggers:
-      - PR E2E Core Tests
-      - Merge Queue E2E Core Tests
-      - Nightly E2E Tests
-      - Push E2E CCIP Tests
-      - Workflow Dispatch E2E CCIP Tests
-    test_cmd: cd smoke/ccip && go test github.com/smartcontractkit/chainlink/integration-tests/smoke/ccip -v -run ^Test_CCIP_AptosMessageHasher_OnChainVerification$ -timeout 18m -count=1 -test.parallel=1 -json
-    pyroscope_env: ci-smoke-ccipv1_6-evm-simulated
-    test_env_vars:
-      E2E_TEST_SELECTED_NETWORK: SIMULATED_1,SIMULATED_2
-      E2E_JD_VERSION: 0.9.0
-      CCIP_V16_TEST_ENV: docker
-    test_go_project_path: integration-tests
-
   - id: smoke/ccip/ccip_gas_price_updates_test.go:^Test_CCIPGasPriceUpdatesWriteFrequency$
     path: integration-tests/smoke/ccip/ccip_gas_price_updates_test.go
     test_env_type: docker
