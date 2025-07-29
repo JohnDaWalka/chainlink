@@ -1,0 +1,59 @@
+[blockchain]
+  type = "anvil"
+  chain_id = "1337"
+  docker_cmd_params = ["-b", "5"]
+
+[[nodesets]]
+  nodes = 6
+  override_mode = "all"
+  http_port_range_start = 10100
+  name = "workflow"
+
+  [nodesets.db]
+    image = "postgres:12.0"
+    port = 13000
+
+  [[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+      docker_ctx = "../.."
+      docker_file = "core/chainlink.Dockerfile"
+      user_config_overrides = """
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+
+    [Feature]
+    FeedsManager = true
+    LogPoller = true
+    UICSAKeys = true
+
+    [Log.File]
+    MaxSize = '0b'
+
+    [WebServer]
+    AllowOrigins = '*'
+    HTTPPort = 6688
+    SecureCookies = false
+    HTTPWriteTimeout = '3m'
+    SessionTimeout = '999h0m0s'
+
+    [WebServer.RateLimit]
+    Authenticated = 2000
+    Unauthenticated = 1000
+
+    [WebServer.TLS]
+    HTTPSPort = 0
+
+    [Database]
+    MaxIdleConns = 20
+    MaxOpenConns = 40
+    MigrateOnStartup = true
+
+    [OCR2]
+    Enabled = true
+
+    [P2P]
+    [P2P.V2]
+    ListenAddresses = ['0.0.0.0:6690']
+      """
+

@@ -19,20 +19,22 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/parrot"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	ctf_docker "github.com/smartcontractkit/chainlink-testing-framework/lib/docker"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
+	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
-	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 )
 
 type ocr2test struct {
@@ -73,7 +75,7 @@ func TestOCRv2Basic(t *testing.T) {
 			t.Parallel()
 			l := logging.GetTestLogger(t)
 
-			testEnv, aggregatorContracts, sethClient := prepareORCv2SmokeTestEnv(t, test, l, 5)
+			_, aggregatorContracts, sethClient, parrotClient := prepareORCv2SmokeTestEnv(t, test, l, 5)
 
 			route := &parrot.Route{
 				Method:             parrot.MethodAny,
@@ -81,7 +83,7 @@ func TestOCRv2Basic(t *testing.T) {
 				ResponseBody:       10,
 				ResponseStatusCode: http.StatusOK,
 			}
-			err := testEnv.MockAdapter.SetAdapterRoute(route)
+			err := parrotClient.SetAdapterRoute(route)
 			require.NoError(t, err, "Failed to set route in mock adapter")
 			err = actions.WatchNewOCRRound(l, sethClient, 2, contracts.V2OffChainAgrregatorToOffChainAggregatorWithRounds(aggregatorContracts), time.Minute*5)
 			require.NoError(t, err)
@@ -101,7 +103,7 @@ func TestOCRv2Request(t *testing.T) {
 	t.Parallel()
 	l := logging.GetTestLogger(t)
 
-	_, aggregatorContracts, sethClient := prepareORCv2SmokeTestEnv(t, defaultTestData(), l, 5)
+	_, aggregatorContracts, sethClient, _ := prepareORCv2SmokeTestEnv(t, defaultTestData(), l, 5)
 
 	// Keep the mockserver value the same and continually request new rounds
 	for round := 2; round <= 4; round++ {
@@ -123,9 +125,20 @@ func TestOCRv2JobReplacement(t *testing.T) {
 	t.Parallel()
 	l := logging.GetTestLogger(t)
 
-	testEnv, aggregatorContracts, sethClient := prepareORCv2SmokeTestEnv(t, defaultTestData(), l, 5)
-	nodeClients := testEnv.ClCluster.NodeAPIs()
-	bootstrapNode, workerNodes := nodeClients[0], nodeClients[1:]
+	nodeSetOutput, aggregatorContracts, sethClient, parrotClient := prepareORCv2SmokeTestEnv(t, defaultTestData(), l, 5)
+	var allNodeClients []*nodeclient.ChainlinkClient
+	for _, node := range nodeSetOutput.CLNodes {
+		clClient, err := nodeclient.NewChainlinkClient(&nodeclient.ChainlinkConfig{
+			URL:      node.Node.ExternalURL,
+			Email:    node.Node.APIAuthUser,
+			Password: node.Node.APIAuthPassword,
+		}, l)
+		require.NoError(t, err, "Error creating chainlink client")
+		allNodeClients = append(allNodeClients, clClient)
+	}
+
+	workerNodeClients := allNodeClients[1:]
+	bootstrapNodeClient := allNodeClients[0]
 
 	route := &parrot.Route{
 		Method:             parrot.MethodAny,
@@ -133,7 +146,7 @@ func TestOCRv2JobReplacement(t *testing.T) {
 		ResponseBody:       10,
 		ResponseStatusCode: http.StatusOK,
 	}
-	err := testEnv.MockAdapter.SetAdapterRoute(route)
+	err := parrotClient.SetAdapterRoute(route)
 	require.NoError(t, err, "Failed to set route in mock adapter")
 	err = actions.WatchNewOCRRound(l, sethClient, 2, contracts.V2OffChainAgrregatorToOffChainAggregatorWithRounds(aggregatorContracts), time.Minute*5)
 	require.NoError(t, err, "Error watching for new OCR2 round")
@@ -145,10 +158,10 @@ func TestOCRv2JobReplacement(t *testing.T) {
 		roundData.Answer.Int64(),
 	)
 
-	err = actions.DeleteJobs(nodeClients)
+	err = actions.DeleteJobs(allNodeClients)
 	require.NoError(t, err)
 
-	err = actions.DeleteBridges(nodeClients)
+	err = actions.DeleteBridges(allNodeClients)
 	require.NoError(t, err)
 
 	route.ResponseBody = 15
@@ -156,9 +169,9 @@ func TestOCRv2JobReplacement(t *testing.T) {
 	require.GreaterOrEqual(t, sethClient.ChainID, int64(0), "Chain ID should be greater than or equal to 0")
 	err = actions.CreateOCRv2JobsLocal(
 		aggregatorContracts,
-		bootstrapNode,
-		workerNodes,
-		testEnv.MockAdapter,
+		bootstrapNodeClient,
+		workerNodeClients,
+		parrotClient,
 		route,
 		uint64(sethClient.ChainID), //nolint:gosec // Conversion from int64 to uint64 is safe
 		false,
@@ -177,51 +190,84 @@ func TestOCRv2JobReplacement(t *testing.T) {
 	)
 }
 
-func prepareORCv2SmokeTestEnv(t *testing.T, testData ocr2test, l zerolog.Logger, firstRoundResult int) (*test_env.CLClusterTestEnv, []contracts.OffchainAggregatorV2, *seth.Client) {
-	config, err := tc.GetConfig([]string{"Smoke"}, tc.OCR2)
-	if err != nil {
-		t.Fatal(err)
+type ocr2Config struct {
+	Blockchain *blockchain.Input `toml:"blockchain"`
+	NodeSets   []*ns.Input       `toml:"nodesets" validate:"required"`
+}
+
+type ocr2contractConfigMock struct {
+	ocr2Config
+}
+
+func (o ocr2contractConfigMock) UseExistingOffChainAggregatorsContracts() bool {
+	return false
+}
+
+func (o ocr2contractConfigMock) ConfigureExistingOffChainAggregatorsContracts() bool {
+	return false
+}
+
+func (o ocr2contractConfigMock) NumberOfContractsToDeploy() int {
+	return 1
+}
+
+func (o ocr2contractConfigMock) OffChainAggregatorsContractsAddresses() []common.Address {
+	return []common.Address{}
+}
+
+func prepareORCv2SmokeTestEnv(t *testing.T, testData ocr2test, l zerolog.Logger, firstRoundResult int) (*ns.Output, []contracts.OffchainAggregatorV2, *seth.Client, *test_env.Parrot) {
+	setErr := os.Setenv("CTF_CONFIGS", "ocr2.toml")
+	require.NoError(t, setErr, "Error setting CTF_CONFIGS")
+
+	conf, confErr := framework.Load[ocr2Config](t)
+	require.NoError(t, confErr, "Error loading config")
+
+	for idx, nodeSpec := range conf.NodeSets[0].NodeSpecs {
+		nodeSpec.Node.EnvVars = testData.env
+		conf.NodeSets[0].NodeSpecs[idx] = nodeSpec
 	}
 
-	privateNetwork, err := actions.EthereumNetworkConfigFromConfig(l, &config)
-	require.NoError(t, err, "Error building ethereum network config")
+	bcOut, bcOutErr := blockchain.NewBlockchainNetwork(conf.Blockchain)
+	require.NoError(t, bcOutErr, "Error creating blockchain network")
 
-	clNodeCount := 6
-
-	testEnv, err := test_env.NewCLTestEnvBuilder().
-		WithTestInstance(t).
-		WithTestConfig(&config).
-		WithPrivateEthereumNetwork(privateNetwork.EthereumNetworkConfig).
-		WithMockAdapter().
-		WithCLNodes(clNodeCount).
-		WithCLNodeOptions(test_env.WithNodeEnvVars(testData.env)).
-		WithStandardCleanup().
+	sethClient, sethErr := seth.NewClientBuilder().
+		WithRpcUrl(bcOut.Nodes[0].ExternalWSUrl).
+		WithPrivateKeys([]string{"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"}).
+		WithProtections(false, false, seth.MustMakeDuration(time.Second)).
 		Build()
-	require.NoError(t, err)
+	require.NoError(t, sethErr, "Error creating seth client")
 
-	evmNetwork, err := testEnv.GetFirstEvmNetwork()
-	require.NoError(t, err, "Error getting first evm network")
+	nodeSetOutput, nodesetErr := ns.NewSharedDBNodeSet(conf.NodeSets[0], bcOut)
+	require.NoError(t, nodesetErr, "Error creating node set")
 
-	sethClient, err := utils.TestAwareSethClient(t, config, evmNetwork)
-	require.NoError(t, err, "Error getting seth client")
+	var allNodeClients []*nodeclient.ChainlinkClient
+	for _, node := range nodeSetOutput.CLNodes {
+		clClient, err := nodeclient.NewChainlinkClient(&nodeclient.ChainlinkConfig{
+			URL:      node.Node.ExternalURL,
+			Email:    node.Node.APIAuthUser,
+			Password: node.Node.APIAuthPassword,
+		}, l)
+		require.NoError(t, err, "Error creating chainlink client")
+		allNodeClients = append(allNodeClients, clClient)
+	}
 
-	nodeClients := testEnv.ClCluster.NodeAPIs()
-	bootstrapNode, workerNodes := nodeClients[0], nodeClients[1:]
+	workerNodeClients := allNodeClients[1:]
+	bootstrapNodeClient := allNodeClients[0]
 
-	linkContract, err := actions.LinkTokenContract(l, sethClient, config.OCR2)
-	require.NoError(t, err, "Error loading/deploying link token contract")
+	linkContract, linkContractErr := contracts.DeployLinkTokenContract(l, sethClient)
+	require.NoError(t, linkContractErr, "Error deploying link token contract")
 
-	err = actions.FundChainlinkNodesFromRootAddress(l, sethClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(workerNodes), big.NewFloat(*config.Common.ChainlinkNodeFunding))
-	require.NoError(t, err, "Error funding Chainlink nodes")
+	fundErr := actions.FundChainlinkNodesFromRootAddress(l, sethClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(workerNodeClients), big.NewFloat(0.5))
+	require.NoError(t, fundErr, "Error funding Chainlink nodes")
 
 	t.Cleanup(func() {
 		// ignore error, we will see failures in the logs anyway
-		_ = actions.ReturnFundsFromNodes(l, sethClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(testEnv.ClCluster.NodeAPIs()))
+		_ = actions.ReturnFundsFromNodes(l, sethClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(allNodeClients))
 	})
 
 	// Gather transmitters
 	var transmitters []string
-	for _, node := range workerNodes {
+	for _, node := range workerNodeClients {
 		addr, err := node.PrimaryEthAddress()
 		if err != nil {
 			require.NoError(t, fmt.Errorf("error getting node's primary ETH address: %w", err))
@@ -230,7 +276,7 @@ func prepareORCv2SmokeTestEnv(t *testing.T, testData ocr2test, l zerolog.Logger,
 	}
 
 	ocrOffChainOptions := contracts.DefaultOffChainAggregatorOptions()
-	aggregatorContracts, err := actions.SetupOCRv2Contracts(l, sethClient, config.OCR2, common.HexToAddress(linkContract.Address()), transmitters, ocrOffChainOptions)
+	aggregatorContracts, err := actions.SetupOCRv2Contracts(l, sethClient, ocr2contractConfigMock{}, common.HexToAddress(linkContract.Address()), transmitters, ocrOffChainOptions)
 	require.NoError(t, err, "Error deploying OCRv2 aggregator contracts")
 
 	if sethClient.ChainID < 0 {
@@ -243,11 +289,17 @@ func prepareORCv2SmokeTestEnv(t *testing.T, testData ocr2test, l zerolog.Logger,
 		ResponseStatusCode: http.StatusOK,
 	}
 	require.GreaterOrEqual(t, sethClient.ChainID, int64(0), "Chain ID should be greater than or equal to 0")
+
+	// TODO: move to CTFv2
+	parrot := test_env.NewParrot([]string{framework.DefaultNetworkName})
+	pErr := parrot.StartContainer()
+	require.NoError(t, pErr, "Error starting parrot")
+
 	err = actions.CreateOCRv2JobsLocal(
 		aggregatorContracts,
-		bootstrapNode,
-		workerNodes,
-		testEnv.MockAdapter,
+		bootstrapNodeClient,
+		workerNodeClients,
+		parrot,
 		ocrRoute,
 		uint64(sethClient.ChainID), //nolint:gosec // Conversion from int64 to uint64 is safe
 		false,
@@ -255,15 +307,15 @@ func prepareORCv2SmokeTestEnv(t *testing.T, testData ocr2test, l zerolog.Logger,
 	)
 	require.NoError(t, err, "Error creating OCRv2 jobs")
 
-	if !config.OCR2.UseExistingOffChainAggregatorsContracts() || (config.OCR2.UseExistingOffChainAggregatorsContracts() && config.OCR2.ConfigureExistingOffChainAggregatorsContracts()) {
-		ocrV2Config, err := actions.BuildMedianOCR2ConfigLocal(workerNodes, ocrOffChainOptions)
-		require.NoError(t, err, "Error building OCRv2 config")
+	// if !config.OCR2.UseExistingOffChainAggregatorsContracts() || (config.OCR2.UseExistingOffChainAggregatorsContracts() && config.OCR2.ConfigureExistingOffChainAggregatorsContracts()) {
+	ocrV2Config, err := actions.BuildMedianOCR2ConfigLocal(workerNodeClients, ocrOffChainOptions)
+	require.NoError(t, err, "Error building OCRv2 config")
 
-		err = actions.ConfigureOCRv2AggregatorContracts(ocrV2Config, aggregatorContracts)
-		require.NoError(t, err, "Error configuring OCRv2 aggregator contracts")
-	}
+	err = actions.ConfigureOCRv2AggregatorContracts(ocrV2Config, aggregatorContracts)
+	require.NoError(t, err, "Error configuring OCRv2 aggregator contracts")
+	// }
 
-	assertCorrectNodeConfiguration(t, l, clNodeCount, testData, testEnv)
+	assertCorrectNodeConfiguration(t, l, testData, nodeSetOutput)
 
 	err = actions.WatchNewOCRRound(l, sethClient, 1, contracts.V2OffChainAgrregatorToOffChainAggregatorWithRounds(aggregatorContracts), time.Minute*5)
 	require.NoError(t, err, "Error watching for new OCR2 round")
@@ -274,10 +326,10 @@ func prepareORCv2SmokeTestEnv(t *testing.T, testData ocr2test, l zerolog.Logger,
 		roundData.Answer.Int64(),
 	)
 
-	return testEnv, aggregatorContracts, sethClient
+	return nodeSetOutput, aggregatorContracts, sethClient, parrot
 }
 
-func assertCorrectNodeConfiguration(t *testing.T, l zerolog.Logger, totalNodeCount int, testData ocr2test, testEnv *test_env.CLClusterTestEnv) {
+func assertCorrectNodeConfiguration(t *testing.T, l zerolog.Logger, testData ocr2test, nodeSetOutput *ns.Output) {
 	l.Info().Msg("Checking if all nodes have correct plugin configuration applied")
 
 	// we have to use gomega here, because sometimes there's a delay in the logs being written (especially in the CI)
@@ -288,7 +340,7 @@ func assertCorrectNodeConfiguration(t *testing.T, l zerolog.Logger, totalNodeCou
 		allNodesHaveCorrectConfig := false
 
 		var expectedPatterns []string
-		expectedNodeCount := totalNodeCount - 1
+		expectedNodeCount := len(nodeSetOutput.CLNodes) - 1
 
 		if testData.env[string(env.MedianPlugin.Cmd)] != "" {
 			expectedPatterns = append(expectedPatterns, `Registered loopp.*OCR2.*Median.*`)
@@ -304,8 +356,8 @@ func assertCorrectNodeConfiguration(t *testing.T, l zerolog.Logger, totalNodeCou
 		tempLogsDir := os.TempDir()
 
 		var nodesToInclude []string
-		for i := 1; i < totalNodeCount; i++ {
-			nodesToInclude = append(nodesToInclude, testEnv.ClCluster.Nodes[i].ContainerName+".log")
+		for i := 1; i < len(nodeSetOutput.CLNodes); i++ {
+			nodesToInclude = append(nodesToInclude, nodeSetOutput.CLNodes[i].Node.ContainerName+".log")
 		}
 
 		// save all log files in temp dir
