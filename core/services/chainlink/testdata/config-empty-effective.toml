@@ -160,6 +160,7 @@ AllowNoBootstrappers = false
 DefaultTransactionQueueDepth = 1
 SimulateTransactions = false
 TraceLogging = false
+KeyValueStoreRootDir = '~/.chainlink-data'
 
 [OCR]
 Enabled = false
@@ -344,6 +345,7 @@ URL = ''
 
 [Billing]
 URL = 'localhost:4319'
+TLSEnabled = true
 
 [BridgeStatusReporter]
 Enabled = false
