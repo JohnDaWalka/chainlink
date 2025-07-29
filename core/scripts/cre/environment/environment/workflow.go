@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/pkg/deploy"
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/pkg/trigger"
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/pkg/verify"
-	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	creworkflow "github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 )
@@ -175,7 +175,7 @@ func deployAndVerifyExampleWorkflow(cmdContext context.Context, rpcURL, gatewayU
 var creCLI = "cre_v0.2.0_darwin_arm64"
 var exampleWorkflowName = "exampleworkflow"
 
-func prepareCLIInput(chainID uint64) (*cretypes.ManageWorkflowWithCRECLIInput, error) {
+func prepareCLIInput(chainID uint64) (*cre.ManageWorkflowWithCRECLIInput, error) {
 	if !isCRECLIIsAvailable() {
 		if downloadErr := tryToDownloadCRECLI(); downloadErr != nil {
 			return nil, errors.Wrapf(downloadErr, "failed to download %s", creCLI)
@@ -225,7 +225,7 @@ func prepareCLIInput(chainID uint64) (*cretypes.ManageWorkflowWithCRECLIInput, e
 		return nil, errors.Wrap(cliSettingsFilhErr, "failed to open the CRE CLI settings file")
 	}
 
-	return &cretypes.ManageWorkflowWithCRECLIInput{
+	return &cre.ManageWorkflowWithCRECLIInput{
 		ChainSelector:            chainSelector,
 		WorkflowDonID:            1,
 		WorkflowOwnerAddress:     deployerAddress,
@@ -244,7 +244,7 @@ func deployExampleWorkflow(chainID uint64, workflowData workflowData) error {
 		return errors.Wrap(registerWorkflowInputErr, "failed to prepare CLI input")
 	}
 
-	registerWorkflowInput.ExistingWorkflow = &cretypes.ExistingWorkflow{
+	registerWorkflowInput.ExistingWorkflow = &cre.ExistingWorkflow{
 		BinaryURL: workflowData.BinaryURL,
 		ConfigURL: &workflowData.ConfigURL,
 	}
