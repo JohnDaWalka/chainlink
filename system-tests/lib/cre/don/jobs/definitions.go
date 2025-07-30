@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	counter             = 0
 	DefaultAllowedPorts = []int{80, 443}
 )
 
@@ -59,18 +60,23 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 
 		gatewayDons += fmt.Sprintf(`
 		[[gatewayConfig.Dons]]
-		DonId = "%d"
+		DonId = "workflows"
 		F = 1
-		HandlerName = "web-api-capabilities"
+		HandlerName = "http-capabilities"
 			[gatewayConfig.Dons.HandlerConfig]
-			MaxAllowedMessageAgeSec = 1_000
+				authPullIntervalMs = 1000
 				[gatewayConfig.Dons.HandlerConfig.NodeRateLimiter]
 				GlobalBurst = 10
 				GlobalRPS = 50
 				PerSenderBurst = 10
 				PerSenderRPS = 10
+				[gatewayConfig.Dons.HandlerConfig.UserRateLimiter]
+				GlobalBurst = 10
+				GlobalRPS = 50
+				PerSenderBurst = 10
+				PerSenderRPS = 10
 			%s
-		`, don.ID, gatewayMembers)
+		`, gatewayMembers)
 	}
 
 	uuid := uuid.NewString()
@@ -83,7 +89,7 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 	forwardingAllowed = false
 	[gatewayConfig.ConnectionManagerConfig]
 	AuthChallengeLen = 10
-	AuthGatewayId = "por_gateway"
+	AuthGatewayId = "gateway%d"
 	AuthTimestampToleranceSec = 5
 	HeartbeatIntervalSec = 20
 	%s
@@ -112,12 +118,14 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 `,
 		uuid,
 		types.GatewayJobName,
+		counter,
 		gatewayDons,
 		gatewayConnectorData.Outgoing.Path,
-		gatewayConnectorData.Outgoing.Port,
+		5003+counter*2,
 		gatewayConnectorData.Incoming.Path,
-		gatewayConnectorData.Incoming.InternalPort,
+		5002+counter*2,
 	)
+	counter++
 
 	if len(extraAllowedPorts) != 0 {
 		var allowedPorts string

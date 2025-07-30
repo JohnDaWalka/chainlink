@@ -30,6 +30,7 @@ import (
 	computecap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
 	consensuscap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
+	httpcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/http"
 	logeventtriggercap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/logevent"
 	readcontractcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/readcontract"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
@@ -40,6 +41,8 @@ import (
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
+	crehttpaction "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/http_action"
+	crehttptrigger "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/http_trigger"
 	crelogevent "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/logevent"
 	crereadcontract "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/readcontract"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/webapi"
@@ -131,6 +134,8 @@ func (c Config) Validate() error {
 
 type ExtraCapabilitiesConfig struct {
 	CronCapabilityBinaryPath  string `toml:"cron_capability_binary_path"`
+	HttpTriggerBinaryPath     string `toml:"http_trigger_capability_binary_path"`
+	HttpActionBinaryPath      string `toml:"http_action_capability_binary_path"`
 	LogEventTriggerBinaryPath string `toml:"log_event_trigger_binary_path"`
 	ReadContractBinaryPath    string `toml:"read_contract_capability_binary_path"`
 }
@@ -488,6 +493,16 @@ func StartCLIEnvironment(
 			capabilitiesBinaryPaths[cretypes.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
 		}
 
+		if in.ExtraCapabilities.HttpTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.HttpTriggerCapability)
+			capabilitiesBinaryPaths[cretypes.HttpTriggerCapability] = in.ExtraCapabilities.HttpTriggerBinaryPath
+		}
+
+		if in.ExtraCapabilities.HttpActionBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.HttpActionCapability)
+			capabilitiesBinaryPaths[cretypes.HttpActionCapability] = in.ExtraCapabilities.HttpActionBinaryPath
+		}
+
 		for capabilityName, binaryPath := range extraBinaries {
 			if binaryPath != "" || withPluginsDockerImageFlag != "" {
 				workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
@@ -532,6 +547,16 @@ func StartCLIEnvironment(
 		if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
 			capabiliitesDONCapabilities = append(capabiliitesDONCapabilities, cretypes.ReadContractCapability)
 			capabilitiesBinaryPaths[cretypes.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
+		}
+
+		if in.ExtraCapabilities.HttpTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.HttpTriggerCapability)
+			capabilitiesBinaryPaths[cretypes.HttpTriggerCapability] = in.ExtraCapabilities.HttpTriggerBinaryPath
+		}
+
+		if in.ExtraCapabilities.HttpActionBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cretypes.HttpActionCapability)
+			capabilitiesBinaryPaths[cretypes.HttpActionCapability] = in.ExtraCapabilities.HttpActionBinaryPath
 		}
 
 		capabilitiesAwareNodeSets = []*cretypes.CapabilitiesAwareNodeSet{
@@ -587,6 +612,8 @@ func StartCLIEnvironment(
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
 		croncap.CronCapabilityFactoryFn,
+		httpcap.HttpTriggerCapabilityFactoryFn,
+		httpcap.HttpActionCapabilityFactoryFn,
 	}
 
 	containerPath, pathErr := crecapabilities.DefaultContainerDirectory(in.Infra.InfraType)
@@ -614,6 +641,18 @@ func StartCLIEnvironment(
 		readContractBinaryName = "readcontract"
 	}
 
+	httpActionBinaryName := filepath.Base(in.ExtraCapabilities.HttpActionBinaryPath)
+	if withPluginsDockerImageFlag != "" {
+		fmt.Println("shouldn't be here")
+		httpActionBinaryName = "http_action"
+	}
+
+	httpTriggerBinaryName := filepath.Base(in.ExtraCapabilities.HttpTriggerBinaryPath)
+	if withPluginsDockerImageFlag != "" {
+		fmt.Println("shouldn't be here2")
+		httpTriggerBinaryName = "http_trigger"
+	}
+
 	jobSpecFactoryFunctions := []cretypes.JobSpecFactoryFn{
 		// add support for more job spec factory functions if needed
 		webapi.WebAPITriggerJobSpecFactoryFn,
@@ -622,6 +661,8 @@ func StartCLIEnvironment(
 		crecron.CronJobSpecFactoryFn(filepath.Join(containerPath, cronBinaryName)),
 		cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 		crecompute.ComputeJobSpecFactoryFn,
+		crehttpaction.HttpActionJobSpecFactoryFn(filepath.Join(containerPath, httpActionBinaryName)),
+		crehttptrigger.HttpTriggerJobSpecFactoryFn(filepath.Join(containerPath, httpTriggerBinaryName)),
 	}
 
 	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, extraJobFactoryFns...)

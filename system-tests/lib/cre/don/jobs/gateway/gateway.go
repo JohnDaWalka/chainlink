@@ -4,8 +4,8 @@ import (
 	"github.com/pkg/errors"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -40,7 +40,7 @@ func GenerateJobSpecs(donTopology *types.DonTopology, extraAllowedPorts []int, e
 	// This map will be used to configure the gateway job on the node that runs it. Currently, we support only a single gateway connector, even if CRE supports multiple
 	for _, donWithMetadata := range donTopology.DonsWithMetadata {
 		// if it's a workflow DON or it has custom compute capability, it needs access to gateway connector
-		if !flags.HasFlag(donWithMetadata.Flags, types.WorkflowDON) && !don.NodeNeedsGateway(donWithMetadata.Flags) {
+		if !flags.HasFlag(donWithMetadata.Flags, types.WorkflowDON) {
 			continue
 		}
 
@@ -73,22 +73,21 @@ func GenerateJobSpecs(donTopology *types.DonTopology, extraAllowedPorts []int, e
 			continue
 		}
 
-		gatewayNode, nodeErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.ExtraRolesKey, Value: types.GatewayNode}, node.LabelContains)
-		if nodeErr != nil {
-			return nil, errors.Wrap(nodeErr, "failed to find bootstrap node")
+		gatewayNodeSet, err := crenode.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: node.ExtraRolesKey, Value: types.GatewayNode}, node.LabelContains)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
-
-		gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKey)
-		if gatewayErr != nil {
-			return nil, errors.Wrap(gatewayErr, "failed to get gateway node id from labels")
+		for _, gatewayNode := range gatewayNodeSet {
+			gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKey)
+			if gatewayErr != nil {
+				return nil, errors.Wrap(gatewayErr, "failed to get gateway node id from labels")
+			}
+			homeChainID, homeChainErr := chainselectors.ChainIdFromSelector(donTopology.HomeChainSelector)
+			if homeChainErr != nil {
+				return nil, errors.Wrap(homeChainErr, "failed to get home chain id from selector")
+			}
+			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.AnyGateway(gatewayNodeID, homeChainID, donWithMetadata.ID, extraAllowedPorts, extraAllowedIPs, extraAllowedIPsCIDR, *gatewayConnectorOutput))
 		}
-
-		homeChainID, homeChainErr := chainselectors.ChainIdFromSelector(donTopology.HomeChainSelector)
-		if homeChainErr != nil {
-			return nil, errors.Wrap(homeChainErr, "failed to get home chain id from selector")
-		}
-
-		donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.AnyGateway(gatewayNodeID, homeChainID, donWithMetadata.ID, extraAllowedPorts, extraAllowedIPs, extraAllowedIPsCIDR, *gatewayConnectorOutput))
 	}
 
 	return donToJobSpecs, nil

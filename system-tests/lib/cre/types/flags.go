@@ -20,6 +20,8 @@ const (
 	LogTriggerCapability    CapabilityFlag = "log-trigger"
 	WebAPITargetCapability  CapabilityFlag = "web-api-target"
 	WebAPITriggerCapability CapabilityFlag = "web-api-trigger"
+	HttpTriggerCapability   CapabilityFlag = "http-trigger"
+	HttpActionCapability    CapabilityFlag = "http-action"
 	MockCapability          CapabilityFlag = "mock"
 	// Add more capabilities as needed
 )

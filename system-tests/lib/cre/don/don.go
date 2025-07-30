@@ -113,8 +113,10 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 			// and use it with some default, so that we can easily modify it with little effort
 			internalHost := infra.InternalHost(nodeIdx, nodeType, donMetadata.Name, infraInput)
 
+			// if nodeSetInput[donIdx].GatewayNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].GatewayNodeIndex {
 			if flags.HasFlag(donMetadata.Flags, cretypes.GatewayDON) {
-				if nodeSetInput[donIdx].GatewayNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].GatewayNodeIndex {
+				if nodeSetInput[donIdx].GatewayNodeIndex != -1 {
+					nodeSetInput[donIdx].GatewayNodeIndex = nodeIdx
 					nodeWithLabels.Labels = append(nodeWithLabels.Labels, &cretypes.Label{
 						Key:   node.ExtraRolesKey,
 						Value: cretypes.GatewayNode,
@@ -125,13 +127,16 @@ func BuildTopology(nodeSetInput []*cretypes.CapabilitiesAwareNodeSet, infraInput
 					topology.GatewayConnectorOutput = &cretypes.GatewayConnectorOutput{
 						Outgoing: cretypes.Outgoing{
 							Path: "/node",
+							// Port: 5003 + 2*nodeIdx,
 							Port: 5003,
 							Host: gatewayInternalHost,
 						},
 						Incoming: cretypes.Incoming{
-							Protocol:     "http",
-							Path:         "/",
+							Protocol: "http",
+							Path:     "/",
+							// InternalPort: 5002 + 2*nodeIdx,
 							InternalPort: 5002,
+							// ExternalPort: infra.ExternalGatewayPort(infraInput) + 2*nodeIdx,
 							ExternalPort: infra.ExternalGatewayPort(infraInput),
 							Host:         infra.ExternalGatewayHost(nodeIdx, nodeType, donMetadata.Name, infraInput),
 						},

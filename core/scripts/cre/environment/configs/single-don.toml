@@ -35,6 +35,8 @@
 # these default paths assume that binaries are placed in core/scripts/cre/environment/ folder
   # points to capabilities repository that's on the same level as chainlink repository
   cron_capability_binary_path = "../../../../../capabilities/cron/cron"
+  http_trigger_capability_binary_path = "../../../../../capabilities/http_trigger/http_trigger"
+  http_action_capability_binary_path = "../../../../../capabilities/http_action/http_action"
 # log_event_trigger_binary_path = "./logtrigger"
 # read_contract_capability_binary_path = "./readcontract"
 
