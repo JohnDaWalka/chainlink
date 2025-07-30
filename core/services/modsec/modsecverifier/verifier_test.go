@@ -137,6 +137,79 @@ func testSetup(t *testing.T) *testUniverse {
 	}
 }
 
+func Test_registerFilterIfNeeded(t *testing.T) {
+	universe := testSetup(t)
+
+	filtersBefore := universe.lp.GetFilters()
+	require.Len(t, filtersBefore, 0)
+
+	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
+
+	filtersAfter := universe.lp.GetFilters()
+	require.Len(t, filtersAfter, 1)
+	var fltr logpoller.Filter
+	for _, filter := range filtersAfter {
+		require.Equal(t, universe.verifier.eventSig, filter.EventSigs[0].Hex())
+		require.Equal(t, universe.verifier.onRampAddress, filter.Addresses[0].Hex())
+		fltr = filter
+	}
+
+	// re-register should not add a new filter
+	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
+
+	filtersAfter2 := universe.lp.GetFilters()
+	require.Len(t, filtersAfter2, 1)
+	for _, filter := range filtersAfter2 {
+		require.Equal(t, fltr, filter)
+	}
+}
+
+func Test_initializeLastProcessedBlock_allVerified(t *testing.T) {
+	universe := testSetup(t)
+
+	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
+
+	for seqNr := range 10 {
+		universe.emitCCIPMessageSent(t, destChainSelector, uint64(seqNr), verifier_events.InternalEVM2AnyCommitVerifierMessage{
+			Header: verifier_events.InternalHeader{
+				MessageId:           [32]byte{byte(seqNr)},
+				SourceChainSelector: sourceChainSelector,
+				DestChainSelector:   destChainSelector,
+				SequenceNumber:      uint64(seqNr),
+			},
+			Sender:             common.HexToAddress("0x1234"),
+			Data:               nil,
+			Receiver:           common.LeftPadBytes(common.HexToAddress("0x5678").Bytes(), 32),
+			DestChainExtraArgs: nil,
+			VerifierExtraArgs:  nil,
+			FeeToken:           common.HexToAddress("0x0"),
+			FeeTokenAmount:     big.NewInt(13371337),
+			FeeValueJuels:      big.NewInt(13371337),
+			TokenAmounts:       nil,
+			RequiredVerifiers:  nil,
+		})
+	}
+
+	universe.simBackend.Commit()
+
+	// Wait for log poller to index the logs.
+	// TODO: should be programmatic / event driven instead.
+	time.Sleep(5 * time.Second)
+
+	// verify everything in storage
+	for i := range 10 {
+		messageID := [32]byte{byte(i)}
+		universe.verifier.storage.Set(t.Context(), hexutil.Encode(messageID[:]), []byte("verified"))
+	}
+
+	latestBlock, err := universe.lp.LatestBlock(t.Context())
+	require.NoError(t, err)
+
+	lastProcessedBlock, err := universe.verifier.initializeLastProcessedBlock(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, latestBlock.FinalizedBlockNumber, lastProcessedBlock)
+}
+
 func Test_initializeLastProcessedBlock_someVerified(t *testing.T) {
 	universe := testSetup(t)
 
