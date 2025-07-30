@@ -2,10 +2,15 @@ package modsecstorage
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 )
+
+// ErrNotFound is returned when a key is not found in the test storage.
+// This is similar to an HTTP 404 Not Found error.
+var ErrNotFound = errors.New("not found")
 
 type testStorage struct {
 	storage map[string][]byte
@@ -13,7 +18,11 @@ type testStorage struct {
 
 // Get implements Storage.
 func (t *testStorage) Get(ctx context.Context, key string) ([]byte, error) {
-	return t.storage[key], nil
+	obj, ok := t.storage[key]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return obj, nil
 }
 
 // Set implements Storage.
@@ -39,6 +48,10 @@ func NewTestServer() (*httptest.Server, func()) {
 	handler.HandleFunc("/get/", func(w http.ResponseWriter, r *http.Request) {
 		key := r.URL.Path[len("/get/"):]
 		val, err := testStore.Get(r.Context(), key)
+		if errors.Is(err, ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
 		if err != nil {
 			http.Error(w, "get error", http.StatusInternalServerError)
 			return

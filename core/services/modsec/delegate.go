@@ -8,9 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
@@ -25,15 +23,6 @@ import (
 
 type Config interface {
 	Feature() config.Feature
-}
-
-type RelayGetter interface {
-	Get(types.RelayID) (loop.Relayer, error)
-	GetIDToRelayerMap() map[types.RelayID]loop.Relayer
-}
-
-type Keystore[K keystore.Key] interface {
-	GetAll() ([]K, error)
 }
 
 type Delegate struct {
@@ -185,12 +174,27 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 
 	storageClient := modsecstorage.NewStdClient(spec.ModsecSpec.StorageEndpoint)
 
+	signingKeys, err := d.keystore.Eth().EnabledKeysForChain(ctx, legacyDestChain.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(signingKeys) == 0 {
+		return nil, errors.New("no signing key found, please ensure keys are present in the keystore")
+	}
+
+	d.lggr.Infow("found signing keys, using first one",
+		"keys", signingKeys,
+		"key", signingKeys[0].EIP55Address.Hex(),
+	)
+
 	verifier := modsecverifier.New(
 		d.lggr,
 		legacySourceChain.LogPoller(),
 		spec.ModsecSpec.CCIPMessageSentEventSig,
 		spec.ModsecSpec.OnRampAddress,
 		storageClient,
+		signingKeys[0],
 	)
 
 	relayer := modsecexecutor.New(
