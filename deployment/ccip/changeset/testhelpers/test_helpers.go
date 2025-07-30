@@ -1090,10 +1090,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	}
 
 	// Setup new PTB client
-	keystoreInstance, err := keystore.NewSuiKeystore(e.Logger, keyString)
+	keystoreInstance := keystore.NewInMemoryKeystore(e.Logger)
+	addr, err := keystoreInstance.AddKey(keyString)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
 	}
+	e.Logger.Info("Address key added", "address", addr, "for key", keyString)
 
 	relayerClient, err := client.NewPTBClient(e.Logger, "http://127.0.0.1:9000", nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
 	if err != nil {
@@ -1340,7 +1342,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 	}
 
 	suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
-	suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.BurnMintTPPackageId)
+	suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.CCIPPackageId)
 
 	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
 	if err != nil {
@@ -1352,7 +1354,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 		return "", "", fmt.Errorf("failed to grant burnMint %d: %w", cfg.DestChain, err)
 	}
 
-	return deployBurnMintTp.Output.BurnMintTPPackageId, deployBurnMintTp.Output.Objects.StateObjectId, nil
+	return deployBurnMintTp.Output.CCIPPackageId, deployBurnMintTp.Output.Objects.StateObjectId, nil
 }
 
 // Helper function to convert a string to a string pointer
