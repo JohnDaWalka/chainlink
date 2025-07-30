@@ -1,7 +1,9 @@
 package modsecverifier
 
 import (
+	"encoding/json"
 	"math/big"
+	"sort"
 	"testing"
 	"time"
 
@@ -137,6 +139,160 @@ func testSetup(t *testing.T) *testUniverse {
 	}
 }
 
+func Test_processPendingMessages(t *testing.T) {
+	const numMessages = 10
+
+	universe := testSetup(t)
+
+	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
+
+	for seqNr := range numMessages {
+		universe.emitCCIPMessageSent(t, destChainSelector, uint64(seqNr), verifier_events.InternalEVM2AnyCommitVerifierMessage{
+			Header: verifier_events.InternalHeader{
+				MessageId:           [32]byte{byte(seqNr)},
+				SourceChainSelector: sourceChainSelector,
+				DestChainSelector:   destChainSelector,
+				SequenceNumber:      uint64(seqNr),
+			},
+			Sender:             common.HexToAddress("0x1234"),
+			Data:               nil,
+			Receiver:           common.LeftPadBytes(common.HexToAddress("0x5678").Bytes(), 32),
+			DestChainExtraArgs: nil,
+			VerifierExtraArgs:  nil,
+			FeeToken:           common.HexToAddress("0x0"),
+			FeeTokenAmount:     big.NewInt(13371337),
+			FeeValueJuels:      big.NewInt(13371337),
+			TokenAmounts:       nil,
+			RequiredVerifiers:  nil,
+		})
+	}
+
+	universe.simBackend.Commit()
+
+	// Wait for log poller to index the logs.
+	// TODO: should be programmatic / event driven instead.
+	time.Sleep(5 * time.Second)
+
+	// query using the eth client to determine the earliest log that was emitted.
+	// since we didn't verify anything just yet, the earliest log should be the one
+	// whose block number is returned.
+	logs, err := universe.simClient.FilterLogs(t.Context(), ethereum.FilterQuery{
+		FromBlock: big.NewInt(1),
+		Addresses: []common.Address{universe.verifierEvents.Address()},
+		Topics: [][]common.Hash{
+			{verifier_events.VerifierEventsCCIPMessageSent{}.Topic()},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, logs, numMessages)
+
+	lastProcessedBlock, err := universe.verifier.initializeLastProcessedBlock(t.Context())
+	require.NoError(t, err)
+
+	pending, err := universe.verifier.pollLogs(t.Context(), lastProcessedBlock)
+	require.NoError(t, err)
+	require.Len(t, pending, numMessages)
+
+	// verify that logs and pending hold the same messages
+	// they might not be in the same order.
+	sort.Slice(logs, func(i, j int) bool {
+		return logs[i].BlockNumber < logs[j].BlockNumber
+	})
+	sort.Slice(pending, func(i, j int) bool {
+		return pending[i].BlockNumber < pending[j].BlockNumber
+	})
+	for i := range numMessages {
+		require.Equal(t, logs[i].TxHash, pending[i].TxHash)
+	}
+
+	universe.verifier.processPendingMessages(t.Context(), pending)
+
+	// verify that the messages are now in storage
+	for i := range numMessages {
+		messageID := [32]byte{byte(i)}
+		verified, err := universe.verifier.storage.Get(t.Context(), hexutil.Encode(messageID[:]))
+		require.NoError(t, err)
+		var payload storageValuePayload
+		require.NoError(t, json.Unmarshal(verified, &payload))
+		t.Logf("message %d is verified: messageData=%s, signature=%s", i, hexutil.Encode(payload.MessageData), hexutil.Encode(payload.Signature))
+
+		// to verify the sig, we need the public key first.
+		pubKey, err := crypto.SigToPub(payload.MessageData, payload.Signature)
+		require.NoError(t, err)
+		require.Equal(t, universe.verifier.signerKey.Address, crypto.PubkeyToAddress(*pubKey))
+
+		// now we can verify the signature
+		// have to trim the last byte (the v byte) because VerifySignature requires a 64 byte signature [R || S || V]
+		require.True(t, crypto.VerifySignature(crypto.CompressPubkey(pubKey), payload.MessageData, payload.Signature[:64]))
+	}
+}
+
+func Test_pollLogs(t *testing.T) {
+	const numMessages = 10
+	universe := testSetup(t)
+
+	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
+
+	for seqNr := range numMessages {
+		universe.emitCCIPMessageSent(t, destChainSelector, uint64(seqNr), verifier_events.InternalEVM2AnyCommitVerifierMessage{
+			Header: verifier_events.InternalHeader{
+				MessageId:           [32]byte{byte(seqNr)},
+				SourceChainSelector: sourceChainSelector,
+				DestChainSelector:   destChainSelector,
+				SequenceNumber:      uint64(seqNr),
+			},
+			Sender:             common.HexToAddress("0x1234"),
+			Data:               nil,
+			Receiver:           common.LeftPadBytes(common.HexToAddress("0x5678").Bytes(), 32),
+			DestChainExtraArgs: nil,
+			VerifierExtraArgs:  nil,
+			FeeToken:           common.HexToAddress("0x0"),
+			FeeTokenAmount:     big.NewInt(13371337),
+			FeeValueJuels:      big.NewInt(13371337),
+			TokenAmounts:       nil,
+			RequiredVerifiers:  nil,
+		})
+	}
+
+	universe.simBackend.Commit()
+
+	// Wait for log poller to index the logs.
+	// TODO: should be programmatic / event driven instead.
+	time.Sleep(5 * time.Second)
+
+	// query using the eth client to determine the earliest log that was emitted.
+	// since we didn't verify anything just yet, the earliest log should be the one
+	// whose block number is returned.
+	logs, err := universe.simClient.FilterLogs(t.Context(), ethereum.FilterQuery{
+		FromBlock: big.NewInt(1),
+		Addresses: []common.Address{universe.verifierEvents.Address()},
+		Topics: [][]common.Hash{
+			{verifier_events.VerifierEventsCCIPMessageSent{}.Topic()},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, logs, numMessages)
+
+	lastProcessedBlock, err := universe.verifier.initializeLastProcessedBlock(t.Context())
+	require.NoError(t, err)
+
+	pending, err := universe.verifier.pollLogs(t.Context(), lastProcessedBlock)
+	require.NoError(t, err)
+	require.Len(t, pending, numMessages)
+
+	// verify that logs and pending hold the same messages
+	// they might not be in the same order.
+	sort.Slice(logs, func(i, j int) bool {
+		return logs[i].BlockNumber < logs[j].BlockNumber
+	})
+	sort.Slice(pending, func(i, j int) bool {
+		return pending[i].BlockNumber < pending[j].BlockNumber
+	})
+	for i := range numMessages {
+		require.Equal(t, logs[i].TxHash, pending[i].TxHash)
+	}
+}
+
 func Test_registerFilterIfNeeded(t *testing.T) {
 	universe := testSetup(t)
 
@@ -165,11 +321,12 @@ func Test_registerFilterIfNeeded(t *testing.T) {
 }
 
 func Test_initializeLastProcessedBlock_allVerified(t *testing.T) {
+	const numMessages = 10
 	universe := testSetup(t)
 
 	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
 
-	for seqNr := range 10 {
+	for seqNr := range numMessages {
 		universe.emitCCIPMessageSent(t, destChainSelector, uint64(seqNr), verifier_events.InternalEVM2AnyCommitVerifierMessage{
 			Header: verifier_events.InternalHeader{
 				MessageId:           [32]byte{byte(seqNr)},
@@ -197,7 +354,7 @@ func Test_initializeLastProcessedBlock_allVerified(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// verify everything in storage
-	for i := range 10 {
+	for i := range numMessages {
 		messageID := [32]byte{byte(i)}
 		universe.verifier.storage.Set(t.Context(), hexutil.Encode(messageID[:]), []byte("verified"))
 	}
@@ -211,11 +368,12 @@ func Test_initializeLastProcessedBlock_allVerified(t *testing.T) {
 }
 
 func Test_initializeLastProcessedBlock_someVerified(t *testing.T) {
+	const numMessages = 10
 	universe := testSetup(t)
 
 	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
 
-	for seqNr := range 10 {
+	for seqNr := range numMessages {
 		universe.emitCCIPMessageSent(t, destChainSelector, uint64(seqNr), verifier_events.InternalEVM2AnyCommitVerifierMessage{
 			Header: verifier_events.InternalHeader{
 				MessageId:           [32]byte{byte(seqNr)},
@@ -243,7 +401,7 @@ func Test_initializeLastProcessedBlock_someVerified(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// put some stuff in storage
-	for i := range 5 {
+	for i := range numMessages / 2 {
 		messageID := [32]byte{byte(i)}
 		universe.verifier.storage.Set(t.Context(), hexutil.Encode(messageID[:]), []byte("verified"))
 	}
@@ -261,7 +419,7 @@ func Test_initializeLastProcessedBlock_someVerified(t *testing.T) {
 	require.NoError(t, err)
 	// seq nrs 0 to 4 should already be verified, so the earliest log should be the one
 	// right after 4, so 5.
-	require.Len(t, logs, 10)
+	require.Len(t, logs, numMessages)
 	var wantBlockNumber uint64
 	for _, log := range logs {
 		parsed, err := universe.verifierEvents.ParseCCIPMessageSent(log)
@@ -277,11 +435,12 @@ func Test_initializeLastProcessedBlock_someVerified(t *testing.T) {
 }
 
 func Test_initializeLastProcessedBlock_noneVerified(t *testing.T) {
+	const numMessages = 10
 	universe := testSetup(t)
 
 	require.NoError(t, universe.verifier.registerFilterIfNeeded(t.Context()))
 
-	for seqNr := range 10 {
+	for seqNr := range numMessages {
 		universe.emitCCIPMessageSent(t, destChainSelector, uint64(seqNr), verifier_events.InternalEVM2AnyCommitVerifierMessage{
 			Header: verifier_events.InternalHeader{
 				MessageId:           [32]byte{byte(seqNr)},
@@ -319,7 +478,7 @@ func Test_initializeLastProcessedBlock_noneVerified(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Len(t, logs, 10)
+	require.Len(t, logs, numMessages)
 	head, err := universe.simClient.HeadByNumber(t.Context(), new(big.Int).SetUint64(logs[0].BlockNumber))
 	require.NoError(t, err)
 	t.Logf("earliest log block number: %d, and time stamp: %s", logs[0].BlockNumber, head.Timestamp)

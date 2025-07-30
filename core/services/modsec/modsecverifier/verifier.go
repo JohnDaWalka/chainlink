@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsectypes"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 )
 
 const (
@@ -125,15 +126,21 @@ func (v *verifier) processPendingMessages(ctx context.Context, pending []logpoll
 			continue
 		}
 
+		// TODO: signature logic, for now just keccak256 the messageID and sign that.
 		messageID := parsedMessage.MessageID()
-		signature, err := v.signerKey.Sign(messageID[:])
+		messageData, err := crypto.Keccak256(messageID[:])
+		if err != nil {
+			v.lggr.Errorw("verifier failed to keccak256 messageID, skipping message", "err", err)
+			continue
+		}
+		signature, err := v.signerKey.Sign(messageData)
 		if err != nil {
 			v.lggr.Errorw("verifier failed to sign message, skipping message", "err", err)
 			continue
 		}
 
 		payload := storageValuePayload{
-			MessageData: messageID[:],
+			MessageData: messageData,
 			Signature:   signature,
 		}
 		payloadBytes, err := json.Marshal(payload)
@@ -157,28 +164,13 @@ func (v *verifier) processPendingMessages(ctx context.Context, pending []logpoll
 	}
 }
 
-func (v *verifier) setLatestHead(head logpoller.Block) {
-	v.latestHeadMu.Lock()
-	defer v.latestHeadMu.Unlock()
-	num := uint64(head.BlockNumber)
-	if num > v.latestHeadNumber {
-		v.latestHeadNumber = num
-	}
-}
-
-func (v *verifier) getLatestHead() uint64 {
-	v.latestHeadMu.RLock()
-	defer v.latestHeadMu.RUnlock()
-	return v.latestHeadNumber
-}
-
 // pollLogs polls the log poller for new finalized CCIPMessageSent events.
 func (v *verifier) pollLogs(ctx context.Context, lastProcessedBlock int64) ([]logpoller.Log, error) {
 	latestBlock, err := v.lp.LatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
-	v.setLatestHead(latestBlock)
+
 	lggr := v.lggr.With(
 		"latestBlock", latestBlock.BlockNumber,
 		"latestFinalizedBlock", latestBlock.FinalizedBlockNumber,
