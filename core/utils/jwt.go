@@ -56,8 +56,7 @@ type SigningMethodEth struct{}
 
 func init() {
 	s := &SigningMethodEth{}
-	// golang-jwt library does not support ES256K (ECDSA on the secp256k1 curve)
-	// so registering a custom implementation of the signing method here
+	// registering a custom implementation of the ETH signing method here
 	jwt.RegisterSigningMethod(s.Alg(), func() jwt.SigningMethod {
 		return s
 	})
@@ -118,7 +117,7 @@ type JWTClaims struct {
 //
 //	{
 //		digest: "<request-digest>",      // 32 byte hex string with "0x" prefix
-//		iss: "<compresssed-public-key>", // compressed ECDSA public key in hex format with "0x" prefix
+//		iss: "ethereum-address",         // Ethereum address of the issuer
 //		exp: <timestamp>,                // expiration time (Unix timestamp)
 //		iat: <timestamp>                 // issued at time (Unix timestamp)
 //	}
@@ -132,7 +131,7 @@ type JWTClaims struct {
 //	  "iat": 1717596400
 //	}
 //
-// signature: ECDSA signature of the header and payload using the private key
+// signature: ETH signature of the header and payload using the private key
 func CreateRequestJWT[T any](req jsonrpc.Request[T], opts ...Option) (*jwt.Token, error) {
 	// Apply options
 	options := &jwtOptions{}
