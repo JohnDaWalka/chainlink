@@ -21,16 +21,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
-
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 

@@ -223,6 +223,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
 				solana.SystemProgramID,
 				tokenPool,
+				solana.PublicKey{},
 				// programData.Address,
 				// configPDA,
 			).ValidateAndBuild()
@@ -237,6 +238,7 @@ func AddTokenPoolAndLookupTable(e cldf.Environment, cfg AddTokenPoolAndLookupTab
 				chain.DeployerKey.PublicKey(), // a token pool will only ever be added by the deployer key.
 				solana.SystemProgramID,
 				tokenPool,
+				solana.PublicKey{},
 				// programData.Address,
 				// configPDA,
 			).ValidateAndBuild()
@@ -1757,8 +1759,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 				poolConfigPDA,
 				tokenPubKey,
 				authority,
-				tokenPool,
-				solana.PublicKey{},
+				// tokenPool,
+				// solana.PublicKey{},
 			).ValidateAndBuild()
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
@@ -1796,8 +1798,8 @@ func TokenPoolOps(e cldf.Environment, cfg TokenPoolOpsCfg) (cldf.ChangesetOutput
 				poolConfigPDA,
 				tokenPubKey,
 				authority,
-				tokenPool,
-				solana.PublicKey{},
+				// tokenPool,
+				// solana.PublicKey{},
 			).ValidateAndBuild()
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)

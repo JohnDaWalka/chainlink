@@ -104,11 +104,18 @@ func baseCCIPConfig(
 		PackageId: strPtr(ccipPkg),
 		ModuleId:  strPtr("dynamic_dispatcher"),
 		Function:  strPtr("create_token_params"),
-		Params: []suicodec.SuiFunctionParam{{
-			Name:     "destination_chain_selector",
-			Type:     "u64",
-			Required: true,
-		}},
+		Params: []suicodec.SuiFunctionParam{
+			{
+				Name:     "destination_chain_selector",
+				Type:     "u64",
+				Required: true,
+			},
+			{
+				Name:     "receiver",
+				Type:     "vector<u8>",
+				Required: true,
+			},
+		},
 	}}
 	// append the variant commands
 	cmds = append(cmds, extra...)
@@ -143,9 +150,8 @@ func configureChainWriterForMsg(
 		Function:  strPtr("ccip_send"),
 		Params: []suicodec.SuiFunctionParam{
 			{Name: "ref", Type: "object_id", Required: true},
-			{Name: "onramp_state", Type: "object_id", Required: true},
+			{Name: "state", Type: "object_id", Required: true},
 			{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
-			{Name: "receiver", Type: "vector<u8>", Required: true},
 			{Name: "data", Type: "vector<u8>", Required: true},
 			{Name: "token_params", Type: "ptb_dependency", Required: true,
 				PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 0}},
@@ -187,9 +193,8 @@ func configureChainWriterForMultipleTokens(
 			Function:  strPtr("ccip_send"),
 			Params: []suicodec.SuiFunctionParam{
 				{Name: "ref", Type: "object_id", Required: true},
-				{Name: "onramp_state", Type: "object_id", Required: true},
+				{Name: "state", Type: "object_id", Required: true},
 				{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
-				{Name: "receiver", Type: "vector<u8>", Required: true},
 				{Name: "data", Type: "vector<u8>", Required: true},
 				{Name: "token_params", Type: "ptb_dependency", Required: true,
 					PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 1}},

@@ -1053,7 +1053,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		"ref":                        ccipObjectRefId,
 		"clock":                      "0x6",
 		"destination_chain_selector": cfg.DestChain,
-		"onramp_state":               onRampStateObjectId,
+		"state":                      onRampStateObjectId,
 		"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
 			0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
@@ -1083,10 +1083,10 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			"state": BurnMintTPState,
 			"c":     msg.TokenAmounts[0].Token,
 		}
-		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", extra)
+		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", extra)
 	} else {
 		// Build PTB for msg transfer
-		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", nil)
+		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", nil)
 	}
 
 	// Setup new PTB client

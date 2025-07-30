@@ -127,6 +127,8 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	var destChainID string
 	if config.Config.ChainSelector == 18395503381733958356 {
 		destChainID = "4"
+	} else if config.Config.ChainSelector == 9762610643973837292 {
+		destChainID = "2"
 	} else {
 		var err error
 		destChainID, err = chainsel.GetChainIDFromSelector(uint64(config.Config.ChainSelector))
