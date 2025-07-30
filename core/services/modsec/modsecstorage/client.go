@@ -3,6 +3,7 @@ package modsecstorage
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,6 +55,37 @@ func (s *stdClient) Set(ctx context.Context, key string, value []byte) error {
 	}
 
 	return nil
+}
+
+// GetMany implements Storage.
+func (s *stdClient) GetMany(ctx context.Context, keys []string) (map[string][]byte, error) {
+	// the standard endpoint is POST /getmany with a JSON body of keys.
+	url := fmt.Sprintf("%s/getmany", s.endpoint)
+	body, err := json.Marshal(keys)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get keys: %s", resp.Status)
+	}
+
+	var results map[string][]byte
+	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 func NewStdClient(endpoint string) Storage {

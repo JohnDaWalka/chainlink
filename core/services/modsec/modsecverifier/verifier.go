@@ -117,17 +117,11 @@ type storageValuePayload struct {
 	Signature   hexutil.Bytes `json:"signature"`
 }
 
-func (v *verifier) processPendingMessages(ctx context.Context, pending []logpoller.Log) {
+func (v *verifier) processPendingMessages(ctx context.Context, pending []unverifiedMessage) {
 	// sign messages and put them into offchain storage
 	for _, message := range pending {
-		parsedMessage, err := v.parser.ParseCCIPMessageSent(message.ToGethLog())
-		if err != nil {
-			v.lggr.Errorw("verifier failed to parse CCIPMessageSent, skipping message", "err", err)
-			continue
-		}
-
 		// TODO: signature logic, for now just keccak256 the messageID and sign that.
-		messageID := parsedMessage.MessageID()
+		messageID := message.parsedMessage.MessageID()
 		messageData, err := crypto.Keccak256(messageID[:])
 		if err != nil {
 			v.lggr.Errorw("verifier failed to keccak256 messageID, skipping message", "err", err)
@@ -165,20 +159,11 @@ func (v *verifier) processPendingMessages(ctx context.Context, pending []logpoll
 }
 
 // pollLogs polls the log poller for new finalized CCIPMessageSent events.
-func (v *verifier) pollLogs(ctx context.Context, lastProcessedBlock int64) ([]logpoller.Log, error) {
+func (v *verifier) pollLogs(ctx context.Context, lastProcessedBlock int64) ([]unverifiedMessage, error) {
 	latestBlock, err := v.lp.LatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
-
-	lggr := v.lggr.With(
-		"latestBlock", latestBlock.BlockNumber,
-		"latestFinalizedBlock", latestBlock.FinalizedBlockNumber,
-	)
-	lggr.Infow("verifier polling logs")
-	defer func() {
-		lggr.Infow("verifier done polling logs")
-	}()
 
 	// We don't specify confs because each request can have a different conf above
 	// the minimum. So we do all conf handling in getConfirmedAt.
@@ -193,7 +178,10 @@ func (v *verifier) pollLogs(ctx context.Context, lastProcessedBlock int64) ([]lo
 		return nil, fmt.Errorf("failed to get logs: %w", err)
 	}
 
-	unverifiedMessages := v.getUnverifiedMessages(ctx, logs)
+	unverifiedMessages, err := v.getUnverifiedMessages(ctx, logs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get unverified messages: %w", err)
+	}
 	if len(unverifiedMessages) == 0 {
 		v.lggr.Debugw("verifier found no unverified messages")
 		return nil, nil
@@ -205,19 +193,13 @@ func (v *verifier) pollLogs(ctx context.Context, lastProcessedBlock int64) ([]lo
 	return v.handleUnverifiedMessages(ctx, unverifiedMessages)
 }
 
-func (v *verifier) handleUnverifiedMessages(ctx context.Context, unverifiedMessages []logpoller.Log) (pending []logpoller.Log, err error) {
+func (v *verifier) handleUnverifiedMessages(ctx context.Context, unverifiedMessages []unverifiedMessage) (pending []unverifiedMessage, err error) {
 	latestBlock, err := v.lp.LatestBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
 
 	for _, message := range unverifiedMessages {
-		parsedMessage, err := v.parser.ParseCCIPMessageSent(message.ToGethLog())
-		if err != nil {
-			v.lggr.Errorw("verifier failed to parse CCIPMessageSent, skipping message", "err", err)
-			continue
-		}
-
 		// check if the message is finalized
 		// TODO: should be able to handle FTF somewhere here.
 		if message.BlockNumber > int64(latestBlock.FinalizedBlockNumber) {
@@ -227,24 +209,8 @@ func (v *verifier) handleUnverifiedMessages(ctx context.Context, unverifiedMessa
 			)
 			continue
 		}
-
-		messageID := parsedMessage.MessageID()
-		if _, err := v.storage.Get(ctx, hexutil.Encode(messageID[:])); err == nil {
-			v.lggr.Debugw("verifier skipping already verified message", "messageID", hexutil.Encode(messageID[:]))
-			continue
-		}
-
-		v.lggr.Infow("verifier found unverified message",
-			"messageID", hexutil.Encode(messageID[:]),
-			"messageBlockNumber", message.BlockNumber,
-			"messageTxHash", message.TxHash,
-			"messageBlockHash", message.BlockHash,
-			"latestFinalizedBlock", latestBlock.FinalizedBlockNumber,
-		)
-
 		pending = append(pending, message)
 	}
-
 	return pending, nil
 }
 
@@ -255,16 +221,6 @@ func (v *verifier) updateLastProcessedBlock(ctx context.Context, currLastProcess
 	if err != nil {
 		return 0, fmt.Errorf("failed to get latest block: %w", err)
 	}
-
-	lggr := v.lggr.With(
-		"currLastProcessedBlock", currLastProcessedBlock,
-		"latestBlock", latestBlock.BlockNumber,
-		"latestFinalizedBlock", latestBlock.FinalizedBlockNumber,
-	)
-	lggr.Infow("verifier updating last processed block")
-	defer func() {
-		lggr.Infow("verifier done updating last processed block")
-	}()
 
 	messages, err := v.lp.LogsWithSigs(
 		ctx,
@@ -277,30 +233,15 @@ func (v *verifier) updateLastProcessedBlock(ctx context.Context, currLastProcess
 		return 0, fmt.Errorf("failed to get logs: %w", err)
 	}
 
-	unverifiedMessages := v.getUnverifiedMessages(ctx, messages)
-	var earliestUnverifiedBlock = latestBlock.FinalizedBlockNumber
-	for _, message := range unverifiedMessages {
-		if message.BlockNumber < earliestUnverifiedBlock {
-			earliestUnverifiedBlock = int64(message.BlockNumber)
-		}
-	}
-
-	return earliestUnverifiedBlock, nil
+	return v.findEarliestUnverifiedBlock(ctx, messages)
 }
 
 // initializeLastProcessedBlock initializes the last processed block for the verifier
 // in order to efficiently query for logs in the log poller.
 // It uses offchain storage to determine whether a message has been verified already.
 func (v *verifier) initializeLastProcessedBlock(ctx context.Context) (int64, error) {
-	latestBlock, err := v.lp.LatestBlock(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get latest block: %w", err)
-	}
-
 	fromTimestamp := time.Now().UTC().Add(-lookback)
 	lggr := v.lggr.With(
-		"latestBlock", latestBlock.BlockNumber,
-		"latestFinalizedBlock", latestBlock.FinalizedBlockNumber,
 		"fromTimestamp", fromTimestamp,
 	)
 	lggr.Infow("verifier initializing last processed block")
@@ -320,42 +261,68 @@ func (v *verifier) initializeLastProcessedBlock(ctx context.Context) (int64, err
 		return 0, fmt.Errorf("failed to get messages: %w", err)
 	}
 
+	return v.findEarliestUnverifiedBlock(ctx, messages)
+}
+
+func (v *verifier) findEarliestUnverifiedBlock(ctx context.Context, messages []logpoller.Log) (int64, error) {
+	latestBlock, err := v.lp.LatestBlock(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get latest block: %w", err)
+	}
 	// determine which messages have been verified already by querying
 	// offchain storage for each message.
-	// TODO: make a batch call?
-	unverifiedMessages := v.getUnverifiedMessages(ctx, messages)
+	unverifiedMessages, err := v.getUnverifiedMessages(ctx, messages)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get unverified messages: %w", err)
+	}
 	// find message block of earliest unverified message
 	// even if this block is > latest finalized, we use latest finalized as earliest unprocessed
 	// because re-orgs can occur on any unfinalized block.
-	var earliestUnverifiedBlock = latestBlock.FinalizedBlockNumber
+	earliestUnverifiedBlock := latestBlock.FinalizedBlockNumber
 	for _, message := range unverifiedMessages {
 		if message.BlockNumber < earliestUnverifiedBlock {
 			earliestUnverifiedBlock = int64(message.BlockNumber)
 		}
 	}
-
 	return earliestUnverifiedBlock, nil
 }
 
-func (v *verifier) getUnverifiedMessages(ctx context.Context, messages []logpoller.Log) (unverifiedMessages []logpoller.Log) {
+type unverifiedMessage struct {
+	logpoller.Log
+	parsedMessage modsectypes.CCIPMessageSent
+}
+
+func (v *verifier) getUnverifiedMessages(ctx context.Context, messages []logpoller.Log) ([]unverifiedMessage, error) {
+	if len(messages) == 0 {
+		return nil, nil
+	}
+	var (
+		messageIDs []string
+		parsedLogs = make(map[string]unverifiedMessage)
+	)
 	for _, message := range messages {
 		parsedMessage, err := v.parser.ParseCCIPMessageSent(message.ToGethLog())
 		if err != nil {
 			v.lggr.Errorw("verifier failed to parse CCIPMessageSent, skipping message", "err", err)
 			continue
 		}
-
-		// TODO: can make a batch call here.
 		messageID := parsedMessage.MessageID()
-		if _, err := v.storage.Get(ctx, hexutil.Encode(messageID[:])); err == nil {
-			v.lggr.Debugw("verifier skipping already verified message", "messageID", hexutil.Encode(messageID[:]))
-			continue
-		}
-
-		unverifiedMessages = append(unverifiedMessages, message)
+		messageIDs = append(messageIDs, hexutil.Encode(messageID[:]))
+		parsedLogs[hexutil.Encode(messageID[:])] = unverifiedMessage{message, parsedMessage}
 	}
 
-	return unverifiedMessages
+	verifiedMessages, err := v.storage.GetMany(ctx, messageIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get many messages from storage: %w", err)
+	}
+
+	var unverifiedMessages []unverifiedMessage
+	for id, log := range parsedLogs {
+		if _, ok := verifiedMessages[id]; !ok {
+			unverifiedMessages = append(unverifiedMessages, log)
+		}
+	}
+	return unverifiedMessages, nil
 }
 
 func (v *verifier) registerFilterIfNeeded(ctx context.Context) error {

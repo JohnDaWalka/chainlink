@@ -2,6 +2,7 @@ package modsecstorage
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -29,6 +30,17 @@ func (t *testStorage) Get(ctx context.Context, key string) ([]byte, error) {
 func (t *testStorage) Set(ctx context.Context, key string, value []byte) error {
 	t.storage[key] = value
 	return nil
+}
+
+// GetMany implements Storage.
+func (t *testStorage) GetMany(ctx context.Context, keys []string) (map[string][]byte, error) {
+	results := make(map[string][]byte)
+	for _, key := range keys {
+		if val, ok := t.storage[key]; ok {
+			results[key] = val
+		}
+	}
+	return results, nil
 }
 
 // NewTestStorage creates a new Storage implementation, backed by a map.
@@ -75,6 +87,23 @@ func NewTestServer() (*httptest.Server, func()) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	})
+	handler.HandleFunc("/getmany", func(w http.ResponseWriter, r *http.Request) {
+		var keys []string
+		if err := json.NewDecoder(r.Body).Decode(&keys); err != nil {
+			http.Error(w, "decode error", http.StatusBadRequest)
+			return
+		}
+		vals, err := testStore.GetMany(r.Context(), keys)
+		if err != nil {
+			http.Error(w, "getmany error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(vals); err != nil {
+			http.Error(w, "encode error", http.StatusInternalServerError)
+			return
+		}
 	})
 
 	server := httptest.NewServer(handler)

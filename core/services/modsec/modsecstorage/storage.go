@@ -20,4 +20,7 @@ import "context"
 type Storage interface {
 	Set(ctx context.Context, key string, value []byte) error
 	Get(ctx context.Context, key string) ([]byte, error)
+	// GetMany returns a map of found key-value pairs.
+	// If a key is not found, it is not included in the map.
+	GetMany(ctx context.Context, keys []string) (map[string][]byte, error)
 }
