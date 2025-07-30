@@ -139,6 +139,9 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 	// based on the method in the ID.
 	// Any messages without "/" is assumed to be a trigger response to a prior user request.
 	if strings.Contains(resp.ID, "/") {
+		if resp.Result == nil {
+			return fmt.Errorf("received empty response from node %s for request ID %s", nodeAddr, resp.ID)
+		}
 		parts := strings.Split(resp.ID, "/")
 		methodName := parts[0]
 		switch methodName {
