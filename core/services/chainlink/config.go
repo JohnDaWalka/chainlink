@@ -365,11 +365,8 @@ func (c *Config) SetFrom(f *Config) (err error) {
 	appendErr(c.Aptos.SetFrom(f.Aptos), "Aptos")
 	appendErr(c.Tron.SetFrom(f.Tron), "Tron")
 	appendErr(c.TON.SetFrom(f.TON), "TON")
-
-	if err7 := c.Sui.SetFrom(f.Sui); err7 != nil {
-		err = multierr.Append(err, commonconfig.NamedMultiErrorList(err7, "Sui"))
-	}
-
+	appendErr(c.Sui.SetFrom(f.Sui), "Sui")
+  
 	_, err = commonconfig.MultiErrorList(err)
 	return err
 }
