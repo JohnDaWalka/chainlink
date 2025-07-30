@@ -276,10 +276,11 @@ func TestEngine_Execution(t *testing.T) {
 		},
 		OnExecutionFinished: func(executionID string, _ string) {
 			executionFinishedCh <- executionID
+			close(executionFinishedCh)
 		},
 	}
 	beholderObserver := beholdertest.NewObserver(t)
-	cfg.BeholderEmitter = custmsg.NewLabeler()
+	cfg.BeholderEmitter = &slowBeholderEmitter{underlying: custmsg.NewLabeler(), blockingCh: executionFinishedCh}
 
 	t.Run("successful execution with no capability calls", func(t *testing.T) {
 		engine, err := v2.NewEngine(cfg)
@@ -1506,4 +1507,26 @@ func (c *TriggerCapabilityWrapper) Info(ctx context.Context) (capabilities.Capab
 		capabilities.CapabilityTypeTrigger,
 		"Mock of trigger capability for testing",
 	)
+}
+
+type slowBeholderEmitter struct {
+	underlying custmsg.MessageEmitter
+	blockingCh chan string
+}
+
+func (s *slowBeholderEmitter) Emit(ctx context.Context, msg string) error {
+	<-s.blockingCh
+	return s.underlying.Emit(ctx, msg)
+}
+
+func (s *slowBeholderEmitter) WithMapLabels(labels map[string]string) custmsg.MessageEmitter {
+	return &slowBeholderEmitter{underlying: s.underlying.WithMapLabels(labels), blockingCh: s.blockingCh}
+}
+
+func (s *slowBeholderEmitter) With(keyValues ...string) custmsg.MessageEmitter {
+	return &slowBeholderEmitter{underlying: s.underlying.With(keyValues...), blockingCh: s.blockingCh}
+}
+
+func (s *slowBeholderEmitter) Labels() map[string]string {
+	return s.underlying.Labels()
 }

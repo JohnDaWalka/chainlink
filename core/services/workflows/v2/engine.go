@@ -54,6 +54,13 @@ type Engine struct {
 	meterReports *metering.Reports
 
 	metrics *monitoring.WorkflowsMetricLabeler
+
+	// Beholder logs are handled asynchronously.
+	// To avoid losing logs, we implement a two-step graceful shutdown.
+	emitQueue              chan func(context.Context)
+	beholderEmitSoftStopCh services.StopChan
+	beholderEmitHardStopCh services.StopChan
+	beholderEmitDone       chan struct{}
 }
 
 type triggerCapability struct {
@@ -87,6 +94,19 @@ func NewEngine(cfg *EngineConfig) (*Engine, error) {
 		return nil, fmt.Errorf("could not get local node state: %w", err)
 	}
 
+	engine := &Engine{
+		cfg:                     cfg,
+		localNode:               localNode,
+		triggers:                make(map[string]*triggerCapability),
+		allTriggerEventsQueueCh: make(chan enqueuedTriggerEvent, cfg.LocalLimits.TriggerEventQueueSize),
+		executionsSemaphore:     make(chan struct{}, cfg.LocalLimits.MaxConcurrentWorkflowExecutions),
+		capCallsSemaphore:       NewSemaphore[*sdkpb.CapabilityResponse](cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow),
+		emitQueue:               make(chan func(context.Context), cfg.LocalLimits.BeholderEmitQueueSize),
+		beholderEmitSoftStopCh:  make(chan struct{}),
+		beholderEmitHardStopCh:  make(chan struct{}),
+		beholderEmitDone:        make(chan struct{}),
+	}
+
 	labels := []any{
 		platform.KeyWorkflowID, cfg.WorkflowID,
 		platform.KeyWorkflowOwner, cfg.WorkflowOwner,
@@ -102,7 +122,7 @@ func NewEngine(cfg *EngineConfig) (*Engine, error) {
 		platform.KeyP2PID, localNode.PeerID.String(),
 	}
 
-	beholderLogger := custmsg.NewBeholderLogger(cfg.Lggr, cfg.BeholderEmitter).Named("WorkflowEngine").With(labels...)
+	beholderLogger := custmsg.NewBeholderLogger(cfg.Lggr, cfg.BeholderEmitter, engine).Named("WorkflowEngine").With(labels...)
 	metricsLabeler := monitoring.NewWorkflowsMetricLabeler(metrics.NewLabeler(), em).With(
 		platform.KeyWorkflowID, cfg.WorkflowID,
 		platform.KeyWorkflowOwner, cfg.WorkflowOwner,
@@ -130,18 +150,11 @@ func NewEngine(cfg *EngineConfig) (*Engine, error) {
 		)
 	}
 
-	engine := &Engine{
-		cfg:                     cfg,
-		lggr:                    beholderLogger,
-		loggerLabels:            labelsMap,
-		localNode:               localNode,
-		triggers:                make(map[string]*triggerCapability),
-		allTriggerEventsQueueCh: make(chan enqueuedTriggerEvent, cfg.LocalLimits.TriggerEventQueueSize),
-		executionsSemaphore:     make(chan struct{}, cfg.LocalLimits.MaxConcurrentWorkflowExecutions),
-		capCallsSemaphore:       NewSemaphore[*sdkpb.CapabilityResponse](cfg.LocalLimits.MaxConcurrentCapabilityCallsPerWorkflow),
-		meterReports:            metering.NewReports(cfg.BillingClient, cfg.WorkflowOwner, cfg.WorkflowID, beholderLogger, labelsMap, metricsLabeler, cfg.WorkflowRegistryAddress, cfg.WorkflowRegistryChainSelector),
-		metrics:                 metricsLabeler,
-	}
+	engine.lggr = beholderLogger
+	engine.loggerLabels = labelsMap
+	engine.meterReports = metering.NewReports(cfg.BillingClient, cfg.WorkflowOwner, cfg.WorkflowID, beholderLogger, labelsMap, metricsLabeler, cfg.WorkflowRegistryAddress, cfg.WorkflowRegistryChainSelector)
+	engine.metrics = metricsLabeler
+
 	engine.Service, engine.srvcEng = services.Config{
 		Name:  "WorkflowEngineV2",
 		Start: engine.start,
@@ -157,6 +170,8 @@ func (e *Engine) start(ctx context.Context) error {
 	e.srvcEng.GoCtx(ctx, e.heartbeatLoop)
 	e.srvcEng.GoCtx(ctx, e.init)
 	e.srvcEng.GoCtx(ctx, e.handleAllTriggerEvents)
+	// launch outside srvcEng because we want this to outlive all other goroutines
+	go e.beholderAsyncEmitLoop(ctx)
 	return nil
 }
 
@@ -203,17 +218,11 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 	subCtx, subCancel := context.WithTimeout(ctx, time.Millisecond*time.Duration(e.cfg.LocalLimits.TriggerSubscriptionRequestTimeoutMs))
 	defer subCancel()
 
-	userLogChan := make(chan *protoevents.LogLine, e.cfg.LocalLimits.MaxUserLogEventsPerExecution)
-	defer close(userLogChan)
-	e.srvcEng.Go(func(_ context.Context) {
-		e.emitUserLogs(subCtx, userLogChan, e.cfg.WorkflowID)
-	})
-
 	result, err := e.cfg.Module.Execute(subCtx, &sdkpb.ExecuteRequest{
 		Request:         &sdkpb.ExecuteRequest_Subscribe{},
 		MaxResponseSize: uint64(e.cfg.LocalLimits.ModuleExecuteMaxResponseSizeBytes),
 		Config:          e.cfg.WorkflowConfig,
-	}, NewDisallowedExecutionHelper(e.lggr, userLogChan, TimeProvider{}, e.cfg.SecretsFetcher))
+	}, NewDisallowedExecutionHelper(e.lggr, e, TimeProvider{}, e.cfg.SecretsFetcher))
 	if err != nil {
 		return fmt.Errorf("failed to execute subscribe: %w", err)
 	}
@@ -374,12 +383,6 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 	defer execCancel()
 	executionLogger := logger.With(e.lggr, "executionID", executionID, "triggerID", wrappedTriggerEvent.triggerCapID, "triggerIndex", wrappedTriggerEvent.triggerIndex)
 
-	userLogChan := make(chan *protoevents.LogLine, e.cfg.LocalLimits.MaxUserLogEventsPerExecution)
-	defer close(userLogChan)
-	e.srvcEng.Go(func(_ context.Context) {
-		e.emitUserLogs(execCtx, userLogChan, executionID)
-	})
-
 	tid, err := safe.IntToUint64(wrappedTriggerEvent.triggerIndex)
 	if err != nil {
 		executionLogger.Errorw("Failed to convert trigger index to uint64", "err", err)
@@ -400,7 +403,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		},
 		MaxResponseSize: uint64(e.cfg.LocalLimits.ModuleExecuteMaxResponseSizeBytes),
 		Config:          e.cfg.WorkflowConfig,
-	}, &ExecutionHelper{Engine: e, WorkflowExecutionID: executionID, UserLogChan: userLogChan, SecretsFetcher: e.cfg.SecretsFetcher})
+	}, &ExecutionHelper{Engine: e, WorkflowExecutionID: executionID, SecretsFetcher: e.cfg.SecretsFetcher})
 
 	endTime := e.cfg.Clock.Now()
 	executionDuration := endTime.Sub(startTime)
@@ -457,6 +460,15 @@ func (e *Engine) close() error {
 
 	// reset metering mode metric so that a positive value does not persist
 	e.metrics.UpdateWorkflowMeteringModeGauge(ctx, false)
+
+	// all executions are finished, we can shut down beholder emit goroutine now
+	close(e.beholderEmitSoftStopCh)
+	select {
+	case <-e.beholderEmitDone:
+	case <-ctx.Done():
+		close(e.beholderEmitHardStopCh)
+		<-e.beholderEmitDone
+	}
 
 	return e.cfg.GlobalLimits.Free(ctx, 1)
 }
@@ -515,34 +527,73 @@ func (e *Engine) deductStandardBalances(meteringReport *metering.Report) {
 	}
 }
 
-// separate call for each workflow execution
-func (e *Engine) emitUserLogs(ctx context.Context, userLogChan chan *protoevents.LogLine, executionID string) {
-	e.lggr.Debugw("Listening for user logs ...")
-	count := 0
-	defer func() { e.lggr.Debugw("Listening for user logs done.", "processedLogLines", count) }()
+func (e *Engine) enqueueUserLog(msg string, count int, workflowExecutionID string) error {
+	logLine := &protoevents.LogLine{
+		NodeTimestamp: time.Now().Format(time.RFC3339Nano),
+		Message:       msg,
+	}
+
+	if e.cfg.DebugMode {
+		e.lggr.Debugf("User log: <<<%s>>>, local node timestamp: %s", logLine.Message, logLine.NodeTimestamp)
+	}
+	if count > int(e.cfg.LocalLimits.MaxUserLogEventsPerExecution) {
+		e.lggr.Warnw("Max user log events per execution reached, dropping event", "maxEvents", e.cfg.LocalLimits.MaxUserLogEventsPerExecution)
+		return fmt.Errorf("max user log events per execution reached: %d", e.cfg.LocalLimits.MaxUserLogEventsPerExecution)
+	}
+	if len(logLine.Message) > int(e.cfg.LocalLimits.MaxUserLogLineLength) {
+		logLine.Message = logLine.Message[:e.cfg.LocalLimits.MaxUserLogLineLength] + " ...(truncated)"
+	}
+
+	e.Enqueue(func(ctx context.Context) {
+		if err := events.EmitUserLogs(ctx, e.loggerLabels, []*protoevents.LogLine{logLine}, workflowExecutionID); err != nil {
+			e.lggr.Errorw("Failed to emit user logs", "err", err)
+		}
+	})
+	return nil
+}
+
+func (e *Engine) beholderAsyncEmitLoop(ctx context.Context) {
+	defer func() { e.beholderEmitDone <- struct{}{} }()
+	ctx, cancel := e.beholderEmitHardStopCh.Ctx(context.WithoutCancel(ctx))
+	defer cancel()
+	e.lggr.Info("Starting Beholder async emit loop")
 	for {
 		select {
-		case <-ctx.Done():
-			return
-		case logLine, ok := <-userLogChan:
+		case <-e.beholderEmitSoftStopCh:
+			e.lggr.Info("Shutting down Beholder async emit loop - engine shutting down")
+			// drain emit queue until hard stop
+			for {
+				select {
+				case fn, ok := <-e.emitQueue:
+					if !ok {
+						return
+					}
+					fn(ctx)
+				case <-e.beholderEmitHardStopCh:
+					e.lggr.Info("Shutting down Beholder async emit loop - hard stop")
+					return
+				default:
+					return
+				}
+			}
+		case fn, ok := <-e.emitQueue:
 			if !ok {
+				// should never happen
+				e.cfg.Lggr.Error("Shutting down Beholder async emit loop - queue channel closed")
 				return
 			}
-			if e.cfg.DebugMode {
-				e.lggr.Debugf("User log: <<<%s>>>, local node timestamp: %s", logLine.Message, logLine.NodeTimestamp)
-			}
-			if count >= int(e.cfg.LocalLimits.MaxUserLogEventsPerExecution) {
-				e.lggr.Warnw("Max user log events per execution reached, dropping event", "maxEvents", e.cfg.LocalLimits.MaxUserLogEventsPerExecution)
-				return
-			}
-			if len(logLine.Message) > int(e.cfg.LocalLimits.MaxUserLogLineLength) {
-				logLine.Message = logLine.Message[:e.cfg.LocalLimits.MaxUserLogLineLength] + " ...(truncated)"
-			}
-
-			if err := events.EmitUserLogs(ctx, e.loggerLabels, []*protoevents.LogLine{logLine}, executionID); err != nil {
-				e.lggr.Errorw("Failed to emit user logs", "err", err)
-			}
-			count++
+			fn(ctx)
 		}
+	}
+}
+
+// Implementation of the taskProcessor interface for BeholderLoger
+func (e *Engine) Enqueue(fn func(context.Context)) {
+	select {
+	case e.emitQueue <- fn:
+	default:
+		// IMPORTANT: Use the raw stderr logger, not BeholderLogger (e.lggr)
+		// Consider adding a metric.
+		e.cfg.Lggr.Errorw("emit queue is full, dropping log", "queueLen", len(e.emitQueue))
 	}
 }

@@ -65,6 +65,7 @@ const (
 	defaultCapabilityCallTimeoutMs                 = 1000 * 60 * 8  // 8 minutes
 	defaultMaxUserLogEventsPerExecution            = 1000
 	defaultMaxUserLogLineLength                    = 1000
+	defaultBeholderEmitQueueSize                   = 10000
 
 	defaultHeartbeatFrequencyMs = 1000 * 60 // 1 minute
 	defaultShutdownTimeoutMs    = 5000
@@ -85,6 +86,7 @@ type EngineLimits struct {
 	CapabilityCallTimeoutMs                 uint32
 	MaxUserLogEventsPerExecution            uint32
 	MaxUserLogLineLength                    uint32
+	BeholderEmitQueueSize                   uint32
 
 	HeartbeatFrequencyMs uint32
 	ShutdownTimeoutMs    uint32
@@ -182,6 +184,9 @@ func (l *EngineLimits) setDefaultLimits() {
 	}
 	if l.MaxUserLogLineLength == 0 {
 		l.MaxUserLogLineLength = defaultMaxUserLogLineLength
+	}
+	if l.BeholderEmitQueueSize == 0 {
+		l.BeholderEmitQueueSize = defaultBeholderEmitQueueSize
 	}
 	if l.HeartbeatFrequencyMs == 0 {
 		l.HeartbeatFrequencyMs = defaultHeartbeatFrequencyMs
