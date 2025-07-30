@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
-	"github.com/smartcontractkit/chainlink-evm/pkg/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsectypes"
 )
 
 // executor is a service that monitors the source chain for CCIPMessageSent events,
@@ -17,7 +17,7 @@ import (
 type executor struct {
 	lggr           logger.Logger
 	lp             logpoller.LogPoller
-	txm            txmgr.TxManager
+	transmitter    modsectypes.Transmitter
 	wg             sync.WaitGroup
 	runCtx         context.Context
 	runCtxCancel   context.CancelFunc
@@ -32,7 +32,7 @@ var _ job.ServiceCtx = &executor{}
 func New(
 	lggr logger.Logger,
 	lp logpoller.LogPoller,
-	txm txmgr.TxManager,
+	transmitter modsectypes.Transmitter,
 	eventSig string,
 	onRampAddress string,
 	offRampAddress string,
@@ -41,7 +41,7 @@ func New(
 	return &executor{
 		lggr:           lggr,
 		lp:             lp,
-		txm:            txm,
+		transmitter:    transmitter,
 		eventSig:       eventSig,
 		onRampAddress:  onRampAddress,
 		offRampAddress: offRampAddress,

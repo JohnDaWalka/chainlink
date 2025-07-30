@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecexecutor"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecstorage"
+	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsectypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/modsec/modsecverifier"
 )
 
@@ -200,7 +201,11 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	relayer := modsecexecutor.New(
 		d.lggr,
 		legacyDestChain.LogPoller(),
-		legacyDestChain.TxManager(),
+		modsectypes.NewEVMTransmitter(
+			d.lggr,
+			legacyDestChain.TxManager(),
+			common.HexToAddress(spec.ModsecSpec.OffRampAddress),
+		),
 		spec.ModsecSpec.CCIPMessageSentEventSig,
 		spec.ModsecSpec.OnRampAddress,
 		spec.ModsecSpec.OffRampAddress,

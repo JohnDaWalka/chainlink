@@ -214,16 +214,18 @@ func Test_processPendingMessages(t *testing.T) {
 		require.NoError(t, err)
 		var payload storageValuePayload
 		require.NoError(t, json.Unmarshal(verified, &payload))
-		t.Logf("message %d is verified: messageData=%s, signature=%s", i, hexutil.Encode(payload.MessageData), hexutil.Encode(payload.Signature))
+		t.Logf("message %d is verified: messageData=%s, signature=%s", i, hexutil.Encode(payload.ABIEncodedMessageData), hexutil.Encode(payload.Signature))
+
+		digestHash := crypto.Keccak256(payload.ABIEncodedMessageData)
 
 		// to verify the sig, we need the public key first.
-		pubKey, err := crypto.SigToPub(payload.MessageData, payload.Signature)
+		pubKey, err := crypto.SigToPub(digestHash, payload.Signature)
 		require.NoError(t, err)
 		require.Equal(t, universe.verifier.signerKey.Address, crypto.PubkeyToAddress(*pubKey))
 
 		// now we can verify the signature
 		// have to trim the last byte (the v byte) because VerifySignature requires a 64 byte signature [R || S || V]
-		require.True(t, crypto.VerifySignature(crypto.CompressPubkey(pubKey), payload.MessageData, payload.Signature[:64]))
+		require.True(t, crypto.VerifySignature(crypto.CompressPubkey(pubKey), digestHash, payload.Signature[:64]))
 	}
 }
 

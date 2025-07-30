@@ -113,35 +113,49 @@ func (v *verifier) run(ctx context.Context) error {
 }
 
 type storageValuePayload struct {
-	MessageData hexutil.Bytes `json:"messageData"`
-	Signature   hexutil.Bytes `json:"signature"`
+	// ABIEncodedMessageData is the abi-encoded message data of the Any2EVM message.
+	ABIEncodedMessageData hexutil.Bytes `json:"abiEncodedMessageData"`
+	// MessageHash is the hash of the ABIEncodedMessageData.
+	MessageHash hexutil.Bytes `json:"messageHash"`
+	// Signature is the signature of the MessageHash.
+	Signature hexutil.Bytes `json:"signature"`
 }
 
 func (v *verifier) processPendingMessages(ctx context.Context, pending []unverifiedMessage) {
 	// sign messages and put them into offchain storage
 	for _, message := range pending {
-		// TODO: signature logic, for now just keccak256 the messageID and sign that.
-		messageID := message.parsedMessage.MessageID()
-		messageData, err := crypto.Keccak256(messageID[:])
+		// TODO: hashing/signature logic, for now just keccak256 the messageData and sign that.
+		messageData, err := message.parsedMessage.Encoded()
+		if err != nil {
+			v.lggr.Errorw("verifier failed to encode message, skipping message", "err", err)
+			continue
+		}
+
+		messageHash, err := crypto.Keccak256(messageData[:])
 		if err != nil {
 			v.lggr.Errorw("verifier failed to keccak256 messageID, skipping message", "err", err)
 			continue
 		}
-		signature, err := v.signerKey.Sign(messageData)
+
+		signature, err := v.signerKey.Sign(messageHash)
 		if err != nil {
 			v.lggr.Errorw("verifier failed to sign message, skipping message", "err", err)
 			continue
 		}
 
 		payload := storageValuePayload{
-			MessageData: messageData,
-			Signature:   signature,
+			ABIEncodedMessageData: messageData,
+			MessageHash:           messageHash,
+			Signature:             signature,
 		}
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
 			v.lggr.Errorw("verifier failed to marshal payload, skipping message", "err", err)
 			continue
 		}
+
+		// key in storage is messageID, which is emitted on source (not necessarily the message hash).
+		messageID := message.parsedMessage.MessageID()
 		if err := v.storage.Set(ctx, hexutil.Encode(messageID[:]), payloadBytes); err != nil {
 			v.lggr.Errorw("verifier failed to set payload in offchain storage, skipping message", "err", err)
 			continue
