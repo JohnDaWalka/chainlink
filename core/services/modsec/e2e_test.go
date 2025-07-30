@@ -13,12 +13,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	"github.com/ethereum/go-ethereum/params"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/verifier_events"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_0_0/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/weth9"
+	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client"
 	v2toml "github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
@@ -134,10 +136,12 @@ func generateChainsEVM(t *testing.T, numChains int, numUsers int, blockTime time
 		}
 
 		chains = append(chains, EVMChain{
-			EVMChainID:  new(big.Int).SetUint64(evmChainID),
-			Backend:     backend,
-			DeployerKey: adminTransactor,
-			Users:       additionalTransactors,
+			ChainSelector: selector,
+			EVMChainID:    new(big.Int).SetUint64(evmChainID),
+			Backend:       backend,
+			Client:        client.NewSimulatedBackendClient(t, backend, new(big.Int).SetUint64(evmChainID)),
+			DeployerKey:   adminTransactor,
+			Users:         additionalTransactors,
 		})
 	}
 
@@ -145,10 +149,38 @@ func generateChainsEVM(t *testing.T, numChains int, numUsers int, blockTime time
 }
 
 type EVMChain struct {
-	EVMChainID  *big.Int
-	Backend     *simulated.Backend
-	DeployerKey *bind.TransactOpts
-	Users       []*bind.TransactOpts
+	ChainSelector uint64
+	EVMChainID    *big.Int
+	Backend       *simulated.Backend
+	Client        client.Client
+	DeployerKey   *bind.TransactOpts
+	Users         []*bind.TransactOpts
+}
+
+func sendEth(t *testing.T, sender *bind.TransactOpts, b *simulated.Backend, to common.Address, eth int) {
+	ctx := t.Context()
+	nonce, err := b.Client().PendingNonceAt(ctx, sender.From)
+	require.NoError(t, err)
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   simChainID,
+		Nonce:     nonce,
+		GasTipCap: big.NewInt(1000000),    // 1 mwei
+		GasFeeCap: assets.GWei(1).ToInt(), // block base fee in sim
+		Gas:       uint64(21_000),
+		To:        &to,
+		Value:     big.NewInt(0).Mul(big.NewInt(int64(eth)), big.NewInt(1e18)),
+		Data:      nil,
+	})
+	balBefore, err := b.Client().BalanceAt(ctx, to, nil)
+	require.NoError(t, err)
+	signedTx, err := sender.Signer(sender.From, tx)
+	require.NoError(t, err)
+	err = b.Client().SendTransaction(ctx, signedTx)
+	require.NoError(t, err)
+	b.Commit()
+	balAfter, err := b.Client().BalanceAt(ctx, to, nil)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(0).Sub(balAfter, balBefore).String(), tx.Value().String())
 }
 
 func setupApp(t *testing.T) (chainlink.Application, ccipDeployments) {
@@ -174,7 +206,7 @@ func setupApp(t *testing.T) (chainlink.Application, ccipDeployments) {
 	clients := make(map[uint64]client.Client)
 	for _, chain := range evmChains {
 		if chain.Backend != nil {
-			clients[chain.EVMChainID.Uint64()] = client.NewSimulatedBackendClient(t, chain.Backend, chain.EVMChainID)
+			clients[chain.EVMChainID.Uint64()] = chain.Client
 		}
 	}
 
@@ -193,6 +225,16 @@ func setupApp(t *testing.T) (chainlink.Application, ccipDeployments) {
 	// transmitter key for each chain
 	for _, chain := range evmChains {
 		require.NoError(t, master.Eth().EnsureKeys(ctx, chain.EVMChainID))
+	}
+
+	// fund transmitter for each chain
+	for _, chain := range evmChains {
+		allKeys, err := master.Eth().EnabledKeysForChain(ctx, chain.EVMChainID)
+		require.NoError(t, err)
+
+		for _, key := range allKeys {
+			sendEth(t, chain.DeployerKey, chain.Backend, key.Address, 10)
+		}
 	}
 
 	app, err := chainlink.NewApplication(ctx, chainlink.ApplicationOpts{
@@ -242,11 +284,19 @@ func createConfigV2Chain(chainID uint64) *v2toml.EVMConfig {
 }
 
 type ccipChainDeployment struct {
-	evmChainID   *big.Int
-	routerAddr   common.Address
-	mockRMNAddr  common.Address
-	armProxyAddr common.Address
-	wethAddr     common.Address
+	deployerKey   *bind.TransactOpts
+	backend       *simulated.Backend
+	simClient     client.Client
+	chainSelector uint64
+	evmChainID    *big.Int
+	routerAddr    common.Address
+	mockRMNAddr   common.Address
+	armProxyAddr  common.Address
+	wethAddr      common.Address
+	// fake onRamp for testing
+	verifierOnRampAddr common.Address
+	// fake offRamp for testing
+	verifierOffRampAddr common.Address
 }
 
 type ccipDeployments struct {
@@ -275,12 +325,28 @@ func deploySingleChain(t *testing.T, chain EVMChain) ccipChainDeployment {
 	require.NoError(t, err)
 	chain.Backend.Commit()
 
+	// deploy "onramp" (fake)
+	verifierOnRampAddr, _, _, err := verifier_events.DeployVerifierEvents(chain.DeployerKey, chain.Backend.Client())
+	require.NoError(t, err)
+	chain.Backend.Commit()
+
+	// deploy "offramp" (fake)
+	verifierOffRampAddr, _, _, err := verifier_events.DeployVerifierEvents(chain.DeployerKey, chain.Backend.Client())
+	require.NoError(t, err)
+	chain.Backend.Commit()
+
 	return ccipChainDeployment{
-		evmChainID:   chain.EVMChainID,
-		routerAddr:   routerAddr,
-		mockRMNAddr:  mockRMNAddr,
-		armProxyAddr: armProxyAddr,
-		wethAddr:     wethAddr,
+		deployerKey:         chain.DeployerKey,
+		backend:             chain.Backend,
+		simClient:           chain.Client,
+		chainSelector:       chain.ChainSelector,
+		evmChainID:          chain.EVMChainID,
+		routerAddr:          routerAddr,
+		mockRMNAddr:         mockRMNAddr,
+		armProxyAddr:        armProxyAddr,
+		wethAddr:            wethAddr,
+		verifierOnRampAddr:  verifierOnRampAddr,
+		verifierOffRampAddr: verifierOffRampAddr,
 	}
 }
 
@@ -294,8 +360,31 @@ func deployContracts(t *testing.T, source, dest EVMChain) ccipDeployments {
 	}
 }
 
-func sendMessage(t *testing.T, sourceDeployment, destDeployment ccipChainDeployment) {
-	// TODO: implement
+func sendMessage(t *testing.T, seqNr uint64, sourceAuth, destAuth *bind.TransactOpts, sourceDeployment, destDeployment ccipChainDeployment) {
+	verifierOnRamp, err := verifier_events.NewVerifierEvents(sourceDeployment.verifierOnRampAddr, sourceDeployment.simClient)
+	require.NoError(t, err)
+
+	_, err = verifierOnRamp.EmitCCIPMessageSent(sourceAuth, destDeployment.chainSelector, seqNr, verifier_events.InternalEVM2AnyCommitVerifierMessage{
+		Header: verifier_events.InternalHeader{
+			MessageId:           [32]byte{byte(seqNr)},
+			SourceChainSelector: sourceDeployment.chainSelector,
+			DestChainSelector:   destDeployment.chainSelector,
+			SequenceNumber:      seqNr,
+		},
+		Sender:             sourceAuth.From,
+		Data:               nil,
+		Receiver:           common.LeftPadBytes(destAuth.From.Bytes(), 32),
+		DestChainExtraArgs: nil,
+		VerifierExtraArgs:  nil,
+		FeeToken:           common.HexToAddress("0x0"),
+		FeeTokenAmount:     big.NewInt(13371337),
+		FeeValueJuels:      big.NewInt(13371337),
+		TokenAmounts:       nil,
+		RequiredVerifiers:  nil,
+	})
+	require.NoError(t, err)
+
+	sourceDeployment.backend.Commit()
 }
 
 func TestModsec_E2E(t *testing.T) {
@@ -316,9 +405,9 @@ func TestModsec_E2E(t *testing.T) {
 			DestinationChainID:      deployments.dest.evmChainID.String(),
 			SourceChainFamily:       string(chaintype.EVM),
 			DestinationChainFamily:  string(chaintype.EVM),
-			OnRampAddress:           deployments.source.routerAddr.Hex(),
-			OffRampAddress:          deployments.dest.routerAddr.Hex(),
-			CCIPMessageSentEventSig: common.HexToHash("0x1").String(),
+			OnRampAddress:           deployments.source.verifierOnRampAddr.Hex(),
+			OffRampAddress:          deployments.dest.verifierOffRampAddr.Hex(),
+			CCIPMessageSentEventSig: verifier_events.VerifierEventsCCIPMessageSent{}.Topic().Hex(),
 			StorageEndpoint:         storageServer.URL,
 			StorageType:             "std",
 		},
@@ -326,6 +415,19 @@ func TestModsec_E2E(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, app.AddJobV2(t.Context(), &jb))
+
+	time.Sleep(10 * time.Second) // wait for the job to startup and filters to register
+
+	sendMessage(t, 1, deployments.source.deployerKey, deployments.dest.deployerKey, deployments.source, deployments.dest)
+
+	// wait for the message to be executed on the destination chain
+	require.Eventually(t, func() bool {
+		verifierOffRamp, err := verifier_events.NewVerifierEvents(deployments.dest.verifierOffRampAddr, deployments.dest.simClient)
+		require.NoError(t, err)
+		numMessagesExecuted, err := verifierOffRamp.SNumMessagesExecuted(&bind.CallOpts{Context: t.Context()})
+		require.NoError(t, err)
+		return numMessagesExecuted >= 1
+	}, 30*time.Second, 1*time.Second)
 }
 
 func ptr[T any](v T) *T { return &v }

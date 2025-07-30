@@ -88,6 +88,32 @@ func (s *stdClient) GetMany(ctx context.Context, keys []string) (map[string][]by
 	return results, nil
 }
 
+// GetAll implements Storage.
+func (s *stdClient) GetAll(ctx context.Context) (map[string][]byte, error) {
+	// the standard endpoint is GET /getall
+	url := fmt.Sprintf("%s/getall", s.endpoint)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get all keys: %s", resp.Status)
+	}
+
+	var results map[string][]byte
+	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 func NewStdClient(endpoint string) Storage {
 	return &stdClient{
 		endpoint: endpoint,

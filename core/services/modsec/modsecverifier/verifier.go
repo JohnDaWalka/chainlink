@@ -112,20 +112,11 @@ func (v *verifier) run(ctx context.Context) error {
 	}
 }
 
-type storageValuePayload struct {
-	// ABIEncodedMessageData is the abi-encoded message data of the Any2EVM message.
-	ABIEncodedMessageData hexutil.Bytes `json:"abiEncodedMessageData"`
-	// MessageHash is the hash of the ABIEncodedMessageData.
-	MessageHash hexutil.Bytes `json:"messageHash"`
-	// Signature is the signature of the MessageHash.
-	Signature hexutil.Bytes `json:"signature"`
-}
-
 func (v *verifier) processPendingMessages(ctx context.Context, pending []unverifiedMessage) {
 	// sign messages and put them into offchain storage
 	for _, message := range pending {
 		// TODO: hashing/signature logic, for now just keccak256 the messageData and sign that.
-		messageData, err := message.parsedMessage.Encoded()
+		messageData, err := message.parsedMessage.EncodedEVM2EVM()
 		if err != nil {
 			v.lggr.Errorw("verifier failed to encode message, skipping message", "err", err)
 			continue
@@ -143,7 +134,7 @@ func (v *verifier) processPendingMessages(ctx context.Context, pending []unverif
 			continue
 		}
 
-		payload := storageValuePayload{
+		payload := modsectypes.StorageValuePayload{
 			ABIEncodedMessageData: messageData,
 			MessageHash:           messageHash,
 			Signature:             signature,
@@ -315,7 +306,7 @@ func (v *verifier) getUnverifiedMessages(ctx context.Context, messages []logpoll
 		parsedLogs = make(map[string]unverifiedMessage)
 	)
 	for _, message := range messages {
-		parsedMessage, err := v.parser.ParseCCIPMessageSent(message.ToGethLog())
+		parsedMessage, err := v.parser.ParseEVM2AnyMessageSent(message.ToGethLog())
 		if err != nil {
 			v.lggr.Errorw("verifier failed to parse CCIPMessageSent, skipping message", "err", err)
 			continue

@@ -212,7 +212,7 @@ func Test_processPendingMessages(t *testing.T) {
 		messageID := [32]byte{byte(i)}
 		verified, err := universe.verifier.storage.Get(t.Context(), hexutil.Encode(messageID[:]))
 		require.NoError(t, err)
-		var payload storageValuePayload
+		var payload modsectypes.StorageValuePayload
 		require.NoError(t, json.Unmarshal(verified, &payload))
 		t.Logf("message %d is verified: messageData=%s, signature=%s", i, hexutil.Encode(payload.ABIEncodedMessageData), hexutil.Encode(payload.Signature))
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/verifier_events"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/config/toml"
@@ -198,17 +199,24 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		signingKeys[0],
 	)
 
+	verifierEvents, err := verifier_events.NewVerifierEvents(
+		common.HexToAddress(spec.ModsecSpec.OnRampAddress),
+		legacySourceChain.Client(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	relayer := modsecexecutor.New(
 		d.lggr,
-		legacyDestChain.LogPoller(),
 		modsectypes.NewEVMTransmitter(
 			d.lggr,
 			legacyDestChain.TxManager(),
 			common.HexToAddress(spec.ModsecSpec.OffRampAddress),
+			signingKeys[0].Address,
 		),
-		spec.ModsecSpec.CCIPMessageSentEventSig,
-		spec.ModsecSpec.OnRampAddress,
 		spec.ModsecSpec.OffRampAddress,
+		verifierEvents,
 		storageClient,
 	)
 

@@ -5,10 +5,13 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/verifier_events"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/verifier_proxy"
 	"github.com/smartcontractkit/chainlink-evm/pkg/txmgr"
+	txmgrcommon "github.com/smartcontractkit/chainlink-framework/chains/txmgr"
 	"github.com/smartcontractkit/chainlink-framework/chains/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -22,17 +25,34 @@ type evmTransmitter struct {
 	lggr           logger.Logger
 	txm            txmgr.TxManager
 	offRampAddress common.Address
+	fromAddress    common.Address
 }
 
-func NewEVMTransmitter(lggr logger.Logger, txm txmgr.TxManager, offRampAddress common.Address) Transmitter {
-	return &evmTransmitter{lggr: lggr, txm: txm, offRampAddress: offRampAddress}
+func NewEVMTransmitter(lggr logger.Logger, txm txmgr.TxManager, offRampAddress common.Address, fromAddress common.Address) Transmitter {
+	return &evmTransmitter{lggr: lggr, txm: txm, offRampAddress: offRampAddress, fromAddress: fromAddress}
 }
 
-func (t *evmTransmitter) Transmit(ctx context.Context, payload TransmissionPayload) error {
+func (t *evmTransmitter) Transmit(ctx context.Context, payload StorageValuePayload) error {
+	// pack the function call for executeMessage
+	method, ok := verifierEventsABI.Methods["executeMessage"]
+	if !ok {
+		return fmt.Errorf("executeMessage method not found")
+	}
+
+	idempotencyKey := uuid.New().String()
+
+	// the executeMessage function just takes a single argument which is the any2EVM message.
+	// its already abi-encoded in the payload, so don't need to re-encode it again, just prepend
+	// the method ID.
+	calldata := append(method.ID, payload.ABIEncodedMessageData...)
+
 	etx, err := t.txm.CreateTransaction(ctx, types.TxRequest[common.Address, common.Hash]{
+		IdempotencyKey: &idempotencyKey,
+		Strategy:       txmgrcommon.NewSendEveryStrategy(),
 		ToAddress:      t.offRampAddress,
-		EncodedPayload: payload.MessageData(),
+		EncodedPayload: calldata,
 		FeeLimit:       1e6, // gas limit
+		FromAddress:    t.fromAddress,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create transaction: %w", err)
@@ -43,36 +63,20 @@ func (t *evmTransmitter) Transmit(ctx context.Context, payload TransmissionPaylo
 	return nil
 }
 
-// TransmissionPayload is the payload that is transmitted to the destination chain.
-// It contains the message data and the signatures for the message being transmitted.
-// The kind of signature depends on the destination chain family.
-// For example, EVM would use ECDSA, Solana would use ed25519, etc.
-type TransmissionPayload interface {
-	// MessageData contains the message encoded for the destination chain family.
-	// If the destination chain is EVM, this would be an abi-encoded Any2EVMMessage.
-	// If the destination chain is Solana, this would be a borsh-encoded Any2SolanaMessage.
-	// etc.
-	MessageData() []byte
-	// Signatures contains the signatures for the message being transmitted.
-	// The kind of signature depends on the destination chain family.
-	// For example, EVM would use ECDSA, Solana would use ed25519, etc.
-	Signatures() [][]byte
-}
-
 type Transmitter interface {
-	Transmit(ctx context.Context, payload TransmissionPayload) error
+	Transmit(ctx context.Context, payload StorageValuePayload) error
 }
 
 type CCIPMessageSent interface {
 	MessageID() [32]byte
-	// Encoded returns the abi-encoded message.
+	// EncodedEVM2EVM returns the abi-encoded message.
 	// TODO: this is evm-specific, needs to be more generic.
-	Encoded() ([]byte, error)
+	EncodedEVM2EVM() ([]byte, error)
 }
 
 type CCIPMessageParser interface {
 	// TODO: EVM-specific, needs to be more generic.
-	ParseCCIPMessageSent(log gethtypes.Log) (CCIPMessageSent, error)
+	ParseEVM2AnyMessageSent(log gethtypes.Log) (CCIPMessageSent, error)
 }
 
 type evmCCIPMessageSent struct {
@@ -83,9 +87,9 @@ func (m *evmCCIPMessageSent) MessageID() [32]byte {
 	return m.ccipMessageSent.Message.Header.MessageId
 }
 
-func (m *evmCCIPMessageSent) Encoded() ([]byte, error) {
+func EVM2AnyToAny2EVM(m verifier_proxy.VerifierProxyCCIPMessageSent) (verifier_events.InternalAny2EVMMultiProofMessage, error) {
 	var tokenAmounts []verifier_events.InternalAny2EVMMultiProofTokenTransfer
-	for _, tokenAmount := range m.ccipMessageSent.Message.TokenAmounts {
+	for _, tokenAmount := range m.Message.TokenAmounts {
 		tokenAmounts = append(tokenAmounts, verifier_events.InternalAny2EVMMultiProofTokenTransfer{
 			SourcePoolAddress: common.LeftPadBytes(tokenAmount.SourcePoolAddress.Bytes(), 32),
 			DestTokenAddress:  common.BytesToAddress(tokenAmount.DestTokenAddress),
@@ -95,7 +99,7 @@ func (m *evmCCIPMessageSent) Encoded() ([]byte, error) {
 	}
 
 	var requiredVerifiers []verifier_events.InternalRequiredVerifier
-	for _, requiredVerifier := range m.ccipMessageSent.Message.RequiredVerifiers {
+	for _, requiredVerifier := range m.Message.RequiredVerifiers {
 		requiredVerifiers = append(requiredVerifiers, verifier_events.InternalRequiredVerifier{
 			VerifierId: requiredVerifier.VerifierId,
 			Payload:    requiredVerifier.Payload,
@@ -105,17 +109,26 @@ func (m *evmCCIPMessageSent) Encoded() ([]byte, error) {
 	// translate the EVM2Any to Any2EVM and abi-encode it.
 	any2EVM := verifier_events.InternalAny2EVMMultiProofMessage{
 		Header: verifier_events.InternalHeader{
-			MessageId:           m.ccipMessageSent.Message.Header.MessageId,
-			SourceChainSelector: m.ccipMessageSent.Message.Header.SourceChainSelector,
-			DestChainSelector:   m.ccipMessageSent.Message.Header.DestChainSelector,
-			SequenceNumber:      m.ccipMessageSent.Message.Header.SequenceNumber,
+			MessageId:           m.Message.Header.MessageId,
+			SourceChainSelector: m.Message.Header.SourceChainSelector,
+			DestChainSelector:   m.Message.Header.DestChainSelector,
+			SequenceNumber:      m.Message.Header.SequenceNumber,
 		},
-		Sender:            common.LeftPadBytes(m.ccipMessageSent.Message.Sender.Bytes(), 32),
-		Data:              m.ccipMessageSent.Message.Data,
-		Receiver:          common.BytesToAddress(m.ccipMessageSent.Message.Receiver),
+		Sender:            common.LeftPadBytes(m.Message.Sender.Bytes(), 32),
+		Data:              m.Message.Data,
+		Receiver:          common.BytesToAddress(m.Message.Receiver),
 		GasLimit:          200_000, // TODO: parse from extraArgs
 		TokenAmounts:      tokenAmounts,
 		RequiredVerifiers: requiredVerifiers,
+	}
+
+	return any2EVM, nil
+}
+
+func (m *evmCCIPMessageSent) EncodedEVM2EVM() ([]byte, error) {
+	any2EVM, err := EVM2AnyToAny2EVM(m.ccipMessageSent)
+	if err != nil {
+		return nil, err
 	}
 
 	method, ok := verifierEventsABI.Methods["exposeAny2EVMMessage"]
@@ -133,7 +146,7 @@ func NewEVMCCIPMessageParser() CCIPMessageParser {
 	return &evmMessageParser{}
 }
 
-func (p *evmMessageParser) ParseCCIPMessageSent(log gethtypes.Log) (CCIPMessageSent, error) {
+func (p *evmMessageParser) ParseEVM2AnyMessageSent(log gethtypes.Log) (CCIPMessageSent, error) {
 	// Don't actually need to call the contract, just need to parse the log.
 	verifierOnramp, err := verifier_proxy.NewVerifierProxy(log.Address, nil)
 	if err != nil {
@@ -148,4 +161,13 @@ func (p *evmMessageParser) ParseCCIPMessageSent(log gethtypes.Log) (CCIPMessageS
 	return &evmCCIPMessageSent{
 		ccipMessageSent: *parsedLog,
 	}, nil
+}
+
+type StorageValuePayload struct {
+	// ABIEncodedMessageData is the abi-encoded message data of the Any2EVM message.
+	ABIEncodedMessageData hexutil.Bytes `json:"abiEncodedMessageData"`
+	// MessageHash is the hash of the ABIEncodedMessageData.
+	MessageHash hexutil.Bytes `json:"messageHash"`
+	// Signature is the signature of the MessageHash.
+	Signature hexutil.Bytes `json:"signature"`
 }

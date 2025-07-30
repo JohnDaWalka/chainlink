@@ -43,6 +43,11 @@ func (t *testStorage) GetMany(ctx context.Context, keys []string) (map[string][]
 	return results, nil
 }
 
+// GetAll implements Storage.
+func (t *testStorage) GetAll(ctx context.Context) (map[string][]byte, error) {
+	return t.storage, nil
+}
+
 // NewTestStorage creates a new Storage implementation, backed by a map.
 // This is intended to be used for testing only.
 func NewTestStorage() Storage {
@@ -97,6 +102,18 @@ func NewTestServer() (*httptest.Server, func()) {
 		vals, err := testStore.GetMany(r.Context(), keys)
 		if err != nil {
 			http.Error(w, "getmany error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(vals); err != nil {
+			http.Error(w, "encode error", http.StatusInternalServerError)
+			return
+		}
+	})
+	handler.HandleFunc("/getall", func(w http.ResponseWriter, r *http.Request) {
+		vals, err := testStore.GetAll(r.Context())
+		if err != nil {
+			http.Error(w, "getall error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
