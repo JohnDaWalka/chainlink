@@ -63,6 +63,7 @@ type AppConfig interface {
 	Telemetry() Telemetry
 	CRE() CRE
 	Billing() Billing
+	BridgeStatusReporter() BridgeStatusReporter
 }
 
 type DatabaseBackupMode string
