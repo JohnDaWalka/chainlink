@@ -292,6 +292,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		initOps = append(initOps, InitAptos(relayerFactory, keyStore.Aptos(), keyStore.CSA(), cfg.AptosConfigs()))
 	}
 	if cfg.TronEnabled() {
+		globalLogger.Infow("TRON is enabled, initializing TRON relayers", "configs", cfg.TronConfigs())
 		initOps = append(initOps, InitTron(relayerFactory, keyStore.Tron(), keyStore.CSA(), cfg.TronConfigs()))
 	}
 	if cfg.TONEnabled() {

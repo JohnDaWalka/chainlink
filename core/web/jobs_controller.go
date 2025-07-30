@@ -113,7 +113,7 @@ func (jc *JobsController) Create(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 100*time.Second)
 	defer cancel()
 	err = jc.App.AddJobV2(ctx, &jb)
 	if err != nil {
