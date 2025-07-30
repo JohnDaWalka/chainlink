@@ -1,10 +1,6 @@
 name: Setup Sui CLI
-description: Install and cache Sui CLI
+description: Install and cache Sui CLI using suiup
 inputs:
-  base-path:
-    description: Path to the base of the repo
-    required: false
-    default: .
   version:
     description: Sui CLI version to install (e.g., mainnet-v1.50.1)
     required: false
@@ -18,18 +14,16 @@ runs:
       name: Cache Sui CLI
       with:
         path: |
-          ~/.sui/cli/${{ inputs.version }}
-        key: ${{ runner.os }}-sui-cli-${{ inputs.version }}
+          ~/.suiup/bin
+        key: ${{ runner.os }}-suiup-${{ inputs.version }}
 
     - if: ${{ steps.cache.outputs.cache-hit != 'true' }}
-      name: Download and install Sui CLI
+      name: Install suiup and Sui CLI
       shell: bash
       run: |
-        mkdir -p ~/.sui/cli/${{ inputs.version }}
-        curl -sSfL https://github.com/MystenLabs/sui/releases/download/${{ inputs.version }}/sui-x86_64-unknown-linux-gnu.tar.gz -o sui.tar.gz
-        tar -xzf sui.tar.gz
-        mv sui ~/.sui/cli/${{ inputs.version }}/sui
+        curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
+        "$HOME/.local/bin/suiup" install sui@${{ inputs.version }}
 
     - name: Export Sui CLI to PATH
       shell: bash
-      run: echo "$HOME/.sui/cli/${{ inputs.version }}:$PATH" >> $GITHUB_ENV
+      run: echo "PATH=$HOME/.suiup/bin:$HOME/.local/bin:$PATH" >> $GITHUB_ENV
