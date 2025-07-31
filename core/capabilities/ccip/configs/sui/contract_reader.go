@@ -53,7 +53,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
 					"GetReportDigestHeader": {
 						SignerAddress: fromAddress,
-						Name: "get_report_digest_header",
+						Name:          "get_report_digest_header",
 					},
 					"GetVersionedConfig": {
 						Name:          "get_versioned_config",
@@ -87,7 +87,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 				"Name": "rmn_remote",
 				"Functions": map[string]*chainreaderConfig.ChainReaderFunction{
 					consts.MethodNameGetARM: {
-						Name: "get_arm",
+						Name:          "get_arm",
 						SignerAddress: fromAddress,
 					},
 				},
@@ -180,7 +180,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
-						ResultTupleToStruct: []string{"ocr_config"},
+						ResultTupleToStruct: []string{"OCRConfig"},
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
 						Name:          "get_latest_price_sequence_number",
