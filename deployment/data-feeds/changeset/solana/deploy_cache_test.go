@@ -159,11 +159,11 @@ func TestConfigureCache(t *testing.T) {
 
 		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
 			&InitCacheDecimalReportRequest{
-				ChainSel:          solSel,
-				Qualifier:         testQualifier,
-				Version:           "1.0.0",
-				DataIDs:           DataIDs,
-				FeedAdmin:         chain.DeployerKey.PublicKey(),
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+				DataIDs:   DataIDs,
+				FeedAdmin: chain.DeployerKey.PublicKey(),
 			},
 		)
 
@@ -189,11 +189,11 @@ func TestConfigureCache(t *testing.T) {
 
 		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
 			&InitCacheDecimalReportRequest{
-				ChainSel:          solSel,
-				Qualifier:         testQualifier,
-				Version:           "1.0.0",
-				DataIDs:           DataIDs,
-				FeedAdmin:         chain.DeployerKey.PublicKey(),
+				ChainSel:  solSel,
+				Qualifier: testQualifier,
+				Version:   "1.0.0",
+				DataIDs:   DataIDs,
+				FeedAdmin: chain.DeployerKey.PublicKey(),
 				MCMS: &proposalutils.TimelockConfig{
 					MinDelay: time.Second,
 				},

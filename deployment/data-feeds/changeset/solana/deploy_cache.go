@@ -189,12 +189,12 @@ func (cs SetCacheUpgradeAuthority) Apply(env cldf.Environment, req *SetCacheUpgr
 }
 
 type InitCacheDecimalReportRequest struct {
-	ChainSel          uint64
-	Version           string
-	Qualifier         string
-	MCMS              *proposalutils.TimelockConfig // if set, assumes current ownership
-	DataIDs           [][16]uint8
-	FeedAdmin         solana.PublicKey
+	ChainSel  uint64
+	Version   string
+	Qualifier string
+	MCMS      *proposalutils.TimelockConfig // if set, assumes current ownership
+	DataIDs   [][16]uint8
+	FeedAdmin solana.PublicKey
 }
 
 var _ cldf.ChangeSetV2[*InitCacheDecimalReportRequest] = InitCacheDecimalReport{}
@@ -374,14 +374,11 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	out.MCMSTimelockProposals = execSetAuthOut.Output.Proposals
 
 	return out, nil
-
-	
 }
 
 // createRemainingAccounts creates the remaining accounts needed for InitCacheDecimalFeed
 // by deriving the decimal report PDAs for each DataID
 func createRemainingAccounts(ds datastore.DataStore, chainSel uint64, qualifier, version string, dataIDs [][16]uint8) ([]solana.AccountMeta, error) {
-
 	// Get the deployed cache state and program ID from the datastore
 	parsedVersion := semver.MustParse(version)
 	cacheStateRef := datastore.NewAddressRefKey(chainSel, CacheState, parsedVersion, qualifier)
@@ -415,5 +412,5 @@ func createRemainingAccounts(ds datastore.DataStore, chainSel uint64, qualifier,
 		remainingAccounts[i] = *solana.Meta(reportPDA).WRITE()
 	}
 
-	return remainingAccounts, nil	
+	return remainingAccounts, nil
 }
