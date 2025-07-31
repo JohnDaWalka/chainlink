@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
@@ -22,7 +23,9 @@ type AddCapabilitiesOpDeps struct {
 }
 
 type AddCapabilitiesOpInput struct {
-	UseMCMS bool
+	ChainID         uint64
+	ContractAddress common.Address
+	UseMCMS         bool
 }
 
 type AddCapabilitiesOpOutput struct {

@@ -18,13 +18,13 @@ type DistributeOCRJobSpecSeqDeps struct {
 }
 
 type DistributeOCRJobSpecSeqInput struct {
-	DomainKey          string
-	EnvironmentLabel   string
-	DONName            string
-	ContractID         string
-	ChainSelectorEVM   uint64
-	ChainSelectorAptos uint64
-	BootstrapperCfgs   []jobs.BootstrapperCfg
+	DomainKey            string
+	EnvironmentLabel     string
+	DONName              string
+	ContractID           string
+	ChainSelectorEVM     uint64
+	ChainSelectorAptos   uint64
+	BootstrapperOCR3Urls []string
 }
 
 type DistributeOCRJobSpecSeqOutput struct {
@@ -36,18 +36,13 @@ var DistributeOCRJobSpecSeq = operations.NewSequence[DistributeOCRJobSpecSeqInpu
 	semver.MustParse("1.0.0"),
 	"Distribute OCR Job Specs",
 	func(b operations.Bundle, deps DistributeOCRJobSpecSeqDeps, input DistributeOCRJobSpecSeqInput) (DistributeOCRJobSpecSeqOutput, error) {
-		btURLs := make([]string, 0, len(input.BootstrapperCfgs))
-		for _, bootCfg := range input.BootstrapperCfgs {
-			btURLs = append(btURLs, bootCfg.OCRUrl)
-		}
-
 		nodesByID := make(map[string]*nodev1.Node)
 		for _, node := range deps.Nodes {
 			nodesByID[node.Id] = node
 		}
 
 		specs, err := jobs.BuildOCR3JobConfigSpecs(
-			deps.Offchain, b.Logger, input.ContractID, input.ChainSelectorEVM, input.ChainSelectorAptos, deps.Nodes, btURLs, input.DONName)
+			deps.Offchain, b.Logger, input.ContractID, input.ChainSelectorEVM, input.ChainSelectorAptos, deps.Nodes, input.BootstrapperOCR3Urls, input.DONName)
 		if err != nil {
 			return DistributeOCRJobSpecSeqOutput{}, fmt.Errorf("failed to build job specs: %w", err)
 		}

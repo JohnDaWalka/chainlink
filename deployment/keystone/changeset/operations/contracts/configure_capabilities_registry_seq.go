@@ -98,7 +98,9 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 			Contract:          capabilitiesRegistry.Contract,
 			DonToCapabilities: donToCapabilities,
 		}, AddCapabilitiesOpInput{
-			UseMCMS: input.UseMCMS,
+			ChainID:         input.RegistryChainSel,
+			ContractAddress: capabilitiesRegistry.Contract.Address(),
+			UseMCMS:         input.UseMCMS,
 		})
 		if err != nil {
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to add capabilities to registry: %w", err)

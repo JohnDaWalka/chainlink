@@ -71,6 +71,11 @@ func (c CsDistributeOCRJobSpecsImpl) Apply(e cldf.Environment, cfg CsDistributeO
 	}
 	e.Logger.Debugw("found OCR contract ID", "contractID", contractID)
 
+	btURLs := make([]string, 0, len(cfg.BootstrapperCfgs))
+	for _, bootCfg := range cfg.BootstrapperCfgs {
+		btURLs = append(btURLs, bootCfg.OCRUrl)
+	}
+
 	seqReport, errs := operations.ExecuteSequence(
 		e.OperationsBundle,
 		jobs2.DistributeOCRJobSpecSeq,
@@ -79,13 +84,13 @@ func (c CsDistributeOCRJobSpecsImpl) Apply(e cldf.Environment, cfg CsDistributeO
 			Offchain: e.Offchain,
 		},
 		jobs2.DistributeOCRJobSpecSeqInput{
-			ContractID:         contractID,
-			EnvironmentLabel:   cfg.EnvLabel,
-			DomainKey:          cfg.DomainKey,
-			DONName:            cfg.DONFilter.DONName,
-			ChainSelectorEVM:   cfg.ChainSelectorEVM,
-			ChainSelectorAptos: cfg.ChainSelectorAptos,
-			BootstrapperCfgs:   cfg.BootstrapperCfgs,
+			ContractID:           contractID,
+			EnvironmentLabel:     cfg.EnvLabel,
+			DomainKey:            cfg.DomainKey,
+			DONName:              cfg.DONFilter.DONName,
+			ChainSelectorEVM:     cfg.ChainSelectorEVM,
+			ChainSelectorAptos:   cfg.ChainSelectorAptos,
+			BootstrapperOCR3Urls: btURLs,
 		},
 	)
 	if errs != nil {
