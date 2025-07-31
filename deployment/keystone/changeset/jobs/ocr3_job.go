@@ -1,4 +1,4 @@
-package changeset
+package jobs
 
 import (
 	"bytes"
@@ -10,10 +10,11 @@ import (
 	"text/template"
 
 	"github.com/google/uuid"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
