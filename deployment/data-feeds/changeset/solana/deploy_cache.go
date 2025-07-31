@@ -195,7 +195,6 @@ type InitCacheDecimalReportRequest struct {
 	MCMS              *proposalutils.TimelockConfig // if set, assumes current ownership
 	DataIDs           [][16]uint8
 	FeedAdmin         solana.PublicKey
-	RemainingAccounts []solana.AccountMeta
 }
 
 var _ cldf.ChangeSetV2[*InitCacheDecimalReportRequest] = InitCacheDecimalReport{}
@@ -223,10 +222,6 @@ func (cs InitCacheDecimalReport) VerifyPreconditions(env cldf.Environment, req *
 
 	if req.FeedAdmin.IsZero() {
 		return errors.New("FeedAdmin cannot be zero")
-	}
-
-	if len(req.DataIDs) != len(req.RemainingAccounts) {
-		return errors.New("DataIDs and RemainingAccounts must have the same length")
 	}
 
 	return nil
@@ -258,14 +253,10 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
 	}
 
-	// Convert user-provided remaining accounts to operation type
-	remainingAccounts := make([]solana.AccountMeta, len(req.RemainingAccounts))
-	for i, account := range req.RemainingAccounts {
-		remainingAccounts[i] = solana.AccountMeta{
-			PublicKey:  account.PublicKey,
-			IsSigner:   account.IsSigner,
-			IsWritable: account.IsWritable,
-		}
+	// Create remaining accounts by deriving PDAs for each DataID
+	remainingAccounts, err := createRemainingAccounts(env.DataStore, req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
+	if err != nil {
+		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
 	}
 
 	initInput := operation.InitCacheDecimalReportInput{
@@ -383,4 +374,46 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	out.MCMSTimelockProposals = execSetAuthOut.Output.Proposals
 
 	return out, nil
+
+	
+}
+
+// createRemainingAccounts creates the remaining accounts needed for InitCacheDecimalFeed
+// by deriving the decimal report PDAs for each DataID
+func createRemainingAccounts(ds datastore.DataStore, chainSel uint64, qualifier, version string, dataIDs [][16]uint8) ([]solana.AccountMeta, error) {
+
+	// Get the deployed cache state and program ID from the datastore
+	parsedVersion := semver.MustParse(version)
+	cacheStateRef := datastore.NewAddressRefKey(chainSel, CacheState, parsedVersion, qualifier)
+	cacheRef := datastore.NewAddressRefKey(chainSel, CacheContract, parsedVersion, qualifier)
+
+	cacheState, err := ds.Addresses().Get(cacheStateRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed load cache state for chain sel %d", chainSel)
+	}
+	cacheProgramID, err := ds.Addresses().Get(cacheRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed load cache program ID for chain sel %d", chainSel)
+	}
+
+	cacheStateKey := solana.MustPublicKeyFromBase58(cacheState.Address)
+	cacheProgramKey := solana.MustPublicKeyFromBase58(cacheProgramID.Address)
+
+	remainingAccounts := make([]solana.AccountMeta, len(dataIDs))
+	for i, dataID := range dataIDs {
+		// Derive decimal report PDA for each data ID
+		seeds := [][]byte{
+			[]byte("decimal_report"),
+			cacheStateKey.Bytes(),
+			dataID[:],
+		}
+		reportPDA, _, err := solana.FindProgramAddress(seeds, cacheProgramKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive decimal report PDA for data ID %x: %w", dataID, err)
+		}
+		// Use the Meta helper for consistency with generated bindings
+		remainingAccounts[i] = *solana.Meta(reportPDA).WRITE()
+	}
+
+	return remainingAccounts, nil	
 }

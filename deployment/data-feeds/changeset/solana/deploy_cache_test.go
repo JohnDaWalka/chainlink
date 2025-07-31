@@ -154,11 +154,8 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first to get the cache state and program ID
-		out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		_, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
 		require.NoError(t, err)
-
-		// Create remaining accounts for the decimal reports
-		remainingAccounts := createRemainingAccounts(t, out.DataStore, solSel, testQualifier, "1.0.0", DataIDs)
 
 		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
 			&InitCacheDecimalReportRequest{
@@ -167,7 +164,6 @@ func TestConfigureCache(t *testing.T) {
 				Version:           "1.0.0",
 				DataIDs:           DataIDs,
 				FeedAdmin:         chain.DeployerKey.PublicKey(),
-				RemainingAccounts: remainingAccounts,
 			},
 		)
 
@@ -188,11 +184,8 @@ func TestConfigureCache(t *testing.T) {
 		)
 
 		// Apply deploy changeset first
-		out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
+		_, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
 		require.NoError(t, err)
-
-		// Create remaining accounts
-		remainingAccounts := createRemainingAccounts(t, out.DataStore, solSel, testQualifier, "1.0.0", DataIDs)
 
 		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
 			&InitCacheDecimalReportRequest{
@@ -201,7 +194,6 @@ func TestConfigureCache(t *testing.T) {
 				Version:           "1.0.0",
 				DataIDs:           DataIDs,
 				FeedAdmin:         chain.DeployerKey.PublicKey(),
-				RemainingAccounts: remainingAccounts,
 				MCMS: &proposalutils.TimelockConfig{
 					MinDelay: time.Second,
 				},
@@ -328,42 +320,6 @@ func TestConfigureCache(t *testing.T) {
 		_, _, err = commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset, transferOwnershipChangeset})
 		require.NoError(t, err)
 	})
-}
-
-// createRemainingAccounts creates the remaining accounts needed for InitCacheDecimalFeed
-// by deriving the decimal report PDAs for each DataID
-func createRemainingAccounts(t *testing.T, ds datastore.DataStore, chainSel uint64, qualifier, version string, dataIDs [][16]uint8) []solana.AccountMeta {
-	t.Helper()
-
-	// Get the deployed cache state and program ID from the datastore
-	parsedVersion := semver.MustParse(version)
-	cacheStateRef := datastore.NewAddressRefKey(chainSel, CacheState, parsedVersion, qualifier)
-	cacheRef := datastore.NewAddressRefKey(chainSel, CacheContract, parsedVersion, qualifier)
-
-	cacheState, err := ds.Addresses().Get(cacheStateRef)
-	require.NoError(t, err)
-	cacheProgramID, err := ds.Addresses().Get(cacheRef)
-	require.NoError(t, err)
-
-	cacheStateKey := solana.MustPublicKeyFromBase58(cacheState.Address)
-	cacheProgramKey := solana.MustPublicKeyFromBase58(cacheProgramID.Address)
-
-	remainingAccounts := make([]solana.AccountMeta, len(dataIDs))
-	for i, dataID := range dataIDs {
-		// Derive decimal report PDA for each data ID
-		seeds := [][]byte{
-			[]byte("decimal_report"),
-			cacheStateKey.Bytes(),
-			dataID[:],
-		}
-		reportPDA, _, err := solana.FindProgramAddress(seeds, cacheProgramKey)
-		require.NoError(t, err)
-
-		// Use the Meta helper for consistency with generated bindings
-		remainingAccounts[i] = *solana.Meta(reportPDA).WRITE()
-	}
-
-	return remainingAccounts
 }
 
 func ParseSemver(v string) *semver.Version {
