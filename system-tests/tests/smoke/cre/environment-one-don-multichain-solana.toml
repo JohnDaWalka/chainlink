@@ -46,28 +46,78 @@
 [dependencies]
   cre_cli_binary_path = "./cre_v0.2.0_darwin_arm64"
   cron_capability_binary_path = "./cron"
+  mock_capability_binary_path = "./mock"
 
 [[nodesets]]
   http_port_range_start = 10100
   name = "workflow"
   nodes = 5
-  override_mode = "all"
+  override_mode = "each"
 
   [nodesets.db]
     image = "postgres:12.0"
     port = 13000
     volume_name = "workflow_volume"
 
-  [[nodesets.node_specs]]
-
+[[nodesets.node_specs]]
     [nodesets.node_specs.node]
       docker_ctx = "../../../.."
       docker_file = "core/chainlink.Dockerfile"
+      custom_ports = ["13401:7777"]  # External:internal port mapping
+
       # image = "chainlink-tmp:latest"
       user_config_overrides = """
       [Log]
       Level = 'debug'
       JSONConsole = true
       """
-    [nodesets.node_specs.node.env_vars]
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+      docker_ctx = "../../../.."
+      docker_file = "core/chainlink.Dockerfile"
+      custom_ports = ["13402:7777"]  # External:internal port mapping
+
+      # image = "chainlink-tmp:latest"
+      user_config_overrides = """
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+      """
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+      docker_ctx = "../../../.."
+      docker_file = "core/chainlink.Dockerfile"
+      custom_ports = ["13403:7777"]  # External:internal port mapping
+
+      # image = "chainlink-tmp:latest"
+      user_config_overrides = """
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+      """
+[[nodesets.node_specs]]
+    [nodesets.node_specs.node]
+      docker_ctx = "../../../.."
+      docker_file = "core/chainlink.Dockerfile"
+      custom_ports = ["13404:7777"]  # External:internal port mapping
+
+      # image = "chainlink-tmp:latest"
+      user_config_overrides = """
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+      """
+[[nodesets.node_specs]]
     # CL_SOLANA_CMD="./chainlink-solana"
+    [nodesets.node_specs.node]
+      docker_ctx = "../../../.."
+      docker_file = "core/chainlink.Dockerfile"
+      custom_ports = ["13405:7777"]  # External:internal port mapping
+
+      # image = "chainlink-tmp:latest"
+      user_config_overrides = """
+      [Log]
+      Level = 'debug'
+      JSONConsole = true
+      """
+

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +40,8 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
 
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
+	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
 	corevm "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
@@ -48,6 +51,7 @@ import (
 	computecap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
 	consensuscap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
+	mockcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/mock"
 	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
 	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 	writesolcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writesolana"
@@ -59,6 +63,7 @@ import (
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
+	cremock "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/mock"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -71,7 +76,7 @@ import (
 
 var (
 	SinglePoRDonCapabilitiesFlags       = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteEVMCapability}
-	SinglePoRDonCapabilitiesFlagsSolana = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteSolanaCapability}
+	SinglePoRDonCapabilitiesFlagsSolana = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteSolanaCapability, types.MockCapability}
 )
 
 type CustomAnvilMiner struct {
@@ -173,6 +178,7 @@ func init() {
 // Command that downloads them is part of "test_cmd" in .github/e2e-tests.yml file
 type DependenciesConfig struct {
 	CronCapabilityBinaryPath string `toml:"cron_capability_binary_path"`
+	MockCapapilityBinaryPath string `toml:"mock_capability_binary_path"`
 	CRECLIBinaryPath         string `toml:"cre_cli_binary_path" validate:"required"`
 }
 
@@ -474,6 +480,15 @@ func setupPoRTestEnvironment(
 		cronBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
 	}
 
+	var mockBinaryPathInTheContainer string
+	if in.DependenciesConfig.MockCapapilityBinaryPath != "" {
+		// where cron binary is located in the container
+		mockBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.MockCapapilityBinaryPath))
+		// where cron binary is located on the host
+		customBinariesPaths[types.MockCapability] = in.DependenciesConfig.MockCapapilityBinaryPath
+	}
+
+	t.Log("customBinariesPaths", customBinariesPaths)
 	firstBlockchain := in.Blockchains[0]
 
 	chainIDInt, err := strconv.Atoi(firstBlockchain.ChainID)
@@ -492,6 +507,7 @@ func setupPoRTestEnvironment(
 			crecron.CronJobSpecFactoryFn(cronBinaryPathInTheContainer),
 			cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 			crecompute.ComputeJobSpecFactoryFn,
+			cremock.MockJobSpecFactoryFn(mockBinaryPathInTheContainer),
 		},
 		ConfigFactoryFunctions: []types.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
@@ -746,7 +762,7 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_Solana_MockedPrice(t *t
 		webapicap.WebAPITargetCapabilityFactoryFn,
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
-		croncap.CronCapabilityFactoryFn,
+		mockcap.MockCapabilityFactoryFn,
 	}
 
 	for _, bc := range in.Blockchains {
@@ -766,6 +782,33 @@ func TestCRE_OCR3_PoR_Workflow_SingleDon_MultipleWriters_Solana_MockedPrice(t *t
 		debugTest(t, testLogger, setupOutput, in)
 	})
 
+	mocksClient := mock_capability.NewMockCapabilityController(testLogger)
+	mockClientsAddress := make([]string, 0)
+	if in.Infra.InfraType == "docker" {
+		for _, nodeSet := range in.NodeSets {
+			if nodeSet.Name == "workflow" {
+				for i, n := range nodeSet.NodeSpecs {
+					if i == 0 {
+						continue
+					}
+					if len(n.Node.CustomPorts) == 0 {
+						panic("no custom port specified, mock capability running in kind must have a custom port in order to connect")
+					}
+					ports := strings.Split(n.Node.CustomPorts[0], ":")
+					mockClientsAddress = append(mockClientsAddress, "127.0.0.1:"+ports[0])
+				}
+			}
+		}
+	}
+
+	require.NoError(t, mocksClient.ConnectAll(mockClientsAddress, true, true), "could not connect to mock capabilities")
+
+	err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{
+		ID:             "test",
+		CapabilityType: 4,
+	})
+	time.Sleep(time.Minute * 2)
+	require.NoError(t, err)
 	// TODO PLEX-1543 waitForFeedUpdateSolana()
 }
 
