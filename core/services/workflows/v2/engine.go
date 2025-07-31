@@ -501,6 +501,10 @@ func (e *Engine) heartbeatLoop(ctx context.Context) {
 }
 
 func (e *Engine) deductStandardBalances(meteringReport *metering.Report) {
+	if meteringReport == nil {
+		e.lggr.Warn("meteringReport is nil, skipping balance deduction")
+		return
+	}
 	// V2Engine runs the entirety of a module's execution as compute. Ensure that the max execution time can run.
 	// Add an extra second of metering padding for context cancel propagation
 	ctxCancelPadding := (time.Millisecond * 1000).Milliseconds()

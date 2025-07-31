@@ -279,6 +279,10 @@ func ByDerivedAvailability(
 // An option of 0 indicates a max spend should be derived from user limits and concurrent call slots. We expect to only
 // set this value once - an error is returned if a step would be overwritten.
 func (r *Report) Deduct(ref string, opt DeductOpt) ([]capabilities.SpendLimit, error) {
+	if r == nil {
+		// TODO change the error
+		return nil, ErrStepDeductExists
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
