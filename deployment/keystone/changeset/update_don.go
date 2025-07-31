@@ -111,7 +111,7 @@ func appendRequest(r *UpdateDonRequest) *AppendNodeCapabilitiesRequest {
 func updateDonRequest(env cldf.Environment, r *UpdateDonRequest) (*internal.UpdateDonRequest, error) {
 	evmChains := env.BlockChains.EVMChains()
 
-	capReg, err := loadCapabilityRegistry(evmChains[r.RegistryChainSel], env, r.RegistryRef)
+	capReg, err := LoadCapabilityRegistry(evmChains[r.RegistryChainSel], env, r.RegistryRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load capability registry: %w", err)
 	}

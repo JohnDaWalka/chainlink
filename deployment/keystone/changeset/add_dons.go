@@ -149,7 +149,7 @@ func AddDons(env cldf.Environment, req *AddDonsRequest) (cldf.ChangesetOutput, e
 	if !ok {
 		return cldf.ChangesetOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", req.RegistryChainSel)
 	}
-	capReg, err := loadCapabilityRegistry(registryChain, env, req.RegistryRef)
+	capReg, err := LoadCapabilityRegistry(registryChain, env, req.RegistryRef)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load capability registry: %w", err)
 	}

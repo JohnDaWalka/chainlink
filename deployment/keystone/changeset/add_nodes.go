@@ -220,7 +220,7 @@ func AddNodes(env cldf.Environment, req *AddNodesRequest) (cldf.ChangesetOutput,
 		return cldf.ChangesetOutput{}, fmt.Errorf("invalid request: %w", err)
 	}
 
-	capReg, err := loadCapabilityRegistry(env.BlockChains.EVMChains()[req.RegistryChainSel], env, req.RegistryRef)
+	capReg, err := LoadCapabilityRegistry(env.BlockChains.EVMChains()[req.RegistryChainSel], env, req.RegistryRef)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load capability registry sets: %w", err)
 	}

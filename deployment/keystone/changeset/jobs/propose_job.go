@@ -10,8 +10,6 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-
-	"github.com/smartcontractkit/chainlink/deployment/helpers/pointer"
 )
 
 type ProposeJobRequest struct {
@@ -19,7 +17,8 @@ type ProposeJobRequest struct {
 	DomainKey   string
 	Environment string
 	// labels to filter nodes by
-	NodeLabels map[string]string
+	//NodeLabels map[string]string
+	NodeIDs []string // node IDs to propose the job to
 	// labels to set on the new/updated job object
 	JobLabels      map[string]string
 	OffchainClient deployment.OffchainClient
@@ -52,49 +51,61 @@ func ProposeJob(ctx context.Context, req ProposeJobRequest) error {
 		return fmt.Errorf("invalid request: %w", err)
 	}
 	var merr error
-	// always filter at least by product and environment
-	domainKey := req.DomainKey
-	selectors := []*ptypes.Selector{
-		{
-			Key:   "product",
-			Op:    ptypes.SelectorOp_EQ,
-			Value: &domainKey,
-		},
-		{
-			Key:   "environment",
-			Op:    ptypes.SelectorOp_EQ,
-			Value: &req.Environment,
-		},
-	}
-	for key, value := range req.NodeLabels {
-		selectors = append(selectors, &ptypes.Selector{
-			Key:   key,
-			Op:    ptypes.SelectorOp_EQ,
-			Value: pointer.To(value), // TODO is this correct?
-		})
-	}
-	nodes, err := req.OffchainClient.ListNodes(ctx, &nodev1.ListNodesRequest{Filter: &nodev1.ListNodesRequest_Filter{
-		Enabled:   1,
-		Selectors: selectors,
-	}})
+	/*
+		// always filter at least by product and environment
+		domainKey := req.DomainKey
+
+		selectors := []*ptypes.Selector{
+			{
+				Key:   "product",
+				Op:    ptypes.SelectorOp_EQ,
+				Value: &domainKey,
+			},
+			{
+				Key:   "environment",
+				Op:    ptypes.SelectorOp_EQ,
+				Value: &req.Environment,
+			},
+		}
+	*/
+	/*
+		for key, value := range req.NodeLabels {
+			selectors = append(selectors, &ptypes.Selector{
+				Key:   key,
+				Op:    ptypes.SelectorOp_EQ,
+				Value: pointer.To(value), // TODO is this correct?
+			})
+		}
+	*/
+	/*
+		nodes, err := req.OffchainClient.ListNodes(ctx, &nodev1.ListNodesRequest{Filter: &nodev1.ListNodesRequest_Filter{
+			Enabled:   1,
+			Selectors: selectors,
+			Ids:       req.NodeIDs,
+		}})
+	*/
+	resp, err := req.OffchainClient.GetNode(ctx, &nodev1.GetNodeRequest{
+		Id: req.NodeIDs[0],
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get node: %w", err)
 	}
 
-	for _, node := range nodes.GetNodes() {
-		_, err1 := req.OffchainClient.ProposeJob(ctx,
-			&jobv1.ProposeJobRequest{
-				NodeId: node.Id,
-				Spec:   req.Job,
-				Labels: convertLabels(req.JobLabels),
-			})
-		if err1 != nil {
-			req.Lggr.Infow("Failed to propose job to node", "nodeId", node.Id, "nodeName", node.Name)
-			merr = errors.Join(merr, fmt.Errorf("error proposing job to node %s spec %s : %w", node.Id, req.Job, err1))
-		} else {
-			req.Lggr.Infow("Successfully proposed job to node", "nodeId", node.Id, "nodeName", node.Name)
-		}
+	//for _, node := range resp.GetNode() {
+	node := resp.GetNode()
+	_, err1 := req.OffchainClient.ProposeJob(ctx,
+		&jobv1.ProposeJobRequest{
+			NodeId: node.Id,
+			Spec:   req.Job,
+			Labels: convertLabels(req.JobLabels),
+		})
+	if err1 != nil {
+		req.Lggr.Infow("Failed to propose job to node", "nodeId", node.Id, "nodeName", node.Name)
+		merr = errors.Join(merr, fmt.Errorf("error proposing job to node %s spec %s : %w", node.Id, req.Job, err1))
+	} else {
+		req.Lggr.Infow("Successfully proposed job to node", "nodeId", node.Id, "nodeName", node.Name)
 	}
+	//}
 
 	return merr
 }

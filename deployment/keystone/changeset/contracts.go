@@ -339,8 +339,8 @@ func GetOwnedContractV2[T Ownable](addrs datastore.AddressRefStore, chain cldf_e
 	return ownedContract, nil
 }
 
-// loadCapabilityRegistry loads the CapabilitiesRegistry contract from the address book or datastore.
-func loadCapabilityRegistry(registryChain cldf_evm.Chain, env cldf.Environment, ref datastore.AddressRefKey) (*OwnedContract[*capabilities_registry.CapabilitiesRegistry], error) {
+// LoadCapabilityRegistry loads the CapabilitiesRegistry contract from the address book or datastore.
+func LoadCapabilityRegistry(registryChain cldf_evm.Chain, env cldf.Environment, ref datastore.AddressRefKey) (*OwnedContract[*capabilities_registry.CapabilitiesRegistry], error) {
 	err := shouldUseDatastore(env, ref)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check registry ref: %w", err)

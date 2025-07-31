@@ -14,6 +14,7 @@ type testDon interface {
 	N() int
 	F() int
 	Name() string
+	GetJDNodeIDs() []string
 }
 
 var _ testDon = (*memoryDon)(nil)
@@ -42,6 +43,15 @@ func (d *memoryDon) N() int {
 
 func (d *memoryDon) F() int {
 	return (d.N() - 1) / 3
+}
+
+func (d *memoryDon) GetJDNodeIDs() []string {
+	out := make([]string, 0, len(d.m))
+	for _, n := range d.m {
+		out = append(out, n.ID)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (d *memoryDon) Name() string {
@@ -80,6 +90,15 @@ func (d *viewOnlyDon) F() int {
 
 func (d *viewOnlyDon) Name() string {
 	return d.name
+}
+
+func (d *viewOnlyDon) GetJDNodeIDs() []string {
+	out := make([]string, 0, len(d.m))
+	for _, n := range d.m {
+		out = append(out, n.NodeID)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // testDons is a collection of testDon with convenience methods commonly used in tests
@@ -198,4 +217,8 @@ func (d *viewOnlyDons) NodeList() deployment.Nodes {
 		nodes = append(nodes, *v)
 	}
 	return nodes
+}
+
+func (d *viewOnlyDons) GetJDNodeIDs() []string {
+	return d.NodeList().IDs()
 }

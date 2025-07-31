@@ -49,8 +49,10 @@ func (c CsDistributeOCRJobSpecsImpl) Apply(e cldf.Environment, cfg CsDistributeO
 		return cldf.ChangesetOutput{}, fmt.Errorf("expected %d nodes, got %d", cfg.DONFilter.Size, len(nodes))
 	}
 	nodesByID := make(map[string]*nodev1.Node)
+	nodeIDs := make([]string, 0, len(nodes))
 	for _, node := range nodes {
 		nodesByID[node.Id] = node
+		nodeIDs = append(nodeIDs, node.Id)
 	}
 
 	contractID, err := getOCRContractID(cfg.DONFilter.DONName, cfg.DON2ContractID)
@@ -80,7 +82,7 @@ func (c CsDistributeOCRJobSpecsImpl) Apply(e cldf.Environment, cfg CsDistributeO
 		e.OperationsBundle,
 		jobs2.DistributeOCRJobSpecSeq,
 		jobs2.DistributeOCRJobSpecSeqDeps{
-			Nodes:    nodes,
+			NodeIDs:  nodeIDs,
 			Offchain: e.Offchain,
 		},
 		jobs2.DistributeOCRJobSpecSeqInput{

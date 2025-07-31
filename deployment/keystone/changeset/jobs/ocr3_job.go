@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
@@ -85,20 +85,16 @@ func BuildOCR3JobConfigSpecs(
 	lggr logger.Logger,
 	contractID string,
 	evmChainSel, aptosChainSel uint64,
-	nodes []*nodev1.Node,
+	//nodes []*nodev1.Node,
+	nodeIDs []string, // list of JD node IDs
 	btURLs []string,
 	donName string,
 ) ([]OCR3JobConfigSpec, error) {
-	nodesLen := len(nodes)
+	nodesLen := len(nodeIDs)
 	if nodesLen == 0 {
 		return nil, errors.New("no nodes to build OCR3 job configs")
 	}
-	nodeIDs := make([]string, 0, nodesLen)
-	nodesByID := make(map[string]*nodev1.Node)
-	for _, node := range nodes {
-		nodesByID[node.Id] = node
-		nodeIDs = append(nodeIDs, node.Id)
-	}
+
 	nodeInfos, err := deployment.NodeInfo(nodeIDs, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get node info: %w", err)

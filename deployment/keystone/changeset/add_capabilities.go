@@ -131,7 +131,7 @@ func AddCapabilities(env cldf.Environment, req *AddCapabilitiesRequest) (cldf.Ch
 		return cldf.ChangesetOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", req.RegistryChainSel)
 	}
 
-	cr, err := loadCapabilityRegistry(registryChain, env, req.RegistryRef)
+	cr, err := LoadCapabilityRegistry(registryChain, env, req.RegistryRef)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load capability registry: %w", err)
 	}

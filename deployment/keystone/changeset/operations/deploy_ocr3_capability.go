@@ -12,8 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
@@ -22,20 +20,22 @@ import (
 	opjobs "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/jobs"
 )
 
-type AddCapabilitiesAndSetupOCR3Deps struct {
-	Env   *cldf.Environment
-	Nodes []*nodev1.Node
+type DeployOCR3Capability struct {
+	Env *cldf.Environment
+	//Nodes []*nodev1.Node
+	NodeIDs []string // Node IDs to distribute the job specs to
 
 	// DonCapabilities is used to add capabilities to capabilities registry.
 	DonCapabilities []internal.DonCapabilities // externally sourced based on the environment
 }
 
-type AddCapabilitiesAndSetupOCR3Input struct {
-	RegistryChainSel        uint64
-	MCMSConfig              *changeset.MCMSConfig
-	RegistryContractAddress *common.Address
-	OracleConfig            internal.OracleConfig
-	DONs                    []contracts.ConfigureKeystoneDON
+type DeployOCR3CapabilityInput struct {
+	RegistryChainSel uint64
+	MCMSConfig       *changeset.MCMSConfig
+	//RegistryContractAddress *common.Address
+	RegistryRef  datastore.AddressRefKey
+	OracleConfig internal.OracleConfig
+	DONs         []contracts.ConfigureKeystoneDON
 
 	// The following are needed for the OCR3 job spec distribution
 	DomainKey            string
@@ -46,47 +46,52 @@ type AddCapabilitiesAndSetupOCR3Input struct {
 	BootstrapperOCR3Urls []string
 }
 
-func (c AddCapabilitiesAndSetupOCR3Input) UseMCMS() bool {
+func (c DeployOCR3CapabilityInput) UseMCMS() bool {
 	return c.MCMSConfig != nil
 }
 
-type AddCapabilitiesAndSetupOCR3Output struct {
+type DeployOCR3CapabilityOutput struct {
 	Specs                 []jobs.OCR3JobConfigSpec
 	Addresses             datastore.AddressRefStore
 	MCMSTimelockProposals []mcms.TimelockProposal
 	BatchOperation        *mcmstypes.BatchOperation
 }
 
-var AddCapabilitiesAndSetupOCR3 = operations.NewSequence[
-	AddCapabilitiesAndSetupOCR3Input,
-	AddCapabilitiesAndSetupOCR3Output,
-	AddCapabilitiesAndSetupOCR3Deps,
+var DeployOCR3CapabilitySeq = operations.NewSequence[
+	DeployOCR3CapabilityInput,
+	DeployOCR3CapabilityOutput,
+	DeployOCR3Capability,
 ](
 	"configure-ocr3-and-distribute-jobs-seq",
 	semver.MustParse("1.0.0"),
 	"Configure OCR3 and Distribute Jobs",
-	func(b operations.Bundle, deps AddCapabilitiesAndSetupOCR3Deps, input AddCapabilitiesAndSetupOCR3Input) (AddCapabilitiesAndSetupOCR3Output, error) {
+	func(b operations.Bundle, deps DeployOCR3Capability, input DeployOCR3CapabilityInput) (DeployOCR3CapabilityOutput, error) {
 		chain, ok := deps.Env.BlockChains.EVMChains()[input.RegistryChainSel]
 		if !ok {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("registry chain selector %d does not exist in environment", input.RegistryChainSel)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", input.RegistryChainSel)
 		}
-
-		capabilitiesRegistry, err := changeset.GetOwnedContractV2[*capabilities_registry.CapabilitiesRegistry](deps.Env.DataStore.Addresses(), chain, input.RegistryContractAddress.Hex())
+		/*
+			capabilitiesRegistry, err := changeset.GetOwnedContractV2[*capabilities_registry.CapabilitiesRegistry](deps.Env.DataStore.Addresses(), chain, input.RegistryContractAddress.Hex())
+			if err != nil {
+				return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
+			}
+		*/
+		capabilitiesRegistry, err := changeset.LoadCapabilityRegistry(chain, *deps.Env, input.RegistryRef)
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
 		}
 		if input.UseMCMS() && capabilitiesRegistry.McmsContracts == nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilitiesRegistry.Contract.Address())
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilitiesRegistry.Contract.Address())
 		}
 
 		donInfos, err := internal.DonInfos(deps.DonCapabilities, deps.Env.Offchain)
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to get don infos: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to get don infos: %w", err)
 		}
 
 		donToCapabilities, err := internal.MapDonsToCaps(capabilitiesRegistry.Contract, donInfos)
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to map dons to capabilities: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to map dons to capabilities: %w", err)
 		}
 
 		capReport, err := operations.ExecuteOperation(b, contracts.AddCapabilitiesOp, contracts.AddCapabilitiesOpDeps{
@@ -99,7 +104,7 @@ var AddCapabilitiesAndSetupOCR3 = operations.NewSequence[
 			UseMCMS:         input.UseMCMS(),
 		})
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to add capabilities to capabilities registry: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to add capabilities to capabilities registry: %w", err)
 		}
 
 		ocr3ContractReport, err := operations.ExecuteOperation(b, contracts.DeployOCR3Op, contracts.DeployOCR3OpDeps{
@@ -108,14 +113,14 @@ var AddCapabilitiesAndSetupOCR3 = operations.NewSequence[
 			ChainSelector: input.RegistryChainSel,
 		})
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to deploy OCR3 contract: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to deploy OCR3 contract: %w", err)
 		}
 		ocr3Addresses, err := ocr3ContractReport.Output.Addresses.Fetch()
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to fetch OCR3 contract addresses: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to fetch OCR3 contract addresses: %w", err)
 		}
 		if len(ocr3Addresses) == 0 {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("no OCR3 capability address found for chain selector %d", input.RegistryChainSel)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("no OCR3 capability address found for chain selector %d", input.RegistryChainSel)
 		}
 		ocr3Address := common.HexToAddress(ocr3Addresses[0].Address)
 
@@ -136,11 +141,11 @@ var AddCapabilitiesAndSetupOCR3 = operations.NewSequence[
 			},
 		)
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to configure OCR3 contract: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to configure OCR3 contract: %w", err)
 		}
 
 		distributionReport, err := operations.ExecuteSequence(b, opjobs.DistributeOCRJobSpecSeq, opjobs.DistributeOCRJobSpecSeqDeps{
-			Nodes:    deps.Nodes,
+			NodeIDs:  deps.NodeIDs,
 			Offchain: deps.Env.Offchain,
 		}, opjobs.DistributeOCRJobSpecSeqInput{
 			DomainKey:            input.DomainKey,
@@ -152,10 +157,10 @@ var AddCapabilitiesAndSetupOCR3 = operations.NewSequence[
 			BootstrapperOCR3Urls: input.BootstrapperOCR3Urls,
 		})
 		if err != nil {
-			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to distribute OCR3 job specs: %w", err)
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to distribute OCR3 job specs: %w", err)
 		}
 
-		return AddCapabilitiesAndSetupOCR3Output{
+		return DeployOCR3CapabilityOutput{
 			Specs:                 distributionReport.Output.Specs,
 			Addresses:             ocr3ContractReport.Output.Addresses,
 			BatchOperation:        capReport.Output.BatchOperation,

@@ -95,7 +95,7 @@ func (req *MutateNodeCapabilitiesRequest) updateNodeCapabilitiesImplRequest(e cl
 		return nil, nil, fmt.Errorf("failed to validate UpdateNodeCapabilitiesRequest: %w", err)
 	}
 	registryChain := e.BlockChains.EVMChains()[req.RegistryChainSel] // exists because of the validation above
-	capReg, err := loadCapabilityRegistry(registryChain, e, req.RegistryRef)
+	capReg, err := LoadCapabilityRegistry(registryChain, e, req.RegistryRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load capability registry: %w", err)
 	}
