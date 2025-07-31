@@ -36,6 +36,24 @@ type MemoryEnvironmentConfig struct {
 	Bootstraps         int
 	RegistryConfig     deployment.CapabilityRegistryConfig
 	CustomDBSetup      []string // SQL queries to run after DB creation
+
+	// Solana Handle different contract versions
+	CCIPSolanaContractVersion CCIPSolanaContractVersion
+}
+
+// TODO: This shouldn't be duplicated from solana_changesets_V0_1_1/utils.go
+// This is a temporary solution to avoid circular dependencies.
+// We should refactor the code to avoid this duplication.
+type CCIPSolanaContractVersion string
+
+const (
+	SolanaContractV0_1_0 CCIPSolanaContractVersion = "v0.1.0"
+	SolanaContractV0_1_1 CCIPSolanaContractVersion = "v0.1.1"
+)
+
+var ContractVersionShortSha = map[CCIPSolanaContractVersion]string{
+	SolanaContractV0_1_0: "0ee732e80586",
+	SolanaContractV0_1_1: "ee587a6c0562",
 }
 
 type NewNodesConfig struct {
@@ -75,8 +93,8 @@ func NewMemoryChainsEVMWithChainIDs(
 	return generateChainsEVMWithIDs(t, chainIDs, numUsers)
 }
 
-func NewMemoryChainsSol(t *testing.T, numChains int) []cldf_chain.BlockChain {
-	return generateChainsSol(t, numChains)
+func NewMemoryChainsSol(t *testing.T, numChains int, commitSha string) []cldf_chain.BlockChain {
+	return generateChainsSol(t, numChains, commitSha)
 }
 
 func NewMemoryChainsAptos(t *testing.T, numChains int) []cldf_chain.BlockChain {
@@ -174,7 +192,15 @@ func NewMemoryEnvironment(
 	config MemoryEnvironmentConfig,
 ) cldf.Environment {
 	evmChains := NewMemoryChainsEVM(t, config.Chains, config.NumOfUsersPerChain)
-	solChains := NewMemoryChainsSol(t, config.SolChains)
+
+	var solanaCommitSha string
+	ccipContractVersion := config.CCIPSolanaContractVersion
+	if ccipContractVersion == SolanaContractV0_1_1 {
+		solanaCommitSha = ContractVersionShortSha[ccipContractVersion]
+	} else {
+		solanaCommitSha = ""
+	}
+	solChains := NewMemoryChainsSol(t, config.SolChains, solanaCommitSha)
 	aptosChains := NewMemoryChainsAptos(t, config.AptosChains)
 	suiChains := NewMemoryChainsSui(t, config.SuiChains)
 	zkChains := NewMemoryChainsZk(t, config.ZkChains)
