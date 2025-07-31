@@ -1261,10 +1261,10 @@ github.com/smartcontractkit/chainlink-common v0.7.1 h1:XL9/wb5VRmkB3GK6PpVL3bCNP
 github.com/smartcontractkit/chainlink-common v0.7.1/go.mod h1:SrzacsyKxhRg/U0fNJc1aMwiZJLq064dZ4Pk5dWCNrg=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7 h1:9wh1G+WbXwPVqf0cfSRSgwIcaXTQgvYezylEAfwmrbw=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7/go.mod h1:yaDOAZF6MNB+NGYpxGCUc+owIdKrjvFW0JODdTcQ3V0=
-github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250704215855-8e0907d77096 h1:s4fQl1rIX163chG90hU25s2844N1NTl98sdiQwsVWmA=
-github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250704215855-8e0907d77096/go.mod h1:U1UAbPhy6D7Qz0wHKGPoQO+dpR0hsYjgUz8xwRrmKwI=
-github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250704203933-af56933301a8 h1:Z/CBFhnxGaR1S74HmUhcGXWmT6Afso2CFcpDQaovqsM=
-github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250704203933-af56933301a8/go.mod h1:2w3TPI7vLgJfFmhhxWjtkwoQzoo8AQT8zsp90TqJ+mM=
+github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250707133321-27faefc9ce45 h1:T+yPdzVifh/oVrfVUXYhNqgJG4ubB+yVODtBxVT6esQ=
+github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250707133321-27faefc9ce45/go.mod h1:U1UAbPhy6D7Qz0wHKGPoQO+dpR0hsYjgUz8xwRrmKwI=
+github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250707133321-27faefc9ce45 h1:ii/BXtlqSwl8dlgRFoDYiZNTDCNcSgZJyfFwiWyYmsg=
+github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250707133321-27faefc9ce45/go.mod h1:2w3TPI7vLgJfFmhhxWjtkwoQzoo8AQT8zsp90TqJ+mM=
 github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae h1:BmqiIDbA9FB/uOCOHi/shgL7P0XmjFxhfRtJHdKPLE4=
 github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae/go.mod h1:2MggrMtbhqr0u4U2pcYa21lvAtvaeSawjxdIy1ytHWE=
 github.com/smartcontractkit/chainlink-deployments-framework v0.15.1 h1:8xmWnZxImfNaINbiEFFMbhvVxI/eZ0db16VaSQXfpag=
