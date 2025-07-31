@@ -73,9 +73,11 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 		// reserve all the ports we need explicitly to avoid port conflicts in other tests
 		ports := freeport.GetN(t, 2)
 
+		imagePlatform := "linux/arm64"
 		bcInput := &blockchain.Input{
-			Image: "", // filled out by defaultSui function
+			Image: "mysten/sui-tools:ci-arm64", // filled out by defaultSui function
 			Type:  "sui",
+			ImagePlatform: &imagePlatform,
 			// TODO: this is unused, can it be applied?
 			ChainID:       chainID, 
 		}

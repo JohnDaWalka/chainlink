@@ -46,11 +46,11 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250729221650-0f971f74a124
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250718143957-41236f9ef8b4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.18.0
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250717140849-58bcb2816c08
-	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250522110034-65c54665034a
+	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250729151842-3e61763566a5
+	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250729142306-508e798f6a5d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250723133614-7cb8cae7326f
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250730104840-17e08b14727d
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250731053107-682007ecdc10
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.3
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4

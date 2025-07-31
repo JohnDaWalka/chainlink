@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
+	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"

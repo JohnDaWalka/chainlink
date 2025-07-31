@@ -23,10 +23,11 @@ func initializePluginConfigFunc(chainselFamily string) ccipcommon.InitFunction {
 		return ccipcommon.PluginConfig{
 			CommitPluginCodec:          NewCommitPluginCodecV1(),
 			ExecutePluginCodec:         NewExecutePluginCodecV1(extraDataCodec),
-			MessageHasher:              NewMessageHasherV1(logger.Sugared(lggr).Named(chainsel.FamilyAptos).Named("MessageHasherV1"), extraDataCodec),
+			MessageHasher:              NewMessageHasherV1(logger.Sugared(lggr).Named(chainselFamily).Named("MessageHasherV1"), extraDataCodec),
 			TokenDataEncoder:           NewAptosTokenDataEncoder(),
 			GasEstimateProvider:        NewGasEstimateProvider(),
 			RMNCrypto:                  nil,
+			ChainAccessorFactory:       AptosChainAccessorFactory{},
 			ContractTransmitterFactory: ocrimpls.NewAptosContractTransmitterFactory(extraDataCodec),
 			ChainRW:                    cwProvider,
 			ExtraDataCodec:             ExtraDataDecoder{},
