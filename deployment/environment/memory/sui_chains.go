@@ -78,7 +78,6 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 			Type:  "sui",
 			// TODO: this is unused, can it be applied?
 			ChainID:       chainID, 
-			ImagePlatform: &imagePlatform,
 		}
 
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
