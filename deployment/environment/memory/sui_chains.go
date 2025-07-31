@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -79,8 +78,7 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 			Image: "mysten/sui-tools:ci", // filled out by defaultSui function
 			Type:  "sui",
 			// TODO: this is unused, can it be applied?
-			ChainID:       chainID,
-			CustomPorts:   []string{fmt.Sprintf("%d:8080", ports[0]), fmt.Sprintf("%d:8081", ports[1])},
+			ChainID:       chainID, 
 			ImagePlatform: &imagePlatform,
 		}
 
