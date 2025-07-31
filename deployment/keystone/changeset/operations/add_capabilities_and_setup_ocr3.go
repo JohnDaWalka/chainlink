@@ -22,7 +22,7 @@ import (
 	opjobs "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/jobs"
 )
 
-type ConfigureOCR3AndDistributeJobsSeqDeps struct {
+type AddCapabilitiesAndSetupOCR3Deps struct {
 	Env   *cldf.Environment
 	Nodes []*nodev1.Node
 
@@ -30,7 +30,7 @@ type ConfigureOCR3AndDistributeJobsSeqDeps struct {
 	DonCapabilities []internal.DonCapabilities // externally sourced based on the environment
 }
 
-type ConfigureOCR3AndDistributeJobsSeqInput struct {
+type AddCapabilitiesAndSetupOCR3Input struct {
 	RegistryChainSel        uint64
 	MCMSConfig              *changeset.MCMSConfig
 	RegistryContractAddress *common.Address
@@ -46,47 +46,47 @@ type ConfigureOCR3AndDistributeJobsSeqInput struct {
 	BootstrapperOCR3Urls []string
 }
 
-func (c ConfigureOCR3AndDistributeJobsSeqInput) UseMCMS() bool {
+func (c AddCapabilitiesAndSetupOCR3Input) UseMCMS() bool {
 	return c.MCMSConfig != nil
 }
 
-type ConfigureOCR3AndDistributeJobsSeqOutput struct {
+type AddCapabilitiesAndSetupOCR3Output struct {
 	Specs                 []jobs.OCR3JobConfigSpec
 	Addresses             datastore.AddressRefStore
 	MCMSTimelockProposals []mcms.TimelockProposal
 	BatchOperation        *mcmstypes.BatchOperation
 }
 
-var ConfigureOCR3AndDistributeJobsSeq = operations.NewSequence[
-	ConfigureOCR3AndDistributeJobsSeqInput,
-	ConfigureOCR3AndDistributeJobsSeqOutput,
-	ConfigureOCR3AndDistributeJobsSeqDeps,
+var AddCapabilitiesAndSetupOCR3 = operations.NewSequence[
+	AddCapabilitiesAndSetupOCR3Input,
+	AddCapabilitiesAndSetupOCR3Output,
+	AddCapabilitiesAndSetupOCR3Deps,
 ](
 	"configure-ocr3-and-distribute-jobs-seq",
 	semver.MustParse("1.0.0"),
 	"Configure OCR3 and Distribute Jobs",
-	func(b operations.Bundle, deps ConfigureOCR3AndDistributeJobsSeqDeps, input ConfigureOCR3AndDistributeJobsSeqInput) (ConfigureOCR3AndDistributeJobsSeqOutput, error) {
+	func(b operations.Bundle, deps AddCapabilitiesAndSetupOCR3Deps, input AddCapabilitiesAndSetupOCR3Input) (AddCapabilitiesAndSetupOCR3Output, error) {
 		chain, ok := deps.Env.BlockChains.EVMChains()[input.RegistryChainSel]
 		if !ok {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", input.RegistryChainSel)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("registry chain selector %d does not exist in environment", input.RegistryChainSel)
 		}
 
 		capabilitiesRegistry, err := changeset.GetOwnedContractV2[*capabilities_registry.CapabilitiesRegistry](deps.Env.DataStore.Addresses(), chain, input.RegistryContractAddress.Hex())
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
 		}
 		if input.UseMCMS() && capabilitiesRegistry.McmsContracts == nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilitiesRegistry.Contract.Address())
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilitiesRegistry.Contract.Address())
 		}
 
 		donInfos, err := internal.DonInfos(deps.DonCapabilities, deps.Env.Offchain)
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to get don infos: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to get don infos: %w", err)
 		}
 
 		donToCapabilities, err := internal.MapDonsToCaps(capabilitiesRegistry.Contract, donInfos)
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to map dons to capabilities: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to map dons to capabilities: %w", err)
 		}
 
 		capReport, err := operations.ExecuteOperation(b, contracts.AddCapabilitiesOp, contracts.AddCapabilitiesOpDeps{
@@ -99,7 +99,7 @@ var ConfigureOCR3AndDistributeJobsSeq = operations.NewSequence[
 			UseMCMS:         input.UseMCMS(),
 		})
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to add capabilities to capabilities registry: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to add capabilities to capabilities registry: %w", err)
 		}
 
 		ocr3ContractReport, err := operations.ExecuteOperation(b, contracts.DeployOCR3Op, contracts.DeployOCR3OpDeps{
@@ -108,14 +108,14 @@ var ConfigureOCR3AndDistributeJobsSeq = operations.NewSequence[
 			ChainSelector: input.RegistryChainSel,
 		})
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to deploy OCR3 contract: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to deploy OCR3 contract: %w", err)
 		}
 		ocr3Addresses, err := ocr3ContractReport.Output.Addresses.Fetch()
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to fetch OCR3 contract addresses: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to fetch OCR3 contract addresses: %w", err)
 		}
 		if len(ocr3Addresses) == 0 {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("no OCR3 capability address found for chain selector %d", input.RegistryChainSel)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("no OCR3 capability address found for chain selector %d", input.RegistryChainSel)
 		}
 		ocr3Address := common.HexToAddress(ocr3Addresses[0].Address)
 
@@ -136,7 +136,7 @@ var ConfigureOCR3AndDistributeJobsSeq = operations.NewSequence[
 			},
 		)
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to configure OCR3 contract: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to configure OCR3 contract: %w", err)
 		}
 
 		distributionReport, err := operations.ExecuteSequence(b, opjobs.DistributeOCRJobSpecSeq, opjobs.DistributeOCRJobSpecSeqDeps{
@@ -152,10 +152,10 @@ var ConfigureOCR3AndDistributeJobsSeq = operations.NewSequence[
 			BootstrapperOCR3Urls: input.BootstrapperOCR3Urls,
 		})
 		if err != nil {
-			return ConfigureOCR3AndDistributeJobsSeqOutput{}, fmt.Errorf("failed to distribute OCR3 job specs: %w", err)
+			return AddCapabilitiesAndSetupOCR3Output{}, fmt.Errorf("failed to distribute OCR3 job specs: %w", err)
 		}
 
-		return ConfigureOCR3AndDistributeJobsSeqOutput{
+		return AddCapabilitiesAndSetupOCR3Output{
 			Specs:                 distributionReport.Output.Specs,
 			Addresses:             ocr3ContractReport.Output.Addresses,
 			BatchOperation:        capReport.Output.BatchOperation,
