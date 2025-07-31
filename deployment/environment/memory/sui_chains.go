@@ -74,14 +74,14 @@ func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey,
 		// reserve all the ports we need explicitly to avoid port conflicts in other tests
 		ports := freeport.GetN(t, 2)
 
-		imagePlatform := "linux/arm64/v8"
+		imagePlatform := "linux/amd64"
 		bcInput := &blockchain.Input{
-			Image:         "mysten/sui-tools:ci-arm64", // filled out by defaultSui function
-			ImagePlatform: &imagePlatform,
-			Type:          "sui",
+			Image: "mysten/sui-tools:ci", // filled out by defaultSui function
+			Type:  "sui",
 			// TODO: this is unused, can it be applied?
-			ChainID:     chainID,
-			CustomPorts: []string{fmt.Sprintf("%d:8080", ports[0]), fmt.Sprintf("%d:8081", ports[1])},
+			ChainID:       chainID,
+			CustomPorts:   []string{fmt.Sprintf("%d:8080", ports[0]), fmt.Sprintf("%d:8081", ports[1])},
+			ImagePlatform: &imagePlatform,
 		}
 
 		output, err := blockchain.NewBlockchainNetwork(bcInput)
