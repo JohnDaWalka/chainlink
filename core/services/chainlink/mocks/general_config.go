@@ -312,7 +312,6 @@ func (_c *GeneralConfig_Billing_Call) RunAndReturn(run func() config.Billing) *G
 	return _c
 }
 
-<<<<<<< HEAD
 // BridgeStatusReporter provides a mock function with no fields
 func (_m *GeneralConfig) BridgeStatusReporter() config.BridgeStatusReporter {
 	ret := _m.Called()
@@ -360,8 +359,6 @@ func (_c *GeneralConfig_BridgeStatusReporter_Call) RunAndReturn(run func() confi
 	return _c
 }
 
-=======
->>>>>>> 2b6552d77d (Revert "make generate")
 // CRE provides a mock function with no fields
 func (_m *GeneralConfig) CRE() config.CRE {
 	ret := _m.Called()
