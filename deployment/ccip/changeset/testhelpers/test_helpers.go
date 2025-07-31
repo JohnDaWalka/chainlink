@@ -1090,7 +1090,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	}
 
 	// Setup new PTB client
-	keystoreInstance := keystore.NewInMemoryKeystore(e.Logger)
+	keystoreInstance, err := keystore.NewInMemoryKeystore(e.Logger)
+	if err != nil {
+		return &AnyMsgSentEvent{}, err
+	}
+
 	addr, err := keystoreInstance.AddKey(keyString)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
@@ -1342,7 +1346,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 	}
 
 	suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
-	suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.CCIPPackageId)
+	suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.BurnMintTPPackageId)
 
 	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
 	if err != nil {
@@ -1354,7 +1358,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *CCIPSendReqConf
 		return "", "", fmt.Errorf("failed to grant burnMint %d: %w", cfg.DestChain, err)
 	}
 
-	return deployBurnMintTp.Output.CCIPPackageId, deployBurnMintTp.Output.Objects.StateObjectId, nil
+	return deployBurnMintTp.Output.BurnMintTPPackageId, deployBurnMintTp.Output.Objects.StateObjectId, nil
 }
 
 // Helper function to convert a string to a string pointer
