@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/mcms"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
 
-	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
-	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_common"
+	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
+	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/test_token_pool"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
@@ -513,7 +513,7 @@ func (cfg SetPoolConfig) Validate(e cldf.Environment, chainState solanastateview
 		if tokenConfig.Metadata == "" {
 			return errors.New("metadata must be defined")
 		}
-		if lut, ok := chainState.TokenPoolLookupTable[tokenPubKey][*tokenConfig.PoolType][tokenConfig.Metadata]; !ok || lut.IsZero() {
+		if lut, ok := chainState.TokenPoolLookupTable[tokenPubKey][tokenConfig.PoolType.String()][tokenConfig.Metadata]; !ok || lut.IsZero() {
 			return fmt.Errorf("token pool lookup table not found for (mint: %s)", tokenPubKey.String())
 		}
 		if !tokenConfig.SkipRegistryCheck {
@@ -567,7 +567,19 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 	for _, tokenConfig := range cfg.SetPoolTokenConfigs {
 		tokenPubKey := tokenConfig.TokenPubKey
 		tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
-		lookupTablePubKey := chainState.TokenPoolLookupTable[tokenPubKey][*tokenConfig.PoolType][tokenConfig.Metadata]
+		lookupTablePubKey := chainState.TokenPoolLookupTable[tokenPubKey][tokenConfig.PoolType.String()][tokenConfig.Metadata]
+
+		var currentAdmin solana.PublicKey
+		// if skip registry check is true, then we are registering and setting pool in the same batch, so while generating the instruction, we will use the timelock signer as the current admin
+		if tokenConfig.SkipRegistryCheck {
+			currentAdmin = timelockSignerPDA
+		} else {
+			var tokenAdminRegistryAccount solCommon.TokenAdminRegistry
+			if err := chain.GetAccountDataBorshInto(context.Background(), tokenAdminRegistryPDA, &tokenAdminRegistryAccount); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("token admin registry not found for (mint: %s, router: %s), cannot set pool", tokenPubKey.String(), routerProgramAddress.String())
+			}
+			currentAdmin = tokenAdminRegistryAccount.Administrator
+		}
 		base := solRouter.NewSetPoolInstruction(
 			cfg.WritableIndexes,
 			routerConfigPDA,
