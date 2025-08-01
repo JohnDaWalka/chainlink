@@ -113,6 +113,7 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 		ID:             "test",
 		CapabilityType: 4,
 	})
+	time.Sleep(time.Minute)
 	require.NoError(t, err)
 }
 

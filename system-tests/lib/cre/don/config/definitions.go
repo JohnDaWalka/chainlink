@@ -180,10 +180,12 @@ func WorkerSolana(chains []*WorkerSolanaInput) string {
 		[[Solana]]
 		ChainID = '%s'
 		Enabled = true
+		[Workflow]
+		ForwarderAddress = '%s'
 		[[Solana.Nodes]]
 		Name = '%s'
 		URL = '%s'
-		`, chain.ChainID, chain.Name, chain.NodeURL)
+		`, chain.ChainID, chain.ForwarderAddress, chain.Name, chain.NodeURL)
 	}
 
 	return ret
