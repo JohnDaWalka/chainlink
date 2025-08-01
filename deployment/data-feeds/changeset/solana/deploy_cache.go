@@ -247,7 +247,7 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 	}
 
 	// Create remaining accounts by deriving PDAs for each DataID
-	remainingAccounts, err := createRemainingAccounts(env.DataStore, req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
+	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
 	if err != nil {
 		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
 	}
@@ -259,7 +259,7 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 		Type:              cldf.ContractType(CacheContract),
 		DataIDs:           req.DataIDs,
 		FeedAdmin:         req.FeedAdmin,
-		RemainingAccounts: remainingAccounts,
+		RemainingAccounts: decimalReportAccounts,
 	}
 
 	deps := operation.Deps{
@@ -281,7 +281,6 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 type ConfigureCacheDecimalReportRequest struct {
 	MCMS *proposalutils.TimelockConfig // if set, assumes current ownership is the timelock
 
-	// Chains is optional. Defines chains for which request will be executed. If empty, runs for all available chains.
 	ChainSel  uint64
 	Qualifier string
 	Version   string
@@ -293,8 +292,6 @@ type ConfigureCacheDecimalReportRequest struct {
 
 	Descriptions [][32]uint8
 	DataIDs      [][16]uint8
-
-	RemainingAccounts []solana.AccountMeta
 }
 
 var _ cldf.ChangeSetV2[*ConfigureCacheDecimalReportRequest] = ConfigureCacheDecimalReport{}
@@ -339,6 +336,12 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
 
+	// Create decimalReportAccounts by deriving PDAs for each DataID
+	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
+	if err != nil {
+		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
+	}
+
 	configureCacheDecimalReportInput := operation.ConfigureCacheDecimalReportInput{
 		ChainSel:             req.ChainSel,
 		MCMS:                 req.MCMS,
@@ -350,7 +353,7 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 		FeedAdmin:            req.FeedAdmin,
 		DataIDs:              req.DataIDs,
 		Descriptions:         req.Descriptions,
-		RemainingAccounts:    req.RemainingAccounts,
+		RemainingAccounts:    decimalReportAccounts,
 	}
 
 	deps := operation.Deps{
