@@ -9,13 +9,13 @@ import (
 	"github.com/pkg/errors"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 )
 
-var MockJobSpecFactoryFn = func(mockBinaryPath string) types.JobSpecFactoryFn {
-	return func(input *types.JobSpecFactoryInput) (types.DonsToJobSpecs, error) {
+var MockJobSpecFactoryFn = func(mockBinaryPath string) cre.JobSpecFactoryFn {
+	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(
 			input.DonTopology,
 			mockBinaryPath,
@@ -23,17 +23,17 @@ var MockJobSpecFactoryFn = func(mockBinaryPath string) types.JobSpecFactoryFn {
 	}
 }
 
-func GenerateJobSpecs(donTopology *types.DonTopology, mockBinaryPath string) (types.DonsToJobSpecs, error) {
+func GenerateJobSpecs(donTopology *cre.DonTopology, mockBinaryPath string) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
-	donToJobSpecs := make(types.DonsToJobSpecs)
+	donToJobSpecs := make(cre.DonsToJobSpecs)
 
 	for _, donWithMetadata := range donTopology.DonsWithMetadata {
-		if !flags.HasFlag(donWithMetadata.Flags, types.MockCapability) {
+		if !flags.HasFlag(donWithMetadata.Flags, cre.MockCapability) {
 			continue
 		}
-		workflowNodeSet, err := crenode.FindManyWithLabel(donWithMetadata.NodesMetadata, &types.Label{Key: crenode.NodeTypeKey, Value: types.WorkerNode}, crenode.EqualLabels)
+		workflowNodeSet, err := crenode.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.WorkerNode}, crenode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
