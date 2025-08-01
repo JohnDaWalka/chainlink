@@ -269,7 +269,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 				},
 				"Events": map[string]*chainreaderConfig.ChainReaderEvent{
 					"ExecutionStateChanged": {
-						Name:      "ExecutionStateChanged",
+						Name:      "offramp",
 						EventType: "ExecutionStateChanged",
 						EventSelector: client.EventFilterByMoveEventModule{
 							Module: "offramp",
@@ -277,7 +277,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 					"CommitReportAccepted": {
-						Name:      "CommitReportAccepted",
+						Name:      "offramp",
 						EventType: "CommitReportAccepted",
 						EventSelector: client.EventFilterByMoveEventModule{
 							Module: "offramp",
@@ -285,7 +285,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 					"ConfigSet": {
-						Name:      "ConfigSet",
+						Name:      "ocr3_base",
 						EventType: "ConfigSet",
 						EventSelector: client.EventFilterByMoveEventModule{
 							Module: "ocr3_base",
@@ -293,7 +293,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 					"SourceChainConfigSet": {
-						Name:      "SourceChainConfigSet",
+						Name:      "offramp",
 						EventType: "SourceChainConfigSet",
 						EventSelector: client.EventFilterByMoveEventModule{
 							Module: "offramp",
