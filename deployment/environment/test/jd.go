@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 	//	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/feeds"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
@@ -26,14 +28,20 @@ var _ csav1.CSAServiceClient = (*JDNodeService)(nil)
 type JDNodeService struct {
 	mu    sync.RWMutex
 	store *store
-	*UnimplementedJobServiceClient
+	*JobServiceClient
 	*UnimplementedCSAServiceClient
 }
 
 func NewJDService(nodes []deployment.Node) *JDNodeService {
+	approverGetter := &fakeJobApproverGetter{
+		jobApprovers: make(map[string]*fakeJobApprover),
+	}
+	for _, n := range nodes {
+		approverGetter.jobApprovers[n.NodeID] = &fakeJobApprover{}
+	}
 	return &JDNodeService{
-		//store: wrapAll(nodes),
-		store: newStore(nodes),
+		store:            newStore(nodes),
+		JobServiceClient: NewJobServiceClient(approverGetter),
 	}
 }
 
@@ -371,4 +379,29 @@ func (s *UnimplementedCSAServiceClient) GetKeypair(ctx context.Context, in *csav
 
 func (s *UnimplementedCSAServiceClient) ListKeypairs(ctx context.Context, in *csav1.ListKeypairsRequest, opts ...grpc.CallOption) (*csav1.ListKeypairsResponse, error) {
 	panic("unimplemented")
+}
+
+// mockJobApprover is a mock implementation of the JobApprover interface
+type fakeJobApprover struct {
+	shouldFail bool
+}
+
+func (m *fakeJobApprover) AutoApproveJob(ctx context.Context, p *feeds.ProposeJobArgs) error {
+	if m.shouldFail {
+		return errors.New("mock approval failure")
+	}
+	return nil
+}
+
+// mockJobApproverGetter is a mock implementation of the getter[JobApprover] interface
+type fakeJobApproverGetter struct {
+	jobApprovers map[string]*fakeJobApprover
+}
+
+func (m *fakeJobApproverGetter) Get(id string) (JobApprover, error) {
+	approver, ok := m.jobApprovers[id]
+	if !ok {
+		return nil, errors.New("job approver not found")
+	}
+	return approver, nil
 }
