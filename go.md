@@ -1,7 +1,5 @@
 # smartcontractkit Go modules
-
 ## Main module
-
 ```mermaid
 flowchart LR
   subgraph chains
@@ -38,9 +36,7 @@ flowchart LR
 	click chainlink-ccip/chains/solana href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/solana/gobindings
 	click chainlink-ccip/chains/solana/gobindings href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-common --> chain-selectors
-	chainlink-common --> chainlink-common/pkg/chipingress
-	chainlink-common --> chainlink-common/pkg/workflows/sdk/v2/pb
+	chainlink-common --> chainlink-common/pkg/values
 	chainlink-common --> chainlink-protos/billing/go
 	chainlink-common --> freeport
 	chainlink-common --> grpc-proxy
@@ -148,9 +144,7 @@ flowchart LR
 	classDef outline stroke-dasharray:6,fill:none;
 	class chainlink-ccip-repo,chainlink-common-repo,chainlink-framework-repo,chainlink-protos-repo,tdh2-repo outline
 ```
-
 ## All modules
-
 ```mermaid
 flowchart LR
   subgraph chains
@@ -189,9 +183,7 @@ flowchart LR
 	click chainlink-ccip/chains/solana href "https://github.com/smartcontractkit/chainlink-ccip"
 	chainlink-ccip/chains/solana/gobindings
 	click chainlink-ccip/chains/solana/gobindings href "https://github.com/smartcontractkit/chainlink-ccip"
-	chainlink-common --> chain-selectors
-	chainlink-common --> chainlink-common/pkg/chipingress
-	chainlink-common --> chainlink-common/pkg/workflows/sdk/v2/pb
+	chainlink-common --> chainlink-common/pkg/values
 	chainlink-common --> chainlink-protos/billing/go
 	chainlink-common --> freeport
 	chainlink-common --> grpc-proxy

@@ -548,21 +548,11 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo()
 	solRouter.SetProgramID(routerProgramAddress)
 	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
-	routerUsingMCMS := solanastateview.IsSolanaProgramOwnedByTimelock(
-		&e,
-		chain,
-		chainState,
-		shared.Router,
-		solana.PublicKey{},
-		"",
-	)
-	authority := GetAuthorityForIxn(
-		&e,
-		chain,
-		chainState,
-		shared.Router,
-		solana.PublicKey{},
-		"")
+	timelockSignerPDA, err := FetchTimelockSigner(e, cfg.ChainSelector)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to fetch timelock signer: %w", err)
+	}
+
 	mcmsTxs := []mcmsTypes.Transaction{}
 	for _, tokenConfig := range cfg.SetPoolTokenConfigs {
 		tokenPubKey := tokenConfig.TokenPubKey
@@ -586,7 +576,7 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 			tokenAdminRegistryPDA,
 			tokenPubKey,
 			lookupTablePubKey,
-			authority,
+			currentAdmin,
 		)
 		base.AccountMetaSlice = append(base.AccountMetaSlice, solana.Meta(lookupTablePubKey))
 		instruction, err := base.ValidateAndBuild()
@@ -594,20 +584,20 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 			return cldf.ChangesetOutput{}, err
 		}
 
-		if routerUsingMCMS {
+		if currentAdmin.Equals(timelockSignerPDA) {
 			tx, err := BuildMCMSTxn(instruction, routerProgramAddress.String(), shared.Router)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
 			}
 			mcmsTxs = append(mcmsTxs, *tx)
-		} else {
+		} else { // already confirmed that admin is either deployer key or timelock signer
 			if err = chain.Confirm([]solana.Instruction{instruction}); err != nil {
 				return cldf.ChangesetOutput{}, err
 			}
 		}
 	}
 
-	if routerUsingMCMS {
+	if len(mcmsTxs) > 0 {
 		proposal, err := BuildProposalsForTxns(
 			e, cfg.ChainSelector, "proposal to RegisterTokenAdminRegistry in Solana", cfg.MCMS.MinDelay, mcmsTxs)
 		if err != nil {
