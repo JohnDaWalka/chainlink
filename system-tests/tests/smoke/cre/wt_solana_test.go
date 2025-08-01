@@ -110,8 +110,9 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	require.NoError(t, mocksClient.ConnectAll(mockClientsAddress, true, true), "could not connect to mock capabilities")
 
 	err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{
-		ID:             "test",
+		ID:             "test", // TODO pass GenerateWriteTargetName
 		CapabilityType: 4,
+		// TODO make payload
 	})
 	time.Sleep(time.Minute)
 	require.NoError(t, err)
