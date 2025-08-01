@@ -75,8 +75,7 @@ import (
 )
 
 var (
-	SinglePoRDonCapabilitiesFlags       = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteEVMCapability}
-	SinglePoRDonCapabilitiesFlagsSolana = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteSolanaCapability, types.MockCapability}
+	SinglePoRDonCapabilitiesFlags = []string{types.CronCapability, types.OCR3Capability, types.CustomComputeCapability, types.WriteEVMCapability}
 )
 
 type CustomAnvilMiner struct {
