@@ -23,11 +23,10 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 	t.Run("success - deploy and configure OCR3 capability", func(t *testing.T) {
 		// Setup test environment with contract deployment
 		te := test.SetupContractTestEnv(t, test.EnvWrapperConfig{
-			WFDonConfig:      test.DonConfig{Name: "wfDon", N: 4},
-			AssetDonConfig:   test.DonConfig{Name: "assetDon", N: 4},
-			WriterDonConfig:  test.DonConfig{Name: "writerDon", N: 4},
-			NumChains:        1,
-			UseInMemoryNodes: true,
+			WFDonConfig:     test.DonConfig{Name: "wfDon", N: 4},
+			AssetDonConfig:  test.DonConfig{Name: "assetDon", N: 4},
+			WriterDonConfig: test.DonConfig{Name: "writerDon", N: 4},
+			NumChains:       1,
 		})
 
 		// Get the capabilities registry address
