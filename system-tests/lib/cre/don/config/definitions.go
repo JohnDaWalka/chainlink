@@ -182,11 +182,19 @@ func WorkerSolana(chains []*WorkerSolanaInput) string {
 		Enabled = true
 		[Solana.Workflow]
 		Enabled = true
-		ForwarderAddress = '%s'
+		ForwarderAddress = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
+		FromAddress      = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
+		ForwarderState   = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
+		OraclesConfigPDA = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
+		LookupTable      = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
+		PollPeriod = '1s'
+		AcceptanceTimeout = '1s'
+		TxAcceptanceState = 3
+		Local = true
 		[[Solana.Nodes]]
 		Name = '%s'
 		URL = '%s'
-		`, chain.ChainID, chain.ForwarderAddress, chain.Name, chain.NodeURL)
+		`, chain.ChainID, chain.Name, chain.NodeURL)
 	}
 
 	return ret
