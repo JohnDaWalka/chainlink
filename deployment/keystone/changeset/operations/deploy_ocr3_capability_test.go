@@ -87,7 +87,7 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 			DONName:              "wfDon",
 			ChainSelectorEVM:     te.RegistrySelector,
 			ChainSelectorAptos:   0, // Not using Aptos in this test
-			BootstrapperOCR3Urls: []string{},
+			BootstrapperOCR3Urls: []string{"12D3KooWHfYFQ8hGttAYbMCevQVESEQhzJAqFZokMVtom8bNxwGq@127.0.0.1:5001"},
 		}
 
 		// Execute the sequence

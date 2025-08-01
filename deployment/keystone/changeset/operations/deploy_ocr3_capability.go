@@ -66,6 +66,8 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 	semver.MustParse("1.0.0"),
 	"Configure OCR3 and Distribute Jobs",
 	func(b operations.Bundle, deps DeployOCR3Capability, input DeployOCR3CapabilityInput) (DeployOCR3CapabilityOutput, error) {
+		ds := datastore.NewMemoryDataStore()
+
 		chain, ok := deps.Env.BlockChains.EVMChains()[input.RegistryChainSel]
 		if !ok {
 			return DeployOCR3CapabilityOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", input.RegistryChainSel)
@@ -123,6 +125,18 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 			return DeployOCR3CapabilityOutput{}, fmt.Errorf("no OCR3 capability address found for chain selector %d", input.RegistryChainSel)
 		}
 		ocr3Address := common.HexToAddress(ocr3Addresses[0].Address)
+
+		for _, addr := range ocr3Addresses {
+			addrErr := ds.Addresses().Add(addr)
+			if addrErr != nil {
+				return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to add OCR3 address %s to datastore: %w", addr.Address, addrErr)
+			}
+		}
+
+		if err := ds.Merge(deps.Env.DataStore); err != nil {
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to merge datastore: %w", err)
+		}
+		deps.Env.DataStore = ds.Seal()
 
 		configOCR3ContractReport, err := operations.ExecuteOperation(
 			b,

@@ -120,21 +120,25 @@ func BuildOCR3JobConfigSpecs(
 		if !ok {
 			return nil, fmt.Errorf("no evm ocr2 config for node %s", node.NodeID)
 		}
-		aptosConfig, ok := node.OCRConfigForChainSelector(aptosChainSel)
-		if !ok {
-			return nil, fmt.Errorf("no aptos ocr2 config for node %s", node.NodeID)
-		}
 
 		jobConfig := &OCR3JobConfig{
-			JobName:              "OCR3 Multichain Capability (" + node.Name + ")",
-			ChainID:              chainID,
-			P2PID:                node.PeerID.String(),
-			OCR2EVMKeyBundleID:   evmConfig.KeyBundleID,
-			OCR2AptosKeyBundleID: aptosConfig.KeyBundleID,
-			ContractID:           contractID,
-			TransmitterID:        string(evmConfig.TransmitAccount),
-			P2Pv2Bootstrappers:   btURLs,
-			ExternalJobID:        extJobID,
+			JobName:            "OCR3 Multichain Capability (" + node.Name + ")",
+			ChainID:            chainID,
+			P2PID:              node.PeerID.String(),
+			OCR2EVMKeyBundleID: evmConfig.KeyBundleID,
+			ContractID:         contractID,
+			TransmitterID:      string(evmConfig.TransmitAccount),
+			P2Pv2Bootstrappers: btURLs,
+			ExternalJobID:      extJobID,
+		}
+
+		// TODO: do we always have to support aptos, or can it be optional?
+		if aptosChainSel > 0 {
+			aptosConfig, ok := node.OCRConfigForChainSelector(aptosChainSel)
+			if !ok {
+				return nil, fmt.Errorf("no aptos ocr2 config for node %s", node.NodeID)
+			}
+			jobConfig.OCR2AptosKeyBundleID = aptosConfig.KeyBundleID
 		}
 
 		err1 := jobConfig.Validate()
