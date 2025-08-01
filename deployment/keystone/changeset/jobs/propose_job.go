@@ -77,11 +77,14 @@ func ProposeJob(ctx context.Context, req ProposeJobRequest) error {
 		})
 	}
 
-	nodes, err := req.OffchainClient.ListNodes(ctx, &nodev1.ListNodesRequest{Filter: &nodev1.ListNodesRequest_Filter{
+	filter := &nodev1.ListNodesRequest_Filter{
 		Enabled:   1,
 		Selectors: selectors,
-		Ids:       req.NodeIDs,
-	}})
+	}
+	if len(req.NodeIDs) > 0 {
+		filter.Ids = req.NodeIDs
+	}
+	nodes, err := req.OffchainClient.ListNodes(ctx, &nodev1.ListNodesRequest{Filter: filter})
 	if err != nil {
 		return fmt.Errorf("failed to get nodes: %w", err)
 	}

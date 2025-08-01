@@ -58,14 +58,14 @@ var DistributeOCRJobSpecSeq = operations.NewSequence[DistributeOCRJobSpecSeqInpu
 				return DistributeOCRJobSpecSeqOutput{}, fmt.Errorf("node not found: %s", spec.NodeID)
 			}
 
-			_, opErr := operations.ExecuteOperation(b, DistributeOCRJobSpecOp, DistributeOCRJobSpecOpDeps{
+			_, opErr := operations.ExecuteOperation(b, DistributeJobSpecOp, DistributeJobSpecOpDeps{
 				Offchain: deps.Offchain,
-			}, DistributeOCRJobSpecOpInput{
+			}, DistributeJobSpecOpInput{
 				NodeID:           spec.NodeID,
 				NodeP2PLabel:     nodeLabel,
 				DomainKey:        input.DomainKey,
 				EnvironmentLabel: input.EnvironmentLabel,
-				Spec:             spec,
+				Spec:             spec.Spec,
 			})
 			if opErr != nil {
 				// Do not fail the sequence if a single proposal fails, make it through all proposals.
