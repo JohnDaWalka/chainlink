@@ -66,7 +66,7 @@ func NewReportingPluginFactory(lggr logger.Logger, store *requests.Store[*Reques
 		MaxIdentifierNamespaceLenBytes: 64,
 	}
 	return &ReportingPluginFactory{
-		lggr:  lggr.Named("VaultReportingPlugin"),
+		lggr:  lggr.Named("VaultReportingPluginFactory"),
 		store: store,
 		cfg:   cfg,
 	}, nil
@@ -80,7 +80,7 @@ type ReportingPluginFactory struct {
 
 func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig, fetcher ocr3_1types.BlobBroadcastFetcher) (ocr3_1types.ReportingPlugin[[]byte], ocr3_1types.ReportingPluginInfo, error) {
 	return &ReportingPlugin{
-		lggr:  r.lggr.Named("ReportingPlugin"),
+		lggr:  r.lggr.Named("VaultReportingPlugin"),
 		store: r.store,
 		cfg:   r.cfg,
 	}, ocr3_1types.ReportingPluginInfo{}, nil
