@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	P2pIdLabel = "p2p_id"
+	P2pIDLabel = "p2p_id"
 )
 
 // DONFilter Source for a set of JD filters to apply when fetching a DON.
@@ -75,7 +75,7 @@ func FetchNodesFromJD(ctx context.Context, jd deployment.OffchainClient, filter 
 
 func GetP2pLabel(labels []*jdtypesv1.Label) string {
 	for _, label := range labels {
-		if label.GetKey() == P2pIdLabel {
+		if label.GetKey() == P2pIDLabel {
 			return label.GetValue()
 		}
 	}

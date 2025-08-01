@@ -21,8 +21,7 @@ import (
 )
 
 type DeployOCR3Capability struct {
-	Env *cldf.Environment
-	//Nodes []*nodev1.Node
+	Env     *cldf.Environment
 	NodeIDs []string // Node IDs to distribute the job specs to
 
 	// DonCapabilities is used to add capabilities to capabilities registry.

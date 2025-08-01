@@ -10,7 +10,6 @@ import (
 )
 
 type DistributeOCRJobSpecOpDeps struct {
-	//Node     *nodev1.Node
 	NodeID   string // Node ID to distribute the job spec to
 	Offchain deployment.OffchainClient
 }
@@ -30,14 +29,11 @@ var DistributeOCRJobSpecOp = operations.NewOperation[DistributeOCRJobSpecOpInput
 	semver.MustParse("1.0.0"),
 	"Distribute OCR Job Spec",
 	func(b operations.Bundle, deps DistributeOCRJobSpecOpDeps, input DistributeOCRJobSpecOpInput) (DistributeOCRJobSpecOpOutput, error) {
-		//node := deps.Node
-		//p2pId := offchain.GetP2pLabel(node.GetLabels())
 		b.Logger.Debugw("Proposing job", "nodeID", deps.NodeID, "domain", input.DomainKey, "environment", input.EnvironmentLabel)
 		req := jobs.ProposeJobRequest{
-			Job:         input.Spec.Spec,
-			DomainKey:   input.DomainKey,
-			Environment: input.EnvironmentLabel,
-			//NodeLabels:     map[string]string{offchain.P2pIdLabel: p2pId},
+			Job:            input.Spec.Spec,
+			DomainKey:      input.DomainKey,
+			Environment:    input.EnvironmentLabel,
 			NodeIDs:        []string{deps.NodeID},
 			OffchainClient: deps.Offchain,
 			Lggr:           b.Logger,
