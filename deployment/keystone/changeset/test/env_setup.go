@@ -84,7 +84,7 @@ type EnvWrapperConfig struct {
 	UseMCMS bool
 	// if true, use in-memory nodes for testing
 	// if false, view only nodes will be used
-	useInMemoryNodes bool
+	UseInMemoryNodes bool
 }
 
 func (c EnvWrapperConfig) Validate() error {
@@ -270,7 +270,7 @@ func initEnv(t *testing.T, nChains int) (registryChainSel uint64, env cldf.Envir
 //
 // - a view-only Offchain client that supports all the read api operations of the Offchain client
 func SetupContractTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
-	c.useInMemoryNodes = false
+	//c.UseInMemoryNodes = false // TODO: does it always need to be false?
 	return setupTestEnv(t, c)
 }
 
@@ -286,7 +286,7 @@ func setupTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
 		dons testDons
 		env  cldf.Environment
 	)
-	if c.useInMemoryNodes {
+	if c.UseInMemoryNodes {
 		dons, env = setupMemoryNodeTest(t, registryChainSel, envWithContracts.BlockChains, c)
 	} else {
 		dons, env = setupViewOnlyNodeTest(t, registryChainSel, envWithContracts.BlockChains.EVMChains(), c)
