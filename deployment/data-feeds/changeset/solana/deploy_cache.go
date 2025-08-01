@@ -237,17 +237,10 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 	}
 
 	cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
-	cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
 	cacheState, err := env.DataStore.Addresses().Get(cacheStateRef)
 	if err != nil {
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
-	cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
-
-	fmt.Printf("Cache state ref: %+v", cacheStateRef)
-	fmt.Printf("Cache ref: %+v", cacheRef)
-	fmt.Printf("Cache state: %+v\n", cacheState)
-	fmt.Printf("Cache program ID: %+v\n", cacheProgramID)
 
 	if err != nil {
 		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
