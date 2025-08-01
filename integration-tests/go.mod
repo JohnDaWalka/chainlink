@@ -43,7 +43,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/slack-go/slack v0.15.0
-	github.com/smartcontractkit/chain-selectors v1.0.62
+	github.com/smartcontractkit/chain-selectors v1.0.65
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.1.0-solana.0.20250729125320-dd7486223496
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
