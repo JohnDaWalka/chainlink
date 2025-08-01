@@ -132,6 +132,9 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 		require.NotEmpty(t, output.JobSpecs, "OCR3 job specs should be created")
 		assert.Len(t, output.JobSpecs, len(wfNodeIDs), "Should have one job spec per node")
 
+		// Verify bootstrap job spec was created
+		require.NotEmpty(t, output.BootstrapSpec, "Bootstrap job spec should be created")
+
 		// Verify no MCMS proposals were created (since not using MCMS)
 		assert.Empty(t, output.MCMSTimelockProposals)
 		assert.Nil(t, output.BatchOperation)
