@@ -27,7 +27,7 @@ type DistributeBootstrapJobSpecsSeqInput struct {
 	EnvironmentLabel string
 	ChainSelectorEVM uint64
 
-	JobName  string
+	JobName  string // Optional job name, if not provided, the default will be used.
 	BootCfgs []DistributeBootstrapJobSpecsSeqBootCfg
 }
 
@@ -40,10 +40,10 @@ type DistributeBootstrapJobSpecsSeqOutput struct {
 	Spec string
 }
 
-var DistributeBootstrapJobSpecsSeq = operations.NewOperation[DistributeBootstrapJobSpecsSeqInput, DistributeBootstrapJobSpecsSeqOutput, DistributeBootstrapJobSpecsSeqDeps](
+var DistributeBootstrapJobSpecsSeq = operations.NewSequence[DistributeBootstrapJobSpecsSeqInput, DistributeBootstrapJobSpecsSeqOutput, DistributeBootstrapJobSpecsSeqDeps](
 	"distribute-bootstrap-job-specs-seq",
 	semver.MustParse("1.0.0"),
-	"Distribute Bootstrap Job Specs",
+	"Distribute Bootstrap Job JobSpecs",
 	func(b operations.Bundle, deps DistributeBootstrapJobSpecsSeqDeps, input DistributeBootstrapJobSpecsSeqInput) (DistributeBootstrapJobSpecsSeqOutput, error) {
 		extJobID, err := jobs.BootstrapExternalJobID(input.DONName, input.ChainSelectorEVM)
 		if err != nil {
@@ -67,6 +67,10 @@ var DistributeBootstrapJobSpecsSeq = operations.NewOperation[DistributeBootstrap
 		})
 		if err != nil {
 			return DistributeBootstrapJobSpecsSeqOutput{}, fmt.Errorf("failed to resolve bootstrap job: %w", err)
+		}
+
+		if len(input.BootCfgs) == 0 {
+			return DistributeBootstrapJobSpecsSeqOutput{}, fmt.Errorf("no bootstrap configurations provided")
 		}
 
 		var mergedErrs error

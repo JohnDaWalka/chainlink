@@ -44,6 +44,7 @@ type DeployOCR3CapabilityInput struct {
 	ChainSelectorEVM     uint64
 	ChainSelectorAptos   uint64
 	BootstrapperOCR3Urls []string
+	BootstrapCfgs        []opjobs.DistributeBootstrapJobSpecsSeqBootCfg
 }
 
 func (c DeployOCR3CapabilityInput) UseMCMS() bool {
@@ -51,7 +52,8 @@ func (c DeployOCR3CapabilityInput) UseMCMS() bool {
 }
 
 type DeployOCR3CapabilityOutput struct {
-	Specs                 []jobs.OCR3JobConfigSpec
+	JobSpecs              []jobs.OCR3JobConfigSpec
+	BootstrapSpec         string
 	Addresses             datastore.AddressRefStore
 	MCMSTimelockProposals []mcms.TimelockProposal
 	BatchOperation        *mcmstypes.BatchOperation
@@ -62,9 +64,9 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 	DeployOCR3CapabilityOutput,
 	DeployOCR3Capability,
 ](
-	"configure-ocr3-and-distribute-jobs-seq",
+	"deploy-ocr3-capability-seq",
 	semver.MustParse("1.0.0"),
-	"Configure OCR3 and Distribute Jobs",
+	"Deploy OCR3 Capability",
 	func(b operations.Bundle, deps DeployOCR3Capability, input DeployOCR3CapabilityInput) (DeployOCR3CapabilityOutput, error) {
 		ds := datastore.NewMemoryDataStore()
 
@@ -153,6 +155,20 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to configure OCR3 contract: %w", err)
 		}
 
+		bootDistributionReport, err := operations.ExecuteSequence(b, opjobs.DistributeBootstrapJobSpecsSeq, opjobs.DistributeBootstrapJobSpecsSeqDeps{
+			Offchain: deps.Env.Offchain,
+		}, opjobs.DistributeBootstrapJobSpecsSeqInput{
+			DONName:          input.DONName,
+			DomainKey:        input.DomainKey,
+			ContractID:       ocr3Address.Hex(),
+			EnvironmentLabel: input.EnvironmentLabel,
+			ChainSelectorEVM: input.ChainSelectorEVM,
+			BootCfgs:         input.BootstrapCfgs,
+		})
+		if err != nil {
+			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to distribute bootstrap job specs: %w", err)
+		}
+
 		distributionReport, err := operations.ExecuteSequence(b, opjobs.DistributeOCRJobSpecSeq, opjobs.DistributeOCRJobSpecSeqDeps{
 			Offchain: deps.Env.Offchain,
 		}, opjobs.DistributeOCRJobSpecSeqInput{
@@ -170,7 +186,8 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 		}
 
 		return DeployOCR3CapabilityOutput{
-			Specs:                 distributionReport.Output.Specs,
+			JobSpecs:              distributionReport.Output.Specs,
+			BootstrapSpec:         bootDistributionReport.Output.Spec,
 			Addresses:             ocr3ContractReport.Output.Addresses,
 			BatchOperation:        capReport.Output.BatchOperation,
 			MCMSTimelockProposals: configOCR3ContractReport.Output.MCMSTimelockProposals,

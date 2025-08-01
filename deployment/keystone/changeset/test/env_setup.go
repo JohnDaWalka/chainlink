@@ -200,6 +200,11 @@ func (te EnvWrapper) GetJDNodeIDsToP2PIDs(donName string) map[string]string {
 	return te.dons.Get(donName).GetJDNodeIDsToP2PIDs()
 }
 
+func (te EnvWrapper) GetJDNodeNamesToP2PIDs(donName string) map[string]string {
+	te.t.Helper()
+	return te.dons.Get(donName).GetJDNodeNamesToP2PIDs()
+}
+
 func initEnv(t *testing.T, nChains int) (registryChainSel uint64, env cldf.Environment) {
 	chains := cldf_chain.NewBlockChainsFromSlice(memory.NewMemoryChainsEVM(t, nChains, 1))
 	registryChainSel = registryChain(t, chains.EVMChains())

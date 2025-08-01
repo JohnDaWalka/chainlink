@@ -52,17 +52,26 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 		}
 
 		// Get nodes from the test environment
-		wfNodeIDsToP2PLabels := te.GetJDNodeIDsToP2PIDs("wfDon")
-		require.NotEmpty(t, wfNodeIDsToP2PLabels)
+		wfNodeIDsToP2PIDs := te.GetJDNodeIDsToP2PIDs("wfDon")
+		require.NotEmpty(t, wfNodeIDsToP2PIDs)
+		wfNodeNamesToP2PIDs := te.GetJDNodeNamesToP2PIDs("wfDon")
+		require.NotEmpty(t, wfNodeNamesToP2PIDs)
 
-		wfNodeIDs := make([]string, 0, len(wfNodeIDsToP2PLabels))
-		seqNodes := make([]jobs.DistributeOCRJobSpecSeqNode, 0, len(wfNodeIDsToP2PLabels))
-		for nodeID, p2pID := range wfNodeIDsToP2PLabels {
+		wfNodeIDs := make([]string, 0, len(wfNodeIDsToP2PIDs))
+		seqNodes := make([]jobs.DistributeOCRJobSpecSeqNode, 0, len(wfNodeIDsToP2PIDs))
+		for nodeID, p2pID := range wfNodeIDsToP2PIDs {
 			seqNodes = append(seqNodes, jobs.DistributeOCRJobSpecSeqNode{
 				ID:       nodeID,
 				P2PLabel: p2pID,
 			})
 			wfNodeIDs = append(wfNodeIDs, nodeID)
+		}
+		bootstrapNodes := make([]jobs.DistributeBootstrapJobSpecsSeqBootCfg, 0, len(wfNodeIDsToP2PIDs))
+		for nodeName, p2pID := range wfNodeNamesToP2PIDs {
+			bootstrapNodes = append(bootstrapNodes, jobs.DistributeBootstrapJobSpecsSeqBootCfg{
+				NodeName: nodeName,
+				P2PID:    p2pID,
+			})
 		}
 
 		// Create oracle config
@@ -97,6 +106,7 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 			ChainSelectorEVM:     te.RegistrySelector,
 			ChainSelectorAptos:   0, // Not using Aptos in this test
 			BootstrapperOCR3Urls: []string{"12D3KooWHfYFQ8hGttAYbMCevQVESEQhzJAqFZokMVtom8bNxwGq@127.0.0.1:5001"},
+			BootstrapCfgs:        bootstrapNodes,
 		}
 
 		// Execute the sequence
@@ -119,8 +129,8 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 		require.NotEmpty(t, addresses, "OCR3 contract should be deployed")
 
 		// Verify job specs were created and distributed
-		require.NotEmpty(t, output.Specs, "OCR3 job specs should be created")
-		assert.Len(t, output.Specs, len(wfNodeIDs), "Should have one job spec per node")
+		require.NotEmpty(t, output.JobSpecs, "OCR3 job specs should be created")
+		assert.Len(t, output.JobSpecs, len(wfNodeIDs), "Should have one job spec per node")
 
 		// Verify no MCMS proposals were created (since not using MCMS)
 		assert.Empty(t, output.MCMSTimelockProposals)
@@ -132,7 +142,7 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 
 		te.Env.Logger.Infow("DeployOCR3CapabilitySeq test completed successfully",
 			"ocr3Address", ocr3Address.Hex(),
-			"jobSpecsCount", len(output.Specs),
+			"jobSpecsCount", len(output.JobSpecs),
 		)
 	})
 	/*
@@ -222,8 +232,8 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, addresses)
 
-			require.NotEmpty(t, output.Specs)
-			assert.Len(t, output.Specs, len(wfNodes))
+			require.NotEmpty(t, output.JobSpecs)
+			assert.Len(t, output.JobSpecs, len(wfNodes))
 		})
 
 		t.Run("failure - invalid registry chain selector", func(t *testing.T) {

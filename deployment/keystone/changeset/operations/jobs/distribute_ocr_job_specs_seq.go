@@ -36,7 +36,7 @@ type DistributeOCRJobSpecSeqOutput struct {
 var DistributeOCRJobSpecSeq = operations.NewSequence[DistributeOCRJobSpecSeqInput, DistributeOCRJobSpecSeqOutput, DistributeOCRJobSpecSeqDeps](
 	"distribute-ocr-job-spec-seq",
 	semver.MustParse("1.0.0"),
-	"Distribute OCR Job Specs",
+	"Distribute OCR Job JobSpecs",
 	func(b operations.Bundle, deps DistributeOCRJobSpecSeqDeps, input DistributeOCRJobSpecSeqInput) (DistributeOCRJobSpecSeqOutput, error) {
 		nodeIdToP2PLabel := make(map[string]string)
 		nodeIDs := make([]string, len(input.Nodes))
