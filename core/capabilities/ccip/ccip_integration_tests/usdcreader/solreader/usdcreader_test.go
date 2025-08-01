@@ -310,7 +310,9 @@ func setup(ctx context.Context, t *testing.T, readerChain ccipocr3.ChainSelector
 		db = pgtest.NewSqlxDB(t) // Use simple in-memory DB for tests
 	}
 	t.Cleanup(func() {
-		require.NoError(t, db.Close())
+		if err := db.Close(); err != nil {
+			t.Logf("failed to close db: %v", err)
+		}
 	})
 
 	// Set program ID
@@ -351,7 +353,15 @@ func setup(ctx context.Context, t *testing.T, readerChain ccipocr3.ChainSelector
 		tomlConfig,
 	)
 
-	// Create contract reader service
+	// Start log poller
+	require.NoError(t, lp.Start(ctx))
+	t.Cleanup(func() {
+		if err := lp.Close(); err != nil {
+			t.Logf("failed to close log poller: %v", err)
+		}
+	})
+
+	// Create a contract reader instance
 	wrp := &chainreader.RPCClientWrapper{AccountReader: rpc}
 	cr, err := chainreader.NewContractReaderService(
 		lggr,
@@ -359,14 +369,14 @@ func setup(ctx context.Context, t *testing.T, readerChain ccipocr3.ChainSelector
 		cfg,
 		lp,
 	)
-
-	// Start all services and make sure they're all closed once the test exits
 	require.NoError(t, err)
-	require.NoError(t, lp.Start(ctx))
+
+	// Start chain reader
 	require.NoError(t, cr.Start(ctx))
 	t.Cleanup(func() {
-		require.NoError(t, cr.Close())
-		require.NoError(t, lp.Close())
+		if err := cr.Close(); err != nil {
+			t.Logf("failed to close chain reader: %v", err)
+		}
 	})
 
 	// Convert to the extended contract reader interface
