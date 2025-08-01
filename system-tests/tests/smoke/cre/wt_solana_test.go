@@ -2,6 +2,7 @@ package cre
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -63,9 +65,6 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 		feedIDs = append(feedIDs, wc.FeedID)
 	}
 
-	priceProvider, priceErr := NewFakePriceProvider(testLogger, in.Fake, AuthorizationKey, feedIDs)
-	require.NoError(t, priceErr, "failed to create fake price provider")
-
 	capabilityFactoryFns := []cre.DONCapabilityWithConfigFactoryFn{
 		consensuscap.OCR3CapabilityFactoryFn,
 		mockcap.MockCapabilityFactoryFn,
@@ -75,11 +74,10 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 		capabilityFactoryFns = append(capabilityFactoryFns, writesolcap.WriteSolanaCapabilityFactory(bc.ChainID))
 	}
 
-	_ = setupWTTestEnvironment(
+	setupOut := setupWTTestEnvironment(
 		t,
 		testLogger,
 		in,
-		priceProvider,
 		mustSetCapabilitiesFn,
 		capabilityFactoryFns,
 	)
@@ -108,10 +106,14 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	}
 
 	require.NoError(t, mocksClient.ConnectAll(mockClientsAddress, true, true), "could not connect to mock capabilities")
-
+	fmt.Println("cap name", setupOut.WriteCap)
 	err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{
-		ID:             "test", // TODO pass GenerateWriteTargetName
-		CapabilityType: 4,
+		ID: setupOut.DeriveRemaining,
+		//ID:             "test",
+		CapabilityType:  4,
+		Config:          []byte{},
+		Inputs:          []byte{},
+		RequestMetadata: &pb.Metadata{},
 		// TODO make payload
 	})
 	time.Sleep(time.Minute)
@@ -119,6 +121,9 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 }
 
 type setupWTOutput struct {
+	WriteCap        string
+	DeriveRemaining string
+	SolChainID      string
 	// TODO put cache address here
 }
 
@@ -126,14 +131,10 @@ func setupWTTestEnvironment(
 	t *testing.T,
 	testLogger zerolog.Logger,
 	in *TestConfig,
-	priceProvider PriceProvider,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*cre.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 ) *setupWTOutput {
 	extraAllowedGatewayPorts := []int{}
-	if _, ok := priceProvider.(*FakePriceProvider); ok {
-		extraAllowedGatewayPorts = append(extraAllowedGatewayPorts, in.Fake.Port)
-	}
 
 	customBinariesPaths := map[string]string{}
 	containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.Type)
@@ -187,16 +188,19 @@ func setupWTTestEnvironment(
 			}
 		}
 	}
-
+	out := &setupWTOutput{}
 	for _, bo := range universalSetupOutput.BlockchainOutput {
 		if bo.ReadOnly {
 			continue
 		}
 
 		if bo.SolChain != nil {
-			// TODO handle deploy and configure cache here
+			chainID, err := bo.SolClient.GetGenesisHash(context.Background())
+			require.NoError(t, err, "failed to get genesis hash")
+			out.WriteCap = writetarget.GenerateWriteTargetName(chainID.String())
+			out.DeriveRemaining = writetarget.GenerateDeriveRemainingName(chainID.String())
 		}
 	}
 
-	return &setupWTOutput{}
+	return out
 }
