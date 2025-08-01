@@ -180,7 +180,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
-						ResultTupleToStruct: []string{"OCRConfig"},
+						ResultTupleToStruct: []string{"ocr_config"},
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
 						Name:          "get_latest_price_sequence_number",
@@ -282,6 +282,22 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						EventSelector: client.EventFilterByMoveEventModule{
 							Module: "offramp",
 							Event:  "CommitReportAccepted",
+						},
+					},
+					"ConfigSet": {
+						Name:      "ConfigSet",
+						EventType: "ConfigSet",
+						EventSelector: client.EventFilterByMoveEventModule{
+							Module: "ocr3_base",
+							Event:  "ConfigSet",
+						},
+					},
+					"SourceChainConfigSet": {
+						Name:      "SourceChainConfigSet",
+						EventType: "SourceChainConfigSet",
+						EventSelector: client.EventFilterByMoveEventModule{
+							Module: "offramp",
+							Event:  "SourceChainConfigSet",
 						},
 					},
 				},
