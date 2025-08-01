@@ -189,7 +189,6 @@ func RegisterTokenAdminRegistry(e cldf.Environment, cfg RegisterTokenAdminRegist
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to create transaction: %w", err)
 			}
 			mcmsTxs = append(mcmsTxs, *tx)
-
 		} else {
 			// if we want to have a different authority, we will need to add the corresponding signer here
 			// for now we are assuming both token owner and ccip admin will always be deployer key if done without mcms
