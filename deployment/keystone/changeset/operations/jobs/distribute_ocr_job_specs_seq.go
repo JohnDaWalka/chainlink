@@ -4,15 +4,12 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
-
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/jobs"
 )
 
 type DistributeOCRJobSpecSeqDeps struct {
-	NodeIDs  []string
 	Offchain deployment.OffchainClient
 }
 
@@ -24,6 +21,12 @@ type DistributeOCRJobSpecSeqInput struct {
 	ChainSelectorEVM     uint64
 	ChainSelectorAptos   uint64
 	BootstrapperOCR3Urls []string
+	Nodes                []DistributeOCRJobSpecSeqNode
+}
+
+type DistributeOCRJobSpecSeqNode struct {
+	ID       string
+	P2PLabel string
 }
 
 type DistributeOCRJobSpecSeqOutput struct {
@@ -35,34 +38,37 @@ var DistributeOCRJobSpecSeq = operations.NewSequence[DistributeOCRJobSpecSeqInpu
 	semver.MustParse("1.0.0"),
 	"Distribute OCR Job Specs",
 	func(b operations.Bundle, deps DistributeOCRJobSpecSeqDeps, input DistributeOCRJobSpecSeqInput) (DistributeOCRJobSpecSeqOutput, error) {
-		nodesByID := make(map[string]struct{})
-		for _, nodeID := range deps.NodeIDs {
-			nodesByID[nodeID] = struct{}{}
+		nodeIdToP2PLabel := make(map[string]string)
+		nodeIDs := make([]string, len(input.Nodes))
+		for _, node := range input.Nodes {
+			nodeIDs = append(nodeIDs, node.ID)
+			nodeIdToP2PLabel[node.ID] = node.P2PLabel
 		}
 
 		specs, err := jobs.BuildOCR3JobConfigSpecs(
-			deps.Offchain, b.Logger, input.ContractID, input.ChainSelectorEVM, input.ChainSelectorAptos, deps.NodeIDs, input.BootstrapperOCR3Urls, input.DONName)
+			deps.Offchain, b.Logger, input.ContractID, input.ChainSelectorEVM, input.ChainSelectorAptos, nodeIDs, input.BootstrapperOCR3Urls, input.DONName)
 		if err != nil {
 			return DistributeOCRJobSpecSeqOutput{}, fmt.Errorf("failed to build job specs: %w", err)
 		}
 
 		var mergedErrs error
 		for _, spec := range specs {
-			_, ok := nodesByID[spec.NodeID]
+			nodeLabel, ok := nodeIdToP2PLabel[spec.NodeID]
 			if !ok {
 				return DistributeOCRJobSpecSeqOutput{}, fmt.Errorf("node not found: %s", spec.NodeID)
 			}
 
 			_, opErr := operations.ExecuteOperation(b, DistributeOCRJobSpecOp, DistributeOCRJobSpecOpDeps{
-				NodeID:   spec.NodeID,
 				Offchain: deps.Offchain,
 			}, DistributeOCRJobSpecOpInput{
+				NodeID:           spec.NodeID,
+				NodeP2PLabel:     nodeLabel,
 				DomainKey:        input.DomainKey,
 				EnvironmentLabel: input.EnvironmentLabel,
 				Spec:             spec,
 			})
 			if opErr != nil {
-				// Do not fail changeset if a single proposal fails, make it through all proposals.
+				// Do not fail the sequence if a single proposal fails, make it through all proposals.
 				mergedErrs = fmt.Errorf("error proposing job to node %s spec %s: %w", spec.NodeID, spec.Spec, opErr)
 				continue
 			}

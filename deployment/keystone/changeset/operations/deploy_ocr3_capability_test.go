@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/jobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -51,8 +52,18 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 		}
 
 		// Get nodes from the test environment
-		wfNodeIDs := te.GetJDNodeIDs("wfDon")
-		require.NotEmpty(t, wfNodeIDs)
+		wfNodeIDsToP2PLabels := te.GetJDNodeIDsToP2PIDs("wfDon")
+		require.NotEmpty(t, wfNodeIDsToP2PLabels)
+
+		wfNodeIDs := make([]string, 0, len(wfNodeIDsToP2PLabels))
+		seqNodes := make([]jobs.DistributeOCRJobSpecSeqNode, 0, len(wfNodeIDsToP2PLabels))
+		for nodeID, p2pID := range wfNodeIDsToP2PLabels {
+			seqNodes = append(seqNodes, jobs.DistributeOCRJobSpecSeqNode{
+				ID:       nodeID,
+				P2PLabel: p2pID,
+			})
+			wfNodeIDs = append(wfNodeIDs, nodeID)
+		}
 
 		// Create oracle config
 		oracleConfig := internal.OracleConfig{
@@ -70,14 +81,12 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 		// Set up dependencies
 		deps := keystoneops.DeployOCR3Capability{
 			Env:             &te.Env,
-			NodeIDs:         wfNodeIDs,
 			DonCapabilities: donCapabilities,
 		}
 
 		// Set up input
-		// convert capRegistryAddr to geth common.Address
-		//capRegistryAddr2 := common.HexToAddress(capRegistryAddr.Qualifier())
 		input := keystoneops.DeployOCR3CapabilityInput{
+			Nodes:                seqNodes,
 			RegistryChainSel:     te.RegistrySelector,
 			RegistryRef:          capRegistryAddr,
 			OracleConfig:         oracleConfig,

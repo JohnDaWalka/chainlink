@@ -15,6 +15,7 @@ type testDon interface {
 	F() int
 	Name() string
 	GetJDNodeIDs() []string
+	GetJDNodeIDsToP2PIDs() map[string]string
 }
 
 var _ testDon = (*memoryDon)(nil)
@@ -51,6 +52,14 @@ func (d *memoryDon) GetJDNodeIDs() []string {
 		out = append(out, n.ID)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func (d *memoryDon) GetJDNodeIDsToP2PIDs() map[string]string {
+	out := make(map[string]string)
+	for _, n := range d.m {
+		out[n.ID] = n.Keys.PeerID.String()
+	}
 	return out
 }
 
@@ -98,6 +107,14 @@ func (d *viewOnlyDon) GetJDNodeIDs() []string {
 		out = append(out, n.NodeID)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func (d *viewOnlyDon) GetJDNodeIDsToP2PIDs() map[string]string {
+	out := make(map[string]string)
+	for _, n := range d.m {
+		out[n.NodeID] = n.PeerID.String()
+	}
 	return out
 }
 

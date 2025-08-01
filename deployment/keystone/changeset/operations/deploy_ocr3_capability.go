@@ -21,14 +21,15 @@ import (
 )
 
 type DeployOCR3Capability struct {
-	Env     *cldf.Environment
-	NodeIDs []string // Node IDs to distribute the job specs to
+	Env *cldf.Environment
 
 	// DonCapabilities is used to add capabilities to capabilities registry.
 	DonCapabilities []internal.DonCapabilities // externally sourced based on the environment
 }
 
 type DeployOCR3CapabilityInput struct {
+	Nodes []opjobs.DistributeOCRJobSpecSeqNode // Node to distribute the job specs to
+
 	RegistryChainSel uint64
 	MCMSConfig       *changeset.MCMSConfig
 	//RegistryContractAddress *common.Address
@@ -71,12 +72,7 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 		if !ok {
 			return DeployOCR3CapabilityOutput{}, fmt.Errorf("registry chain selector %d does not exist in environment", input.RegistryChainSel)
 		}
-		/*
-			capabilitiesRegistry, err := changeset.GetOwnedContractV2[*capabilities_registry.CapabilitiesRegistry](deps.Env.DataStore.Addresses(), chain, input.RegistryContractAddress.Hex())
-			if err != nil {
-				return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
-			}
-		*/
+
 		capabilitiesRegistry, err := changeset.LoadCapabilityRegistry(chain, *deps.Env, input.RegistryRef)
 		if err != nil {
 			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to get capabilities registry contract: %w", err)
@@ -158,9 +154,9 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 		}
 
 		distributionReport, err := operations.ExecuteSequence(b, opjobs.DistributeOCRJobSpecSeq, opjobs.DistributeOCRJobSpecSeqDeps{
-			NodeIDs:  deps.NodeIDs,
 			Offchain: deps.Env.Offchain,
 		}, opjobs.DistributeOCRJobSpecSeqInput{
+			Nodes:                input.Nodes,
 			DomainKey:            input.DomainKey,
 			EnvironmentLabel:     input.EnvironmentLabel,
 			DONName:              input.DONName,
