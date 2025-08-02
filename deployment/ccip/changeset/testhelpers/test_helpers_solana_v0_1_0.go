@@ -34,7 +34,14 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
 	suicrcwconfig "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
+	"github.com/smartcontractkit/chainlink-sui/relayer/client"
+	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
+	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
+	"github.com/smartcontractkit/chainlink-sui/relayer/txm"
 
 	crConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
 
@@ -60,9 +67,10 @@ import (
 
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
+	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	aptosstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 
-	ccipChangeSetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
+	ccipChangeSetSolanaV0_1_0 "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana_v0_1_0"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -92,30 +100,13 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
-	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_burn_mint_token_pool"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
-	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
-
-	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	chainreader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
-	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
-
-	chain_reader_types "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-sui/relayer/client"
-	"github.com/smartcontractkit/chainlink-sui/relayer/txm"
-
-	commonTypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/base_token_pool"
-	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_common"
-	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_offramp"
-	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
-	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/fee_quoter"
-	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/rmn_remote"
-	solTestReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_ccip_receiver"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/base_token_pool"
+	solCommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_common"
+	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_offramp"
+	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/ccip_router"
+	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/fee_quoter"
+	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/rmn_remote"
+	solTestReceiver "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/test_ccip_receiver"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
@@ -896,10 +887,15 @@ func SendRequestSol(
 
 	base.SetTokenIndexes(tokenIndexes)
 
-	ix, err := base.ValidateAndBuild()
+	tempIx, err := base.ValidateAndBuild()
 	if err != nil {
 		return nil, err
 	}
+	ixData, err := tempIx.Data()
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract data payload from router ccip send instruction: %w", err)
+	}
+	ix := solana.NewInstruction(s.Router, tempIx.Accounts(), ixData)
 
 	// for some reason onchain doesn't see extraAccounts
 
@@ -956,8 +952,8 @@ func SendRequestSol(
 					SequenceNumber:      ccipMessageSentEvent.SequenceNumber,
 					Nonce:               ccipMessageSentEvent.Message.Header.Nonce,
 				},
-				FeeTokenAmount: ConvertSolanaCrossChainAmountToBigInt(ccipMessageSentEvent.Message.FeeTokenAmount),
-				FeeValueJuels:  ConvertSolanaCrossChainAmountToBigInt(ccipMessageSentEvent.Message.FeeValueJuels),
+				FeeTokenAmount: ConvertSolanaCrossChainAmountToBigInt(ccipMessageSentEvent.Message.FeeTokenAmount.LeBytes),
+				FeeValueJuels:  ConvertSolanaCrossChainAmountToBigInt(ccipMessageSentEvent.Message.FeeValueJuels.LeBytes),
 				ExtraArgs:      ccipMessageSentEvent.Message.ExtraArgs,
 				Receiver:       ccipMessageSentEvent.Message.Receiver,
 				Data:           ccipMessageSentEvent.Message.Data,
@@ -1519,8 +1515,8 @@ func SendRequestAptos(
 	return nil, errors.New("sent message but didn't receive CCIPMessageSent event")
 }
 
-func ConvertSolanaCrossChainAmountToBigInt(amount solRouter.CrossChainAmount) *big.Int {
-	bytes := amount.LeBytes[:]
+func ConvertSolanaCrossChainAmountToBigInt(amountLeBytes [32]uint8) *big.Int {
+	bytes := amountLeBytes[:]
 	slices.Reverse(bytes) // convert to big-endian
 	return big.NewInt(0).SetBytes(bytes)
 }
@@ -1623,7 +1619,7 @@ func AddLane(
 		}
 		changesets = append(changesets, AddEVMSrcChangesets(from, to, isTestRouter, gasPrices, evmTokenPrices, fqCfg)...)
 	case chainsel.FamilySolana:
-		changesets = append(changesets, AddLaneSolanaChangesets(e, from, to, toFamily)...)
+		changesets = append(changesets, AddLaneSolanaChangesetsV0_1_0(e, from, to, toFamily)...)
 	case chainsel.FamilyAptos:
 		aptosTokenPrices := make(map[aptos.AccountAddress]*big.Int, len(tokenPrices))
 		for address, price := range tokenPrices {
@@ -1638,7 +1634,7 @@ func AddLane(
 	case chainsel.FamilyEVM:
 		changesets = append(changesets, AddEVMDestChangesets(e, to, from, isTestRouter)...)
 	case chainsel.FamilySolana:
-		changesets = append(changesets, AddLaneSolanaChangesets(e, to, from, fromFamily)...)
+		changesets = append(changesets, AddLaneSolanaChangesetsV0_1_0(e, to, from, fromFamily)...)
 	case chainsel.FamilyAptos:
 		changesets = append(changesets, AddLaneAptosChangesets(t, from, to, gasPrices, nil)...)
 	case chainsel.FamilyTon:
@@ -1656,8 +1652,8 @@ func AddLane(
 	return nil
 }
 
-func AddLaneSolanaChangesets(e *DeployedEnv, solChainSelector, remoteChainSelector uint64, remoteFamily string) []commoncs.ConfiguredChangeSet {
-	chainFamilySelector := [4]uint8{}
+func AddLaneSolanaChangesetsV0_1_0(e *DeployedEnv, solChainSelector, remoteChainSelector uint64, remoteFamily string) []commoncs.ConfiguredChangeSet {
+	var chainFamilySelector [4]uint8
 	switch remoteFamily {
 	case chainsel.FamilyEVM:
 		// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
@@ -1673,10 +1669,10 @@ func AddLaneSolanaChangesets(e *DeployedEnv, solChainSelector, remoteChainSelect
 	}
 	solanaChangesets := []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(
-			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToRouter),
-			ccipChangeSetSolana.AddRemoteChainToRouterConfig{
+			cldf.CreateLegacyChangeSet(ccipChangeSetSolanaV0_1_0.AddRemoteChainToRouter),
+			ccipChangeSetSolanaV0_1_0.AddRemoteChainToRouterConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]*ccipChangeSetSolana.RouterConfig{
+				UpdatesByChain: map[uint64]*ccipChangeSetSolanaV0_1_0.RouterConfig{
 					remoteChainSelector: {
 						RouterDestinationConfig: solRouter.DestChainConfig{
 							AllowListEnabled: true,
@@ -1687,10 +1683,10 @@ func AddLaneSolanaChangesets(e *DeployedEnv, solChainSelector, remoteChainSelect
 			},
 		),
 		commoncs.Configure(
-			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToFeeQuoter),
-			ccipChangeSetSolana.AddRemoteChainToFeeQuoterConfig{
+			cldf.CreateLegacyChangeSet(ccipChangeSetSolanaV0_1_0.AddRemoteChainToFeeQuoter),
+			ccipChangeSetSolanaV0_1_0.AddRemoteChainToFeeQuoterConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]*ccipChangeSetSolana.FeeQuoterConfig{
+				UpdatesByChain: map[uint64]*ccipChangeSetSolanaV0_1_0.FeeQuoterConfig{
 					remoteChainSelector: {
 						FeeQuoterDestinationConfig: solFeeQuoter.DestChainConfig{
 							IsEnabled:                   true,
@@ -1707,10 +1703,10 @@ func AddLaneSolanaChangesets(e *DeployedEnv, solChainSelector, remoteChainSelect
 			},
 		),
 		commoncs.Configure(
-			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.AddRemoteChainToOffRamp),
-			ccipChangeSetSolana.AddRemoteChainToOffRampConfig{
+			cldf.CreateLegacyChangeSet(ccipChangeSetSolanaV0_1_0.AddRemoteChainToOffRamp),
+			ccipChangeSetSolanaV0_1_0.AddRemoteChainToOffRampConfig{
 				ChainSelector: solChainSelector,
-				UpdatesByChain: map[uint64]*ccipChangeSetSolana.OffRampConfig{
+				UpdatesByChain: map[uint64]*ccipChangeSetSolanaV0_1_0.OffRampConfig{
 					remoteChainSelector: {
 						EnabledAsSource: true,
 					},
@@ -2324,205 +2320,6 @@ func DeployTransferableTokenAptos(
 	return evmToken, evmPool, tokenMetadataAddress, aptosTokenPool, nil
 }
 
-// assuming one out of the src and dst is solana and the other is evm
-func DeployTransferableTokenSolana(
-	lggr logger.Logger,
-	e cldf.Environment,
-	evmChainSel, solChainSel uint64,
-	evmDeployer *bind.TransactOpts,
-	evmTokenName string,
-) (*burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, solana.PublicKey, error) {
-	selectorFamily, err := chainsel.GetSelectorFamily(evmChainSel)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	if selectorFamily != chainsel.FamilyEVM {
-		return nil, nil, solana.PublicKey{}, fmt.Errorf("evmChainSel %d is not an evm chain", evmChainSel)
-	}
-	selectorFamily, err = chainsel.GetSelectorFamily(solChainSel)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	if selectorFamily != chainsel.FamilySolana {
-		return nil, nil, solana.PublicKey{}, fmt.Errorf("solChainSel %d is not a solana chain", solChainSel)
-	}
-	state, err := stateview.LoadOnchainState(e)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-
-	addresses := e.ExistingAddresses
-	// deploy evm token and pool
-	evmToken, evmPool, err := deployTransferTokenOneEnd(lggr, e.BlockChains.EVMChains()[evmChainSel], evmDeployer, addresses, evmTokenName)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	// attach token and pool to the registry
-	if err := attachTokenToTheRegistry(e.BlockChains.EVMChains()[evmChainSel], state.MustGetEVMChainState(evmChainSel), evmDeployer, evmToken.Address(), evmPool.Address()); err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	solDeployerKey := e.BlockChains.SolanaChains()[solChainSel].DeployerKey.PublicKey()
-
-	// deploy solana token
-	solTokenName := evmTokenName
-	e, err = commoncs.Apply(nil, e,
-		commoncs.Configure(
-			// this makes the deployer the mint authority by default
-			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.DeploySolanaToken),
-			ccipChangeSetSolana.DeploySolanaTokenConfig{
-				ChainSelector:    solChainSel,
-				TokenProgramName: shared.SPL2022Tokens,
-				TokenDecimals:    9,
-				TokenSymbol:      solTokenName,
-				ATAList:          []string{solDeployerKey.String()},
-				MintAmountToAddress: map[string]uint64{
-					solDeployerKey.String(): uint64(1000e9),
-				},
-			},
-		),
-	)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	// find solana token address
-	solAddresses, err := e.ExistingAddresses.AddressesForChain(solChainSel)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	solTokenAddress := solanastateview.FindSolanaAddress(
-		cldf.TypeAndVersion{
-			Type:    shared.SPL2022Tokens,
-			Version: deployment.Version1_0_0,
-			Labels:  cldf.NewLabelSet(solTokenName),
-		},
-		solAddresses,
-	)
-	bnm := solTestTokenPool.BurnAndMint_PoolType
-
-	// // Setup global config when using Solana Contracts V0.1.1 or above
-	// e, err = commoncs.Apply(nil, e,
-	//	commoncs.Configure(
-	//		cldf.CreateLegacyChangeSet(ccipChangeSetSolana.InitGlobalConfigTokenPoolProgram),
-	//		ccipChangeSetSolana.TokenPoolConfigWithMCM{
-	//			ChainSelector: solChainSel,
-	//			TokenPubKey:   solTokenAddress,
-	//			PoolType:      &bnm,
-	//			Metadata:      shared.CLLMetadata,
-	//		}),
-	// )
-	// if err != nil {
-	//	return nil, nil, solana.PublicKey{}, err
-	// }
-
-	// deploy and configure solana token pool
-	e, err = commoncs.Apply(nil, e,
-		commoncs.Configure(
-			// deploy token pool and set the burn/mint authority to the tokenPool
-			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.E2ETokenPool),
-			ccipChangeSetSolana.E2ETokenPoolConfig{
-				AddTokenPoolAndLookupTable: []ccipChangeSetSolana.AddTokenPoolAndLookupTableConfig{
-					{
-						ChainSelector: solChainSel,
-						TokenPoolConfigs: []ccipChangeSetSolana.TokenPoolConfig{
-							{
-								TokenPubKey: solTokenAddress,
-								PoolType:    &bnm,
-								Metadata:    shared.CLLMetadata,
-							},
-						},
-					},
-				},
-				RegisterTokenAdminRegistry: []ccipChangeSetSolana.RegisterTokenAdminRegistryConfig{
-					{
-						ChainSelector: solChainSel,
-						RegisterTokenConfigs: []ccipChangeSetSolana.RegisterTokenConfig{
-							{
-								TokenPubKey:             solTokenAddress,
-								TokenAdminRegistryAdmin: solDeployerKey,
-								RegisterType:            ccipChangeSetSolana.ViaGetCcipAdminInstruction,
-							},
-						},
-					},
-				},
-				AcceptAdminRoleTokenAdminRegistry: []ccipChangeSetSolana.AcceptAdminRoleTokenAdminRegistryConfig{
-					{
-						ChainSelector: solChainSel,
-						AcceptAdminRoleTokenConfigs: []ccipChangeSetSolana.AcceptAdminRoleTokenConfig{
-							{
-								TokenPubKey: solTokenAddress,
-							},
-						},
-					},
-				},
-				SetPool: []ccipChangeSetSolana.SetPoolConfig{
-					{
-						ChainSelector: solChainSel,
-						SetPoolTokenConfigs: []ccipChangeSetSolana.SetPoolTokenConfig{
-							{
-								TokenPubKey: solTokenAddress,
-								PoolType:    &bnm,
-								Metadata:    shared.CLLMetadata,
-							},
-						},
-						WritableIndexes: []uint8{3, 4, 7},
-					},
-				},
-				RemoteChainTokenPool: []ccipChangeSetSolana.SetupTokenPoolForRemoteChainConfig{
-					{
-						SolChainSelector: solChainSel,
-						RemoteTokenPoolConfigs: []ccipChangeSetSolana.RemoteChainTokenPoolConfig{
-							{
-								SolTokenPubKey: solTokenAddress,
-								SolPoolType:    &bnm,
-								Metadata:       shared.CLLMetadata,
-								EVMRemoteConfigs: map[uint64]ccipChangeSetSolana.EVMRemoteConfig{
-									evmChainSel: {
-										TokenSymbol: shared.TokenSymbol(evmTokenName),
-										PoolType:    shared.BurnMintTokenPool,
-										PoolVersion: shared.CurrentTokenPoolVersion,
-										RateLimiterConfig: ccipChangeSetSolana.RateLimiterConfig{
-											Inbound: solTestTokenPool.RateLimitConfig{
-												Enabled:  false,
-												Capacity: 0,
-												Rate:     0,
-											},
-											Outbound: solTestTokenPool.RateLimitConfig{
-												Enabled:  false,
-												Capacity: 0,
-												Rate:     0,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		),
-	)
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-
-	// configure evm
-	poolConfigPDA, err := soltokens.TokenPoolConfigAddress(solTokenAddress, state.SolChains[solChainSel].BurnMintTokenPools[shared.CLLMetadata])
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChainSel], evmPool, evmDeployer, solChainSel, solTokenAddress.Bytes(), poolConfigPDA.Bytes())
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-
-	err = grantMintBurnPermissions(lggr, e.BlockChains.EVMChains()[evmChainSel], evmToken, evmDeployer, evmPool.Address())
-	if err != nil {
-		return nil, nil, solana.PublicKey{}, err
-	}
-
-	return evmToken, evmPool, solTokenAddress, nil
-}
-
 func deployTokenPoolsInParallel(
 	lggr logger.Logger,
 	chains map[uint64]cldf_evm.Chain,
@@ -2927,7 +2724,7 @@ type TestTransferRequest struct {
 	Name                   string
 	SourceChain, DestChain uint64
 	Receiver               []byte
-	TokenReceiver          []byte
+	TokenReceiverATA       []byte
 	ExpectedStatus         int
 	// optional
 	Tokens                []router.ClientEVMTokenAmount
@@ -2983,7 +2780,7 @@ func TransferMultiple(
 				require.NoError(t, err)
 				if destFamily == chainsel.FamilySolana {
 					// for EVM2Solana token transfer we need to use tokenReceiver instead logical receiver
-					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiver, tt.ExpectedTokenBalances)
+					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiverATA, tt.ExpectedTokenBalances)
 				} else {
 					expectedTokenBalances.add(tt.DestChain, tt.Receiver, tt.ExpectedTokenBalances)
 				}
@@ -3115,13 +2912,7 @@ func WaitForTokenBalances(
 					// TODO: need to pass env rather than chains
 					token := solana.PublicKeyFromBytes(id.token)
 					receiver := solana.PublicKeyFromBytes(id.receiver)
-					// TODO: could be spl instead of spl2022
-					// TODO: receiver is actually the receiver's ATA
-					tokenReceiver, _, err := soltokens.FindAssociatedTokenAddress(solana.Token2022ProgramID, token, receiver)
-					if err != nil {
-						return err
-					}
-					WaitForTheTokenBalanceSol(ctx, t, token, tokenReceiver, env.BlockChains.SolanaChains()[chainSelector], expectedBalance)
+					WaitForTheTokenBalanceSol(ctx, t, token, receiver, env.BlockChains.SolanaChains()[chainSelector], expectedBalance)
 				case chainsel.FamilyAptos:
 					expectedBalance := balance.Uint64()
 					fungibleAssetMetadata := aptos.AccountAddress{}
@@ -3379,12 +3170,12 @@ func DeploySolanaCcipReceiver(t *testing.T, e cldf.Environment) {
 	}
 }
 
-func TransferOwnershipSolana(
+func TransferOwnershipSolanaV0_1_0(
 	t *testing.T,
 	e *cldf.Environment,
 	solChain uint64,
 	needTimelockDeployed bool,
-	contractsToTransfer ccipChangeSetSolana.CCIPContractsToTransfer,
+	contractsToTransfer ccipChangeSetSolanaV0_1_0.CCIPContractsToTransfer,
 ) (timelockSignerPDA solana.PublicKey, mcmSignerPDA solana.PublicKey) {
 	var err error
 	if needTimelockDeployed {
@@ -3421,10 +3212,10 @@ func TransferOwnershipSolana(
 	// Apply transfer ownership changeset
 	*e, _, err = commoncs.ApplyChangesets(t, *e, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(
-			cldf.CreateLegacyChangeSet(ccipChangeSetSolana.TransferCCIPToMCMSWithTimelockSolana),
-			ccipChangeSetSolana.TransferCCIPToMCMSWithTimelockSolanaConfig{
+			cldf.CreateLegacyChangeSet(ccipChangeSetSolanaV0_1_0.TransferCCIPToMCMSWithTimelockSolana),
+			ccipChangeSetSolanaV0_1_0.TransferCCIPToMCMSWithTimelockSolanaConfig{
 				MCMSCfg: proposalutils.TimelockConfig{MinDelay: 1 * time.Second},
-				ContractsByChain: map[uint64]ccipChangeSetSolana.CCIPContractsToTransfer{
+				ContractsByChain: map[uint64]ccipChangeSetSolanaV0_1_0.CCIPContractsToTransfer{
 					solChain: contractsToTransfer,
 				},
 			},
