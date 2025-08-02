@@ -53,11 +53,12 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.65
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250718185907-0123e1ba03af
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250731220216-a9d0e3782e92
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250609091505-5c8cd74b92ed
-	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250729221650-0f971f74a124
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250802014724-ae79263d0a03
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250728091106-f398970aa4bc
+	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250801172621-657b217a5459
 	github.com/smartcontractkit/chainlink-deployments-framework v0.18.0
-	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250729151842-3e61763566a5
+	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250801102619-bf75f8afcd90
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250802011850-182aa71db75e
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
@@ -491,7 +492,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-d98d7674da89 // indirect
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250730104840-17e08b14727d // indirect
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250730160224-0a480a68cd26 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.3 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250701132001-f8be142155b6 // indirect
 	github.com/smartcontractkit/freeport v0.1.1 // indirect

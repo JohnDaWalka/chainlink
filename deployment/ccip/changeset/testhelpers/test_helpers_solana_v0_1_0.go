@@ -24,6 +24,10 @@ import (
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"golang.org/x/sync/errgroup"
 
+	chain_reader_types "github.com/smartcontractkit/chainlink-common/pkg/types"
+	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_burn_mint_token_pool"
+
 	aptosBind "github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	aptos_fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
@@ -35,13 +39,16 @@ import (
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader"
+	chainreader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
 	suicrcwconfig "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	"github.com/smartcontractkit/chainlink-sui/relayer/client"
 	"github.com/smartcontractkit/chainlink-sui/relayer/keystore"
 	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink-sui/relayer/txm"
+
+	commonTypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 
 	crConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
 
@@ -80,7 +87,6 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
-	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 
@@ -1079,10 +1085,10 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			"state": BurnMintTPState,
 			"c":     msg.TokenAmounts[0].Token,
 		}
-		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", extra)
+		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", extra)
 	} else {
 		// Build PTB for msg transfer
-		ptbArgs = buildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", nil)
+		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", nil)
 	}
 
 	// Setup new PTB client

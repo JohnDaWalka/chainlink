@@ -207,7 +207,7 @@ func configureChainWriterForMultipleTokens(
 	return baseCCIPConfig(ccipPkg, pubKey, extra)
 }
 
-func buildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) config.Arguments {
+func BuildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) config.Arguments {
 	args := make(map[string]any, len(baseArgs)+len(extraArgs))
 	for k, v := range baseArgs {
 		args[k] = v
