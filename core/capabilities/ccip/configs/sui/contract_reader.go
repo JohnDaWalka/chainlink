@@ -34,7 +34,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 
 	offRampStatePointer := "_::offramp::OffRampStatePointer::off_ramp_state_id"
 	onRampStatePointer := "_::onramp::OnRampStatePointer::on_ramp_state_id"
-	ccipObjectRefStatePointer := "_::ccip::CCIPObjectRefPointer::object_ref_id"
+	ccipObjectRefStatePointer := "_::state_object::CCIPObjectRefPointer::object_ref_id"
 
 	return map[string]any{
 		"IsLoopPlugin": true,
