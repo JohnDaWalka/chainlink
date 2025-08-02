@@ -285,7 +285,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 					"ConfigSet": {
-						Name:      "ocr3_base",
+						Name:      "offramp",
 						EventType: "ConfigSet",
 						EventSelector: client.EventFilterByMoveEventModule{
 							Module: "ocr3_base",
