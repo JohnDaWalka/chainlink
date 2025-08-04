@@ -570,7 +570,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			"chainID", chainID,
 			"destChainID", destChainID,
 			"relayChainFamily", relayChainFamily,
-			"destChainFamily", destChainFamily)
+			"destChainFamily", destChainFamily,
+			"offRampAddr:", destAddrStr)
 
 		if chainID == destChainID && destChainFamily == relayChainFamily {
 			offrampAddress := destAddrStr
@@ -585,9 +586,13 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			}
 		}
 
+		i.lggr.Infow("START CHAIN READER")
+
 		if err2 := cr.Start(ctx); err2 != nil {
 			return nil, nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chainID, err2)
 		}
+
+		i.lggr.Infow("START CHAIN READER")
 
 		var solanaChainWriterConfigVersion *string
 		if ofc.Execute != nil {
