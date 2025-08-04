@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/jobs"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 	opjobs "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/jobs"
@@ -22,9 +22,6 @@ import (
 
 type DeployOCR3Capability struct {
 	Env *cldf.Environment
-
-	// DonCapabilities is used to add capabilities to capabilities registry.
-	DonCapabilities []internal.DonCapabilities // externally sourced based on the environment
 }
 
 type DeployOCR3CapabilityInput struct {
@@ -34,8 +31,10 @@ type DeployOCR3CapabilityInput struct {
 	MCMSConfig       *changeset.MCMSConfig
 	//RegistryContractAddress *common.Address
 	RegistryRef  datastore.AddressRefKey
-	OracleConfig internal.OracleConfig
+	OracleConfig changeset.OracleConfig
 	DONs         []contracts.ConfigureKeystoneDON
+
+	Capabilities []capabilities_registry.CapabilitiesRegistryCapability
 
 	// The following are needed for the OCR3 job spec distribution
 	DomainKey            string
@@ -83,22 +82,12 @@ var DeployOCR3CapabilitySeq = operations.NewSequence[
 			return DeployOCR3CapabilityOutput{}, fmt.Errorf("capabilities registry contract %s is not owned by MCMS", capabilitiesRegistry.Contract.Address())
 		}
 
-		donInfos, err := internal.DonInfos(deps.DonCapabilities, deps.Env.Offchain)
-		if err != nil {
-			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to get don infos: %w", err)
-		}
-
-		donToCapabilities, err := internal.MapDonsToCaps(capabilitiesRegistry.Contract, donInfos)
-		if err != nil {
-			return DeployOCR3CapabilityOutput{}, fmt.Errorf("failed to map dons to capabilities: %w", err)
-		}
-
 		capReport, err := operations.ExecuteOperation(b, contracts.AddCapabilitiesOp, contracts.AddCapabilitiesOpDeps{
-			Chain:             chain,
-			Contract:          capabilitiesRegistry.Contract,
-			DonToCapabilities: donToCapabilities,
+			Chain:    chain,
+			Contract: capabilitiesRegistry.Contract,
 		}, contracts.AddCapabilitiesOpInput{
 			ChainID:         input.RegistryChainSel,
+			Capabilities:    input.Capabilities,
 			ContractAddress: capabilitiesRegistry.Contract.Address(),
 			UseMCMS:         input.UseMCMS(),
 		})

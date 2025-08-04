@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/jobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,10 +88,28 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 			NodeIDs: wfNodeIDs,
 		}
 
+		donInfos, err := internal.DonInfos(donCapabilities, te.Env.Offchain)
+		require.NoError(t, err)
+
+		chain, ok := te.Env.BlockChains.EVMChains()[te.RegistrySelector]
+		require.True(t, ok)
+
+		capabilitiesRegistry, err := changeset.LoadCapabilityRegistry(chain, te.Env, capRegistryAddr)
+		require.NoError(t, err)
+
+		donToCapabilities, err := internal.MapDonsToCaps(capabilitiesRegistry.Contract, donInfos)
+		require.NoError(t, err)
+
+		var capabilities []kcr.CapabilitiesRegistryCapability
+		for _, don := range donToCapabilities {
+			for _, donCap := range don {
+				capabilities = append(capabilities, donCap.CapabilitiesRegistryCapability)
+			}
+		}
+
 		// Set up dependencies
 		deps := keystoneops.DeployOCR3Capability{
-			Env:             &te.Env,
-			DonCapabilities: donCapabilities,
+			Env: &te.Env,
 		}
 
 		// Set up input

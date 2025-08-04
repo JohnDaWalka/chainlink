@@ -93,11 +93,18 @@ var ConfigureCapabilitiesRegistrySeq = operations.NewSequence[ConfigureCapabilit
 			return ConfigureCapabilitiesRegistrySeqOutput{}, fmt.Errorf("failed to map nops to nodes: %w", err)
 		}
 
+		var capabilities []capabilities_registry.CapabilitiesRegistryCapability
+		for _, don := range donToCapabilities {
+			for _, donCap := range don {
+				capabilities = append(capabilities, donCap.CapabilitiesRegistryCapability)
+			}
+		}
+
 		_, err = operations.ExecuteOperation(b, AddCapabilitiesOp, AddCapabilitiesOpDeps{
-			Chain:             chain,
-			Contract:          capabilitiesRegistry.Contract,
-			DonToCapabilities: donToCapabilities,
+			Chain:    chain,
+			Contract: capabilitiesRegistry.Contract,
 		}, AddCapabilitiesOpInput{
+			Capabilities:    capabilities,
 			ChainID:         input.RegistryChainSel,
 			ContractAddress: capabilitiesRegistry.Contract.Address(),
 			UseMCMS:         input.UseMCMS,
