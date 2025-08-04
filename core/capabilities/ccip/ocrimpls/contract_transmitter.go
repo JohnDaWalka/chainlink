@@ -160,13 +160,14 @@ func (c *ccipTransmitter) Transmit(
 	c.lggr.Infow("Submitting transaction", "tx", txID)
 	c.lggr.Info("SUBMITTING TX TO CW: ", contract, method, args, c.offrampAddress, txID.String(), c.offrampAddress, meta, zero)
 	c.lggr.Infow("SUBMIT TX INTERFACE", "type", fmt.Sprintf("%T", c.cw), "value", c.cw)
+	c.lggr.Infow("SUBMIT TX CW VALUE: ", c.cw.Name())
 	if dl, ok := ctx.Deadline(); ok {
 		c.lggr.Infow("SubmitTransaction context deadline", "deadline", dl)
 	} else {
 		c.lggr.Infow("SubmitTransaction context has no deadline")
 	}
 
-	ctx2, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx2, cancel := context.WithTimeout(context.Background(), 60*2*time.Second)
 	defer cancel()
 	if err := c.cw.SubmitTransaction(ctx2, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
@@ -190,3 +191,23 @@ func (c *ccipTransmitter) Transmit(
 
 	return nil
 }
+
+// Aptos
+// type aptosChainWriter struct {
+// 	logger    logger.Logger
+// 	txm       *txm.AptosTxm
+// 	feeClient aptos.AptosRpcClient
+// 	config    ChainWriterConfig
+
+// 	starter utils.StartStopOnce
+// }
+
+// Sui
+// type SuiChainWriter struct {
+// 	lggr       logger.Logger
+// 	txm        txm.TxManager
+// 	config     cwConfig.ChainWriterConfig
+// 	simulate   bool
+// 	ptbFactory *ptb.PTBConstructor
+// 	services.StateMachine
+// }
