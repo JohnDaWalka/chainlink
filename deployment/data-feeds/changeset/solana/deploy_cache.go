@@ -1,6 +1,8 @@
 package solana
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
@@ -247,7 +249,7 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 	}
 
 	// Create remaining accounts by deriving PDAs for each DataID
-	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
+	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, "decimal_report", req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
 	if err != nil {
 		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
 	}
@@ -329,17 +331,36 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	if !ok {
 		return out, fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
 	}
-
 	cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
+	cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
+
 	cacheState, err := env.DataStore.Addresses().Get(cacheStateRef)
 	if err != nil {
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
+	cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
+	if err != nil {
+		return out, fmt.Errorf("failed load cache program ID for chain sel %d", req.ChainSel)
+	}
 
+	var remainings []solana.AccountMeta
 	// Create decimalReportAccounts by deriving PDAs for each DataID
-	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
+	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, "feed_config", req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
 	if err != nil {
 		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
+	}
+
+	cacheStateKey := solana.MustPublicKeyFromBase58(cacheState.Address)
+	cacheProgramKey := solana.MustPublicKeyFromBase58(cacheProgramID.Address)
+	remainings = append(remainings, decimalReportAccounts...)
+	for idx := range req.AllowedSender {
+		permissionAccounts, err := createPermissionFlagAccounts(cacheProgramKey, cacheStateKey, req.DataIDs,
+			req.AllowedSender[idx], req.AllowedWorkflowOwner[idx], req.AllowedWorkflowName[idx])
+		remainings = append(remainings, permissionAccounts...)
+		if err != nil {
+			return out, fmt.Errorf("failed to create permission accounts: %w", err)
+		}
+
 	}
 
 	configureCacheDecimalReportInput := operation.ConfigureCacheDecimalReportInput{
@@ -353,7 +374,7 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 		FeedAdmin:            req.FeedAdmin,
 		DataIDs:              req.DataIDs,
 		Descriptions:         req.Descriptions,
-		RemainingAccounts:    decimalReportAccounts,
+		RemainingAccounts:    remainings,
 	}
 
 	deps := operation.Deps{
@@ -372,9 +393,40 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	return out, nil
 }
 
+func createPermissionFlagAccounts(programID, state solana.PublicKey, dataIDs [][16]byte, sender solana.PublicKey, owner [20]byte, name [10]byte) ([]solana.AccountMeta, error) {
+	var ret []solana.AccountMeta
+
+	for _, dataID := range dataIDs {
+		repHash := createReportHash(dataID, sender, owner, name)
+		flagPDA, _, err := solana.FindProgramAddress([][]byte{
+			[]byte("permission_flag"),
+			state.Bytes(),
+			repHash[:],
+		}, programID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive permission_flag PDA: %w", err)
+		}
+		ret = append(ret, *solana.Meta(flagPDA).WRITE())
+
+	}
+
+	return ret, nil
+}
+
+// createReportHash matches Rust's hash::hash(&[data_id, sender, owner, name].concat()).to_bytes()
+func createReportHash(dataID [16]byte, sender solana.PublicKey, owner [20]byte, name [10]byte) [32]byte {
+	buf := bytes.Join([][]byte{
+		dataID[:],
+		sender.Bytes(),
+		owner[:],
+		name[:],
+	}, nil)
+	return sha256.Sum256(buf)
+}
+
 // createRemainingAccounts creates the remaining accounts needed for InitCacheDecimalFeed
 // by deriving the decimal report PDAs for each DataID
-func createRemainingAccounts(ds datastore.DataStore, chainSel uint64, qualifier, version string, dataIDs [][16]uint8) ([]solana.AccountMeta, error) {
+func createRemainingAccounts(ds datastore.DataStore, seed string, chainSel uint64, qualifier, version string, dataIDs [][16]uint8) ([]solana.AccountMeta, error) {
 	// Get the deployed cache state and program ID from the datastore
 	parsedVersion := semver.MustParse(version)
 	cacheStateRef := datastore.NewAddressRefKey(chainSel, CacheState, parsedVersion, qualifier)
@@ -396,7 +448,7 @@ func createRemainingAccounts(ds datastore.DataStore, chainSel uint64, qualifier,
 	for i, dataID := range dataIDs {
 		// Derive decimal report PDA for each data ID
 		seeds := [][]byte{
-			[]byte("decimal_report"),
+			[]byte(seed),
 			cacheStateKey.Bytes(),
 			dataID[:],
 		}

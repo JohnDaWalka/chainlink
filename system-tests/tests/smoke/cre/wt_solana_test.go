@@ -2,6 +2,7 @@ package cre
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
@@ -17,6 +19,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	df_cs "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_solana "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
@@ -109,7 +113,9 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 
 	require.NoError(t, mocksClient.ConnectAll(mockClientsAddress, true, true), "could not connect to mock capabilities")
 	fmt.Println("cap name", setupOut.WriteCap)
-	fmt.Println("forwarder address", setupOut.ForwarderAddress, "state", setupOut.ForwarderState)
+	fmt.Println("forwarder address", setupOut.ForwarderAddress, "forwarder state", setupOut.ForwarderState)
+	fmt.Println("cache address", setupOut.CacheAddress, "cache state", setupOut.CacheState)
+
 	err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{
 		ID:              setupOut.DeriveRemaining,
 		CapabilityType:  4,
@@ -121,11 +127,15 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 }
 
 type setupWTOutput struct {
-	WriteCap         string
-	DeriveRemaining  string
-	SolChainID       string
+	WriteCap        string
+	DeriveRemaining string
+	SolChainID      string
+
 	ForwarderAddress string
 	ForwarderState   string
+
+	CacheAddress string
+	CacheState   string
 }
 
 func setupWTTestEnvironment(
@@ -190,6 +200,9 @@ func setupWTTestEnvironment(
 		}
 	}
 	out := &setupWTOutput{}
+	wfName := [][10]uint8{{1, 2, 3}}
+	wfDescription := [][32]uint8{{2, 3, 4}}
+	wfOwner := [20]uint8{1}
 	for _, bo := range universalSetupOutput.BlockchainOutput {
 		if bo.ReadOnly {
 			continue
@@ -215,10 +228,63 @@ func setupWTTestEnvironment(
 			))
 			out.ForwarderAddress = forwarder.Address
 			out.ForwarderState = forwarderState.Address
+
+			//df cache
+			dfQualifier := "df-cache-qualifier"
+			dfDeployOut, err := commonchangeset.RunChangeset(df_cs.DeployCache{}, *universalSetupOutput.CldEnvironment, &df_cs.DeployCacheRequest{
+				ChainSel:   bo.SolChain.ChainSelector,
+				Qualifier:  dfQualifier,
+				Version:    "1.0.0",
+				FeedAdmins: []solana.PublicKey{bo.SolChain.PrivateKey.PublicKey()},
+			})
+			require.NoError(t, err, "failed to deploy df cache")
+			cacheID, err := dfDeployOut.DataStore.Addresses().Get(
+				datastore.NewAddressRefKey(bo.SolChain.ChainSelector, df_cs.CacheContract, semver.MustParse("1.0.0"), dfQualifier))
+			require.NoError(t, err, "df cache address not found")
+			out.CacheAddress = cacheID.Address
+
+			cacheState, err := dfDeployOut.DataStore.Addresses().Get(
+				datastore.NewAddressRefKey(bo.SolChain.ChainSelector, df_cs.CacheState, semver.MustParse("1.0.0"), dfQualifier))
+			require.NoError(t, err, "df cache state not found")
+
+			out.CacheAddress = cacheID.Address
+			out.CacheState = cacheState.Address
+			ds := datastore.NewMemoryDataStore()
+			ds.Merge(dfDeployOut.DataStore.Seal())
+			ds.Merge(universalSetupOutput.CldEnvironment.DataStore)
+			universalSetupOutput.CldEnvironment.DataStore = ds.Seal()
+			//[]uint8([]byte(in.WorkflowConfigs[0].FeedID))
+			feedIDin, err := hex.DecodeString(in.WorkflowConfigs[0].FeedID)
+			var feedID [16]uint8
+			copy(feedID[:], feedIDin)
+			require.NoError(t, err, "failed to decode FeedID")
+
+			_, err = commonchangeset.RunChangeset(df_cs.InitCacheDecimalReport{}, *universalSetupOutput.CldEnvironment,
+				&df_cs.InitCacheDecimalReportRequest{
+					ChainSel:  bo.SolChain.ChainSelector,
+					Qualifier: dfQualifier,
+					Version:   "1.0.0",
+					FeedAdmin: bo.SolChain.PrivateKey.PublicKey(),
+					DataIDs:   [][16]uint8{feedID},
+				},
+			)
+			require.NoError(t, err, "failed to init decimal report")
+
+			_, err = commonchangeset.RunChangeset(df_cs.ConfigureCacheDecimalReport{}, *universalSetupOutput.CldEnvironment,
+				&df_cs.ConfigureCacheDecimalReportRequest{
+					ChainSel:             bo.SolChain.ChainSelector,
+					Qualifier:            dfQualifier,
+					Version:              "1.0.0",
+					AllowedSender:        []solana.PublicKey{solana.MustPublicKeyFromBase58(forwarder.Address)},
+					FeedAdmin:            bo.SolChain.PrivateKey.PublicKey(),
+					DataIDs:              [][16]uint8{feedID},
+					AllowedWorkflowOwner: [][20]uint8{wfOwner},
+					AllowedWorkflowName:  wfName,
+					Descriptions:         wfDescription,
+				})
+			require.NoError(t, err, "failed to configure decimal report")
 		}
 	}
-
-	// deploy df cache
 
 	return out
 }
