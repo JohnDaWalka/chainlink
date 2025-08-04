@@ -32,7 +32,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
-	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana"
+	ccipChangesetSolana "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana_v0_1_0"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_5_1"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -42,7 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/test_token_pool"
+	solTestTokenPool "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/test_token_pool"
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
@@ -530,35 +530,51 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 				// deploy token pool and set the burn/mint authority to the tokenPool
 				cldf.CreateLegacyChangeSet(ccipChangesetSolana.E2ETokenPool),
 				ccipChangesetSolana.E2ETokenPoolConfig{
-					AddTokenPoolAndLookupTable: []ccipChangesetSolana.TokenPoolConfig{
+					AddTokenPoolAndLookupTable: []ccipChangesetSolana.AddTokenPoolAndLookupTableConfig{
 						{
 							ChainSelector: solChainSel,
-							TokenPubKey:   solTokenAddress,
-							PoolType:      &bnm,
-							Metadata:      shared.CLLMetadata,
+							TokenPoolConfigs: []ccipChangesetSolana.TokenPoolConfig{
+								{
+									TokenPubKey: solTokenAddress,
+									PoolType:    &bnm,
+									Metadata:    shared.CLLMetadata,
+								},
+							},
 						},
 					},
 					RegisterTokenAdminRegistry: []ccipChangesetSolana.RegisterTokenAdminRegistryConfig{
 						{
-							ChainSelector:           solChainSel,
-							TokenPubKey:             solTokenAddress,
-							TokenAdminRegistryAdmin: e.BlockChains.SolanaChains()[solChainSel].DeployerKey.PublicKey().String(),
-							RegisterType:            ccipChangesetSolana.ViaGetCcipAdminInstruction,
+							ChainSelector: solChainSel,
+							RegisterTokenConfigs: []ccipChangesetSolana.RegisterTokenConfig{
+								{
+									TokenPubKey:             solTokenAddress,
+									TokenAdminRegistryAdmin: e.BlockChains.SolanaChains()[solChainSel].DeployerKey.PublicKey(),
+									RegisterType:            ccipChangesetSolana.ViaGetCcipAdminInstruction,
+								},
+							},
 						},
 					},
 					AcceptAdminRoleTokenAdminRegistry: []ccipChangesetSolana.AcceptAdminRoleTokenAdminRegistryConfig{
 						{
 							ChainSelector: solChainSel,
-							TokenPubKey:   solTokenAddress,
+							AcceptAdminRoleTokenConfigs: []ccipChangesetSolana.AcceptAdminRoleTokenConfig{
+								{
+									TokenPubKey: solTokenAddress,
+								},
+							},
 						},
 					},
 					SetPool: []ccipChangesetSolana.SetPoolConfig{
 						{
 							ChainSelector:   solChainSel,
-							TokenPubKey:     solTokenAddress,
-							PoolType:        &bnm,
-							Metadata:        shared.CLLMetadata,
 							WritableIndexes: []uint8{3, 4, 7},
+							SetPoolTokenConfigs: []ccipChangesetSolana.SetPoolTokenConfig{
+								{
+									TokenPubKey: solTokenAddress,
+									PoolType:    &bnm,
+									Metadata:    shared.CLLMetadata,
+								},
+							},
 						},
 					},
 				},
@@ -745,7 +761,7 @@ func setupSolEvmLanes(lggr logger.Logger, e *cldf.Environment, state stateview.C
 				if hasLaneFromTo(relevantLanes, evmChainSel, solChainSel) {
 					cs := testhelpers.AddEVMSrcChangesets(evmChainSel, solChainSel, false, gasPrices, tokenPrices, fqCfg)
 					laneChangesets = append(laneChangesets, cs...)
-					cs = testhelpers.AddLaneSolanaChangesets(&deployedEnv, solSelector.Selector, evmSelector.Selector, chainselectors.FamilyEVM)
+					cs = testhelpers.AddLaneSolanaChangesetsV0_1_1(&deployedEnv, solSelector.Selector, evmSelector.Selector, chainselectors.FamilyEVM)
 					laneChangesets = append(laneChangesets, cs...)
 				}
 
@@ -759,18 +775,22 @@ func setupSolEvmLanes(lggr logger.Logger, e *cldf.Environment, state stateview.C
 				laneChangesets = append(laneChangesets,
 					commonchangeset.Configure(
 						cldf.CreateLegacyChangeSet(ccipChangesetSolana.SetupTokenPoolForRemoteChain),
-						ccipChangesetSolana.RemoteChainTokenPoolConfig{
+						ccipChangesetSolana.SetupTokenPoolForRemoteChainConfig{
 							SolChainSelector: solSelector.Selector,
-							SolTokenPubKey:   solChainState.LinkToken,
-							SolPoolType:      &bnm,
-							EVMRemoteConfigs: map[uint64]ccipChangesetSolana.EVMRemoteConfig{
-								evmSelector.Selector: {
-									TokenSymbol: shared.LinkSymbol,
-									PoolType:    shared.BurnMintTokenPool,
-									PoolVersion: shared.CurrentTokenPoolVersion,
-									RateLimiterConfig: ccipChangesetSolana.RateLimiterConfig{
-										Inbound:  solTestTokenPool.RateLimitConfig{},
-										Outbound: solTestTokenPool.RateLimitConfig{},
+							RemoteTokenPoolConfigs: []ccipChangesetSolana.RemoteChainTokenPoolConfig{
+								{
+									SolTokenPubKey: solChainState.LinkToken,
+									SolPoolType:    &bnm,
+									EVMRemoteConfigs: map[uint64]ccipChangesetSolana.EVMRemoteConfig{
+										evmSelector.Selector: {
+											TokenSymbol: shared.LinkSymbol,
+											PoolType:    shared.BurnMintTokenPool,
+											PoolVersion: shared.CurrentTokenPoolVersion,
+											RateLimiterConfig: ccipChangesetSolana.RateLimiterConfig{
+												Inbound:  solTestTokenPool.RateLimitConfig{},
+												Outbound: solTestTokenPool.RateLimitConfig{},
+											},
+										},
 									},
 								},
 							},
