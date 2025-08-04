@@ -9,13 +9,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	ks_solana "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -46,7 +49,6 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	require.NoError(t, err, "couldn't load test config")
 	validateEnvVars(t)
 	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
-
 	// Assign all capabilities to the single node set
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*cre.CapabilitiesAwareNodeSet {
 		return []*cre.CapabilitiesAwareNodeSet{
@@ -107,24 +109,23 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 
 	require.NoError(t, mocksClient.ConnectAll(mockClientsAddress, true, true), "could not connect to mock capabilities")
 	fmt.Println("cap name", setupOut.WriteCap)
+	fmt.Println("forwarder address", setupOut.ForwarderAddress, "state", setupOut.ForwarderState)
 	err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{
-		ID: setupOut.DeriveRemaining,
-		//ID:             "test",
+		ID:              setupOut.DeriveRemaining,
 		CapabilityType:  4,
 		Config:          []byte{},
 		Inputs:          []byte{},
 		RequestMetadata: &pb.Metadata{},
-		// TODO make payload
 	})
-	time.Sleep(time.Minute)
 	require.NoError(t, err)
 }
 
 type setupWTOutput struct {
-	WriteCap        string
-	DeriveRemaining string
-	SolChainID      string
-	// TODO put cache address here
+	WriteCap         string
+	DeriveRemaining  string
+	SolChainID       string
+	ForwarderAddress string
+	ForwarderState   string
 }
 
 func setupWTTestEnvironment(
@@ -199,8 +200,25 @@ func setupWTTestEnvironment(
 			require.NoError(t, err, "failed to get genesis hash")
 			out.WriteCap = writetarget.GenerateWriteTargetName(chainID.String())
 			out.DeriveRemaining = writetarget.GenerateDeriveRemainingName(chainID.String())
+			forwarder, err := universalSetupOutput.CldEnvironment.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+				bo.SolChain.ChainSelector,
+				ks_solana.ForwarderContract,
+				semver.MustParse("1.0.0"),
+				"test-forwarder",
+			))
+			require.NoError(t, err, "forwarder not found")
+			forwarderState, err := universalSetupOutput.CldEnvironment.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+				bo.SolChain.ChainSelector,
+				ks_solana.ForwarderState,
+				semver.MustParse("1.0.0"),
+				"test-forwarder",
+			))
+			out.ForwarderAddress = forwarder.Address
+			out.ForwarderState = forwarderState.Address
 		}
 	}
+
+	// deploy df cache
 
 	return out
 }

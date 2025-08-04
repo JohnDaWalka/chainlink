@@ -16,7 +16,10 @@ import (
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	ks_solana "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	df_changeset "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset"
 	df_changeset_types "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
@@ -316,16 +319,48 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 	if addrErr != nil {
 		return errors.Wrap(addrErr, "failed to get addresses from address book")
 	}
-	chainsWithForwarders := make(map[uint64]struct{})
+
+	evmChainsWithForwarders := make(map[uint64]struct{})
 	for chainSelector, addresses := range allAddresses {
 		for _, typeAndVersion := range addresses {
 			if typeAndVersion.Type == keystone_changeset.KeystoneForwarder {
-				chainsWithForwarders[chainSelector] = struct{}{}
+				evmChainsWithForwarders[chainSelector] = struct{}{}
 			}
 		}
 	}
 
-	if len(chainsWithForwarders) > 0 {
+	solForwarders := input.CldEnv.DataStore.Addresses().Filter(datastore.AddressRefByQualifier("test-forwarder"))
+	solChainsWithForwarder := make(map[uint64]struct{})
+	if len(solForwarders) > 0 {
+		for _, forwarder := range solForwarders {
+			solChainsWithForwarder[forwarder.ChainSelector] = struct{}{}
+		}
+		for _, don := range configDONs {
+			forwarderKey := datastore.NewAddressRefKey(solForwarders[0].ChainSelector, ks_solana.ForwarderContract, solForwarders[0].Version, "test-forwarder")
+			_, err := input.CldEnv.DataStore.Addresses().Get(forwarderKey)
+			if err != nil {
+				return errors.Wrap(err, "forwarder not found")
+			}
+			cs := commonchangeset.Configure(ks_solana.ConfigureForwarders{},
+				&ks_solana.ConfigureForwarderRequest{
+					WFDonName:        don.Name,
+					WFNodeIDs:        don.NodeIDs,
+					RegistryChainSel: input.ChainSelector,
+					Chains:           solChainsWithForwarder,
+					Qualifier:        "test-forwarder",
+					Version:          "1.0.0",
+				},
+			)
+
+			_, err = cs.Apply(*input.CldEnv)
+			if err != nil {
+				return errors.Wrap(err, "failed to configure sol forwarders")
+			}
+
+		}
+	}
+
+	if len(evmChainsWithForwarders) > 0 {
 		_, err = operations.ExecuteSequence(
 			input.CldEnv.OperationsBundle,
 			ks_contracts_op.ConfigureForwardersSeq,
@@ -336,14 +371,13 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 			ks_contracts_op.ConfigureForwardersSeqInput{
 				RegistryChainSel: input.ChainSelector,
 				DONs:             configDONs,
-				Chains:           chainsWithForwarders,
+				Chains:           evmChainsWithForwarders,
 			},
 		)
 		if err != nil {
 			return errors.Wrap(err, "failed to configure forwarders")
 		}
 	}
-	// TODO PLEX-1622 Configure Solana Forwarder here once Changeset with programID resolution is ready
 
 	_, err = operations.ExecuteOperation(
 		input.CldEnv.OperationsBundle,

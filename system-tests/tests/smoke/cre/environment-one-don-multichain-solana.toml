@@ -11,6 +11,7 @@
   port = "8550"
   type = "solana"
   public_key = "7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV"
+  contracts_dir = "../tests/smoke/cre/solana_contracts"
 
 [custom_anvil_miner]
   block_speed_seconds = 5

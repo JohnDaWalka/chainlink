@@ -1,8 +1,11 @@
 package environment
 
 import (
+	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +29,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
+	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
 )
 
 type BlockchainsInput struct {
@@ -51,6 +55,10 @@ func CreateBlockchains(
 	}
 
 	blockchainOutput := make([]*cre.WrappedBlockchainOutput, 0)
+	privKey, err := solana.NewRandomPrivateKey()
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to generate private key for solana")
+	}
 	for _, bi := range input.blockchainsInput {
 		var bcOut *blockchain.Output
 		var bcErr error
@@ -74,6 +82,8 @@ func CreateBlockchains(
 				return nil, pkgerrors.Wrap(err, "RPC endpoint is not available")
 			}
 		} else {
+			bi.Input.PublicKey = privKey.PublicKey().String()
+			bi.Input.ContractsDir = getSolProgramsPath(bi.Input.ContractsDir)
 			bcOut, bcErr = blockchain.NewBlockchainNetwork(&bi.Input)
 			if bcErr != nil {
 				return nil, pkgerrors.Wrap(bcErr, "failed to deploy blockchain")
@@ -89,11 +99,8 @@ func CreateBlockchains(
 				return nil, pkgerrors.Errorf("selector not found for solana chainID '%s'", bi.ChainID)
 			}
 
-			// TODO GetEnv("PRIVATE_KEY_SOLANA") ?
-			privKey, err := solana.NewRandomPrivateKey()
-			if err != nil {
-				return nil, pkgerrors.Wrap(err, "failed to generate private key for solana")
-			}
+			cldf_solana_provider.WritePrivateKeyToPath(filepath.Join(bi.ContractsDir, "deploy-keypair.json"), privKey)
+
 			blockchainOutput = append(blockchainOutput, &cre.WrappedBlockchainOutput{
 				BlockchainOutput: bcOut,
 				SolClient:        solClient,
@@ -101,8 +108,11 @@ func CreateBlockchains(
 					ChainSelector: selector,
 					ChainID:       bi.ChainID,
 					PrivateKey:    privKey,
+					ArtifactsDir:  bi.ContractsDir,
 				},
 			})
+
+			fmt.Println(bi.ContractsDir)
 
 			continue
 		}
@@ -141,7 +151,6 @@ func CreateBlockchains(
 			ReadOnly:           bi.ReadOnly,
 		})
 	}
-
 	return blockchainOutput, nil
 }
 
@@ -162,7 +171,6 @@ func StartBlockchains(loggers BlockchainLoggers, input BlockchainsInput) (StartB
 	}
 
 	chainsConfigs := make([]devenv.ChainConfig, 0)
-
 	for _, bcOut := range blockchainsOutput {
 		switch bcOut.BlockchainOutput.Family {
 		case chainselectors.FamilyEVM:
@@ -196,6 +204,7 @@ func StartBlockchains(loggers BlockchainLoggers, input BlockchainsInput) (StartB
 				SolDeployerKey: bcOut.SolChain.PrivateKey,
 				SolArtifactDir: bcOut.SolChain.ArtifactsDir,
 			})
+
 		}
 	}
 	blockChains, err := devenv.NewChains(loggers.singleFile, chainsConfigs)
@@ -207,4 +216,13 @@ func StartBlockchains(loggers BlockchainLoggers, input BlockchainsInput) (StartB
 		BlockChainOutputs: blockchainsOutput,
 		BlockChains:       maps.Collect(blockChains.All()),
 	}, nil
+}
+
+func getSolProgramsPath(path string) string {
+	// Get the directory of the current file (environment.go)
+	_, currentFile, _, _ := runtime.Caller(0)
+	// Go up to the root of the deployment package
+	rootDir := filepath.Dir(filepath.Dir(filepath.Dir(currentFile)))
+	// Construct the absolute path
+	return filepath.Join(rootDir, path)
 }

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/jmoiron/sqlx"
 	pkgerrors "github.com/pkg/errors"
@@ -21,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/Masterminds/semver/v3"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
@@ -41,6 +41,9 @@ import (
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
+	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
+	ks_sol_seq "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana/sequence"
+	ks_sol_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana/sequence/operation"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
@@ -217,19 +220,53 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
 	}
 
-	if len(solForwarderSelectors) > 0 {
-		// TODO PLEX-1543 deploy forwarder on sol chains
-		// for now just save random address
+	for _, sel := range solForwarderSelectors {
+		out, err := operations.ExecuteSequence(
+			allChainsCLDEnvironment.OperationsBundle,
+			ks_sol_seq.DeployForwarderSeq,
+			ks_sol_op.Deps{
+				Env:       *allChainsCLDEnvironment,
+				Chain:     allChainsCLDEnvironment.BlockChains.SolanaChains()[sel],
+				Datastore: memoryDatastore.Seal(),
+			},
+			ks_sol_seq.DeployForwarderSeqInput{
+				ChainSel:    sel,
+				ProgramName: "keystone_forwarder",
+			},
+		)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to deploy sol forwarder")
+		}
+		// TODO PLEX-1543 move modify datastore into sequence
 		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
-			Address:       solana.PublicKey{1, 2, 3}.String(),
-			ChainSelector: solForwarderSelectors[0],
+			Address:       out.Output.ProgramID.String(),
+			ChainSelector: sel,
 			Qualifier:     "test-forwarder",
+			Version:       semver.MustParse("1.0.0"),
+			Type:          ks_sol.ForwarderContract,
 		})
 		if err != nil {
 			return nil, pkgerrors.Wrap(err, "failed to add address to the datastore")
 		}
+
+		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
+			Address:       out.Output.State.String(),
+			ChainSelector: sel,
+			Qualifier:     "test-forwarder",
+			Version:       semver.MustParse("1.0.0"),
+			Type:          ks_sol.ForwarderState,
+		})
+
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to add address to the datastore")
+		}
+
+		allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
+		testLogger.Info().Msgf("Deployed Forwarder contract on sol chain chain %d programID: %s state: %s", sel, out.Output.ProgramID.String(), out.Output.State.String())
+		solForwarders := allChainsCLDEnvironment.DataStore.Addresses().Filter(datastore.AddressRefByQualifier("test-forwarder"))
+		fmt.Println("sol forwarders", solForwarders)
+
 	}
-	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 
 	ocr3Addr := libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String())         //nolint:staticcheck // won't migrate now
 	wfRegAddr := libcontracts.MustFindAddressesForChain(allChainsCLDEnvironment.ExistingAddresses, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String())      //nolint:staticcheck // won't migrate now
@@ -257,6 +294,7 @@ func SetupTestEnvironment(
 			solClients[sel] = bcOut.SolClient
 			bcOuts[sel].ChainSelector = sel
 			bcOuts[sel].SolChain = bcOut.SolChain
+			bcOuts[sel].SolChain.ArtifactsDir = bcOut.SolChain.ArtifactsDir
 			continue
 		}
 		bcOuts[bcOut.ChainSelector] = bcOut
