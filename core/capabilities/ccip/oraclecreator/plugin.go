@@ -127,6 +127,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	}
 
 	var destChainID string
+	// TODO: don't hardcode this
 	switch config.Config.ChainSelector {
 	case 18395503381733958356:
 		destChainID = "4"
@@ -634,7 +635,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		i.lggr.Infow("CHAIN WRITER TYPE",
 			"selector", sel,
 			"type", fmt.Sprintf("%T", cw),
-			"value", cw,
+			"value", cw.Name(),
 		)
 	}
 

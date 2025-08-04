@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -160,16 +159,14 @@ func (c *ccipTransmitter) Transmit(
 	c.lggr.Infow("Submitting transaction", "tx", txID)
 	c.lggr.Info("SUBMITTING TX TO CW: ", contract, method, args, c.offrampAddress, txID.String(), c.offrampAddress, meta, zero)
 	c.lggr.Infow("SUBMIT TX INTERFACE", "type", fmt.Sprintf("%T", c.cw), "value", c.cw)
-	c.lggr.Infow("SUBMIT TX CW VALUE: ", "value", c.cw.Name())
+	c.lggr.Infow("SUBMIT TX CW VALUE: ", "value", c.cw.Name()) // Sui.2.RelayerService.PluginRelayerClient.RelayerClient.ContractWriterClient
 	if dl, ok := ctx.Deadline(); ok {
 		c.lggr.Infow("SubmitTransaction context deadline", "deadline", dl)
 	} else {
 		c.lggr.Infow("SubmitTransaction context has no deadline")
 	}
 
-	ctx2, cancel := context.WithTimeout(context.Background(), 60*2*time.Second)
-	defer cancel()
-	if err := c.cw.SubmitTransaction(ctx2, contract, method, args,
+	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {
 		// log everything you know
