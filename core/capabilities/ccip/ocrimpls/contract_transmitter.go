@@ -160,7 +160,7 @@ func (c *ccipTransmitter) Transmit(
 	c.lggr.Infow("Submitting transaction", "tx", txID)
 	c.lggr.Info("SUBMITTING TX TO CW: ", contract, method, args, c.offrampAddress, txID.String(), c.offrampAddress, meta, zero)
 	c.lggr.Infow("SUBMIT TX INTERFACE", "type", fmt.Sprintf("%T", c.cw), "value", c.cw)
-	c.lggr.Infow("SUBMIT TX CW VALUE: ", c.cw.Name())
+	c.lggr.Infow("SUBMIT TX CW VALUE: ", "value", c.cw.Name())
 	if dl, ok := ctx.Deadline(); ok {
 		c.lggr.Infow("SubmitTransaction context deadline", "deadline", dl)
 	} else {
