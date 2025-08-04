@@ -599,9 +599,9 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			solanaChainWriterConfigVersion = ofc.Execute.SolanaChainWriterConfigVersion
 		}
 
-		i.lggr.Info("INITIALIZING CW FOR SUI(1): ", chainID)
-		i.lggr.Info("INITIALIZING CW FOR SUI(2): ", relayer)
-		i.lggr.Info("INITIALIZING CW FOR SUI(3): ", i.transmitters)
+		i.lggr.Infow("INITIALIZING CW FOR SUI(1): ", chainID)
+		i.lggr.Infow("INITIALIZING CW FOR SUI(2): ", relayer)
+		i.lggr.Infow("INITIALIZING CW FOR SUI(3): ", i.transmitters)
 
 		cw, err1 := crcw.GetChainWriter(ctx, ccipcommon.ChainWriterProviderOpts{
 			ChainID:                        chainID,
