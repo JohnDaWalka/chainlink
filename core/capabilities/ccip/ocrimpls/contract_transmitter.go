@@ -162,7 +162,21 @@ func (c *ccipTransmitter) Transmit(
 	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {
-		return fmt.Errorf("failed to submit transaction via chain writer: %w", err)
+		// log everything you know
+		c.lggr.Errorw("SubmitTransaction failed",
+			"contract", contract,
+			"method", method,
+			"to", c.offrampAddress,
+			"txID", txID.String(),
+			"err", err,
+			"ctxErr", ctx.Err(),
+		)
+
+		// wrap the error so callers see the metadata too
+		return fmt.Errorf(
+			"failed to submit tx via chain writer (contract=%s method=%s to=%s txID=%s): %w",
+			contract, method, c.offrampAddress, txID.String(), err,
+		)
 	}
 
 	return nil
