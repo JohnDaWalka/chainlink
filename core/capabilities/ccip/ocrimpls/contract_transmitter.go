@@ -170,7 +170,7 @@ func (c *ccipTransmitter) Transmit(
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {
 		// log everything you know
-		c.lggr.Errorw("SubmitTransaction failed",
+		c.lggr.Errorw(" failed",
 			"contract", contract,
 			"method", method,
 			"to", c.offrampAddress,
