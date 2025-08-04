@@ -158,6 +158,7 @@ func (c *ccipTransmitter) Transmit(
 	zero := big.NewInt(0)
 	c.lggr.Infow("Submitting transaction", "tx", txID)
 	c.lggr.Info("SUBMITTING TX TO CW: ", contract, method, args, c.offrampAddress, txID.String(), c.offrampAddress, meta, zero)
+	c.lggr.Infow("SUBMIT TX INTERFACE", "type", fmt.Sprintf("%T", c.cw), "value", c.cw)
 	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {

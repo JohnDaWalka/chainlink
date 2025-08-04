@@ -43,11 +43,11 @@ func (g ChainCWProvider) GetChainWriter(ctx context.Context, params ccipcommon.C
 	transmitter := params.Transmitters[types.NewRelayID(params.ChainFamily, params.ChainID)]
 	cfg, err := suiconfig.GetChainWriterConfig(transmitter[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Aptos chain writer config: %w", err)
+		return nil, fmt.Errorf("failed to get Sui chain writer config: %w", err)
 	}
 	chainWriterConfig, err := json.Marshal(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal Aptos chain writer config: %w", err)
+		return nil, fmt.Errorf("failed to marshal Sui chain writer config: %w", err)
 	}
 
 	cw, err := params.Relayer.NewContractWriter(ctx, chainWriterConfig)

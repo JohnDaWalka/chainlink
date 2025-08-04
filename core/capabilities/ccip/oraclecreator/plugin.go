@@ -126,11 +126,12 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	}
 
 	var destChainID string
-	if config.Config.ChainSelector == 18395503381733958356 {
+	switch config.Config.ChainSelector {
+	case 18395503381733958356:
 		destChainID = "4"
-	} else if config.Config.ChainSelector == 9762610643973837292 {
+	case 9762610643973837292:
 		destChainID = "2"
-	} else {
+	default:
 		var err error
 		destChainID, err = chainsel.GetChainIDFromSelector(uint64(config.Config.ChainSelector))
 		if err != nil {
@@ -583,6 +584,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		if ofc.Execute != nil {
 			solanaChainWriterConfigVersion = ofc.Execute.SolanaChainWriterConfigVersion
 		}
+
+		i.lggr.Info("INITIALIZING CW FOR SUI: ", chainID, relayer, i.transmitters, relayChainFamily, config.Config.OfframpAddress)
 		cw, err1 := crcw.GetChainWriter(ctx, ccipcommon.ChainWriterProviderOpts{
 			ChainID:                        chainID,
 			Relayer:                        relayer,
