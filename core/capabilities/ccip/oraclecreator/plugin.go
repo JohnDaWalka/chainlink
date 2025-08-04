@@ -635,7 +635,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			"type", fmt.Sprintf("%T", cw),
 		)
 	}
-	
+
 	return contractReaders, chainWriters, nil
 }
 
@@ -674,8 +674,8 @@ func decodeAndValidateOffchainConfig(
 func defaultLocalConfig() ocrtypes.LocalConfig {
 	return ocrtypes.LocalConfig{
 		DefaultMaxDurationInitialization: 30 * time.Second,
-		BlockchainTimeout:                10 * time.Second,
-		ContractConfigLoadTimeout:        10 * time.Second,
+		BlockchainTimeout:                60 * time.Second,
+		ContractConfigLoadTimeout:        60 * time.Second,
 		// Config tracking is handled by the launcher, since we're doing blue-green
 		// deployments we're not going to be using OCR's built-in config switching,
 		// which always shuts down the previous instance.
