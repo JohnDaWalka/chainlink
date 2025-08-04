@@ -34,6 +34,9 @@ func (g ChainCWProvider) GetChainReader(ctx context.Context, params ccipcommon.C
 		return nil, err
 	}
 
+	loggerInst, _ := logger.NewLogger()
+	loggerInst.Infow("GETCHAINREADER: ", "cw: ", cr.Name()) // SUI CHAINREADER NOT COMMON
+
 	cr = suiloop.NewLoopChainReader(params.Lggr, cr)
 
 	return cr, nil
