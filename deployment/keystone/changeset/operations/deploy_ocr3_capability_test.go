@@ -224,14 +224,12 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 		wfNodeNamesToP2PIDs := te.GetJDNodeNamesToP2PIDs("wfDon")
 		require.NotEmpty(t, wfNodeNamesToP2PIDs)
 
-		wfNodeIDs := make([]string, 0, len(wfNodeIDsToP2PIDs))
 		seqNodes := make([]jobs.DistributeOCRJobSpecSeqNode, 0, len(wfNodeIDsToP2PIDs))
 		for nodeID, p2pID := range wfNodeIDsToP2PIDs {
 			seqNodes = append(seqNodes, jobs.DistributeOCRJobSpecSeqNode{
 				ID:       nodeID,
 				P2PLabel: p2pID,
 			})
-			wfNodeIDs = append(wfNodeIDs, nodeID)
 		}
 		bootstrapNodes := make([]jobs.DistributeBootstrapJobSpecsSeqBootCfg, 0, len(wfNodeIDsToP2PIDs))
 		for nodeName, p2pID := range wfNodeNamesToP2PIDs {
