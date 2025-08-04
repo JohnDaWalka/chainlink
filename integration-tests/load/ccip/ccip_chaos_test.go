@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 
-	framework "github.com/smartcontractkit/chainlink-testing-framework/framework/grafana"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
 	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig/ccip"
