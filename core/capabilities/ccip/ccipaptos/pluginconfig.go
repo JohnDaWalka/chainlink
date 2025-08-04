@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsui"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 )
 
 // initializePluginConfig returns a PluginConfig for Aptos chains.
@@ -21,13 +20,6 @@ func initializePluginConfigFunc(chainselFamily string) ccipcommon.InitFunction {
 			cwProvider = ccipsui.ChainCWProvider{}
 		}
 
-		var transmitFactory cctypes.ContractTransmitterFactory
-		if chainselFamily == chainsel.FamilySui {
-			transmitFactory = ocrimpls.NewSuiContractTransmitterFactory(extraDataCodec)
-		} else {
-			transmitFactory = ocrimpls.NewAptosContractTransmitterFactory(extraDataCodec)
-		}
-
 		return ccipcommon.PluginConfig{
 			CommitPluginCodec:          NewCommitPluginCodecV1(),
 			ExecutePluginCodec:         NewExecutePluginCodecV1(extraDataCodec),
@@ -36,7 +28,7 @@ func initializePluginConfigFunc(chainselFamily string) ccipcommon.InitFunction {
 			GasEstimateProvider:        NewGasEstimateProvider(),
 			RMNCrypto:                  nil,
 			ChainAccessorFactory:       AptosChainAccessorFactory{},
-			ContractTransmitterFactory: transmitFactory,
+			ContractTransmitterFactory: ocrimpls.NewAptosContractTransmitterFactory(extraDataCodec),
 			ChainRW:                    cwProvider,
 			ExtraDataCodec:             ExtraDataDecoder{},
 			AddressCodec:               AddressCodec{},
