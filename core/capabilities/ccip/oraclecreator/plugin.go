@@ -537,6 +537,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	}
 
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
+	i.lggr.Infow("RELAYER MAP", "keys", i.relayers)
 	chainWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	for relayID, relayer := range i.relayers {
 		chainID := relayID.ChainID
@@ -546,6 +547,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		if err1 != nil {
 			return nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID, err1)
 		}
+
+		i.lggr.Infow("INSIDE RELAYER LOOP", "relayID", relayID, "relayChainFam", relayChainFamily)
 
 		cr, err1 := crcw.GetChainReader(ctx, ccipcommon.ChainReaderProviderOpts{
 			Lggr:          i.lggr,
@@ -562,6 +565,12 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		if err1 != nil {
 			return nil, nil, err1
 		}
+
+		i.lggr.Infow("CW CONDITION DEBUG",
+			"chainID", chainID,
+			"destChainID", destChainID,
+			"relayChainFamily", relayChainFamily,
+			"destChainFamily", destChainFamily)
 
 		if chainID == destChainID && destChainFamily == relayChainFamily {
 			offrampAddress := destAddrStr
