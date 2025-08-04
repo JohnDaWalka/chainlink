@@ -126,6 +126,7 @@ func TestDeployOCR3CapabilitySeq(t *testing.T) {
 			ChainSelectorAptos:   0, // Not using Aptos in this test
 			BootstrapperOCR3Urls: []string{"12D3KooWHfYFQ8hGttAYbMCevQVESEQhzJAqFZokMVtom8bNxwGq@127.0.0.1:5001"},
 			BootstrapCfgs:        bootstrapNodes,
+			Capabilities:         capabilities,
 		}
 
 		// Execute the sequence
