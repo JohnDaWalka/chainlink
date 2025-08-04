@@ -629,6 +629,13 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	}
 
 	i.lggr.Info("CHAINWRITERERS CREATED: ", chainWriters)
+	for sel, cw := range chainWriters {
+		i.lggr.Infow("CHAIN WRITER TYPE",
+			"selector", sel,
+			"type", fmt.Sprintf("%T", cw),
+		)
+	}
+	
 	return contractReaders, chainWriters, nil
 }
 
