@@ -288,10 +288,10 @@ func (c *ConfigureKeystoneInput) Validate() error {
 type GatewayConnectorDons struct {
 	MembersEthAddresses []string
 	ID                  uint32
+	IsVault             bool
 }
 
 type GatewayConnectorOutput struct {
-	Dons     []GatewayConnectorDons // do not set, it will be set dynamically
 	Outgoing Outgoing
 	Incoming Incoming
 }

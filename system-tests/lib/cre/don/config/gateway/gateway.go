@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,10 +76,18 @@ func GenerateConfig(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverri
 				}
 			}
 
+			// Handle the DON ID for any vault node being hardcoded to "vault".
+			// This is used by the Gateway node to route requests to the vault service
+			// if a DON ID is not provided in the request.
+			donID := fmt.Sprintf("%d", input.DonMetadata.ID)
+			if flags.HasFlag(input.Flags, cre.VaultCapability) {
+				donID = "vault"
+			}
+
 			configOverrides[nodeIndex] += config.WorkerGateway(
 				nodeEthAddr,
 				homeChainID,
-				input.DonMetadata.ID,
+				donID,
 				*input.GatewayConnectorOutput,
 			)
 		}
