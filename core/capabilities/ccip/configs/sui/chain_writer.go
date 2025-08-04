@@ -24,6 +24,22 @@ func GetChainWriterConfig(publicKeyStr string) (map[string]any, error) {
 						"from_address": fromAddress.String(),
 						"params": []map[string]any{
 							{
+								"name":     "object_ref_id",
+								"type":     "object_id",
+								"required": true,
+							},
+							{
+								"name":      "off_ramp_state_id",
+								"type":      "object_id",
+								"required":  true,
+								"isMutable": false,
+							},
+							{
+								"name":     "clock",
+								"type":     "object_id",
+								"required": true,
+							},
+							{
 								"name":     "ReportContext",
 								"type":     "vector<vector<u8>>",
 								"required": true,
