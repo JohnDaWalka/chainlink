@@ -48,12 +48,10 @@ func (c CsDistributeOCRJobSpecsImpl) Apply(e cldf.Environment, cfg CsDistributeO
 	if len(nodes) != cfg.DONFilter.Size {
 		return cldf.ChangesetOutput{}, fmt.Errorf("expected %d nodes, got %d", cfg.DONFilter.Size, len(nodes))
 	}
-	nodeIDs := make([]string, 0, len(nodes))
 	nodesByID := make(map[string]*nodev1.Node)
 	seqNodes := make([]jobs2.DistributeOCRJobSpecSeqNode, 0, len(nodes))
 	for _, node := range nodes {
 		nodesByID[node.Id] = node
-		nodeIDs = append(nodeIDs, node.Id)
 
 		p2pLabel := offchain.GetP2pLabel(node.GetLabels())
 		seqNodes = append(seqNodes, jobs2.DistributeOCRJobSpecSeqNode{

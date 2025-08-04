@@ -85,7 +85,6 @@ func BuildOCR3JobConfigSpecs(
 	lggr logger.Logger,
 	contractID string,
 	evmChainSel, aptosChainSel uint64,
-	//nodes []*nodev1.Node,
 	nodeIDs []string, // list of JD node IDs
 	btURLs []string,
 	donName string,

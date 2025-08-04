@@ -29,10 +29,9 @@ type DeployOCR3CapabilityInput struct {
 
 	RegistryChainSel uint64
 	MCMSConfig       *changeset.MCMSConfig
-	//RegistryContractAddress *common.Address
-	RegistryRef  datastore.AddressRefKey
-	OracleConfig changeset.OracleConfig
-	DONs         []contracts.ConfigureKeystoneDON
+	RegistryRef      datastore.AddressRefKey
+	OracleConfig     changeset.OracleConfig
+	DONs             []contracts.ConfigureKeystoneDON
 
 	Capabilities []capabilities_registry.CapabilitiesRegistryCapability
 

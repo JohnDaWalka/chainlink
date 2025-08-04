@@ -1,11 +1,13 @@
 package jobs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -70,14 +72,12 @@ var DistributeBootstrapJobSpecsSeq = operations.NewSequence[DistributeBootstrapJ
 		}
 
 		if len(input.BootCfgs) == 0 {
-			return DistributeBootstrapJobSpecsSeqOutput{}, fmt.Errorf("no bootstrap configurations provided")
+			return DistributeBootstrapJobSpecsSeqOutput{}, errors.New("no bootstrap configurations provided")
 		}
 
 		var mergedErrs error
 		for _, bootCfg := range input.BootCfgs {
-			_, opErr := operations.ExecuteOperation(b, DistributeJobSpecOp, DistributeJobSpecOpDeps{
-				Offchain: deps.Offchain,
-			}, DistributeJobSpecOpInput{
+			_, opErr := operations.ExecuteOperation(b, DistributeJobSpecOp, DistributeJobSpecOpDeps(deps), DistributeJobSpecOpInput{
 				Spec:             spec,
 				NodeP2PLabel:     bootCfg.P2PID,
 				NodeName:         bootCfg.NodeName,

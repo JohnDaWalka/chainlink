@@ -280,7 +280,7 @@ func initEnv(t *testing.T, nChains int) (registryChainSel uint64, env cldf.Envir
 //
 // - a view-only Offchain client that supports all the read api operations of the Offchain client
 func SetupContractTestEnv(t *testing.T, c EnvWrapperConfig) EnvWrapper {
-	//c.UseInMemoryNodes = false // TODO: does it always need to be false?
+	// c.UseInMemoryNodes = false // TODO: does it always need to be false?
 	return setupTestEnv(t, c)
 }
 

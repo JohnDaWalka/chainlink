@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/jobs"
 )
 
@@ -38,11 +40,11 @@ var DistributeOCRJobSpecSeq = operations.NewSequence[DistributeOCRJobSpecSeqInpu
 	semver.MustParse("1.0.0"),
 	"Distribute OCR Job JobSpecs",
 	func(b operations.Bundle, deps DistributeOCRJobSpecSeqDeps, input DistributeOCRJobSpecSeqInput) (DistributeOCRJobSpecSeqOutput, error) {
-		nodeIdToP2PLabel := make(map[string]string)
+		nodeIDToP2PLabel := make(map[string]string)
 		nodeIDs := make([]string, len(input.Nodes))
 		for _, node := range input.Nodes {
 			nodeIDs = append(nodeIDs, node.ID)
-			nodeIdToP2PLabel[node.ID] = node.P2PLabel
+			nodeIDToP2PLabel[node.ID] = node.P2PLabel
 		}
 
 		specs, err := jobs.BuildOCR3JobConfigSpecs(
@@ -53,14 +55,12 @@ var DistributeOCRJobSpecSeq = operations.NewSequence[DistributeOCRJobSpecSeqInpu
 
 		var mergedErrs error
 		for _, spec := range specs {
-			nodeLabel, ok := nodeIdToP2PLabel[spec.NodeID]
+			nodeLabel, ok := nodeIDToP2PLabel[spec.NodeID]
 			if !ok {
 				return DistributeOCRJobSpecSeqOutput{}, fmt.Errorf("node not found: %s", spec.NodeID)
 			}
 
-			_, opErr := operations.ExecuteOperation(b, DistributeJobSpecOp, DistributeJobSpecOpDeps{
-				Offchain: deps.Offchain,
-			}, DistributeJobSpecOpInput{
+			_, opErr := operations.ExecuteOperation(b, DistributeJobSpecOp, DistributeJobSpecOpDeps(deps), DistributeJobSpecOpInput{
 				NodeID:           spec.NodeID,
 				NodeP2PLabel:     nodeLabel,
 				DomainKey:        input.DomainKey,
