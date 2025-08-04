@@ -201,6 +201,17 @@ func SetupTestEnvironment(
 		forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
 	}
 
+	var allNodeFlags []string
+	for i := range input.CapabilitiesAwareNodeSets {
+		nodeFlags, err := flags.NodeSetFlags(input.CapabilitiesAwareNodeSets[i])
+		if err != nil {
+			continue
+		}
+		allNodeFlags = append(allNodeFlags, nodeFlags...)
+	}
+	vaultOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.VaultCapability)
+	evmOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.EVMCapability)
+
 	deployKeystoneReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
 		ks_contracts_op.DeployKeystoneContractsSequence,
@@ -210,6 +221,8 @@ func SetupTestEnvironment(
 		ks_contracts_op.DeployKeystoneContractsSequenceInput{
 			RegistryChainSelector: homeChainOutput.ChainSelector,
 			ForwardersSelectors:   forwardersSelectors,
+			DeployVaultOCR3:       vaultOCR3AddrFlag,
+			DeployEVMOCR3:         evmOCR3AddrFlag,
 		},
 	)
 	if err != nil {

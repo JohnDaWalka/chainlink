@@ -75,7 +75,7 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 
 		pollIntervalStr, ok := config["logTriggerPollInterval"]
 		if !ok || pollIntervalStr == nil {
-			return nil, errors.New("logTriggerPollInterval is missing in config")
+			pollIntervalStr = "1s"
 		}
 		pollInterval, err := time.ParseDuration(pollIntervalStr.(string))
 		if err != nil {
@@ -84,7 +84,7 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 
 		receiverGasMinimumStr, ok := config["receiverGasMinimum"]
 		if !ok || receiverGasMinimumStr == nil {
-			return nil, errors.New("receiverGasMinimum is missing in config")
+			receiverGasMinimumStr = "1"
 		}
 		receiverGasMinimum, err := strconv.ParseUint(receiverGasMinimumStr.(string), 10, 64)
 		if err != nil {
@@ -127,7 +127,7 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 			return nil, errors.Wrap(err, "failed to get CRE Forwarder address")
 		}
 
-		logger.Debug().Msgf("Deployed CRE Forwarder contract on chain %d at %s", chainID, creForwarderAddress.Address)
+		logger.Debug().Msgf("Found CRE Forwarder contract on chain %d at %s", chainID, creForwarderAddress.Address)
 
 		for _, workerNode := range workflowNodeSet {
 			nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
@@ -206,7 +206,6 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 				donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)
 			}
 
-			logger.Info().Msgf("Created EVM Capability ID: %s job spec: \n\n %s\n\n", jobName(chainID), jobSpec.Spec)
 			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobSpec)
 		}
 	}

@@ -17,6 +17,8 @@ type DeployKeystoneContractsSequenceDeps struct {
 type DeployKeystoneContractsSequenceInput struct {
 	RegistryChainSelector uint64
 	ForwardersSelectors   []uint64
+	DeployVaultOCR3       bool
+	DeployEVMOCR3         bool
 }
 
 type DeployKeystoneContractsSequenceOutput struct {
@@ -89,24 +91,27 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 			return DeployKeystoneContractsSequenceOutput{}, err
 		}
 
-		// Vault OCR3 Contract
-		vaultOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_vault"})
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
+		if input.DeployVaultOCR3 {
+			// Vault OCR3 Contract
+			vaultOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_vault"})
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+			err = updateAddresses(as.Addresses(), vaultOCR3DeployReport.Output.Addresses, ab, vaultOCR3DeployReport.Output.AddressBook)
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
 		}
-		err = updateAddresses(as.Addresses(), vaultOCR3DeployReport.Output.Addresses, ab, vaultOCR3DeployReport.Output.AddressBook)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-
-		// EVM cap OCR3 Contract
-		evmOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_evm"})
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-		err = updateAddresses(as.Addresses(), evmOCR3DeployReport.Output.Addresses, ab, evmOCR3DeployReport.Output.AddressBook)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
+		if input.DeployEVMOCR3 {
+			// EVM cap OCR3 Contract
+			evmOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_evm"})
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+			err = updateAddresses(as.Addresses(), evmOCR3DeployReport.Output.Addresses, ab, evmOCR3DeployReport.Output.AddressBook)
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
 		}
 
 		return DeployKeystoneContractsSequenceOutput{
