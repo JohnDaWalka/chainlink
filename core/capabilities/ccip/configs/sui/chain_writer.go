@@ -12,7 +12,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 	// if err != nil {
 	// 	return chainwriter.ChainWriterConfig{}, fmt.Errorf("failed to parse Sui address from public key %s: %w", publicKeyStr, err)
 	// }
-	 
+
 	isClockMutable := false
 
 	return chainwriter.ChainWriterConfig{
