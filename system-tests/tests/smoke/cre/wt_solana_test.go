@@ -151,7 +151,7 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	err = val.Underlying["remaining_accounts"].UnwrapTo(&res)
 	require.NoError(t, err, "unwrap response failed")
 
-	fmt.Println(res)
+	require.Len(t, res, 3)
 }
 
 type setupWTOutput struct {
