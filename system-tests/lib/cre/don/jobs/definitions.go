@@ -44,9 +44,7 @@ const (
 	EmptyStdCapConfig = "\"\""
 )
 
-func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.ProposeJobRequest {
-	uuid := uuid.NewString()
-
+func WorkerStandardCapability(nodeID, name, command, config, oracleFactoryConfig string) *jobv1.ProposeJobRequest {
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
@@ -57,11 +55,13 @@ func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.Propo
 	forwardingAllowed = false
 	command = "%s"
 	config = %s
+	%s
 `,
-			uuid,
+			uuid.NewString(),
 			name,
 			command,
-			config),
+			config,
+			oracleFactoryConfig),
 	}
 }
 
@@ -109,7 +109,7 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	}
 }
 
-func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64, masterPublicKey string, encryptedPrivateKeyShare string) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
 
 	return &jobv1.ProposeJobRequest{
@@ -131,6 +131,9 @@ func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2
 	chainID = "%d"
 	[pluginConfig]
 	requestExpiryDuration = "60s"
+	[pluginConfig.dkg]
+	masterPublicKey = "%s"
+	encryptedPrivateKeyShare = "%s"
 `,
 			uuid,
 			"Vault OCR3 Capability",
@@ -141,6 +144,8 @@ func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2
 			types.VaultPlugin,
 			nodeEthAddress,
 			chainID,
+			masterPublicKey,
+			encryptedPrivateKeyShare,
 		),
 	}
 }
