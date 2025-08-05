@@ -10,7 +10,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
@@ -18,13 +20,14 @@ import (
 )
 
 var (
-	_ connector.GatewayConnectorHandler = (*Handler)(nil)
+	_ connector.GatewayConnectorHandler = (*GatewayHandler)(nil)
 
-	ConnectorMethod = "vault"
+	ConnectorMethod = "capability"
 	HandlerName     = "VaultHandler"
 )
 
 type metrics struct {
+	// Given that all requests are coming from the gateway, we can assume that all errors are internal errors
 	requestInternalError metric.Int64Counter
 	requestSuccess       metric.Int64Counter
 }
@@ -46,44 +49,40 @@ func newMetrics() (*metrics, error) {
 	}, nil
 }
 
-type gatewaySender interface {
-	SendToGateway(ctx context.Context, gatewayID string, resp *jsonrpc.Response[json.RawMessage]) error
+type GatewayHandler struct {
+	secretsService SecretsService
+	gwConnector    core.GatewayConnector
+	lggr           logger.Logger
+	metrics        *metrics
 }
 
-type Handler struct {
-	vault         *Service
-	gatewaySender gatewaySender
-	lggr          logger.Logger
-	metrics       *metrics
-}
-
-func NewHandler(vault *Service, gwsender gatewaySender, lggr logger.Logger) (*Handler, error) {
+func NewGatewayHandler(secretsService SecretsService, gwConnector core.GatewayConnector, lggr logger.Logger) (*GatewayHandler, error) {
 	metrics, err := newMetrics()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metrics: %w", err)
 	}
 
-	return &Handler{
-		vault:         vault,
-		gatewaySender: gwsender,
-		lggr:          lggr.Named(HandlerName),
-		metrics:       metrics,
+	return &GatewayHandler{
+		secretsService: secretsService,
+		gwConnector:    gwConnector,
+		lggr:           lggr.Named(HandlerName),
+		metrics:        metrics,
 	}, nil
 }
 
-func (h *Handler) Start(ctx context.Context) error {
+func (h *GatewayHandler) Start(ctx context.Context) error {
 	return nil
 }
 
-func (h *Handler) Close() error {
+func (h *GatewayHandler) Close() error {
 	return nil
 }
 
-func (h *Handler) ID(ctx context.Context) (string, error) {
+func (h *GatewayHandler) ID(ctx context.Context) (string, error) {
 	return HandlerName, nil
 }
 
-func (h *Handler) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request[json.RawMessage]) (err error) {
+func (h *GatewayHandler) HandleGatewayMessage(ctx context.Context, gatewayID string, req *jsonrpc.Request[json.RawMessage]) (err error) {
 	h.lggr.Debugf("Received message from gateway %s: %v", gatewayID, req)
 
 	var response *jsonrpc.Response[json.RawMessage]
@@ -94,7 +93,7 @@ func (h *Handler) HandleGatewayMessage(ctx context.Context, gatewayID string, re
 		response = h.errorResponse(ctx, gatewayID, req, api.UnsupportedMethodError, errors.New("unsupported method: "+req.Method))
 	}
 
-	if err = h.gatewaySender.SendToGateway(ctx, gatewayID, response); err != nil {
+	if err = h.gwConnector.SendToGateway(ctx, gatewayID, response); err != nil {
 		h.lggr.Errorf("Failed to send message to gateway %s: %v", gatewayID, err)
 		return err
 	}
@@ -106,21 +105,29 @@ func (h *Handler) HandleGatewayMessage(ctx context.Context, gatewayID string, re
 	return nil
 }
 
-func (h *Handler) handleSecretsCreate(ctx context.Context, gatewayID string, req *jsonrpc.Request[json.RawMessage]) *jsonrpc.Response[json.RawMessage] {
+func (h *GatewayHandler) handleSecretsCreate(ctx context.Context, gatewayID string, req *jsonrpc.Request[json.RawMessage]) *jsonrpc.Response[json.RawMessage] {
 	var requestData vault_api.SecretsCreateRequest
 	if err := json.Unmarshal(*req.Params, &requestData); err != nil {
 		return h.errorResponse(ctx, gatewayID, req, api.UserMessageParseError, err)
 	}
-
-	// DUMMY RESPONSE
-	responseData := vault_api.SecretsCreateResponse{
-		ResponseBase: vault_api.ResponseBase{
-			Success: true,
+	vaultCapRequest := vault.CreateSecretsRequest{
+		EncryptedSecrets: []*vault.EncryptedSecret{
+			{
+				Id: &vault.SecretIdentifier{
+					Owner:     "", // TBD
+					Namespace: "", // TBD
+					Key:       requestData.ID,
+				},
+				EncryptedValue: requestData.Value,
+			},
 		},
-		SecretID: requestData.ID,
+	}
+	vaultCapResponse, err := h.secretsService.CreateSecrets(ctx, &vaultCapRequest)
+	if err != nil {
+		return h.errorResponse(ctx, gatewayID, req, api.FatalError, err)
 	}
 
-	resultBytes, err := json.Marshal(responseData)
+	resultBytes, err := json.Marshal(vaultCapResponse)
 	if err != nil {
 		return h.errorResponse(ctx, gatewayID, req, api.NodeReponseEncodingError, err)
 	}
@@ -132,7 +139,7 @@ func (h *Handler) handleSecretsCreate(ctx context.Context, gatewayID string, req
 	}
 }
 
-func (h *Handler) errorResponse(
+func (h *GatewayHandler) errorResponse(
 	ctx context.Context,
 	gatewayID string,
 	req *jsonrpc.Request[json.RawMessage],
@@ -140,7 +147,6 @@ func (h *Handler) errorResponse(
 	err error,
 ) *jsonrpc.Response[json.RawMessage] {
 	h.lggr.Errorf("error code: %d, err: %s", errorCode, err.Error())
-	// Given that all requests are coming from the gateway, we can assume that all errors are internal errors
 	h.metrics.requestInternalError.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("gateway_id", gatewayID),
 		attribute.String("error", errorCode.String()),

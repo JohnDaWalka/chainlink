@@ -18,12 +18,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	vault2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/vault"
 )
 
 func TestService_CapabilityCall(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	store := requests.NewStore[*Request]()
-	service := NewService(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
+	store := requests.NewStore[*vault2.Request]()
+	service := NewCapability(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
 	servicetest.Run(t, service)
 
 	owner := "test-owner"
@@ -82,7 +83,7 @@ func TestService_CapabilityCall(t *testing.T) {
 				reqs := store.GetByIDs([]string{requestID})
 				if len(reqs) == 1 {
 					req := reqs[0]
-					req.SendResponse(t.Context(), &Response{
+					req.SendResponse(t.Context(), &vault2.Response{
 						ID:      requestID,
 						Payload: data,
 					})
@@ -113,8 +114,8 @@ func TestService_CapabilityCall(t *testing.T) {
 
 func TestService_CapabilityCall_DuringSubscriptionPhase(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	store := requests.NewStore[*Request]()
-	service := NewService(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
+	store := requests.NewStore[*vault2.Request]()
+	service := NewCapability(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
 	servicetest.Run(t, service)
 
 	owner := "test-owner"
@@ -172,7 +173,7 @@ func TestService_CapabilityCall_DuringSubscriptionPhase(t *testing.T) {
 				reqs := store.GetByIDs([]string{requestID})
 				if len(reqs) == 1 {
 					req := reqs[0]
-					req.SendResponse(t.Context(), &Response{
+					req.SendResponse(t.Context(), &vault2.Response{
 						ID:      requestID,
 						Payload: data,
 					})
@@ -203,8 +204,8 @@ func TestService_CapabilityCall_DuringSubscriptionPhase(t *testing.T) {
 
 func TestService_CapabilityCall_ReturnsIncorrectType(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	store := requests.NewStore[*Request]()
-	service := NewService(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
+	store := requests.NewStore[*vault2.Request]()
+	service := NewCapability(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
 	servicetest.Run(t, service)
 
 	owner := "test-owner"
@@ -244,7 +245,7 @@ func TestService_CapabilityCall_ReturnsIncorrectType(t *testing.T) {
 				reqs := store.GetByIDs([]string{requestID})
 				if len(reqs) == 1 {
 					req := reqs[0]
-					req.SendResponse(t.Context(), &Response{
+					req.SendResponse(t.Context(), &vault2.Response{
 						ID:      requestID,
 						Payload: []byte("invalid data"),
 					})
@@ -271,9 +272,9 @@ func TestService_CapabilityCall_ReturnsIncorrectType(t *testing.T) {
 
 func TestService_CapabilityCall_TimeOut(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	store := requests.NewStore[*Request]()
+	store := requests.NewStore[*vault2.Request]()
 	fakeClock := clockwork.NewFakeClock()
-	service := NewService(lggr, store, fakeClock, 10*time.Second)
+	service := NewCapability(lggr, store, fakeClock, 10*time.Second)
 	servicetest.Run(t, service)
 
 	owner := "test-owner"
@@ -346,17 +347,17 @@ func TestService_CRUD(t *testing.T) {
 	testCases := []struct {
 		name     string
 		error    string
-		response *Response
-		call     func(t *testing.T, service *Service) (*Response, error)
+		response *vault2.Response
+		call     func(t *testing.T, service *Capability) (*vault2.Response, error)
 	}{
 		{
 			name: "CreateSecrets",
-			response: &Response{
+			response: &vault2.Response{
 				ID:      "response-id",
 				Payload: []byte("hello world"),
 				Format:  "protobuf",
 			},
-			call: func(t *testing.T, service *Service) (*Response, error) {
+			call: func(t *testing.T, service *Capability) (*vault2.Response, error) {
 				req := &vault.CreateSecretsRequest{
 					RequestId: requestID,
 					EncryptedSecrets: []*vault.EncryptedSecret{
@@ -374,8 +375,8 @@ func TestService_CRUD(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			lggr := logger.TestLogger(t)
-			store := requests.NewStore[*Request]()
-			service := NewService(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
+			store := requests.NewStore[*vault2.Request]()
+			service := NewCapability(lggr, store, clockwork.NewFakeClock(), 10*time.Second)
 			servicetest.Run(t, service)
 
 			var wg sync.WaitGroup

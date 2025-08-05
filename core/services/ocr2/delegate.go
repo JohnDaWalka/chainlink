@@ -33,6 +33,7 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
+	vault2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -639,20 +640,20 @@ func (d *Delegate) newServicesVaultPlugin(
 	}
 
 	store := requests.NewStore[*vault.Request]()
-	service := vault.NewService(
+	vaultCapability := vault2.NewCapability(
 		lggr,
 		store,
 		clockwork.NewRealClock(),
 		cfg.RequestExpiryDuration.Duration(),
 	)
-	srvs = append(srvs, service)
+	srvs = append(srvs, vaultCapability)
 
-	err = capabilitiesRegistry.Add(ctx, service)
+	err = capabilitiesRegistry.Add(ctx, vaultCapability)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to register vault capability: %w", err)
 	}
 
-	handler, err := vault.NewHandler(service, gwconnector, d.lggr)
+	handler, err := vault2.NewGatewayHandler(vaultCapability, gwconnector, d.lggr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to create vault handler: %w", err)
 	}
@@ -661,7 +662,7 @@ func (d *Delegate) newServicesVaultPlugin(
 	}
 	srvs = append(srvs, handler)
 
-	if err := gwconnector.AddHandler(ctx, []string{vault.ConnectorMethod}, handler); err != nil {
+	if err := gwconnector.AddHandler(ctx, []string{vault2.ConnectorMethod}, handler); err != nil {
 		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to add vault handler to connector: %w", err)
 	}
 
