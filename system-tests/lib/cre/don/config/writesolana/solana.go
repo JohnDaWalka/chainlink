@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	ks_solana "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-type Config struct {
-}
-
-func GetGenerateConfig(in Config) func(cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverride, error) {
+func GetGenerateConfig() func(cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverride, error) {
 	return func(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverride, error) {
 		configOverrides := make(cre.NodeIndexToConfigOverride)
 		if flags.HasFlag(input.Flags, cre.WriteSolanaCapability) {
@@ -31,11 +31,31 @@ func GetGenerateConfig(in Config) func(cre.GenerateConfigsInput) (cre.NodeIndexT
 					return nil, errors.Wrap(err, "failed to get chainID from solana")
 				}
 
+				forwarder, err := input.Datastore.Addresses().Get(datastore.NewAddressRefKey(
+					bcOut.SolChain.ChainSelector,
+					ks_solana.ForwarderContract,
+					semver.MustParse("1.0.0"),
+					"test-forwarder",
+				))
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get test-forwarder address")
+				}
+				forwarderState, err := input.Datastore.Addresses().Get(datastore.NewAddressRefKey(
+					bcOut.SolChain.ChainSelector,
+					ks_solana.ForwarderState,
+					semver.MustParse("1.0.0"),
+					"test-forwarder",
+				))
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get test-forwarder state address")
+				}
+
 				workerSolanaInputs = append(workerSolanaInputs, &config.WorkerSolanaInput{
-					Name:    fmt.Sprintf("node-%d", chainSelector),
-					ChainID: chainID.String(),
-					NodeURL: bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
-					// TODO PLEX-1622 add the rest solana inputs (forwarder, forwarder state from datastore) once changesets are integrated
+					Name:             fmt.Sprintf("node-%d", chainSelector),
+					ChainID:          chainID.String(),
+					NodeURL:          bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
+					ForwarderAddress: forwarder.Address,
+					ForwarderState:   forwarderState.Address,
 				})
 			}
 

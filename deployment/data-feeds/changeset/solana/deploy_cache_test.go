@@ -49,7 +49,7 @@ func TestDeployCache(t *testing.T) {
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
 				BuildConfig: &helpers.BuildSolanaConfig{
-					GitCommitSha:   "17e08b14727dd36659c3929018a361210e07c0d7",
+					GitCommitSha:   "c912ada0e4efb730bd7ca47d06208aa9609ee26f",
 					DestinationDir: getProgramsPath(),
 					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
 				},
@@ -122,8 +122,11 @@ func TestConfigureCache(t *testing.T) {
 	}
 
 	// For AllowedSender (slice of solana.PublicKey)
-	allowedSender := []solana.PublicKey{
-		solana.MustPublicKeyFromBase58("11111111111111111111111111111112"), // example public key
+	allowedSender := []AllowedSender{
+		{
+			ProgramID: solana.MustPublicKeyFromBase58("11111111111111111111111111111112"), // example public key
+			State:     solana.MustPublicKeyFromBase58("11111111111111111111111111111113"), // example public key
+		},
 	}
 
 	// For AllowedWorkflowOwner (slice of [20]uint8 arrays)
@@ -170,7 +173,7 @@ func TestConfigureCache(t *testing.T) {
 				ChainSel:             solSel,
 				Qualifier:            testQualifier,
 				Version:              "1.0.0",
-				AllowedSender:        allowedSender,
+				AllowedSenders:       allowedSender,
 				AllowedWorkflowOwner: allowedWorkflowOwner,
 				AllowedWorkflowName:  allowedWorkflowName,
 				FeedAdmin:            chain.DeployerKey.PublicKey(),
@@ -261,7 +264,7 @@ func TestConfigureCache(t *testing.T) {
 				ChainSel:             solSel,
 				Qualifier:            testQualifier,
 				Version:              "1.0.0",
-				AllowedSender:        allowedSender,
+				AllowedSenders:       allowedSender,
 				AllowedWorkflowOwner: allowedWorkflowOwner,
 				AllowedWorkflowName:  allowedWorkflowName,
 				FeedAdmin:            chain.DeployerKey.PublicKey(),

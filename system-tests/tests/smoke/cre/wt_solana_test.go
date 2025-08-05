@@ -2,8 +2,8 @@ package cre
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
+	"math/big"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -37,6 +38,7 @@ import (
 	cremock "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/mock"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
+	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
 	"github.com/stretchr/testify/require"
 )
@@ -116,14 +118,40 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	fmt.Println("forwarder address", setupOut.ForwarderAddress, "forwarder state", setupOut.ForwarderState)
 	fmt.Println("cache address", setupOut.CacheAddress, "cache state", setupOut.CacheState)
 
-	err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{
-		ID:              setupOut.DeriveRemaining,
-		CapabilityType:  4,
-		Config:          []byte{},
-		Inputs:          []byte{},
-		RequestMetadata: &pb.Metadata{},
+	//err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{})
+	val, err := values.WrapMap(struct {
+		State    string // State pubkey of df cache
+		Receiver string // df cache programID
+		FeedIDs  []string
+	}{
+		setupOut.CacheState,
+		setupOut.CacheAddress,
+		[]string{in.WorkflowConfigs[0].FeedID},
 	})
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to wrap value")
+	cfg, err := mockcapability.MapToBytes(val)
+	require.NoError(t, err, "failed map to bytes config")
+	ret, err := mocksClient.Nodes[0].API.Execute(context.TODO(), &pb.ExecutableRequest{
+		ID:             setupOut.DeriveRemaining,
+		CapabilityType: 4,
+		Config:         cfg,
+		Inputs:         []byte{},
+		RequestMetadata: &pb.Metadata{
+			WorkflowOwner: setupOut.WFOwner,
+			WorkflowName:  setupOut.WFName,
+		},
+	})
+
+	require.NoError(t, err, "execute capability failed")
+	val, err = mockcapability.BytesToMap(ret.Value)
+	require.NoError(t, err, "unmarshal response failed")
+
+	var res solana.AccountMetaSlice
+
+	err = val.Underlying["remaining_accounts"].UnwrapTo(&res)
+	require.NoError(t, err, "unwrap response failed")
+
+	fmt.Println(res)
 }
 
 type setupWTOutput struct {
@@ -136,6 +164,10 @@ type setupWTOutput struct {
 
 	CacheAddress string
 	CacheState   string
+
+	WFName  string
+	WFOwner string
+	FeedID  string
 }
 
 func setupWTTestEnvironment(
@@ -179,7 +211,7 @@ func setupWTTestEnvironment(
 		},
 		ConfigFactoryFunctions: []cre.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
-			solwriterconfig.GetGenerateConfig(solwriterconfig.Config{}),
+			solwriterconfig.GetGenerateConfig(),
 		},
 	}
 
@@ -203,6 +235,8 @@ func setupWTTestEnvironment(
 	wfName := [][10]uint8{{1, 2, 3}}
 	wfDescription := [][32]uint8{{2, 3, 4}}
 	wfOwner := [20]uint8{1}
+	out.WFName = string(wfName[0][:])
+	out.WFOwner = string(wfOwner[:])
 	for _, bo := range universalSetupOutput.BlockchainOutput {
 		if bo.ReadOnly {
 			continue
@@ -253,12 +287,12 @@ func setupWTTestEnvironment(
 			ds.Merge(dfDeployOut.DataStore.Seal())
 			ds.Merge(universalSetupOutput.CldEnvironment.DataStore)
 			universalSetupOutput.CldEnvironment.DataStore = ds.Seal()
-			//[]uint8([]byte(in.WorkflowConfigs[0].FeedID))
-			feedIDin, err := hex.DecodeString(in.WorkflowConfigs[0].FeedID)
+			feedIDin, ok := new(big.Int).SetString(in.WorkflowConfigs[0].FeedID, 0)
+			require.True(t, ok, "invalid feedID")
+			require.LessOrEqual(t, feedIDin.BitLen(), 128, "invalid feedID len")
 			var feedID [16]uint8
-			copy(feedID[:], feedIDin)
+			copy(feedID[:], feedIDin.Bytes())
 			require.NoError(t, err, "failed to decode FeedID")
-
 			_, err = commonchangeset.RunChangeset(df_cs.InitCacheDecimalReport{}, *universalSetupOutput.CldEnvironment,
 				&df_cs.InitCacheDecimalReportRequest{
 					ChainSel:  bo.SolChain.ChainSelector,
@@ -272,10 +306,15 @@ func setupWTTestEnvironment(
 
 			_, err = commonchangeset.RunChangeset(df_cs.ConfigureCacheDecimalReport{}, *universalSetupOutput.CldEnvironment,
 				&df_cs.ConfigureCacheDecimalReportRequest{
-					ChainSel:             bo.SolChain.ChainSelector,
-					Qualifier:            dfQualifier,
-					Version:              "1.0.0",
-					AllowedSender:        []solana.PublicKey{solana.MustPublicKeyFromBase58(forwarder.Address)},
+					ChainSel:  bo.SolChain.ChainSelector,
+					Qualifier: dfQualifier,
+					Version:   "1.0.0",
+					AllowedSenders: []df_cs.AllowedSender{
+						{
+							ProgramID: solana.MustPublicKeyFromBase58(forwarder.Address),
+							State:     solana.MustPublicKeyFromBase58(forwarderState.Address),
+						},
+					},
 					FeedAdmin:            bo.SolChain.PrivateKey.PublicKey(),
 					DataIDs:              [][16]uint8{feedID},
 					AllowedWorkflowOwner: [][20]uint8{wfOwner},
