@@ -37,7 +37,7 @@ func TestTransmitter(t *testing.T) {
 	err := store.Add(&Request{
 		Payload:      req1,
 		ResponseChan: ch,
-		id:           keyFor(id1),
+		IDVal:        keyFor(id1),
 	})
 	require.NoError(t, err)
 
