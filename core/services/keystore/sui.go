@@ -52,6 +52,7 @@ func (ks *sui) GetAll() ([]suikey.Key, error) {
 	for _, key := range ks.keyRing.Sui {
 		accounts = append(accounts, key)
 	}
+	ks.logger.Info("SUIKEY GETALL: ", accounts)
 	return accounts, nil
 }
 

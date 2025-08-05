@@ -433,6 +433,12 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 		aptosKey := aptoskey.KeyFor(internal.NewRaw(rawAptosKey))
 		keyRing.Aptos[aptosKey.ID()] = aptosKey
 	}
+
+	for _, rawSuiKey := range rawKeys.Sui {
+		suiKey := suikey.KeyFor(internal.NewRaw(rawSuiKey))
+		keyRing.Sui[suiKey.ID()] = suiKey
+	}
+
 	for _, rawTronKey := range rawKeys.Tron {
 		tronKey := tronkey.KeyFor(internal.NewRaw(rawTronKey))
 		keyRing.Tron[tronKey.ID()] = tronKey
