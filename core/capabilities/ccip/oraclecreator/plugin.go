@@ -603,7 +603,9 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 
 		i.lggr.Infow("INITIALIZING CW FOR SUI(1): ", "chainID", chainID)
 		i.lggr.Infow("INITIALIZING CW FOR SUI(2): ", "relayer", relayer)
-		i.lggr.Infow("INITIALIZING CW FOR SUI(3): ", "transmitters", i.transmitters)
+		for rid, txs := range i.transmitters {
+			i.lggr.Infow("CW Transmitter Entry", "relayID", rid.String(), "transmitters", txs)
+		}
 
 		cw, err1 := crcw.GetChainWriter(ctx, ccipcommon.ChainWriterProviderOpts{
 			ChainID:                        chainID,
