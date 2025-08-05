@@ -29,6 +29,7 @@ import (
 	"github.com/urfave/cli"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -38,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 
 	clhttp "github.com/smartcontractkit/chainlink-common/pkg/http"
+
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
@@ -125,6 +127,8 @@ func initGlobals(cfgProm config.Prometheus, cfgTracing config.Tracing, cfgTeleme
 			}
 			var beholderClient *beholder.Client
 			beholderClient, err = beholder.NewClient(clientCfg)
+			beholderClient.TracerProvider = noop.NewTracerProvider()
+
 			if err != nil {
 				return err
 			}
