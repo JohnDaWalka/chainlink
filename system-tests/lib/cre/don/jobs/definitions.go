@@ -166,9 +166,7 @@ const (
 	EmptyStdCapConfig = "\"\""
 )
 
-func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.ProposeJobRequest {
-	uuid := uuid.NewString()
-
+func WorkerStandardCapability(nodeID, name, command, config, oracleFactoryConfig string) *jobv1.ProposeJobRequest {
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
@@ -179,11 +177,13 @@ func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.Propo
 	forwardingAllowed = false
 	command = "%s"
 	config = %s
+	%s
 `,
-			uuid,
+			uuid.NewString(),
 			name,
 			command,
-			config),
+			config,
+			oracleFactoryConfig),
 	}
 }
 
