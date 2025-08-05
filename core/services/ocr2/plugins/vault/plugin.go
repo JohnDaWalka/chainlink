@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -316,7 +316,7 @@ func (r *ReportingPlugin) observeGetSecretsRequest(ctx context.Context, reader R
 
 	shares := []*vault.EncryptedShares{}
 	for _, pk := range secretRequest.EncryptionKeys {
-		publicKey, err := base64.StdEncoding.DecodeString(pk)
+		publicKey, err := hex.DecodeString(pk)
 		if err != nil {
 			return nil, newUserError("failed to convert public key to bytes: " + err.Error())
 		}
@@ -334,7 +334,7 @@ func (r *ReportingPlugin) observeGetSecretsRequest(ctx context.Context, reader R
 		shares = append(shares, &vault.EncryptedShares{
 			EncryptionKey: pk,
 			Shares: []string{
-				base64.StdEncoding.EncodeToString(encrypted),
+				hex.EncodeToString(encrypted),
 			},
 		})
 	}
@@ -343,7 +343,7 @@ func (r *ReportingPlugin) observeGetSecretsRequest(ctx context.Context, reader R
 		Id: id,
 		Result: &vault.SecretResponse_Data{
 			Data: &vault.SecretData{
-				EncryptedValue:               base64.StdEncoding.EncodeToString(secret.EncryptedSecret),
+				EncryptedValue:               hex.EncodeToString(secret.EncryptedSecret),
 				EncryptedDecryptionKeyShares: shares,
 			},
 		},
@@ -361,9 +361,9 @@ func (r *ReportingPlugin) observeCreateSecretRequest(ctx context.Context, reader
 	}
 
 	rawCiphertext := secretRequest.EncryptedValue
-	rawCiphertextB, err := base64.StdEncoding.DecodeString(rawCiphertext)
+	rawCiphertextB, err := hex.DecodeString(rawCiphertext)
 	if err != nil {
-		return id, newUserError("invalid base64 encoding for ciphertext: " + err.Error())
+		return id, newUserError("invalid hex encoding for ciphertext: " + err.Error())
 	}
 
 	if len(rawCiphertextB) > r.cfg.MaxCiphertextLenBytes {
@@ -705,9 +705,9 @@ func (r *ReportingPlugin) stateTransitionCreateSecretsRequest(ctx context.Contex
 		return resp, nil
 	}
 
-	encryptedSecret, err := base64.StdEncoding.DecodeString(req.EncryptedValue)
+	encryptedSecret, err := hex.DecodeString(req.EncryptedValue)
 	if err != nil {
-		return nil, newUserError("could not decode secret value: invalid base64")
+		return nil, newUserError("could not decode secret value: invalid hex" + err.Error())
 	}
 
 	secret, err := store.GetSecret(req.Id)
