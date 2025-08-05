@@ -45,8 +45,10 @@ require (
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250718211650-37ca415e72a0
 	github.com/smartcontractkit/chainlink/system-tests/lib v0.0.0-20250718211650-37ca415e72a0
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
+	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20250624150019-e49f7e125e6b
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/crypto v0.40.0
 	golang.org/x/sync v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -492,7 +494,6 @@ require (
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/mcms v0.21.0 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de // indirect
-	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect
 	github.com/sony/gobreaker/v2 v2.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
@@ -588,7 +589,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org/netipx v0.0.0-20230125063823-8449b0a6169f // indirect
 	golang.org/x/arch v0.11.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
 	golang.org/x/lint v0.0.0-20241112194109-818c5a804067 // indirect
 	golang.org/x/mod v0.26.0 // indirect

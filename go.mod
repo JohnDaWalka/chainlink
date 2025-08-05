@@ -83,7 +83,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/shopspring/decimal v1.4.0
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3
-	github.com/smartcontractkit/chain-selectors v1.0.65
+	github.com/smartcontractkit/chain-selectors v1.0.66
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.0.0-20250802014724-ae79263d0a03
@@ -109,7 +109,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.1
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de
-	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de
+	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20250624150019-e49f7e125e6b
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
