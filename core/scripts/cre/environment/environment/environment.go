@@ -15,8 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/evm"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -133,10 +131,11 @@ func (c Config) Validate() error {
 }
 
 type ExtraCapabilitiesConfig struct {
-	CronCapabilityBinaryPath  string `toml:"cron_capability_binary_path"`
-	EVMCapabilityBinaryPath   string `toml:"evm_capability_binary_path"`
-	LogEventTriggerBinaryPath string `toml:"log_event_trigger_binary_path"`
-	ReadContractBinaryPath    string `toml:"read_contract_capability_binary_path"`
+	CronCapabilityBinaryPath      string `toml:"cron_capability_binary_path"`
+	EVMCapabilityBinaryPath       string `toml:"evm_capability_binary_path"`
+	ConsensusCapabilityBinaryPath string `toml:"consensus_capability_binary_path"`
+	LogEventTriggerBinaryPath     string `toml:"log_event_trigger_binary_path"`
+	ReadContractBinaryPath        string `toml:"read_contract_capability_binary_path"`
 }
 
 // DX tracking
@@ -492,6 +491,11 @@ func StartCLIEnvironment(
 			capabilitiesBinaryPaths[cre.EVMCapability] = in.ExtraCapabilities.EVMCapabilityBinaryPath
 		}
 
+		if in.ExtraCapabilities.ConsensusCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+			workflowDONCapabilities = append(workflowDONCapabilities, cre.ConsensusCapability)
+			capabilitiesBinaryPaths[cre.ConsensusCapability] = in.ExtraCapabilities.ConsensusCapabilityBinaryPath
+		}
+
 		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
 			workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
 			capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
@@ -645,6 +649,7 @@ func StartCLIEnvironment(
 		webapicap.WebAPITargetCapabilityFactoryFn,
 		computecap.ComputeCapabilityFactoryFn,
 		consensuscap.OCR3CapabilityFactoryFn,
+		consensuscap.ConsensusCapabilityV2FactoryFn,
 		croncap.CronCapabilityFactoryFn,
 		vaultcap.VaultCapabilityFactoryFn,
 		mock.CapabilityFactoryFn,
@@ -665,9 +670,14 @@ func StartCLIEnvironment(
 		cronBinaryName = "cron"
 	}
 
-	evmBinaryName := filepath.Base(in.ExtraCapabilities.EVMCapabilityBinaryPath)
+	/*evmBinaryName := filepath.Base(in.ExtraCapabilities.EVMCapabilityBinaryPath)
 	if withPluginsDockerImageFlag != "" {
 		evmBinaryName = "evm"
+	}*/
+
+	consensusBinaryName := filepath.Base(in.ExtraCapabilities.ConsensusCapabilityBinaryPath)
+	if withPluginsDockerImageFlag != "" {
+		consensusBinaryName = "consensus"
 	}
 
 	logEventTriggerBinaryName := filepath.Base(in.ExtraCapabilities.LogEventTriggerBinaryPath)
@@ -705,9 +715,21 @@ func StartCLIEnvironment(
 		}
 		capabilityFactoryFns = append(capabilityFactoryFns, readcontractcap.ReadContractCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 		capabilityFactoryFns = append(capabilityFactoryFns, logeventtriggercap.LogEventTriggerCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
-		capabilityFactoryFns = append(capabilityFactoryFns, evm.EVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
+		//capabilityFactoryFns = append(capabilityFactoryFns, evm.EVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 
 		config := in.CapabilitiesConfig.EVM[blockchain.ChainID]
+		/*
+			jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn(
+				testLogger,
+				libc.MustSafeUint64(int64(chainIDInt)),
+				"evm",
+				config,
+				capabilitiesAwareNodeSets,
+				*in.Infra,
+				filepath.Join(containerPath, evmBinaryName),
+				"capability_evm",
+			))*/
+
 		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn(
 			testLogger,
 			libc.MustSafeUint64(int64(chainIDInt)),
@@ -715,7 +737,8 @@ func StartCLIEnvironment(
 			config,
 			capabilitiesAwareNodeSets,
 			*in.Infra,
-			filepath.Join(containerPath, evmBinaryName),
+			filepath.Join(containerPath, consensusBinaryName),
+			"capability_consensus",
 		))
 
 		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crelogevent.LogEventTriggerJobSpecFactoryFn(

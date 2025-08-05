@@ -38,6 +38,7 @@ const (
 // Capabilities
 const (
 	OCR3Capability          CapabilityFlag = "ocr3"
+	ConsensusCapability     CapabilityFlag = "consensus" // v2
 	CronCapability          CapabilityFlag = "cron"
 	EVMCapability           CapabilityFlag = "evm"
 	CustomComputeCapability CapabilityFlag = "custom-compute"
@@ -265,6 +266,9 @@ type ConfigureKeystoneInput struct {
 
 	EVMOCR3Config  keystone_changeset.OracleConfig
 	EVMOCR3Address *common.Address
+
+	ConsensusOCR3Config  keystone_changeset.OracleConfig
+	ConsensusOCR3Address *common.Address
 
 	CapabilitiesRegistryAddress *common.Address
 }

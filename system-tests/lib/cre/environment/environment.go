@@ -211,6 +211,7 @@ func SetupTestEnvironment(
 	}
 	vaultOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.VaultCapability)
 	evmOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.EVMCapability)
+	consensusAddrFlag := flags.HasFlag(allNodeFlags, cre.ConsensusCapability)
 
 	deployKeystoneReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
@@ -223,6 +224,7 @@ func SetupTestEnvironment(
 			ForwardersSelectors:   forwardersSelectors,
 			DeployVaultOCR3:       vaultOCR3AddrFlag,
 			DeployEVMOCR3:         evmOCR3AddrFlag,
+			DeployConsensusOCR3:   consensusAddrFlag,
 		},
 	)
 	if err != nil {
@@ -243,8 +245,12 @@ func SetupTestEnvironment(
 	vaultOCR3Addr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String(), "1.0.0", "capability_vault")
 	testLogger.Info().Msgf("Deployed Vault OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, vaultOCR3Addr)
 
-	evmOCR3Addr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String(), "1.0.0", "capability_evm")
-	testLogger.Info().Msgf("Deployed EVM OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, evmOCR3Addr)
+	evmOCR3Addr := "0x0000000000000000000000000000000000000000"
+	//evmOCR3Addr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String(), "1.0.0", "capability_evm")
+	//testLogger.Info().Msgf("Deployed EVM OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, evmOCR3Addr)
+
+	consensusOCR3Addr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String(), "1.0.0", "capability_consensus")
+	testLogger.Info().Msgf("Deployed Consensus V2 OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, consensusOCR3Addr)
 
 	wfRegAddr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String(), "1.0.0", "")
 	testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, wfRegAddr)
@@ -507,6 +513,7 @@ func SetupTestEnvironment(
 	vaultOCR3CommonAddr := common.HexToAddress(vaultOCR3Addr)
 	evmOCR3CommonAddr := common.HexToAddress(evmOCR3Addr)
 	capRegCommonAddr := common.HexToAddress(capRegAddr)
+	consensusOCR3CommonAddr := common.HexToAddress(consensusOCR3Addr)
 	configureKeystoneInput := cre.ConfigureKeystoneInput{
 		ChainSelector:               homeChainOutput.ChainSelector,
 		CldEnv:                      fullCldOutput.Environment,
@@ -515,6 +522,7 @@ func SetupTestEnvironment(
 		OCR3Address:                 &ocr3CommonAddr,
 		VaultOCR3Address:            &vaultOCR3CommonAddr,
 		EVMOCR3Address:              &evmOCR3CommonAddr,
+		ConsensusOCR3Address:        &consensusOCR3CommonAddr,
 	}
 
 	if input.OCR3Config != nil {
@@ -538,6 +546,7 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(evmOcr3ConfigErr, "failed to generate default OCR3 config for EVM")
 	}
 	configureKeystoneInput.EVMOCR3Config = *evmOcr3Config
+	configureKeystoneInput.ConsensusOCR3Config = *evmOcr3Config // TODO name?
 
 	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)
 	if keystoneErr != nil {

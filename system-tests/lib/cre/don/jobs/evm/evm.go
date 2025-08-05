@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 
@@ -30,9 +29,10 @@ import (
 var EVMJobSpecFactoryFn = func(logger zerolog.Logger, chainID uint64, networkFamily string, config map[string]any,
 	capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet,
 	infraInput infra.Input,
-	evmBinaryPath string) cre.JobSpecFactoryFn {
+	evmBinaryPath string,
+	contractName string) cre.JobSpecFactoryFn {
 	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
-		return GenerateJobSpecs(logger, input.DonTopology, input.CldEnvironment.DataStore, chainID, networkFamily, config, capabilitiesAwareNodeSets, infraInput, evmBinaryPath)
+		return GenerateJobSpecs(logger, input.DonTopology, input.CldEnvironment.DataStore, chainID, networkFamily, config, capabilitiesAwareNodeSets, infraInput, evmBinaryPath, contractName)
 	}
 }
 
@@ -46,7 +46,8 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 	networkFamily string, config map[string]any,
 	nodeSetInput []*cre.CapabilitiesAwareNodeSet,
 	infraInput infra.Input,
-	evmBinaryPath string) (cre.DonsToJobSpecs, error) {
+	evmBinaryPath string,
+	contractName string) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
@@ -56,7 +57,7 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 		donTopology.HomeChainSelector,
 		datastore.ContractType(keystone_changeset.OCR3Capability.String()),
 		semver.MustParse("1.0.0"),
-		"capability_evm",
+		contractName,
 	)
 	evmOCR3CapabilityAddress, err := ds.Addresses().Get(evmOCR3Key)
 	if err != nil {
@@ -64,9 +65,6 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 	}
 
 	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
-		if !flags.HasFlag(donWithMetadata.Flags, cre.EVMCapability) {
-			continue
-		}
 
 		internalHostsBS := getBoostrapWorkflowNames(donWithMetadata, nodeSetInput, donIdx, infraInput)
 		if len(internalHostsBS) == 0 {
@@ -113,7 +111,7 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 		}
 
 		// create job specs for the bootstrap node
-		donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "evm-capability", evmOCR3CapabilityAddress.Address, chainID))
+		donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, contractName, evmOCR3CapabilityAddress.Address, chainID))
 		logger.Debug().Msgf("Deployed EVM OCR3 contract on chain %d at %s", chainID, evmOCR3CapabilityAddress.Address)
 
 		creForwarderKey := datastore.NewAddressRefKey(

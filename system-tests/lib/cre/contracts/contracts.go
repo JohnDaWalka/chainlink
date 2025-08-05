@@ -353,6 +353,27 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 		return errors.Wrap(err, "failed to configure Vault OCR3 contract")
 	}
 
+	if (input.EVMOCR3Address.Cmp(common.Address{}) != 0) {
+		_, err = operations.ExecuteOperation(
+			input.CldEnv.OperationsBundle,
+			ks_contracts_op.ConfigureOCR3Op,
+			ks_contracts_op.ConfigureOCR3OpDeps{
+				Env:      input.CldEnv,
+				Registry: capReg.Contract,
+			},
+			ks_contracts_op.ConfigureOCR3OpInput{
+				ContractAddress:  input.EVMOCR3Address,
+				RegistryChainSel: input.ChainSelector,
+				DONs:             configDONs,
+				Config:           &input.EVMOCR3Config,
+				DryRun:           false,
+			},
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to configure EVM OCR3 contract")
+		}
+	}
+
 	_, err = operations.ExecuteOperation(
 		input.CldEnv.OperationsBundle,
 		ks_contracts_op.ConfigureOCR3Op,
@@ -361,15 +382,15 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 			Registry: capReg.Contract,
 		},
 		ks_contracts_op.ConfigureOCR3OpInput{
-			ContractAddress:  input.EVMOCR3Address,
+			ContractAddress:  input.ConsensusOCR3Address,
 			RegistryChainSel: input.ChainSelector,
 			DONs:             configDONs,
-			Config:           &input.EVMOCR3Config,
+			Config:           &input.ConsensusOCR3Config,
 			DryRun:           false,
 		},
 	)
 	if err != nil {
-		return errors.Wrap(err, "failed to configure EVM OCR3 contract")
+		return errors.Wrap(err, "failed to configure Consensus OCR3 contract")
 	}
 
 	return nil
