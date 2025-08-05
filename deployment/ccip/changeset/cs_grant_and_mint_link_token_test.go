@@ -71,11 +71,10 @@ func TestDeployLinktokenAndTransferOwnershipCS(t *testing.T) {
 	// Verify recipient received the minted tokens
 	balance, err := linkToken.BalanceOf(&bind.CallOpts{}, recipientAddr)
 	require.NoError(t, err)
-	require.True(t, balance.Cmp(expectedMintAmount) >= 0, "Recipient should have received at least the expected minted tokens")
+	require.GreaterOrEqual(t, balance.Cmp(expectedMintAmount), 0, "Recipient should have received at least the expected minted tokens")
 
 	// Verify total supply increased
 	totalSupply, err := linkToken.TotalSupply(&bind.CallOpts{})
 	require.NoError(t, err)
-	require.True(t, totalSupply.Cmp(expectedMintAmount) >= 0, "Total supply should be at least the minted amount")
-
+	require.GreaterOrEqual(t, totalSupply.Cmp(expectedMintAmount), 0, "Total supply should be at least the minted amount")
 }

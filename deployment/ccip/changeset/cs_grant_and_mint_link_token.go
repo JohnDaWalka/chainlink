@@ -1,6 +1,7 @@
 package changeset
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -30,7 +31,7 @@ func (cfg GrantMintRoleAndMintConfig) Validate(e cldf.Environment) error {
 	}
 
 	if cfg.ToAddress == (common.Address{}) {
-		return fmt.Errorf("toAddress cannot be empty")
+		return errors.New("toAddress cannot be empty")
 	}
 
 	return nil
@@ -48,7 +49,7 @@ func ValidatePreConditions(e cldf.Environment, cfg GrantMintRoleAndMintConfig) e
 	chainName := e.BlockChains.EVMChains()[cfg.Selector].Name()
 	// The mintOnLinkToken should never happen on Mainnet
 	if e.Name == "mainnet" || strings.Contains(chainName, "mainnet") {
-		return fmt.Errorf("minting on LINK token is not allowed on Mainnet")
+		return errors.New("minting on LINK token is not allowed on Mainnet")
 	}
 
 	chainState, ok := state.EVMChainState(cfg.Selector)
