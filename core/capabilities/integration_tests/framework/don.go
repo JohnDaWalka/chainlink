@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
@@ -56,24 +57,48 @@ type DonContext struct {
 	computeFetcherFactory compute.FetcherFactory
 }
 
-func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
-	ethBlockchain := NewEthBlockchain(t, 1000, 1*time.Second)
+type DonContextOpts struct {
+	EthBlockchain          *EthBlockchain
+	CreateWorkflowRegistry bool
+	SyncerFetcher          artifacts.FetcherFunc
+	ComputeFetcherFactory  compute.FetcherFactory
+}
+
+func CreateDonContextWithOpts(ctx context.Context, t *testing.T, opts DonContextOpts) DonContext {
+	if opts.EthBlockchain == nil {
+		opts.EthBlockchain = NewEthBlockchain(t, 1000, 1*time.Second)
+		servicetest.Run(t, opts.EthBlockchain)
+	}
+
 	rageP2PNetwork := NewFakeRageP2PNetwork(ctx, t, 1000)
-	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, ethBlockchain)
+	capabilitiesRegistry := NewCapabilitiesRegistry(ctx, t, opts.EthBlockchain)
 
 	servicetest.Run(t, rageP2PNetwork)
-	servicetest.Run(t, ethBlockchain)
-	return DonContext{EthBlockchain: ethBlockchain, p2pNetwork: rageP2PNetwork, capabilityRegistry: capabilitiesRegistry}
+	donContext := DonContext{
+		EthBlockchain:         opts.EthBlockchain,
+		p2pNetwork:            rageP2PNetwork,
+		capabilityRegistry:    capabilitiesRegistry,
+		syncerFetcherFunc:     opts.SyncerFetcher,
+		computeFetcherFactory: opts.ComputeFetcherFactory,
+	}
+	if opts.CreateWorkflowRegistry {
+		donContext.workflowRegistry = NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
+	}
+
+	return donContext
+}
+
+func CreateDonContext(ctx context.Context, t *testing.T) DonContext {
+	return CreateDonContextWithOpts(ctx, t, DonContextOpts{})
 }
 
 func CreateDonContextWithWorkflowRegistry(ctx context.Context, t *testing.T, syncerFetcherFunc artifacts.FetcherFunc,
 	computeFetcherFactory compute.FetcherFactory) DonContext {
-	donContext := CreateDonContext(ctx, t)
-	workflowRegistry := NewWorkflowRegistry(ctx, t, donContext.EthBlockchain)
-	donContext.workflowRegistry = workflowRegistry
-	donContext.syncerFetcherFunc = syncerFetcherFunc
-	donContext.computeFetcherFactory = computeFetcherFactory
-	return donContext
+	return CreateDonContextWithOpts(ctx, t, DonContextOpts{
+		CreateWorkflowRegistry: true,
+		SyncerFetcher:          syncerFetcherFunc,
+		ComputeFetcherFactory:  computeFetcherFactory,
+	})
 }
 
 func (c DonContext) WaitForCapabilitiesToBeExposed(t *testing.T, dons ...*DON) {
