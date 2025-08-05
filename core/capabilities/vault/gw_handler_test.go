@@ -148,17 +148,17 @@ func TestGatewayHandler_Lifecycle(t *testing.T) {
 
 	t.Run("start", func(t *testing.T) {
 		err := handler.Start(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("close", func(t *testing.T) {
 		err := handler.Close()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("id", func(t *testing.T) {
 		id, err := handler.ID(ctx)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, vaultCap.HandlerName, id)
 	})
 }
