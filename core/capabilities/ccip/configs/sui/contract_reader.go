@@ -2,7 +2,6 @@ package suiconfig
 
 import (
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -26,11 +25,11 @@ func PublicKeyToAddress(pubKeyHex string) (string, error) {
 }
 
 func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
-	fromAddress, err := PublicKeyToAddress(pubKeyStr)
-	if err != nil {
-		return map[string]any{}, fmt.Errorf("unable to derive Sui address from public key %s: %w", pubKeyStr, err)
-	}
-	fromAddress = "0x" + fromAddress
+	// fromAddress, err := PublicKeyToAddress(pubKeyStr)
+	// if err != nil {
+	// 	return map[string]any{}, fmt.Errorf("unable to derive Sui address from public key %s: %w", pubKeyStr, err)
+	// }
+	fromAddress := "0x" + pubKeyStr
 
 	offRampStatePointer := "_::offramp::OffRampStatePointer::off_ramp_state_id"
 	onRampStatePointer := "_::onramp::OnRampStatePointer::on_ramp_state_id"
