@@ -1,4 +1,5 @@
 //nolint
+//nolint:nolintlint
 package dummydkg
 
 import (

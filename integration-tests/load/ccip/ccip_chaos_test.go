@@ -35,7 +35,7 @@ func a(ns, text string, dashboardUIDs []string, from, to *time.Time) framework.A
 	return a
 }
 
-func prepareChaos(t *testing.T) (*ccip.Config, *havoc.NamespaceScopedChaosRunner, *framework.Client) {
+func prepareChaos(t *testing.T) (*ccip.Config, *havoc.NamespaceScopedChaosRunner, *framework.GrafanaClient) {
 	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.DebugLevel)
 	c, err := havoc.NewChaosMeshClient()
 	if err != nil {

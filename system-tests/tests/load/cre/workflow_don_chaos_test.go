@@ -35,7 +35,7 @@ func a(ns, text string, dashboardUIDs []string, from, to *time.Time) framework.A
 }
 
 // prepareChaos creates a namespace scoped chaos runner and Grafana client
-func prepareChaos(t *testing.T) (*havoc.NamespaceScopedChaosRunner, *framework.Client, error) {
+func prepareChaos(t *testing.T) (*havoc.NamespaceScopedChaosRunner, *framework.GrafanaClient, error) {
 	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.DebugLevel)
 	c, err := havoc.NewChaosMeshClient()
 	if err != nil {

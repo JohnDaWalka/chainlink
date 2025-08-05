@@ -1,4 +1,5 @@
 //nolint
+//nolint:nolintlint
 package dkg
 
 type ParticipantSecretKey []byte

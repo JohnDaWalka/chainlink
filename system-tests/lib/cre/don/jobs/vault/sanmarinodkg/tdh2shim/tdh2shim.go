@@ -1,4 +1,5 @@
 //nolint
+//nolint:nolintlint
 package tdh2shim
 
 import (

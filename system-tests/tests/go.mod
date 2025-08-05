@@ -15,10 +15,6 @@ replace github.com/smartcontractkit/chainlink/system-tests/lib => ../lib
 
 replace github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based => ../../core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based
 
-replace github.com/smartcontractkit/chainlink-testing-framework/framework => github.com/cedric-cordenier/chainlink-testing-framework/framework v0.0.0-20250805121446-b1daa8dd3ebf
-
-replace github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake => github.com/cedric-cordenier/chainlink-testing-framework/framework/components/fake v0.0.0-20250805121446-b1daa8dd3ebf
-
 require (
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/gin-gonic/gin v1.10.1
@@ -34,8 +30,8 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.17.2
 	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250801102619-bf75f8afcd90
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.9
-	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.9.9
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.10
+	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
