@@ -81,6 +81,7 @@ func TestStaging_CCIP_Load(t *testing.T) {
 		wg2.Wait()
 		srcChains := laneConfig.GetSourceChainsForDestination(cs)
 		gunMap[cs], err = NewDestinationGun(
+			t,
 			env.Logger,
 			cs,
 			*env,

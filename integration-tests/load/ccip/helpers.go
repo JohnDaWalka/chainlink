@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/nonce_manager"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -47,7 +48,7 @@ const (
 
 var (
 	// TMP for testnet
-	fundingAmount = deployment.UBigInt(500000000000000000) // 0.5 ETH
+	fundingAmount = deployment.UBigInt(700000000000000000) // 0.5 ETH
 	// fundingAmount = new(big.Int).Mul(deployment.UBigInt(1), deployment.UBigInt(1e18)) // 100 eth
 )
 
@@ -518,8 +519,13 @@ func fundAdditionalKeys(lggr logger.Logger, e cldf.Environment, destChains []uin
 	g := new(errgroup.Group)
 	for sel, addresses := range addressMap {
 		sel, addresses := sel, addresses
+		// Fund more on AVAX
+		funding := fundingAmount
+		if sel == chainselectors.AVALANCHE_TESTNET_FUJI.Selector {
+			funding = deployment.UBigInt(10000000000000000000)
+		}
 		g.Go(func() error {
-			return crib.SendFundsToAccounts(e.GetContext(), lggr, e.BlockChains.EVMChains()[sel], addresses, fundingAmount, sel)
+			return crib.SendFundsToAccounts(e.GetContext(), lggr, e.BlockChains.EVMChains()[sel], addresses, funding, sel)
 		})
 	}
 
@@ -632,4 +638,134 @@ func prepareAccountToSendLink(
 	tx, err = srcLink.Approve(srcAccount, state.Chains[src].Router.Address(), big.NewInt(math.MaxInt64))
 	_, err = cldf.ConfirmIfNoError(e.BlockChains.EVMChains()[src], tx, err)
 	return err
+}
+
+func approveBnmForLoadTestAccount(
+	lggr logger.Logger,
+	state stateview.CCIPOnChainState,
+	e cldf.Environment,
+	src uint64,
+	srcAccount *bind.TransactOpts,
+) error {
+	lggr.Infow("Approving BnM token for load test account", "src", src, "account", srcAccount.From.Hex())
+
+	srcChainState, exists := state.Chains[src]
+	if !exists {
+		return fmt.Errorf("no state available for source chain %d", src)
+	}
+	var bnmTokenAddr common.Address
+	for _, versionMap := range srcChainState.LockReleaseTokenPools {
+		for _, pool := range versionMap {
+			tokenAddr, err := pool.GetToken(&bind.CallOpts{Context: context.Background()})
+			if err != nil {
+				return fmt.Errorf("failed to get token from LockReleaseTokenPool: %w", err)
+			}
+			bnmTokenAddr = tokenAddr
+			break
+		}
+		if bnmTokenAddr != (common.Address{}) {
+			break
+		}
+	}
+	if bnmTokenAddr == (common.Address{}) {
+		return fmt.Errorf("no BnM token found in LockReleaseTokenPools for chain %d", src)
+	}
+
+	bnmToken, err := burn_mint_erc677.NewBurnMintERC677(bnmTokenAddr, e.BlockChains.EVMChains()[src].Client)
+	if err != nil {
+		return fmt.Errorf("failed to create BnM token contract: %w", err)
+	}
+
+	lggr.Infow("Approving router for BnM tokens")
+	approvalAmount := new(big.Int).Mul(big.NewInt(1_000_000), big.NewInt(1e18)) // A sufficiently large amount
+	tx, err := bnmToken.Approve(srcAccount, srcChainState.Router.Address(), approvalAmount)
+	_, err = cldf.ConfirmIfNoError(e.BlockChains.EVMChains()[src], tx, err)
+	if err != nil {
+		return fmt.Errorf("failed to approve router for BnM tokens: %w", err)
+	}
+
+	lggr.Infow("Successfully approved router for BnM transfers",
+		"account", srcAccount.From.Hex(),
+		"approvedAmount", approvalAmount,
+		"router", srcChainState.Router.Address().Hex())
+
+	return nil
+}
+
+func fundLoadAccountsWithBnM(
+	lggr logger.Logger,
+	state stateview.CCIPOnChainState,
+	e cldf.Environment,
+	src uint64,
+	loadAccounts []*bind.TransactOpts,
+) error {
+	srcDeployer := e.BlockChains.EVMChains()[src].DeployerKey
+	lggr.Infow("Funding load test accounts with BnM tokens", "src", src, "numAccounts", len(loadAccounts))
+
+	// Find BnM token from LockReleaseTokenPool (same logic as in destination_gun)
+	srcChainState, exists := state.Chains[src]
+	if !exists {
+		return fmt.Errorf("no state available for source chain %d", src)
+	}
+
+	var bnmTokenAddr common.Address
+	for _, versionMap := range srcChainState.LockReleaseTokenPools {
+		for _, pool := range versionMap {
+			tokenAddr, err := pool.GetToken(&bind.CallOpts{Context: context.Background()})
+			if err != nil {
+				return fmt.Errorf("failed to get token from LockReleaseTokenPool: %w", err)
+			}
+			bnmTokenAddr = tokenAddr
+			break
+		}
+		if bnmTokenAddr != (common.Address{}) {
+			break
+		}
+	}
+
+	if bnmTokenAddr == (common.Address{}) {
+		return fmt.Errorf("no LockReleaseTokenPool found for chain %d", src)
+	}
+
+	// Create BurnMintERC677 contract instance
+	bnmToken, err := burn_mint_erc677.NewBurnMintERC677(bnmTokenAddr, e.BlockChains.EVMChains()[src].Client)
+	if err != nil {
+		return fmt.Errorf("failed to create BnM token contract: %w", err)
+	}
+
+	transferAmount := big.NewInt(1e12)
+
+	lggr.Infow("Starting BnM token transfers",
+		"tokenAddress", bnmTokenAddr.Hex(),
+		"transferAmount", transferAmount,
+		"fromAccount", srcDeployer.From.Hex())
+
+	for i, loadAccount := range loadAccounts {
+		lggr.Infow("Transferring BnM tokens to load account",
+			"accountIndex", i,
+			"recipient", loadAccount.From.Hex(),
+			"amount", transferAmount)
+
+		tx, err := bnmToken.Transfer(srcDeployer, loadAccount.From, transferAmount)
+		if err != nil {
+			return fmt.Errorf("failed to transfer BnM tokens to account %s: %w", loadAccount.From.Hex(), err)
+		}
+
+		_, err = cldf.ConfirmIfNoError(e.BlockChains.EVMChains()[src], tx, err)
+		if err != nil {
+			return fmt.Errorf("failed to confirm BnM transfer to account %s: %w", loadAccount.From.Hex(), err)
+		}
+
+		lggr.Infow("Successfully transferred BnM tokens",
+			"recipient", loadAccount.From.Hex(),
+			"amount", transferAmount,
+			"txHash", tx.Hash().Hex())
+	}
+
+	lggr.Infow("Successfully funded all load test accounts with BnM tokens",
+		"chain", src,
+		"numAccounts", len(loadAccounts),
+		"totalTransferred", new(big.Int).Mul(transferAmount, big.NewInt(int64(len(loadAccounts)))))
+
+	return nil
 }

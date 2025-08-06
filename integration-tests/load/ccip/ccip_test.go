@@ -177,7 +177,9 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		lggr.Infow("Aptos deployer account created", "account", deployerAccount.Address, "privateKey", pk)
 		require.NoError(t, err)
 		// TMP for testnet
-		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 30_000_000)
+		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 800_000_000)
+		// aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 1_000_000_000)
+
 		require.NoError(t, err)
 	}
 
@@ -361,10 +363,25 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
-
 					if *userOverrides.Testnet {
 						return nil
-
+						err := fundLoadAccountsWithBnM(
+							lggr,
+							state,
+							*env,
+							src,
+							[]*bind.TransactOpts{evmSourceKeys[cs][src]},
+						)
+						if err != nil {
+							return err
+						}
+						return approveBnmForLoadTestAccount(
+							lggr,
+							state,
+							*env,
+							src,
+							evmSourceKeys[cs][src],
+						)
 					} else {
 						return prepareAccountToSendLink(
 							lggr,
@@ -374,6 +391,14 @@ func TestCCIPLoad_RPS(t *testing.T) {
 							evmSourceKeys[cs][src],
 						)
 					}
+				case selectors.FamilyAptos:
+					return nil
+					return fundAptosLoadAccountsWithBnM(
+						lggr,
+						*env,
+						src,
+						[]*aptos.Account{aptosSourceKeys[cs][src]},
+					)
 				default:
 					return nil
 				}
@@ -389,6 +414,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		switch selectorFamily {
 		case selectors.FamilyEVM:
 			gunMap[cs], err = NewDestinationGun(
+				t,
 				env.Logger,
 				cs,
 				*env,
@@ -445,6 +471,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 			receiverAddress := state.AptosChains[cs].ReceiverAddress
 			receiver := receiverAddress[:]
 			gunMap[cs], err = NewDestinationGun(
+				t,
 				env.Logger,
 				cs,
 				*env,
@@ -490,6 +517,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		case selectors.FamilySolana:
 
 			gunMap[cs], err = NewDestinationGun(
+				t,
 				env.Logger,
 				cs,
 				*env,

@@ -17,6 +17,8 @@ import (
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	aptos_ccip_onramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_onramp"
 	module_onramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_onramp/onramp"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 
@@ -57,14 +59,104 @@ func fundAdditionalAptosKeys(
 			)
 
 			memory.FundAptosAccount(t, signer, account.AccountAddress(), fundingAmount, chain.Client)
-			if err != nil {
-				return map[uint64][]aptos.Account{}, err
-			}
-
 			funded[chain.ChainSelector()] = append(funded[chain.ChainSelector()], *account)
 		}
 	}
 	return funded, nil
+}
+
+func fundAptosLoadAccountsWithBnM(
+	lggr logger.Logger,
+	e cldf.Environment,
+	aptosChainSelector uint64,
+	loadAccounts []*aptos.Account,
+) error {
+	lggr.Infow("Funding Aptos load test accounts with BnM tokens",
+		"chain", aptosChainSelector,
+		"numAccounts", len(loadAccounts))
+
+	// Find the actual CCIP-BnM FA metadata address from the address book
+	addresses, err := e.ExistingAddresses.AddressesForChain(aptosChainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get addresses for chain %d: %w", aptosChainSelector, err)
+	}
+
+	var bnmTokenAddr aptos.AccountAddress
+	var found bool
+
+	for addrStr, typeAndVersion := range addresses {
+		if typeAndVersion.Type == cldf.ContractType(shared.CCIPBnMSymbol) {
+			err := bnmTokenAddr.ParseStringRelaxed(addrStr)
+			if err != nil {
+				return fmt.Errorf("failed to parse BnM address %s: %w", addrStr, err)
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("CCIP-BnM FA metadata address not found for chain %d", aptosChainSelector)
+	}
+
+	deployer := e.BlockChains.AptosChains()[aptosChainSelector].DeployerSigner
+	client := e.BlockChains.AptosChains()[aptosChainSelector].Client
+
+	deployerAddr := deployer.AccountAddress()
+	lggr.Infow("Starting BnM token transfers for Aptos accounts",
+		"tokenAddress", bnmTokenAddr.String(),
+		"deployerAddress", deployerAddr.String())
+
+	transferAmount := uint64(1e9)
+
+	aptosClient, ok := client.(*aptos.Client)
+	if !ok {
+		return fmt.Errorf("client is not of type *aptos.Client")
+	}
+
+	for i, loadAccount := range loadAccounts {
+		lggr.Infow("Transferring BnM tokens to Aptos load account",
+			"accountIndex", i,
+			"recipient", loadAccount.Address.String(),
+			"amount", transferAmount)
+
+		payload, err := aptos.FungibleAssetPrimaryStoreTransferPayload(
+			&bnmTokenAddr,       // BnM token metadata address
+			loadAccount.Address, // recipient address
+			transferAmount,      // amount to transfer
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create transfer payload for account %s: %w", loadAccount.Address.String(), err)
+		}
+
+		tx, err := aptosClient.BuildSignAndSubmitTransaction(deployer, aptos.TransactionPayload{
+			Payload: payload,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to build/sign/submit transfer transaction for account %s: %w", loadAccount.Address.String(), err)
+		}
+
+		res, err := aptosClient.WaitForTransaction(tx.Hash)
+		if err != nil {
+			return fmt.Errorf("failed to wait for BnM transfer transaction for account %s: %w", loadAccount.Address.String(), err)
+		}
+
+		if !res.Success {
+			return fmt.Errorf("BnM transfer transaction failed for account %s: %s", loadAccount.Address.String(), res.VmStatus)
+		}
+
+		lggr.Infow("Successfully transferred BnM tokens to Aptos account",
+			"recipient", loadAccount.Address.String(),
+			"amount", transferAmount,
+			"txHash", tx.Hash)
+	}
+
+	lggr.Infow("Successfully funded all Aptos load test accounts with BnM tokens",
+		"chain", aptosChainSelector,
+		"numAccounts", len(loadAccounts),
+		"amountPerAccount", transferAmount)
+
+	return nil
 }
 
 func subscribeAptosTransmitEvents(
@@ -272,13 +364,6 @@ func subscribeAptosCommitEvents(
 			// Process both blessed and unblessed merkle roots
 			allRoots := append(report.BlessedMerkleRoots, report.UnblessedMerkleRoots...)
 			for _, mr := range allRoots {
-				// lggr.Infow("Received aptos commit report ",
-				// 	"sourceChain", mr.SourceChainSelector,
-				// 	"destChain", chainSelector,
-				// 	"minSeqNr", mr.MinSeqNr,
-				// 	"maxSeqNr", mr.MaxSeqNr,
-				// 	"version", eventWithVersion.Version)
-
 				// Push metrics for each sequence number in the range
 				for i := mr.MinSeqNr; i <= mr.MaxSeqNr; i++ {
 					data := messageData{

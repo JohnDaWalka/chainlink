@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
+	"testing"
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
@@ -42,6 +43,7 @@ type SeqNumRange struct {
 }
 
 type DestinationGun struct {
+	t                *testing.T
 	l                logger.Logger
 	env              cldf.Environment
 	state            *stateview.CCIPOnChainState
@@ -57,6 +59,7 @@ type DestinationGun struct {
 }
 
 func NewDestinationGun(
+	t *testing.T,
 	l logger.Logger,
 	chainSelector uint64,
 	env cldf.Environment,
@@ -189,25 +192,36 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 		acc.GasLimit = uint64(gasLimit)
 	}
 
-	// Check if destination is Aptos
-	dstSelFamily, err := selectors.GetSelectorFamily(m.chainSelector)
-	if err != nil {
-		return fmt.Errorf("failed to get destination chain family: %w", err)
-	}
-
 	var fee *big.Int
-	if dstSelFamily == selectors.FamilyAptos {
-		fee = big.NewInt(172725000000000000)
-		m.l.Infow("Using default fee for Aptos destination", "fee", fee)
-	} else {
-		// For EVM destinations, calculate fee normally
+	maxRetries := 3
+	baseDelay := 100 * time.Millisecond
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// log the message
+		m.l.Infow("Getting fee for message", "message", msg)
 		fee, err = r.GetFee(
 			&bind.CallOpts{Context: context.Background()}, m.chainSelector, msg)
-		if err != nil {
-			// Try to extract detailed revert reason
+
+		if err == nil {
+			break
+		}
+
+		if attempt < maxRetries-1 {
+			delay := baseDelay * time.Duration(1<<attempt)
+			m.l.Warnw("fee calculation failed, retrying",
+				"attempt", attempt+1,
+				"maxRetries", maxRetries,
+				"retryDelay", delay,
+				"dstChainSelector", m.chainSelector,
+				"srcChainSelector", src,
+				"err", cldf.MaybeDataErr(err))
+
+			time.Sleep(delay)
+		} else {
 			rpcError, extractErr := evmclient.ExtractRPCError(err)
 			if extractErr == nil && rpcError.Data != nil {
-				m.l.Errorw("fee calculation failed with detailed revert data",
+				m.l.Errorw("fee calculation failed after all retries with detailed revert data",
+					"attempts", maxRetries,
 					"dstChainSelector", m.chainSelector,
 					"srcChainSelector", src,
 					"rpcErrorCode", rpcError.Code,
@@ -215,18 +229,40 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 					"revertData", rpcError.Data,
 					"originalErr", cldf.MaybeDataErr(err))
 			} else {
-				m.l.Errorw("could not get fee",
+				m.l.Errorw("could not get fee after all retries",
+					"attempts", maxRetries,
 					"dstChainSelector", m.chainSelector,
 					"srcChainSelector", src,
 					"fee", fee,
 					"err", cldf.MaybeDataErr(err))
 			}
-			return fmt.Errorf("failed to get fee: %w", err)
 		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to get fee after %d attempts: %w", maxRetries, err)
 	}
 
 	if msg.FeeToken == common.HexToAddress("0x0") {
 		acc.Value = fee
+	}
+
+	dstSelFamily, err := selectors.GetSelectorFamily(m.chainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get destination chain family: %w", err)
+	}
+
+	if dstSelFamily == selectors.FamilyAptos && len(msg.TokenAmounts) > 0 {
+		for _, tokenAmount := range msg.TokenAmounts {
+			err = testhelpers.ApproveToken(m.env, src, tokenAmount.Token, r.Address(), tokenAmount.Amount)
+			if err != nil {
+				return fmt.Errorf("failed to approve token %s for router: %w", tokenAmount.Token.Hex(), err)
+			}
+			m.l.Infow("Approved token for router (Aptos destination)",
+				"token", tokenAmount.Token.Hex(),
+				"amount", tokenAmount.Amount,
+				"router", r.Address().Hex())
+		}
 	}
 
 	msgWithoutData := msg
@@ -240,7 +276,6 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 
 	tx, err := r.CcipSend(acc, m.chainSelector, msg)
 	if err != nil {
-		// Try to extract detailed revert reason for transaction submission failure
 		rpcError, extractErr := evmclient.ExtractRPCError(err)
 		if extractErr == nil && rpcError.Data != nil {
 			m.l.Errorw("transaction submission failed with detailed revert data",
@@ -296,8 +331,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 	if selectedMsgDetails == nil {
 		return router.ClientEVM2AnyMessage{}, 0, errors.New("failed to select message type")
 	}
-
 	m.l.Infow("Selected message type", "msgType", *selectedMsgDetails.MsgType)
+	feeToken := common.HexToAddress("0x0")
 
 	switch dstSelFamily {
 	case selectors.FamilyEVM:
@@ -337,10 +372,14 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			return router.ClientEVM2AnyMessage{}, 0, err
 		}
 	}
+	srcChainState, exists := m.state.Chains[src]
+	if !exists {
+		return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no state available for source chain %d", src)
+	}
 
 	message := router.ClientEVM2AnyMessage{
 		Receiver:  rcv,
-		FeeToken:  common.HexToAddress("0x0"),
+		FeeToken:  feeToken,
 		ExtraArgs: extraArgs,
 	}
 
@@ -359,6 +398,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 		dataLength := *selectedMsgDetails.DataLengthBytes
 		switch dstSelFamily {
 		case selectors.FamilyEVM:
+			dataLength = *selectedMsgDetails.DataLengthBytes
+		case selectors.FamilyAptos:
 			dataLength = *selectedMsgDetails.DataLengthBytes
 		case selectors.FamilySolana:
 			dataLength = *m.testConfig.SolanaDataSize
@@ -385,15 +426,38 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 
 	// Set token amounts if it's a token transfer
 	if selectedMsgDetails.IsTokenTransfer() {
-		srcChainState, exists := m.state.Chains[src]
-		if !exists {
-			return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no state available for source chain %d", src)
+		var token common.Address
+		token, err = srcChainState.LinkTokenAddress()
+		if err != nil {
+			return router.ClientEVM2AnyMessage{}, 0, err
+		}
+
+		for symbol, versionMap := range srcChainState.LockReleaseTokenPools {
+			for _, pool := range versionMap {
+				tokenAddr, err := pool.GetToken(&bind.CallOpts{Context: context.Background()})
+				if err != nil {
+					return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("failed to get token from LockReleaseTokenPool: %w", err)
+				}
+				token = tokenAddr
+				m.l.Infow("Using token from LockReleaseTokenPool for Aptos destination",
+					"tokenSymbol", symbol,
+					"poolAddress", pool.Address().Hex(),
+					"tokenAddress", token.Hex())
+				break
+			}
+			if token != (common.Address{}) {
+				break
+			}
+		}
+
+		if token == (common.Address{}) {
+			return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no LockReleaseTokenPool found for Aptos destination")
 		}
 
 		message.TokenAmounts = []router.ClientEVMTokenAmount{
 			{
-				Token:  srcChainState.LinkToken.Address(),
-				Amount: big.NewInt(1),
+				Token:  token,
+				Amount: big.NewInt(1e8),
 			},
 		}
 
@@ -571,10 +635,11 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 	m.l.Infow("Selected message type for Aptos", "msgType", *selectedMsg.MsgType)
 
 	receiver := common.LeftPadBytes(m.receiver, 32)
+
 	var feeToken aptos.AccountAddress
 	err := feeToken.ParseStringRelaxed(shared.AptosAPTAddress)
 	if err != nil {
-		return testhelpers.AptosSendRequest{}, err
+		return testhelpers.AptosSendRequest{}, fmt.Errorf("could not parse aptos fee token address for source: %d", src)
 	}
 
 	extraArgs := []byte{}
@@ -588,13 +653,40 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 	}
 
 	var tokenAmounts []testhelpers.AptosTokenAmount
-	// if selectedMsg.IsTokenTransfer() {
-	// 	srcState := m.state.AptosChains[src]
-	// 	tokenAmounts = []testhelpers.AptosTokenAmount{{
-	// 		Token:  srcState.LinkTokenAddress,
-	// 		Amount: 1,
-	// 	}}
-	// }
+	if selectedMsg.IsTokenTransfer() {
+		// Use the same method as fundAptosLoadAccountsWithBnM to get BnM token address
+		addresses, err := m.env.ExistingAddresses.AddressesForChain(src)
+		if err != nil {
+			return testhelpers.AptosSendRequest{}, fmt.Errorf("failed to get addresses for chain %d: %w", src, err)
+		}
+
+		var bnmToken aptos.AccountAddress
+		var found bool
+
+		for addrStr, typeAndVersion := range addresses {
+			if typeAndVersion.Type == cldf.ContractType(shared.CCIPBnMSymbol) {
+				err := bnmToken.ParseStringRelaxed(addrStr)
+				if err != nil {
+					return testhelpers.AptosSendRequest{}, fmt.Errorf("failed to parse BnM address %s: %w", addrStr, err)
+				}
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return testhelpers.AptosSendRequest{}, fmt.Errorf("CCIP-BnM token not found in address book for chain %d", src)
+		}
+
+		m.l.Infow("Using CCIP-BnM token for Aptos transfer",
+			"tokenSymbol", shared.CCIPBnMSymbol,
+			"tokenAddress", bnmToken.String())
+
+		tokenAmounts = []testhelpers.AptosTokenAmount{{
+			Token:  bnmToken,
+			Amount: 1e8,
+		}}
+	}
 
 	return testhelpers.AptosSendRequest{
 		Receiver:     receiver,
