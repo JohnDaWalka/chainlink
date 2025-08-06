@@ -1,9 +1,6 @@
 package suiconfig
 
 import (
-	"encoding/hex"
-	"fmt"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	_ "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
 	chainwriter "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
@@ -11,10 +8,10 @@ import (
 )
 
 func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, error) {
-	rawPubKey, err := hex.DecodeString(publicKeyStr)
-	if err != nil {
-		return chainwriter.ChainWriterConfig{}, fmt.Errorf("invalid public key hex %q: %w", publicKeyStr, err)
-	}
+	// rawPubKey, err := hex.DecodeString(publicKeyStr)
+	// if err != nil {
+	// 	return chainwriter.C, fmt.Errorf("invalid public key hex %q: %w", publicKeyStr, err)
+	// }
 
 	isClockMutable := false
 
@@ -25,7 +22,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 				Functions: map[string]*chainwriter.ChainWriterFunction{
 					consts.MethodCommit: {
 						Name:      "commit",
-						PublicKey: rawPubKey,
+						PublicKey: []byte(publicKeyStr),
 						Params: []codec.SuiFunctionParam{
 							{
 								Name:     "object_ref_id",
@@ -62,7 +59,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 					},
 					consts.MethodExecute: {
 						Name:      "execute",
-						PublicKey: rawPubKey,
+						PublicKey: []byte(publicKeyStr),
 						Params: []codec.SuiFunctionParam{
 							{
 								Name:     "ReportContext",
