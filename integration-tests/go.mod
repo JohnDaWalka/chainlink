@@ -54,10 +54,10 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250718185907-0123e1ba03af
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250805180409-111ef75e9257
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250804184440-c0506474fc44
-	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250805010500-5c7c90830911
-	github.com/smartcontractkit/chainlink-deployments-framework v0.18.0
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250805210128-7f8a0f403c3a
+	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250806001251-ce3566411a14
+	github.com/smartcontractkit/chainlink-deployments-framework v0.17.2
 	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250801102619-bf75f8afcd90
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250806170352-c4a90ecfd5fb
@@ -69,7 +69,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.0
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
-	github.com/smartcontractkit/mcms v0.20.2
+	github.com/smartcontractkit/mcms v0.21.1
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	github.com/subosito/gotenv v1.6.0
