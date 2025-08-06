@@ -52,7 +52,6 @@ import (
 )
 
 const (
-	cronCapabilityAssetFile            = "cron"
 	GithubReadTokenEnvVarName          = "GITHUB_READ_TOKEN"
 	E2eJobDistributorImageEnvVarName   = "E2E_JD_IMAGE"
 	E2eJobDistributorVersionEnvVarName = "E2E_JD_VERSION"
@@ -387,12 +386,15 @@ func SetupTestEnvironment(
 
 	createJobsInput := CreateJobsWithJdOpInput{}
 	createJobsDeps := CreateJobsWithJdOpDeps{
-		Logger:                    testLogger,
-		SingleFileLogger:          singleFileLogger,
-		HomeChainBlockchainOutput: homeChainOutput.BlockchainOutput,
-		AddressBook:               allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		JobSpecFactoryFunctions:   input.JobSpecFactoryFunctions,
-		FullCLDEnvOutput:          fullCldOutput,
+		Logger:                        testLogger,
+		SingleFileLogger:              singleFileLogger,
+		HomeChainBlockchainOutput:     homeChainOutput.BlockchainOutput,
+		AddressBook:                   allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		JobSpecFactoryFunctions:       input.JobSpecFactoryFunctions,
+		FullCLDEnvOutput:              fullCldOutput,
+		CapabilitiesAwareNodeSets:     input.CapabilitiesAwareNodeSets,
+		InfraInput:                    &input.InfraInput,
+		AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
 	}
 	_, createJobsErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, CreateJobsWithJdOp, createJobsDeps, createJobsInput)
 	if createJobsErr != nil {

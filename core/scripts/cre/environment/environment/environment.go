@@ -31,7 +31,6 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	computecap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
 	consensuscap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
@@ -112,17 +111,13 @@ const (
 )
 
 type Config struct {
-	Blockchains        []*cre.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
-	NodeSets           []*ns.Input                   `toml:"nodesets" validate:"required"`
-	JD                 *jd.Input                     `toml:"jd" validate:"required"`
-	Infra              *infra.Input                  `toml:"infra" validate:"required"`
-	ExtraCapabilities  ExtraCapabilitiesConfig       `toml:"extra_capabilities"`
-	CapabilitiesConfig CapabilitiesConfig            `toml:"capabilities_configs"`
-	S3ProviderInput    *s3provider.Input             `toml:"s3provider"`
-}
-
-type CapabilitiesConfig struct {
-	EVM map[string]map[string]any `toml:"evm"`
+	Blockchains            []*cre.WrappedBlockchainInput   `toml:"blockchains" validate:"required"`
+	NodeSets               []*ns.Input                     `toml:"nodesets" validate:"required"`
+	JD                     *jd.Input                       `toml:"jd" validate:"required"`
+	Infra                  *infra.Input                    `toml:"infra" validate:"required"`
+	ExtraCapabilities      ExtraCapabilitiesConfig         `toml:"extra_capabilities"`
+	AdditionalCapabilities map[string]cre.CapabilityConfig `toml:"additional_capabilities"` // capability name -> capability config
+	S3ProviderInput        *s3provider.Input               `toml:"s3provider"`
 }
 
 func (c Config) Validate() error {
@@ -468,9 +463,12 @@ func StartCLIEnvironment(
 		return nil, fmt.Errorf("either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag", os.Getenv("CTF_CONFIGS"))
 	}
 
-	if evmCapErr := validateCapabilitiesConfig(in); evmCapErr != nil {
-		return nil, evmCapErr
-	}
+	// if evmCapErr := validateCapabilitiesConfig(in); evmCapErr != nil {
+	// 	return nil, evmCapErr
+	// }
+
+	// TODO:
+	// validate if all capabilities have corresponding flags
 
 	capabilitiesBinaryPaths := map[cre.CapabilityFlag]string{}
 	var capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
@@ -650,34 +648,9 @@ func StartCLIEnvironment(
 		mock.CapabilityFactoryFn,
 	}
 
-	containerPath, pathErr := crecapabilities.DefaultContainerDirectory(in.Infra.Type)
-	if pathErr != nil {
-		return nil, fmt.Errorf("failed to get default container directory: %w", pathErr)
-	}
-
 	homeChainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
 	if chainErr != nil {
 		return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
-	}
-
-	cronBinaryName := filepath.Base(in.ExtraCapabilities.CronCapabilityBinaryPath)
-	if withPluginsDockerImageFlag != "" {
-		cronBinaryName = "cron"
-	}
-
-	evmBinaryName := filepath.Base(in.ExtraCapabilities.EVMCapabilityBinaryPath)
-	if withPluginsDockerImageFlag != "" {
-		evmBinaryName = "evm"
-	}
-
-	logEventTriggerBinaryName := filepath.Base(in.ExtraCapabilities.LogEventTriggerBinaryPath)
-	if withPluginsDockerImageFlag != "" {
-		logEventTriggerBinaryName = "log-event-trigger"
-	}
-
-	readContractBinaryName := filepath.Base(in.ExtraCapabilities.ReadContractBinaryPath)
-	if withPluginsDockerImageFlag != "" {
-		readContractBinaryName = "readcontract"
 	}
 
 	jobSpecFactoryFunctions := []cre.JobSpecFactoryFn{
@@ -685,11 +658,11 @@ func StartCLIEnvironment(
 		webapi.WebAPITriggerJobSpecFactoryFn,
 		webapi.WebAPITargetJobSpecFactoryFn,
 		creconsensus.ConsensusJobSpecFactoryFn(libc.MustSafeUint64(int64(homeChainIDInt))),
-		crecron.CronJobSpecFactoryFn(filepath.Join(containerPath, cronBinaryName)),
+		crecron.CronJobSpecFactoryFn,
 		cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 		crecompute.ComputeJobSpecFactoryFn,
 		crevault.VaultJobSpecFactoryFn(libc.MustSafeUint64(int64(homeChainIDInt))),
-		mock2.MockJobSpecFactoryFn(7777),
+		mock2.MockJobSpecFactoryFn,
 	}
 
 	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, extraJobFactoryFns...)
@@ -707,30 +680,9 @@ func StartCLIEnvironment(
 		capabilityFactoryFns = append(capabilityFactoryFns, logeventtriggercap.LogEventTriggerCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 		capabilityFactoryFns = append(capabilityFactoryFns, evm.EVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 
-		config := in.CapabilitiesConfig.EVM[blockchain.ChainID]
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn(
-			testLogger,
-			libc.MustSafeUint64(int64(chainIDInt)),
-			"evm",
-			config,
-			capabilitiesAwareNodeSets,
-			*in.Infra,
-			filepath.Join(containerPath, evmBinaryName),
-		))
-
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crelogevent.LogEventTriggerJobSpecFactoryFn(
-			chainIDInt,
-			"evm",
-			// path within the container/pod
-			filepath.Join(containerPath, logEventTriggerBinaryName),
-		))
-
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crereadcontract.ReadContractJobSpecFactoryFn(
-			chainIDInt,
-			"evm",
-			// path within the container/pod
-			filepath.Join(containerPath, readContractBinaryName),
-		))
+		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn)
+		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crelogevent.LogEventTriggerJobSpecFactoryFn)
+		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crereadcontract.ReadContractJobSpecFactoryFn)
 	}
 
 	if in.JD.CSAEncryptionKey == "" {
@@ -769,34 +721,35 @@ func StartCLIEnvironment(
 	return universalSetupOutput, nil
 }
 
-func validateCapabilitiesConfig(in *Config) error {
-	// if CapabilitiesConfig has values, EVM capability binary must be present
-	if len(in.CapabilitiesConfig.EVM) > 0 && in.ExtraCapabilities.EVMCapabilityBinaryPath == "" {
-		return errors.New("evm_capability_binary_path must be provided when capabilities_configs is set")
-	}
-	for chainID, config := range in.CapabilitiesConfig.EVM {
-		// check the chain exists in the blockchain list
-		found := false
-		for _, blockchain := range in.Blockchains {
-			if blockchain.ChainID == chainID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return errors.Errorf("capabilities_configs.evm.%q does not match any configured blockchains ChainID", chainID)
-		}
+//TODO refactor this
+// func validateCapabilitiesConfig(in *Config) error {
+// 	// if CapabilitiesConfig has values, EVM capability binary must be present
+// 	if len(in.CapabilitiesConfig.EVM) > 0 && in.ExtraCapabilities.EVMCapabilityBinaryPath == "" {
+// 		return errors.New("evm_capability_binary_path must be provided when capabilities_configs is set")
+// 	}
+// 	for chainID, config := range in.CapabilitiesConfig.EVM {
+// 		// check the chain exists in the blockchain list
+// 		found := false
+// 		for _, blockchain := range in.Blockchains {
+// 			if blockchain.ChainID == chainID {
+// 				found = true
+// 				break
+// 			}
+// 		}
+// 		if !found {
+// 			return errors.Errorf("capabilities_configs.evm.%q does not match any configured blockchains ChainID", chainID)
+// 		}
 
-		// check the configs per chain is a map[string]string
-		for subK, subV := range config {
-			_, okVal := subV.(string)
-			if !okVal {
-				return errors.Errorf("capabilities_configs.evm.%q[%s] must be a map[string]string (got %T)", chainID, subK, subV)
-			}
-		}
-	}
-	return nil
-}
+// 		// check the configs per chain is a map[string]string
+// 		for subK, subV := range config {
+// 			_, okVal := subV.(string)
+// 			if !okVal {
+// 				return errors.Errorf("capabilities_configs.evm.%q[%s] must be a map[string]string (got %T)", chainID, subK, subV)
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }
 
 func isBlockscoutRunning(cmdContext context.Context) bool {
 	dockerClient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())

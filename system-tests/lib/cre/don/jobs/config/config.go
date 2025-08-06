@@ -10,22 +10,11 @@ import (
 
 // BuildFromTOML builds configuration from TOML config, requiring global config section
 // Applies in order: global config (required) -> chain-specific config (optional)
-func BuildFromTOML(config map[string]any, chainID int) (map[string]any, error) {
+func BuildFromTOML(globalConfig, config map[string]any, chainID int) (map[string]any, error) {
 	result := make(map[string]any)
 
-	// Require global capability config to be present
-	globalConfig, ok := config["config"]
-	if !ok {
-		return nil, errors.New("global config section is required but not found")
-	}
-
-	globalConfigMap, ok := globalConfig.(map[string]any)
-	if !ok {
-		return nil, errors.New("global config section must be a map")
-	}
-
 	// Start with global config
-	if err := mergo.Merge(&result, globalConfigMap, mergo.WithOverride); err != nil {
+	if err := mergo.Merge(&result, globalConfig, mergo.WithOverride); err != nil {
 		return nil, errors.Wrap(err, "failed to merge global config")
 	}
 
@@ -46,9 +35,8 @@ func BuildFromTOML(config map[string]any, chainID int) (map[string]any, error) {
 	return result, nil
 }
 
-// BuildFromTOMLOptional builds configuration from TOML config where global config is optional
-// Used for capabilities like cron that don't require config by default
-func BuildFromTOMLOptional(config map[string]any) (map[string]any, error) {
+// BuildGlobalFromTOML builds global configuration from TOML
+func BuildGlobalFromTOML(config map[string]any) (map[string]any, error) {
 	result := make(map[string]any)
 
 	// Global config is optional

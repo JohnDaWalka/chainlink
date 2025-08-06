@@ -14,15 +14,19 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
 type CreateJobsWithJdOpDeps struct {
-	Logger                    zerolog.Logger
-	SingleFileLogger          common.Logger
-	HomeChainBlockchainOutput *blockchain.Output
-	AddressBook               deployment.AddressBook
-	JobSpecFactoryFunctions   []cre.JobSpecFactoryFn
-	FullCLDEnvOutput          *cre.FullCLDEnvironmentOutput
+	Logger                        zerolog.Logger
+	SingleFileLogger              common.Logger
+	HomeChainBlockchainOutput     *blockchain.Output
+	AddressBook                   deployment.AddressBook
+	JobSpecFactoryFunctions       []cre.JobSpecFactoryFn
+	FullCLDEnvOutput              *cre.FullCLDEnvironmentOutput
+	CapabilitiesAwareNodeSets     []*cre.CapabilitiesAwareNodeSet
+	AdditionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs
+	InfraInput                    *infra.Input
 }
 
 type CreateJobsWithJdOpInput struct {
@@ -84,9 +88,12 @@ func CreateJobsWithJdOpFactory(id string, version string) *operations.Operation[
 
 			for _, jobSpecGeneratingFn := range deps.JobSpecFactoryFunctions {
 				singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecFactoryInput{
-					CldEnvironment:   deps.FullCLDEnvOutput.Environment,
-					BlockchainOutput: deps.HomeChainBlockchainOutput,
-					DonTopology:      deps.FullCLDEnvOutput.DonTopology,
+					CldEnvironment:            deps.FullCLDEnvOutput.Environment,
+					BlockchainOutput:          deps.HomeChainBlockchainOutput,
+					DonTopology:               deps.FullCLDEnvOutput.DonTopology,
+					CapabilitiesAwareNodeSets: deps.CapabilitiesAwareNodeSets,
+					AdditionalCapabilities:    deps.AdditionalCapabilitiesConfigs,
+					InfraInput:                deps.InfraInput,
 				})
 				if jobSpecsErr != nil {
 					return CreateJobsWithJdOpOutput{}, pkgerrors.Wrap(jobSpecsErr, "failed to generate job specs")

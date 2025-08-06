@@ -79,6 +79,14 @@ type DonsToJobSpecs = map[uint32]DonJobs
 type NodeIndexToConfigOverride = map[int]string
 type NodeIndexToSecretsOverride = map[int]string
 
+type AdditionalCapabilitiesConfigs = map[string]CapabilityConfig
+type CapabilityConfig struct {
+	BinaryPath   string         `toml:"binary_path"`
+	Config       map[string]any `toml:"config"`
+	Chains       []string       `toml:"chains"`
+	ChainConfigs map[string]any `toml:"chain_configs"`
+}
+
 type WorkflowRegistryInput struct {
 	ContractAddress common.Address          `toml:"_"`
 	ChainSelector   uint64                  `toml:"-"`
@@ -640,9 +648,12 @@ type CapabilitiesBinaryPathFactoryFn = func(donMetadata *DonMetadata) ([]string,
 type JobSpecFactoryFn = func(input *JobSpecFactoryInput) (DonsToJobSpecs, error)
 
 type JobSpecFactoryInput struct {
-	CldEnvironment   *cldf.Environment
-	BlockchainOutput *blockchain.Output
-	DonTopology      *DonTopology
+	CldEnvironment            *cldf.Environment
+	BlockchainOutput          *blockchain.Output
+	DonTopology               *DonTopology
+	InfraInput                *infra.Input
+	AdditionalCapabilities    map[string]CapabilityConfig
+	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet
 }
 
 type ManageWorkflowWithCRECLIInput struct {

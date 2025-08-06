@@ -2,41 +2,39 @@ package logevent
 
 import (
 	"bytes"
-	"fmt"
+	"path/filepath"
+	"strconv"
 	"text/template"
 
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/config"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
+const flag = cre.LogTriggerCapability
 const logEventTriggerConfigTemplate = `'{"chainId":"{{.ChainID}}","network":"{{.NetworkFamily}}","lookbackBlocks":{{.LookbackBlocks}},"pollPeriod":{{.PollPeriod}}}'`
 
-// buildLogEventTriggerRuntimeFallbacks creates runtime-generated fallback values for any keys not specified in TOML
-func buildLogEventTriggerRuntimeFallbacks(chainID int, networkFamily string) map[string]any {
-	return map[string]any{
-		"ChainID":        chainID,
-		"NetworkFamily":  networkFamily,
-		"LookbackBlocks": 1000,
-		"PollPeriod":     1000,
-	}
+// Log event trigger is now fully configurable via TOML - no runtime fallbacks needed
+
+var LogEventTriggerJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+	return generateJobSpecs(
+		input.DonTopology,
+		*input.InfraInput,
+		input.AdditionalCapabilities,
+	)
 }
 
-var LogEventTriggerJobSpecFactoryFn = func(chainID int, networkFamily, logEventTriggerBinaryPath string, tomlConfig map[string]any) cre.JobSpecFactoryFn {
-	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
-		return GenerateJobSpecs(input.DonTopology, chainID, networkFamily, logEventTriggerBinaryPath, tomlConfig)
-	}
+var LogEventTriggerJobName = func(chainID string) string {
+	return "log-event-trigger-" + chainID
 }
 
-var LogEventTriggerJobName = func(chainID int) string {
-	return fmt.Sprintf("log-event-trigger-%d", chainID)
-}
-
-func GenerateJobSpecs(donTopology *cre.DonTopology, chainID int, networkFamily, logEventTriggerBinaryPath string, tomlConfig map[string]any) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
@@ -47,28 +45,41 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, chainID int, networkFamily, 
 			continue
 		}
 
+		logEventConfig, ok := capabilitiesConfig[flag]
+		if !ok {
+			return nil, errors.New("log event trigger config not found in capabilities config")
+		}
+
+		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
+		if pathErr != nil {
+			return nil, errors.Wrapf(pathErr, "failed to get default container directory for infra type %s", infraInput.Type)
+		}
+
+		logEventTriggerBinaryPath := filepath.Join(containerPath, filepath.Base(logEventConfig.BinaryPath))
+
 		workflowNodeSet, err := libnode.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: libnode.NodeTypeKey, Value: cre.WorkerNode}, libnode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		for _, workerNode := range workflowNodeSet {
-			nodeID, nodeIDErr := libnode.FindLabelValue(workerNode, libnode.NodeIDKey)
-			if nodeIDErr != nil {
-				return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+		// Build user configuration from TOML (optional for cron)
+		globalConfig, err := config.BuildGlobalFromTOML(logEventConfig.Config)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to build config from TOML")
+		}
+
+		for _, chainIDStr := range logEventConfig.Chains {
+			chainID, err := strconv.Atoi(chainIDStr)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to convert chain ID %s to int", chainIDStr)
 			}
 
-			// Build user configuration from TOML (global config is required)
-			userConfig, err := config.BuildFromTOML(tomlConfig, chainID)
+			// Extract chain ID from template data to pass to BuildFromTOML
+			// We need to get it from the first chain in the chains list or from config
+			templateData, err := config.BuildFromTOML(globalConfig, logEventConfig.Config, chainID)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to build config from TOML")
 			}
-
-			// Build runtime fallbacks for any missing values
-			runtimeFallbacks := buildLogEventTriggerRuntimeFallbacks(chainID, networkFamily)
-
-			// Apply runtime fallbacks only for keys not specified by user
-			templateData := config.ApplyRuntimeFallbacks(userConfig, runtimeFallbacks)
 
 			// Parse and execute template
 			tmpl, err := template.New("logEventTriggerConfig").Parse(logEventTriggerConfigTemplate)
@@ -82,13 +93,20 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, chainID int, networkFamily, 
 			}
 			configStr := configBuffer.String()
 
-			jobSpec := libjobs.WorkerStandardCapability(nodeID, LogEventTriggerJobName(chainID), logEventTriggerBinaryPath, configStr, "")
+			for _, workerNode := range workflowNodeSet {
+				nodeID, nodeIDErr := libnode.FindLabelValue(workerNode, libnode.NodeIDKey)
+				if nodeIDErr != nil {
+					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				}
 
-			if _, ok := donToJobSpecs[donWithMetadata.ID]; !ok {
-				donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)
+				jobSpec := libjobs.WorkerStandardCapability(nodeID, LogEventTriggerJobName(chainIDStr), logEventTriggerBinaryPath, configStr, "")
+
+				if _, ok := donToJobSpecs[donWithMetadata.ID]; !ok {
+					donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)
+				}
+
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobSpec)
 			}
-
-			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobSpec)
 		}
 	}
 
