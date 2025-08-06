@@ -138,18 +138,14 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	for _, cs := range evmChains {
 		client := env.BlockChains.EVMChains()[cs].Client
 
-		// 1. Get the latest block header
 		latestBlock, err := client.HeaderByNumber(context.Background(), nil)
 		require.NoError(t, err, "Failed to get latest block for chain %s", cs)
 
-		// 2. Get the previous block's header
 		prevBlockNumber := new(big.Int).Sub(latestBlock.Number, big.NewInt(1))
 		prevBlock, err := client.HeaderByNumber(context.Background(), prevBlockNumber)
 		require.NoError(t, err, "Failed to get previous block for chain %s", cs)
 
-		// 3. Calculate the average block time using the two recent blocks
-		// The time difference is the block time, since the block number difference is 1.
-		blockTime := latestBlock.Time - prevBlock.Time // .Time is already a uint64 representing Unix seconds
+		blockTime := latestBlock.Time - prevBlock.Time
 
 		blockTimes[cs] = blockTime
 		lggr.Infow("Chain block time", "chainSelector", cs, "blockTime", blockTime)
