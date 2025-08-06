@@ -25,11 +25,13 @@ import (
 )
 
 const (
+	HandlerType = "web-api-capabilities" //  Handler for v0.1 HTTP capabilities for DAG workflows
+
 	// NOTE: more methods will go here. HTTP trigger/action/target; etc.
-	MethodWebAPITarget   = "web_api_target"
-	MethodWebAPITrigger  = "web_api_trigger"
-	MethodComputeAction  = "compute_action"
-	MethodWorkflowSyncer = "workflow_syncer"
+	MethodWebAPITarget   = HandlerType + ".web_api_target"
+	MethodWebAPITrigger  = HandlerType + ".web_api_trigger"
+	MethodComputeAction  = HandlerType + ".compute_action"
+	MethodWorkflowSyncer = HandlerType + ".workflow_syncer"
 
 	// Error messages
 	ErrTransformingMessageToRequest = "error transforming message to request"

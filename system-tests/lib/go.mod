@@ -21,6 +21,7 @@ require (
 	github.com/ethereum/go-ethereum v1.15.7
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
@@ -337,6 +338,7 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect

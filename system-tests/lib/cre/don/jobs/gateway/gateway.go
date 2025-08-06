@@ -182,7 +182,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, ext
 
 		donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], &jobv1.ProposeJobRequest{
 			NodeId: gatewayNodeID,
-			Spec:   tomlSpec,
+			Spec:   string(tomlSpec),
 		})
 	}
 

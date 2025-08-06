@@ -401,6 +401,8 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/naoina/go-stringutil v0.1.0 // indirect
+	github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416 // indirect
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
