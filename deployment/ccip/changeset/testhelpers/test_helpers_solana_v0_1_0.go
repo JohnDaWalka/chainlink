@@ -1129,7 +1129,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		chainWriterConfig = configureChainWriterForMsg(ccipPackageId, onRampPackageId, publicKeyBytes)
 	}
 
-	chainWriter, err := chainwriter.NewSuiChainWriter(e.Logger, txManager, chainWriterConfig, false)
+	chainWriter, err := chainwriter.NewChainWriter(e.Logger, txManager, chainWriterConfig, false)
 	if err != nil {
 		return &AnyMsgSentEvent{}, err
 	}

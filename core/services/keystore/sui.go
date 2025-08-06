@@ -52,7 +52,6 @@ func (ks *sui) GetAll() ([]suikey.Key, error) {
 	for _, key := range ks.keyRing.Sui {
 		accounts = append(accounts, key)
 	}
-	ks.logger.Info("SUIKEY GETALL: ", accounts)
 	return accounts, nil
 }
 
@@ -137,7 +136,7 @@ func (ks *sui) EnsureKey(ctx context.Context) error {
 		return err
 	}
 
-	ks.logger.Infof("Created Sui key with ID %s", key.ID())
+	// ks.logger.Infof("Created Sui key with ID %s", key.ID())
 
 	return ks.safeAddKey(ctx, key)
 }
@@ -156,7 +155,7 @@ func (ks *sui) Sign(_ context.Context, id string, msg []byte) ([]byte, error) {
 }
 
 func (ks *sui) getByID(id string) (suikey.Key, error) {
-	ks.logger.Info("SUIKEYID: ", id)
+	// ks.logger.Info("SUIKEYID: ", id)
 	for id, _ := range ks.keyRing.Sui {
 		fmt.Printf("keyID: %s\n", id)
 	}
