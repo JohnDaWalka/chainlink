@@ -3,10 +3,13 @@ package evm
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
+	"dario.cat/mergo"
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -26,6 +29,73 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 )
+
+const evmConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","logTriggerPollInterval":{{.LogTriggerPollInterval}}, "creForwarderAddress":"{{.CreForwarderAddress}}","receiverGasMinimum":{{.ReceiverGasMinimum}},"nodeAddress":"{{.NodeAddress}}"}'`
+
+// buildEVMRuntimeFallbacks creates runtime-generated fallback values for any keys not specified in TOML
+func buildEVMRuntimeFallbacks(chainID uint64, networkFamily, creForwarderAddress, nodeAddress string, pollInterval time.Duration, receiverGasMinimum uint64) map[string]any {
+	return map[string]any{
+		"ChainID":                chainID,
+		"NetworkFamily":          networkFamily,
+		"CreForwarderAddress":    creForwarderAddress,
+		"NodeAddress":            nodeAddress,
+		"LogTriggerPollInterval": pollInterval.Nanoseconds(),
+		"ReceiverGasMinimum":     receiverGasMinimum,
+	}
+}
+
+// buildConfigFromTOML builds configuration from TOML config, requiring global config section
+// Applies in order: global config (required) -> chain-specific config (optional)
+func buildConfigFromTOML(config map[string]any, chainID uint64) (map[string]any, error) {
+	result := make(map[string]any)
+
+	// Require global capability config to be present
+	globalConfig, ok := config["config"]
+	if !ok {
+		return nil, errors.New("global config section is required but not found")
+	}
+
+	globalConfigMap, ok := globalConfig.(map[string]any)
+	if !ok {
+		return nil, errors.New("global config section must be a map")
+	}
+
+	// Start with global config
+	if err := mergo.Merge(&result, globalConfigMap, mergo.WithOverride); err != nil {
+		return nil, errors.Wrap(err, "failed to merge global config")
+	}
+
+	// Then, apply chain-specific config if it exists
+	if chainConfigs, ok := config["chain_configs"]; ok {
+		if chainConfigsMap, ok := chainConfigs.(map[string]any); ok {
+			chainIDStr := strconv.FormatUint(chainID, 10)
+			if chainConfig, ok := chainConfigsMap[chainIDStr]; ok {
+				if chainConfigMap, ok := chainConfig.(map[string]any); ok {
+					if err := mergo.Merge(&result, chainConfigMap, mergo.WithOverride); err != nil {
+						return nil, errors.Wrap(err, "failed to merge chain-specific config")
+					}
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// applyRuntimeFallbacks fills in any missing config values with runtime-generated fallbacks
+func applyRuntimeFallbacks(userConfig map[string]any, runtimeFallbacks map[string]any) map[string]any {
+	result := make(map[string]any)
+	maps.Copy(result, userConfig)
+
+	// Add runtime fallbacks only for keys not already specified by user
+	for key, value := range runtimeFallbacks {
+		if _, exists := result[key]; !exists {
+			result[key] = value
+		}
+	}
+
+	return result
+}
 
 var EVMJobSpecFactoryFn = func(logger zerolog.Logger, chainID uint64, networkFamily string, config map[string]any,
 	capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet,
@@ -189,16 +259,32 @@ func GenerateJobSpecs(logger zerolog.Logger, donTopology *cre.DonTopology,
 
 			logger.Info().Msgf("Creating EVM Capability job spec for chainID: %d, selector: %d, DON:%q, node:%q", chainID, chain.Selector, donWithMetadata.Name, nodeID)
 
+			// Build user configuration from TOML (global config is required)
+			userConfig, err := buildConfigFromTOML(config, chainID)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to build config from TOML")
+			}
+
+			// Build runtime fallbacks for any missing values
+			runtimeFallbacks := buildEVMRuntimeFallbacks(chainID, networkFamily, creForwarderAddress.Address, nodeAddress, pollInterval, receiverGasMinimum)
+
+			// Apply runtime fallbacks only for keys not specified by user
+			templateData := applyRuntimeFallbacks(userConfig, runtimeFallbacks)
+
+			// Parse and execute template
+			tmpl, err := template.New("evmConfig").Parse(evmConfigTemplate)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to parse EVM config template")
+			}
+
+			var configBuffer bytes.Buffer
+			if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+				return nil, errors.Wrap(err, "failed to execute EVM config template")
+			}
+			configStr := configBuffer.String()
+
 			jobSpec := jobs.WorkerStandardCapability(nodeID, jobName(chainID), evmBinaryPath,
-				fmt.Sprintf(
-					`'{"chainId":%d,"network":"%s","logTriggerPollInterval":%d, "creForwarderAddress":"%s","receiverGasMinimum":%d,"nodeAddress":"%s"}'`,
-					chainID,
-					networkFamily,
-					pollInterval.Nanoseconds(),
-					creForwarderAddress.Address,
-					receiverGasMinimum,
-					nodeAddress,
-				),
+				configStr,
 				oracleStr,
 			)
 
