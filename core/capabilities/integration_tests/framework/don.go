@@ -198,6 +198,10 @@ func NewDON(ctx context.Context, t *testing.T, lggr logger.Logger, donConfig Don
 	return don
 }
 
+func (d *DON) GetAllNodes() []*capabilityNode {
+	return d.nodes
+}
+
 // Initialise must be called after all capabilities have been added to the DONs and before Start is called
 func (d *DON) Initialise() {
 	id := d.capabilitiesRegistry.setupDON(d.config, d.publishedCapabilities)
