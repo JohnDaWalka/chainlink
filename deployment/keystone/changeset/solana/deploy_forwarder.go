@@ -232,6 +232,7 @@ func (cs ConfigureForwarders) VerifyPreconditions(env cldf.Environment, req *Con
 			}
 			forwarderKey := datastore.NewAddressRefKey(sel, ForwarderContract, version, req.Qualifier)
 			_, err := env.DataStore.Addresses().Get(forwarderKey)
+
 			if err != nil {
 				return fmt.Errorf("failed get fowarder for chain selector %d: %w", sel, err)
 			}

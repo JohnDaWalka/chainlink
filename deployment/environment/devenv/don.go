@@ -270,10 +270,10 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 		case "APTOS", "SOLANA":
 			accounts, err := n.gqlClient.FetchKeys(ctx, chain.ChainType)
 			if err != nil {
-				return fmt.Errorf("failed to fetch account address for node %s and chain %s and chainID %s: %w", n.Name, chain.ChainType, chain.ChainID, err)
+				return fmt.Errorf("failed to fetch account address for node %s and chain %s: %w", n.Name, chain.ChainType, err)
 			}
 			if len(accounts) == 0 {
-				return fmt.Errorf("failed to fetch account address for node %s and chain %s and chainID %s", n.Name, chain.ChainType, chain.ChainID)
+				return fmt.Errorf("failed to fetch account address for node %s and chain %s: %w", n.Name, chain.ChainType, err)
 			}
 			n.AccountAddr[chain.ChainID] = accounts[0]
 			account = accounts[0]

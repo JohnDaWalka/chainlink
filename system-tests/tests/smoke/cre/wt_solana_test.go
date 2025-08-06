@@ -309,10 +309,10 @@ func setupWTTestEnvironment(
 					ChainSel:  bo.SolChain.ChainSelector,
 					Qualifier: dfQualifier,
 					Version:   "1.0.0",
-					AllowedSenders: []df_cs.AllowedSender{
+					SenderList: []df_cs.Sender{
 						{
 							ProgramID: solana.MustPublicKeyFromBase58(forwarder.Address),
-							State:     solana.MustPublicKeyFromBase58(forwarderState.Address),
+							StateID:   solana.MustPublicKeyFromBase58(forwarderState.Address),
 						},
 					},
 					FeedAdmin:            bo.SolChain.PrivateKey.PublicKey(),

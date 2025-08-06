@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 	seq "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence"
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana/sequence/operation"
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
+
+	df_cache "github.com/smartcontractkit/chainlink-solana/contracts/generated/data_feeds_cache"
 )
 
 const (
@@ -243,12 +246,15 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
 
+	if err != nil {
+		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
+	}
+
 	// Create remaining accounts by deriving PDAs for each DataID
 	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, "decimal_report", req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
 	if err != nil {
 		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
 	}
-	fmt.Println("derived PDAs for decimal reports ", decimalReportAccounts)
 
 	initInput := operation.InitCacheDecimalReportInput{
 		ChainSel:          req.ChainSel,
@@ -276,9 +282,9 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 	return out, nil
 }
 
-type AllowedSender struct {
+type Sender struct {
 	ProgramID solana.PublicKey
-	State     solana.PublicKey
+	StateID   solana.PublicKey
 }
 
 type ConfigureCacheDecimalReportRequest struct {
@@ -288,13 +294,11 @@ type ConfigureCacheDecimalReportRequest struct {
 	Qualifier string
 	Version   string
 
-	AllowedSenders       []AllowedSender // forwarderState
+	SenderList []Sender
+
 	AllowedWorkflowOwner [][20]uint8
 	AllowedWorkflowName  [][10]uint8
 	FeedAdmin            solana.PublicKey
-
-	ForwarderProgramID solana.PublicKey
-	ForwarderState     solana.PublicKey
 
 	Descriptions [][32]uint8
 	DataIDs      [][16]uint8
@@ -313,8 +317,8 @@ func (cs ConfigureCacheDecimalReport) VerifyPreconditions(env cldf.Environment, 
 	}
 	// Check that AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName are all the same length
 	// This is a requirement for the ConfigureCacheDecimalFeed operation
-	if len(req.AllowedSenders) != len(req.AllowedWorkflowOwner) || len(req.AllowedSenders) != len(req.AllowedWorkflowName) {
-		return errors.New("AllowedSender, AllowedWorkflowOwner, and AllowedWorkflowName must all have the same length")
+	if len(req.SenderList) != len(req.AllowedWorkflowOwner) || len(req.SenderList) != len(req.AllowedWorkflowName) {
+		return errors.New("SenderList, AllowedWorkflowOwner, and AllowedWorkflowName must all have the same length")
 	}
 
 	// Check that Descriptions and DataIDs are all the same length
@@ -335,6 +339,7 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	if !ok {
 		return out, fmt.Errorf("solana chain not found for chain selector %d", req.ChainSel)
 	}
+
 	cacheStateRef := datastore.NewAddressRefKey(req.ChainSel, CacheState, version, req.Qualifier)
 	cacheRef := datastore.NewAddressRefKey(req.ChainSel, CacheContract, version, req.Qualifier)
 
@@ -342,12 +347,14 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	if err != nil {
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
+
 	cacheProgramID, err := env.DataStore.Addresses().Get(cacheRef)
 	if err != nil {
 		return out, fmt.Errorf("failed load cache program ID for chain sel %d", req.ChainSel)
 	}
 
-	var remainings []solana.AccountMeta
+	var remainingAccounts []solana.AccountMeta
+
 	// Create decimalReportAccounts by deriving PDAs for each DataID
 	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, "feed_config", req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
 	if err != nil {
@@ -356,36 +363,41 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 
 	cacheStateKey := solana.MustPublicKeyFromBase58(cacheState.Address)
 	cacheProgramKey := solana.MustPublicKeyFromBase58(cacheProgramID.Address)
-	remainings = append(remainings, decimalReportAccounts...)
+	remainingAccounts = append(remainingAccounts, decimalReportAccounts...)
 
-	senders := make([]solana.PublicKey, 0)
-	for idx := range req.AllowedSenders {
-		authority, err := deriveForwarderAuthority(req.AllowedSenders[idx].State, cacheProgramKey, req.AllowedSenders[idx].ProgramID)
+	workflowMetadatas := make([]df_cache.WorkflowMetadata, len(req.SenderList))
+
+	for idx, sender := range req.SenderList {
+		allowedSender, err := deriveForwarderAuthority(sender.StateID, cacheProgramKey, sender.ProgramID)
 		if err != nil {
-			return out, fmt.Errorf("failed to derive forwarder authority")
+			return out, fmt.Errorf("failed to derive forwarder authority: %w", err)
 		}
-		senders = append(senders, authority)
+
 		permissionAccounts, err := createPermissionFlagAccounts(cacheProgramKey, cacheStateKey, req.DataIDs,
-			authority, req.AllowedWorkflowOwner[idx], req.AllowedWorkflowName[idx])
-		remainings = append(remainings, permissionAccounts...)
+			allowedSender, req.AllowedWorkflowOwner[idx], req.AllowedWorkflowName[idx])
+
 		if err != nil {
 			return out, fmt.Errorf("failed to create permission accounts: %w", err)
 		}
+		remainingAccounts = append(remainingAccounts, permissionAccounts...)
 
+		workflowMetadatas[idx] = df_cache.WorkflowMetadata{
+			AllowedSender:        allowedSender,
+			AllowedWorkflowOwner: req.AllowedWorkflowOwner[idx],
+			AllowedWorkflowName:  req.AllowedWorkflowName[idx],
+		}
 	}
 
 	configureCacheDecimalReportInput := operation.ConfigureCacheDecimalReportInput{
-		ChainSel:             req.ChainSel,
-		MCMS:                 req.MCMS,
-		State:                solana.MustPublicKeyFromBase58(cacheState.Address),
-		Type:                 cldf.ContractType(CacheContract),
-		AllowedSender:        senders,
-		AllowedWorkflowOwner: req.AllowedWorkflowOwner,
-		AllowedWorkflowName:  req.AllowedWorkflowName,
-		FeedAdmin:            req.FeedAdmin,
-		DataIDs:              req.DataIDs,
-		Descriptions:         req.Descriptions,
-		RemainingAccounts:    remainings,
+		ChainSel:          req.ChainSel,
+		MCMS:              req.MCMS,
+		State:             solana.MustPublicKeyFromBase58(cacheState.Address),
+		Type:              cldf.ContractType(CacheContract),
+		WorkflowMetadatas: workflowMetadatas,
+		FeedAdmin:         req.FeedAdmin,
+		DataIDs:           req.DataIDs,
+		Descriptions:      req.Descriptions,
+		RemainingAccounts: remainingAccounts,
 	}
 
 	deps := operation.Deps{
@@ -404,26 +416,6 @@ func (cs ConfigureCacheDecimalReport) Apply(env cldf.Environment, req *Configure
 	return out, nil
 }
 
-func createPermissionFlagAccounts(programID, state solana.PublicKey, dataIDs [][16]byte, authority solana.PublicKey, owner [20]byte, name [10]byte) ([]solana.AccountMeta, error) {
-	var ret []solana.AccountMeta
-
-	for _, dataID := range dataIDs {
-		repHash := createReportHash(dataID, authority, owner, name)
-		flagPDA, _, err := solana.FindProgramAddress([][]byte{
-			[]byte("permission_flag"),
-			state.Bytes(),
-			repHash[:],
-		}, programID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive permission_flag PDA: %w", err)
-		}
-		ret = append(ret, *solana.Meta(flagPDA).WRITE())
-
-	}
-
-	return ret, nil
-}
-
 func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram solana.PublicKey, forwarderProgram solana.PublicKey) (solana.PublicKey, error) {
 	seeds := [][]byte{
 		[]byte("forwarder"),
@@ -431,21 +423,7 @@ func deriveForwarderAuthority(forwarderState solana.PublicKey, receiverProgram s
 		receiverProgram[:],
 	}
 	ret, _, err := solana.FindProgramAddress(seeds, forwarderProgram)
-
 	return ret, err
-}
-
-// createReportHash matches Rust's hash::hash(&[data_id, sender, owner, name].concat()).to_bytes()
-func createReportHash(dataID [16]byte, authority solana.PublicKey, owner [20]byte, name [10]byte) [32]byte {
-	var buf []byte
-
-	buf = append(buf, dataID[:]...)
-	buf = append(buf, authority.Bytes()...)
-	buf = append(buf, owner[:]...)
-	buf = append(buf, name[:]...)
-	h := sha256.Sum256(buf)
-
-	return h
 }
 
 // createRemainingAccounts creates the remaining accounts needed for InitCacheDecimalFeed
@@ -485,4 +463,34 @@ func createRemainingAccounts(ds datastore.DataStore, seed string, chainSel uint6
 	}
 
 	return remainingAccounts, nil
+}
+
+func createPermissionFlagAccounts(programID, state solana.PublicKey, dataIDs [][16]byte, sender solana.PublicKey, owner [20]byte, name [10]byte) ([]solana.AccountMeta, error) {
+	var ret []solana.AccountMeta
+
+	for _, dataID := range dataIDs {
+		repHash := createReportHash(dataID, sender, owner, name)
+		flagPDA, _, err := solana.FindProgramAddress([][]byte{
+			[]byte("permission_flag"),
+			state.Bytes(),
+			repHash[:],
+		}, programID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive permission_flag PDA: %w", err)
+		}
+		ret = append(ret, *solana.Meta(flagPDA).WRITE())
+	}
+	return ret, nil
+}
+
+// createReportHash matches Rust's hash::hash(&[data_id, sender, owner, name].concat()).to_bytes()
+// https://github.com/smartcontractkit/chainlink-solana/blob/develop/contracts/programs/data-feeds-cache/src/lib.rs#L1089
+func createReportHash(dataID [16]byte, sender solana.PublicKey, owner [20]byte, name [10]byte) [32]byte {
+	buf := bytes.Join([][]byte{
+		dataID[:],
+		sender.Bytes(),
+		owner[:],
+		name[:],
+	}, nil)
+	return sha256.Sum256(buf)
 }

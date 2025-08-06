@@ -237,7 +237,6 @@ func SetupTestEnvironment(
 		if err != nil {
 			return nil, pkgerrors.Wrap(err, "failed to deploy sol forwarder")
 		}
-		// TODO PLEX-1543 move modify datastore into sequence
 		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
 			Address:       out.Output.ProgramID.String(),
 			ChainSelector: sel,
