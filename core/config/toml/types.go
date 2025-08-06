@@ -2362,6 +2362,9 @@ type Billing struct {
 func (b *Billing) setFrom(f *Billing) {
 	if f.URL != nil {
 		b.URL = f.URL
+	}
+
+	if f.TLSEnabled != nil {
 		b.TLSEnabled = f.TLSEnabled
 	}
 }
@@ -2372,7 +2375,8 @@ func (b *Billing) ValidateConfig() error {
 	}
 
 	if b.TLSEnabled == nil {
-		return configutils.ErrInvalid{Name: "TLSEnabled", Value: "", Msg: "billing service TLS option must be set"}
+		val := true
+		b.TLSEnabled = &val
 	}
 
 	return nil
