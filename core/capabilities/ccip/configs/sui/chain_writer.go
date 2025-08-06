@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	_ "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
+	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	chainwriter "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 )
@@ -30,37 +31,45 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 					consts.MethodCommit: {
 						Name:      "commit",
 						PublicKey: pubKeyBytes,
-						Params: []codec.SuiFunctionParam{
+						Params:    []codec.SuiFunctionParam{},
+						PTBCommands: []config.ChainWriterPTBCommand{
 							{
-								Name:     "object_ref_id",
-								Type:     "object_id",
-								Required: true,
-							},
-							{
-								Name:     "off_ramp_state_id",
-								Type:     "object_id",
-								Required: true,
-							},
-							{
-								Name:      "clock",
-								Type:      "object_id",
-								Required:  true,
-								IsMutable: &isClockMutable,
-							},
-							{
-								Name:     "ReportContext",
-								Type:     "vector<vector<u8>>",
-								Required: true,
-							},
-							{
-								Name:     "Report",
-								Type:     "vector<u8>",
-								Required: true,
-							},
-							{
-								Name:     "Signatures",
-								Type:     "vector<vector<u8>>",
-								Required: true,
+								Type:     codec.SuiPTBCommandMoveCall,
+								ModuleId: strPtr("offramp"),
+								Function: strPtr("commit"),
+								Params: []codec.SuiFunctionParam{
+									{
+										Name:     "object_ref_id",
+										Type:     "object_id",
+										Required: true,
+									},
+									{
+										Name:     "off_ramp_state_id",
+										Type:     "object_id",
+										Required: true,
+									},
+									{
+										Name:      "clock",
+										Type:      "object_id",
+										Required:  true,
+										IsMutable: &isClockMutable,
+									},
+									{
+										Name:     "ReportContext",
+										Type:     "vector<vector<u8>>",
+										Required: true,
+									},
+									{
+										Name:     "Report",
+										Type:     "vector<u8>",
+										Required: true,
+									},
+									{
+										Name:     "Signatures",
+										Type:     "vector<vector<u8>>",
+										Required: true,
+									},
+								},
 							},
 						},
 					},
@@ -87,4 +96,9 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 		// FeeStrategy: chainwriter.DefaultFeeStrategy,
 	}, nil
 
+}
+
+// Helper function to convert a string to a string pointer
+func strPtr(s string) *string {
+	return &s
 }
