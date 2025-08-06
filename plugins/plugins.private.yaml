@@ -1,4 +1,4 @@
-# This file defines private plugins to be installed via `loopinstall`.
+# This file defines private plugins to be installed via `loopinstall`
 
 # Common plugin configuration
 defaults:
