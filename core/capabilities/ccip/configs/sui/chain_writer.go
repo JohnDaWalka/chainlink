@@ -39,12 +39,12 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 								Function: strPtr("commit"),
 								Params: []codec.SuiFunctionParam{
 									{
-										Name:     "object_ref_id",
+										Name:     "ref",
 										Type:     "object_id",
 										Required: true,
 									},
 									{
-										Name:     "off_ramp_state_id",
+										Name:     "state",
 										Type:     "object_id",
 										Required: true,
 									},
@@ -55,17 +55,17 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 										IsMutable: &isClockMutable,
 									},
 									{
-										Name:     "ReportContext",
+										Name:     "report_context",
 										Type:     "vector<vector<u8>>",
 										Required: true,
 									},
 									{
-										Name:     "Report",
+										Name:     "report",
 										Type:     "vector<u8>",
 										Required: true,
 									},
 									{
-										Name:     "Signatures",
+										Name:     "signatures",
 										Type:     "vector<vector<u8>>",
 										Required: true,
 									},
