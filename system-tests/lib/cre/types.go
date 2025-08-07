@@ -365,11 +365,12 @@ type DonWithMetadata struct {
 }
 
 type DonMetadata struct {
-	NodesMetadata   []*NodeMetadata
-	Flags           []string
-	ID              uint32
-	Name            string
-	SupportedChains []uint64 // chain IDs that the DON supports, empty means all chains
+	NodesMetadata      []*NodeMetadata
+	Flags              []string
+	ID                 uint32
+	Name               string
+	SupportedChains    []uint64 // chain IDs that the DON supports, empty means all chains
+	SupportedSolChains []string
 }
 
 type Label struct {
@@ -410,6 +411,7 @@ type CapabilitiesAwareNodeSet struct {
 	Capabilities       []string
 	DONTypes           []string
 	SupportedChains    []uint64          // chain IDs that the DON supports, empty means all chains
+	SupportedSolChains []string          // sol chain IDs that the DON supports
 	BootstrapNodeIndex int               // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
 	GatewayNodeIndex   int               // -1 -> no gateway, only used if the DON has the GatewayDON flag
 	EnvVars            map[string]string // additional environment variables to be set on each node
@@ -429,6 +431,7 @@ type OCRPeeringData struct {
 
 type GenerateKeysInput struct {
 	GenerateEVMKeysForChainIDs []int
+	GenerateSolKeysForChainIDs []string
 	GenerateP2PKeys            bool
 	Topology                   *Topology
 	Password                   string
@@ -451,20 +454,28 @@ func (g *GenerateKeysInput) Validate() error {
 // chainID -> EVMKeys
 type ChainIDToEVMKeys = map[int]*crypto.EVMKeys
 
+// chainID -> SolKeys
+type ChainIDToSolKeys = map[string]*crypto.SolKeys
+
 // donID -> chainID -> EVMKeys
 type DonsToEVMKeys = map[uint32]ChainIDToEVMKeys
+
+// donID -> chainID -> EVMKeys
+type DonsToSolKeys = map[uint32]ChainIDToSolKeys
 
 // donID -> P2PKeys
 type DonsToP2PKeys = map[uint32]*crypto.P2PKeys
 
 type GenerateKeysOutput struct {
 	EVMKeys DonsToEVMKeys
+	SolKeys DonsToSolKeys
 	P2PKeys DonsToP2PKeys
 }
 
 type GenerateSecretsInput struct {
 	DonMetadata *DonMetadata
 	EVMKeys     ChainIDToEVMKeys
+	SolKeys     ChainIDToSolKeys
 	P2PKeys     *crypto.P2PKeys
 }
 

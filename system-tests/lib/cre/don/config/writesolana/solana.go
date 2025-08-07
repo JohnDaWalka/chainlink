@@ -59,25 +59,25 @@ func GetGenerateConfig() func(cre.GenerateConfigsInput) (cre.NodeIndexToConfigOv
 				})
 			}
 
-			workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to find worker nodes")
-			}
+			//workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+			//if err != nil {
+			//	return nil, errors.Wrap(err, "failed to find worker nodes")
+			//}
 
-			for i := range workflowNodeSet {
-				var nodeIndex int
-				for _, label := range workflowNodeSet[i].Labels {
-					if label.Key == node.IndexKey {
-						nodeIndex, err = strconv.Atoi(label.Value)
-						if err != nil {
-							return nil, errors.Wrap(err, "failed to convert node index to int")
-						}
-						break
-					}
-				}
+			//for i := range workflowNodeSet {
+			//	var nodeIndex int
+			//	for _, label := range workflowNodeSet[i].Labels {
+			//		if label.Key == node.IndexKey {
+			//			nodeIndex, err = strconv.Atoi(label.Value)
+			//			if err != nil {
+			////				return nil, errors.Wrap(err, "failed to convert node index to int")
+			//			}
+			//			break
+			//		}
+			//	}
 
-				configOverrides[nodeIndex] = config.WorkerSolana(workerSolanaInputs)
-			}
+			//configOverrides[nodeIndex] = config.WorkerSolana(workerSolanaInputs)
+			//}
 
 			bootstrapNodes, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
 			if err != nil {

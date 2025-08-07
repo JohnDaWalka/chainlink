@@ -286,6 +286,7 @@ func SetupTestEnvironment(
 	bcOuts := make(map[uint64]*cre.WrappedBlockchainOutput)
 	sethClients := make(map[uint64]*seth.Client)
 	solClients := make(map[uint64]*solrpc.Client)
+	solChainIDs := make([]string, 0)
 	for _, bcOut := range blockchainOutputs {
 		if bcOut.SolChain != nil {
 			sel := bcOut.SolChain.ChainSelector
@@ -294,6 +295,7 @@ func SetupTestEnvironment(
 			bcOuts[sel].ChainSelector = sel
 			bcOuts[sel].SolChain = bcOut.SolChain
 			bcOuts[sel].SolChain.ArtifactsDir = bcOut.SolChain.ArtifactsDir
+			solChainIDs = append(solChainIDs, bcOut.SolChain.ChainID)
 			continue
 		}
 		bcOuts[bcOut.ChainSelector] = bcOut
@@ -308,6 +310,7 @@ func SetupTestEnvironment(
 		input.CapabilitiesAwareNodeSets,
 		input.InfraInput,
 		chainIDs,
+		solChainIDs,
 		bcOuts,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		allChainsCLDEnvironment.DataStore,

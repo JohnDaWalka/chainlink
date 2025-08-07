@@ -56,10 +56,17 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	validateEnvVars(t)
 	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
 	// Assign all capabilities to the single node set
+	var solChains []string
+	for _, chain := range in.Blockchains {
+		if chain.Type == "solana" {
+			solChains = append(solChains, chain.ChainID)
+		}
+	}
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*cre.CapabilitiesAwareNodeSet {
 		return []*cre.CapabilitiesAwareNodeSet{
 			{
 				Input:              input[0],
+				SupportedSolChains: solChains,
 				Capabilities:       SinglePoRDonCapabilitiesFlagsSolana,
 				DONTypes:           []string{cre.WorkflowDON, cre.GatewayDON},
 				BootstrapNodeIndex: 0, // not required, but set to make the configuration explicit
@@ -131,7 +138,7 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	require.NoError(t, err, "failed to wrap value")
 	cfg, err := mockcapability.MapToBytes(val)
 	require.NoError(t, err, "failed map to bytes config")
-	ret, err := mocksClient.Nodes[0].API.Execute(context.TODO(), &pb.ExecutableRequest{
+	ret, err := mocksClient.Nodes[1].API.Execute(context.TODO(), &pb.ExecutableRequest{
 		ID:             setupOut.DeriveRemaining,
 		CapabilityType: 4,
 		Config:         cfg,
@@ -196,6 +203,7 @@ func setupWTTestEnvironment(
 	chainIDInt, err := strconv.Atoi(firstBlockchain.ChainID)
 	require.NoError(t, err, "failed to convert chain ID to int")
 	chainIDUint64 := libc.MustSafeUint64(int64(chainIDInt))
+	cfg := solwriterconfig.GetGenerateConfig()
 
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
@@ -211,7 +219,7 @@ func setupWTTestEnvironment(
 		},
 		ConfigFactoryFunctions: []cre.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
-			solwriterconfig.GetGenerateConfig(),
+			cfg,
 		},
 	}
 

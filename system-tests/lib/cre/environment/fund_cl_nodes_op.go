@@ -71,7 +71,7 @@ var FundCLNodesOp = operations.NewOperation[FundCLNodesOpInput, FundCLNodesOpOut
 								return nil
 							}
 							bal, _ := bcOut.SolClient.GetBalance(ctx, funder.PublicKey(), rpc.CommitmentConfirmed)
-							fmt.Println("Sender balance:", bal.Value)
+							fmt.Println("sender balance:", bal.Value, "recipient:", recipient)
 
 							recent, err := bcOut.SolClient.GetRecentBlockhash(ctx, rpc.CommitmentFinalized)
 							if err != nil {

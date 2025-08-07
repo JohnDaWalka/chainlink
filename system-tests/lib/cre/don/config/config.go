@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -55,10 +57,17 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 	workerSolInputs := make([]*WorkerSolanaInput, 0)
 	for chainSelector, bcOut := range input.BlockchainOutput {
 		if bcOut.SolChain != nil {
+			chainID, err := bcOut.SolClient.GetGenesisHash(context.Background())
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get chainID from solana")
+			}
+
 			workerSolInputs = append(workerSolInputs, &WorkerSolanaInput{
 				ChainSelector:        bcOut.SolChain.ChainSelector,
+				Name:                 fmt.Sprintf("node-%d", bcOut.SolChain.ChainSelector),
 				HasForwarderContract: !bcOut.ReadOnly,
-				ChainID:              bcOut.SolChain.ChainID,
+				ChainID:              chainID.String(),
+				NodeURL:              bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
 			})
 			continue
 		}
@@ -195,6 +204,10 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 
 			forwarders := input.Datastore.Addresses().Filter(datastore.AddressRefByChainSelector(wi.ChainSelector))
 			for _, addr := range forwarders {
+				if addr.Type == ks_sol.ForwarderState {
+					wi.ForwarderState = addr.Address
+					continue
+				}
 				expectedAddressKey := node.AddressKeyFromSelector(wi.ChainSelector)
 				wi.ForwarderAddress = addr.Address
 				for _, label := range workflowNodeSet[i].Labels {
@@ -207,7 +220,7 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 					}
 				}
 				if wi.FromAddress.IsZero() {
-					//		return nil, errors.Errorf("failed to get from address for solchain %d", wi.ChainSelector)
+					return nil, errors.Errorf("failed to get from address for solchain %d", wi.ChainSelector)
 				}
 			}
 		}
@@ -215,7 +228,7 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 		// connect worker nodes to all the chains, add chain ID for registry (home chain)
 		// we configure both EVM chains, nodes and EVM.Workflow with Forwarder
 		configOverrides[nodeIndex] = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.PeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs)
-		//configOverrides[nodeIndex] += WorkerSolana(workerSolInputs)
+		configOverrides[nodeIndex] += WorkerSolana(workerSolInputs)
 	}
 	fmt.Println("overrides", configOverrides)
 

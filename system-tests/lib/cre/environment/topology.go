@@ -23,6 +23,7 @@ func BuildTopology(
 	nodeSets []*cre.CapabilitiesAwareNodeSet,
 	infraInput infra.Input,
 	chainIDs []int,
+	solChainIDs []string,
 	blockchainOutput map[uint64]*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	datastore datastore.DataStore,
@@ -53,6 +54,7 @@ func BuildTopology(
 
 	generateKeysInput := &cre.GenerateKeysInput{
 		GenerateEVMKeysForChainIDs: chainIDs,
+		GenerateSolKeysForChainIDs: solChainIDs,
 		GenerateP2PKeys:            true,
 		Topology:                   topology,
 		Password:                   "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
@@ -134,11 +136,15 @@ func BuildTopology(
 				secretsInput.EVMKeys = evmKeys
 			}
 
+			if solKeys, ok := keys.SolKeys[donMetadata.ID]; ok {
+				secretsInput.SolKeys = solKeys
+			}
+
 			if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
 				secretsInput.P2PKeys = p2pKeys
 			}
 
-			// EVM and P2P keys will be provided to nodes as secrets
+			// EVM, Solana and P2P keys will be provided to nodes as secrets
 			secrets, secretsErr := cresecrets.GenerateSecrets(
 				secretsInput,
 			)
