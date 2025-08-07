@@ -296,7 +296,7 @@ func GetChainReaderConfig() (config.ChainReaderConfig, error) {
 								Required: true,
 							},
 						},
-						ResultTupleToStruct: []string{"sequenceNumber", "allowListEnabled", "router"},
+						ResultTupleToStruct: []string{"sequenceNumber", "allowListEnabled", "router", "router_state_address"},
 					},
 					consts.MethodNameGetExpectedNextSequenceNumber: {
 						Name: "get_expected_next_sequence_number",
