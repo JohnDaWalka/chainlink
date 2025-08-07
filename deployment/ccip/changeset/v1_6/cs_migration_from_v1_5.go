@@ -1,9 +1,7 @@
 package v1_6
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -72,7 +70,7 @@ type InitChainUpgradesConfig struct {
 	// SourceChains is a map of source chain selectors to their upgrade configurations.
 	SourceChains map[uint64]SourceChainConfig
 	// MCMSConfig is the configuration for the MCMS.
-	MCMSConfig *proposalutils.TimelockConfig
+	// MCMSConfig *proposalutils.TimelockConfig
 }
 
 // NewFeeQuoterParamsForDestinationBySource returns a map of source chain selectors to their new FeeQuoter parameters for the given destination chain selector.
@@ -88,9 +86,6 @@ func (c InitChainUpgradesConfig) NewFeeQuoterParamsForDestinationBySource(destCh
 }
 
 func initChainUpgradesPrecondition(e cldf.Environment, c InitChainUpgradesConfig) error {
-	if c.MCMSConfig == nil {
-		return errors.New("MCMSConfig must be defined")
-	}
 	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
@@ -100,22 +95,8 @@ func initChainUpgradesPrecondition(e cldf.Environment, c InitChainUpgradesConfig
 	if err != nil {
 		return fmt.Errorf("failed to validate home chain state: %w", err)
 	}
-	// Home chain contracts are owned by MCMS.
-	err = commoncs.ValidateOwnership(e.GetContext(), true, common.Address{}, state.Chains[c.HomeChainSelector].Timelock.Address(), state.Chains[c.HomeChainSelector].CCIPHome)
-	if err != nil {
-		return fmt.Errorf("failed to validate ownership of CCIPHome on %s: %w", e.BlockChains.EVMChains()[c.HomeChainSelector], err)
-	}
-	err = commoncs.ValidateOwnership(e.GetContext(), true, common.Address{}, state.Chains[c.HomeChainSelector].Timelock.Address(), state.Chains[c.HomeChainSelector].CapabilityRegistry)
-	if err != nil {
-		return fmt.Errorf("failed to validate ownership of CapabilityRegistry on %s: %w", e.BlockChains.EVMChains()[c.HomeChainSelector], err)
-	}
 
 	for _, destChainSel := range c.DestChains {
-		// Dest chain selector is a valid EVM chain selector & all MCMS contracts exist.
-		err := stateview.ValidateChain(e, state, destChainSel, c.MCMSConfig)
-		if err != nil {
-			return fmt.Errorf("failed to validate chain %d: %w", destChainSel, err)
-		}
 		destDONCfg, ok := c.DONConfigs[destChainSel]
 		if !ok {
 			return fmt.Errorf("no DON config defined for chain %d", destChainSel)
@@ -130,19 +111,10 @@ func initChainUpgradesPrecondition(e cldf.Environment, c InitChainUpgradesConfig
 		if err != nil {
 			return fmt.Errorf("failed to validate exec OCR params for chain %d: %w", destChainSel, err)
 		}
-		// ARMProxy contracts are owned by MCMS on destination.
-		err = commoncs.ValidateOwnership(e.GetContext(), true, common.Address{}, state.Chains[destChainSel].Timelock.Address(), state.Chains[destChainSel].RMNProxy)
-		if err != nil {
-			return fmt.Errorf("failed to validate ownership of RMNProxy on %s: %w", e.BlockChains.EVMChains()[destChainSel], err)
-		}
 
 		sourceChainSels := getSourceChainsForSelector(state, destChainSel)
 		for _, sourceChainSel := range sourceChainSels {
 			// Source chain selector is a valid EVM chain selector & all MCMS contracts exist.
-			err := stateview.ValidateChain(e, state, sourceChainSel, c.MCMSConfig)
-			if err != nil {
-				return fmt.Errorf("failed to validate chain %d: %w", sourceChainSel, err)
-			}
 			// Price registry exists on source if 1.5.0 OnRamps exist
 			if len(state.Chains[sourceChainSel].EVM2EVMOnRamp) > 0 && state.Chains[sourceChainSel].PriceRegistry == nil {
 				return fmt.Errorf("price registry does not exist on source chain %d, but 1.5.0 OnRamps exist", sourceChainSel)
@@ -201,22 +173,10 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 	}
 
 	for chainSel, chainUpgradeCfg := range c.DONConfigs {
-		// Ensure that FeeQuoter & NonceManager are owned by the timelock contract on all chains.
-		out, err := ensureTimelockOwnership(e, chainSel, []commoncs.Ownable{
-			state.Chains[chainSel].FeeQuoter,
-			state.Chains[chainSel].NonceManager,
-		}, *c.MCMSConfig)
-		allReports = append(allReports, out.Reports...)
-		if err != nil {
-			return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to ensure timelock ownership of FeeQuoter and NonceManager on %d: %w", chainSel, err)
-		}
-		allProposals = append(allProposals, out.MCMSTimelockProposals...)
-
 		chain := e.BlockChains.EVMChains()[chainSel]
 		setCandidateBase := SetCandidateConfigBase{
 			HomeChainSelector: c.HomeChainSelector,
 			FeedChainSelector: chainUpgradeCfg.FeedChainSelector,
-			MCMS:              c.MCMSConfig,
 		}
 
 		// Skip chains that already have a DON.
@@ -234,12 +194,11 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 		}
 
 		// Add reader config for chain on CCIPHome.
-		out, err = UpdateChainConfigChangeset(e, UpdateChainConfigConfig{
+		out, err := UpdateChainConfigChangeset(e, UpdateChainConfigConfig{
 			HomeChainSelector: c.HomeChainSelector,
 			RemoteChainAdds: map[uint64]ChainConfig{
 				chainSel: chainUpgradeCfg.ChainConfig,
 			},
-			MCMS: c.MCMSConfig,
 		})
 		allReports = append(allReports, out.Reports...)
 		if err != nil {
@@ -292,20 +251,9 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 	for _, destChainSel := range c.DestChains {
 		destChain := e.BlockChains.EVMChains()[destChainSel]
 
-		// Ensure that RMNRemote is owned by the timelock contract
-		out, err := ensureTimelockOwnership(e, destChainSel, []commoncs.Ownable{
-			state.Chains[destChainSel].RMNRemote,
-		}, *c.MCMSConfig)
-		allReports = append(allReports, out.Reports...)
-		if err != nil {
-			return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to ensure timelock ownership of RMNRemote on %s: %w", destChain, err)
-		}
-		allProposals = append(allProposals, out.MCMSTimelockProposals...)
-
 		// Point ARMProxy to RMNRemote
-		out, err = SetRMNRemoteOnRMNProxyChangeset(e, SetRMNRemoteOnRMNProxyConfig{
+		out, err := SetRMNRemoteOnRMNProxyChangeset(e, SetRMNRemoteOnRMNProxyConfig{
 			ChainSelectors: []uint64{destChainSel},
-			MCMSConfig:     c.MCMSConfig,
 		})
 		allReports = append(allReports, out.Reports...)
 		if err != nil {
@@ -317,7 +265,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 		out, err = TranslateEVM2EVMOnRampsToFeeQuoterChangeset(e, TranslateEVM2EVMOnRampsToFeeQuoterConfig{
 			NewFeeQuoterParamsPerSource: c.NewFeeQuoterParamsForDestinationBySource(destChainSel),
 			DestChainSelector:           destChainSel,
-			MCMS:                        c.MCMSConfig,
 		})
 		allReports = append(allReports, out.Reports...)
 		if err != nil {
@@ -329,7 +276,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 		out, err = TranslateEVM2EVMOnRampsToFeeQTokenTransferFeeConfigChangeset(e, TranslateEVM2EVMOnRampsToFeeQuoterConfig{
 			NewFeeQuoterParamsPerSource: c.NewFeeQuoterParamsForDestinationBySource(destChainSel),
 			DestChainSelector:           destChainSel,
-			MCMS:                        c.MCMSConfig,
 		})
 		allReports = append(allReports, out.Reports...)
 		if err != nil {
@@ -347,7 +293,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 			// OverrideExisting is set to true because previous a remote chain can show up twice for a given local chain (as a source or dest).
 			// We don't want applyPreviousRampsUpdates to fail when it is called for the second time for a given remote chain selector.
 			out, err = UpdateNonceManagersChangeset(e, UpdateNonceManagerConfig{
-				MCMS:               c.MCMSConfig,
 				SkipOwnershipCheck: true,
 				UpdatesByChain: map[uint64]NonceManagerUpdate{
 					destChainSel: {
@@ -376,14 +321,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 
 			// Update OnRamp 1.6.0 on source chain (use test router).
 			// OnRamp may be owned by timelock or deployer key here, so we need to check.
-			mcmsConfig := c.MCMSConfig
-			owner, err := state.Chains[sourceChainSel].OnRamp.Owner(&bind.CallOpts{Context: e.GetContext()})
-			if err != nil {
-				return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to get OnRamp owner on %s: %w", sourceChain, err)
-			}
-			if owner == sourceChain.DeployerKey.From {
-				mcmsConfig = nil // If OnRamp is owned by deployer key, we don't use MCMS.
-			}
 			out, err = UpdateOnRampsDestsChangeset(e, UpdateOnRampDestsConfig{
 				UpdatesByChain: map[uint64]map[uint64]OnRampDestinationUpdate{
 					sourceChainSel: {
@@ -394,7 +331,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 						},
 					},
 				},
-				MCMS: mcmsConfig,
 			})
 			allReports = append(allReports, out.Reports...)
 			if err != nil {
@@ -409,7 +345,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 						FeeAggregator: state.Chains[sourceChainSel].Timelock.Address(),
 					},
 				},
-				MCMS: mcmsConfig,
 			})
 			allReports = append(allReports, out.Reports...)
 			if err != nil {
@@ -419,13 +354,8 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 
 			// Update OffRamp 1.6.0 on destination chain (use test router, no RMN verification).
 			// OffRamp may be owned by timelock or deployer key here, so we need to check.
-			mcmsConfig = c.MCMSConfig
-			owner, err = state.Chains[destChainSel].OffRamp.Owner(&bind.CallOpts{Context: e.GetContext()})
 			if err != nil {
 				return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to get OffRamp owner on %s: %w", destChain, err)
-			}
-			if owner == e.BlockChains.EVMChains()[destChainSel].DeployerKey.From {
-				mcmsConfig = nil // If OffRamp is owned by deployer key, we don't use MCMS.
 			}
 			out, err = UpdateOffRampSourcesChangeset(e, UpdateOffRampSourcesConfig{
 				UpdatesByChain: map[uint64]map[uint64]OffRampSourceUpdate{
@@ -437,7 +367,6 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 						},
 					},
 				},
-				MCMS: mcmsConfig,
 			})
 			allReports = append(allReports, out.Reports...)
 			if err != nil {
@@ -466,24 +395,7 @@ func initChainUpgradesLogic(e cldf.Environment, c InitChainUpgradesConfig) (cldf
 		}
 	}
 
-	proposal, err := proposalutils.AggregateProposalsV2(
-		e,
-		proposalutils.MCMSStates{
-			MCMSEVMState: state.EVMMCMSStateByChain(),
-		},
-		allProposals,
-		"InitChainUpgradesOnTestRouters for destinations: "+strings.Join(allDestChainNames, ","),
-		c.MCMSConfig,
-	)
-	if err != nil {
-		return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to aggregate proposals: %w", err)
-	}
-
-	if proposal == nil {
-		return cldf.ChangesetOutput{Reports: allReports}, nil
-	}
-
-	return cldf.ChangesetOutput{Reports: allReports, MCMSTimelockProposals: []mcms.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{Reports: allReports}, nil
 }
 
 // PromoteChainUpgradesConfig defines the configuration for the PromoteChainUpgradesChangeset.
@@ -493,14 +405,9 @@ type PromoteChainUpgradesConfig struct {
 	// DestChains is the list of destination chain selectors to promote
 	// The sources of these chains will be promoted as well.
 	DestChains []uint64
-	// MCMSConfig is the configuration for MCMS.
-	MCMSConfig *proposalutils.TimelockConfig
 }
 
 func promoteChainUpgradesPrecondition(e cldf.Environment, c PromoteChainUpgradesConfig) error {
-	if c.MCMSConfig == nil {
-		return errors.New("MCMSConfig must be defined")
-	}
 	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
@@ -510,41 +417,13 @@ func promoteChainUpgradesPrecondition(e cldf.Environment, c PromoteChainUpgrades
 	if err != nil {
 		return fmt.Errorf("failed to validate home chain state: %w", err)
 	}
-	// Home chain contracts are owned by MCMS.
-	err = commoncs.ValidateOwnership(e.GetContext(), true, common.Address{}, state.Chains[c.HomeChainSelector].Timelock.Address(), state.Chains[c.HomeChainSelector].CCIPHome)
-	if err != nil {
-		return fmt.Errorf("failed to validate ownership of CCIPHome on %s: %w", e.BlockChains.EVMChains()[c.HomeChainSelector], err)
-	}
-	err = commoncs.ValidateOwnership(e.GetContext(), true, common.Address{}, state.Chains[c.HomeChainSelector].Timelock.Address(), state.Chains[c.HomeChainSelector].CapabilityRegistry)
-	if err != nil {
-		return fmt.Errorf("failed to validate ownership of CapabilityRegistry on %s: %w", e.BlockChains.EVMChains()[c.HomeChainSelector], err)
-	}
 
 	allChainSels := make(map[uint64]struct{})
 	for _, destChainSel := range c.DestChains {
-		// Chain selector is a valid EVM chain selector & all MCMS contracts exist.
-		err := stateview.ValidateChain(e, state, destChainSel, c.MCMSConfig)
-		if err != nil {
-			return fmt.Errorf("failed to validate chain %d: %w", destChainSel, err)
-		}
-
 		allChainSels[destChainSel] = struct{}{}
 		sourceChainSels := getSourceChainsForSelector(state, destChainSel)
 		for _, sourceChainSel := range sourceChainSels {
-			// Source chain selector is a valid EVM chain selector & all MCMS contracts exist.
-			err := stateview.ValidateChain(e, state, sourceChainSel, c.MCMSConfig)
-			if err != nil {
-				return fmt.Errorf("failed to validate chain %d: %w", sourceChainSel, err)
-			}
 			allChainSels[sourceChainSel] = struct{}{}
-		}
-	}
-
-	for chainSel := range allChainSels {
-		// Routers are owned by MCMS on both source and destination chains.
-		err := commoncs.ValidateOwnership(e.GetContext(), true, common.Address{}, state.Chains[chainSel].Timelock.Address(), state.Chains[chainSel].Router)
-		if err != nil {
-			return fmt.Errorf("failed to validate ownership of Router on %s: %w", e.BlockChains.EVMChains()[chainSel], err)
 		}
 	}
 
@@ -622,7 +501,6 @@ func promoteChainUpgradesLogic(e cldf.Environment, c PromoteChainUpgradesConfig)
 				AllowEmptyConfigPromote: false,
 			},
 		},
-		MCMS: c.MCMSConfig,
 	})
 	allReports = append(allReports, out.Reports...)
 	if err != nil {
@@ -631,43 +509,14 @@ func promoteChainUpgradesLogic(e cldf.Environment, c PromoteChainUpgradesConfig)
 	allProposals = append(allProposals, out.MCMSTimelockProposals...)
 
 	// Connect each destination to each of its sources via main routers
-	ownershipAlreadyEnsured := make(map[uint64]map[common.Address]struct{})
 	for _, destChainSel := range c.DestChains {
 		// Assemble source chains for the destination chain, using 1.5.0 OnRamps.
 		destChain := e.BlockChains.EVMChains()[destChainSel]
-
-		// Transfer ownership of OffRamp on destination chain.
-		out, err := ensureTimelockOwnership(e, destChainSel, []commoncs.Ownable{
-			state.Chains[destChainSel].OffRamp,
-		}, *c.MCMSConfig)
-		allReports = append(allReports, out.Reports...)
-		if err != nil {
-			return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to ensure timelock ownership of OffRamp on %s: %w", destChain, err)
-		}
-		allProposals = append(allProposals, out.MCMSTimelockProposals...)
 
 		// Loop through each source connected to the destination chain.
 		sourceChainsToConnect := getSourceChainsForSelector(state, destChainSel)
 		for _, sourceChainSel := range sourceChainsToConnect {
 			sourceChain := e.BlockChains.EVMChains()[sourceChainSel]
-
-			// Transfer ownership of OnRamp on source chain.
-			// We need to track if we already ensured ownership of the OnRamp on the source chain,
-			// as multiple destination chains can have overlapping source chains.
-			if ownershipAlreadyEnsured[sourceChainSel] == nil {
-				ownershipAlreadyEnsured[sourceChainSel] = make(map[common.Address]struct{})
-			}
-			if _, ok := ownershipAlreadyEnsured[sourceChainSel][state.Chains[sourceChainSel].OnRamp.Address()]; !ok {
-				out, err = ensureTimelockOwnership(e, sourceChainSel, []commoncs.Ownable{
-					state.Chains[sourceChainSel].OnRamp,
-				}, *c.MCMSConfig)
-				allReports = append(allReports, out.Reports...)
-				if err != nil {
-					return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to ensure timelock ownership of OnRamp on %s: %w", sourceChain, err)
-				}
-				allProposals = append(allProposals, out.MCMSTimelockProposals...)
-				ownershipAlreadyEnsured[sourceChainSel][state.Chains[sourceChainSel].OnRamp.Address()] = struct{}{}
-			}
 
 			/*
 				The ordering of the following changesets is important so we don't disrupt traffic:
@@ -693,7 +542,6 @@ func promoteChainUpgradesLogic(e cldf.Environment, c PromoteChainUpgradesConfig)
 					},
 				},
 				SkipOwnershipCheck: true, // We already ensured desired ownership above.
-				MCMS:               c.MCMSConfig,
 			})
 			allReports = append(allReports, out.Reports...)
 			if err != nil {
@@ -704,7 +552,6 @@ func promoteChainUpgradesLogic(e cldf.Environment, c PromoteChainUpgradesConfig)
 			// Update OnRamp to router on source, OffRamp to router on destination (use main router).
 			out, err = UpdateRouterRampsChangeset(e, UpdateRouterRampsConfig{
 				TestRouter:         false,
-				MCMS:               c.MCMSConfig,
 				SkipOwnershipCheck: true, // We already ensured desired ownership above.
 				UpdatesByChain: map[uint64]RouterUpdates{
 					destChainSel: {
@@ -733,7 +580,6 @@ func promoteChainUpgradesLogic(e cldf.Environment, c PromoteChainUpgradesConfig)
 					},
 				},
 				SkipOwnershipCheck: true, // We already ensured desired ownership above.
-				MCMS:               c.MCMSConfig,
 			})
 			allReports = append(allReports, out.Reports...)
 			if err != nil {
@@ -743,24 +589,7 @@ func promoteChainUpgradesLogic(e cldf.Environment, c PromoteChainUpgradesConfig)
 		}
 	}
 
-	proposal, err := proposalutils.AggregateProposalsV2(
-		e,
-		proposalutils.MCMSStates{
-			MCMSEVMState: state.EVMMCMSStateByChain(),
-		},
-		allProposals,
-		"PromoteChainUpgradesToMainRoutersChangeset for destinations: "+strings.Join(allDestChainNames, ","),
-		c.MCMSConfig,
-	)
-	if err != nil {
-		return cldf.ChangesetOutput{Reports: allReports}, fmt.Errorf("failed to aggregate proposals: %w", err)
-	}
-
-	if proposal == nil {
-		return cldf.ChangesetOutput{Reports: allReports}, nil
-	}
-
-	return cldf.ChangesetOutput{Reports: allReports, MCMSTimelockProposals: []mcms.TimelockProposal{*proposal}}, nil
+	return cldf.ChangesetOutput{Reports: allReports}, nil
 }
 
 func getSourceChainsForSelector(state stateview.CCIPOnChainState, chainSel uint64) []uint64 {
