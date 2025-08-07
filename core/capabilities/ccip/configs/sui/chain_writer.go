@@ -39,7 +39,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 								Function: strPtr("commit"),
 								Params: []codec.SuiFunctionParam{
 									{
-										Name:     "ref",
+										Name:     "cip_object_ref",
 										Type:     "object_id",
 										Required: true,
 									},

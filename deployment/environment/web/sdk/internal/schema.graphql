@@ -801,10 +801,7 @@ enum OCR2ChainType {
     APTOS
     TRON
     TON
-<<<<<<< HEAD
     SUI
-=======
->>>>>>> develop
 }
 
 type OCR2KeyBundle {

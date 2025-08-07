@@ -6453,10 +6453,7 @@ const (
 	OCR2ChainTypeAptos    OCR2ChainType = "APTOS"
 	OCR2ChainTypeTron     OCR2ChainType = "TRON"
 	OCR2ChainTypeTon      OCR2ChainType = "TON"
-<<<<<<< HEAD
 	OCR2ChainTypeSui      OCR2ChainType = "SUI"
-=======
->>>>>>> develop
 )
 
 // OCR2Spec includes the GraphQL fields of OCR2Spec requested by the fragment OCR2Spec.

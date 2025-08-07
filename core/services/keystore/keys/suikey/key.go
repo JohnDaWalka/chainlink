@@ -101,12 +101,8 @@ func (s Key) PublicKeyStr() string {
 func (s Key) Raw() internal.Raw { return s.raw }
 
 // Sign is used to sign a message
-func (s Key) Sign(msg []byte) ([]byte, error) {
-	// Step 1: Create Ed25519 private key from seed
-	privKey := ed25519.NewKeyFromSeed(internal.Bytes(s.raw))
-
-	// Step 2 Sign the Blake2b hash (no internal re-hashing!)
-	sig := ed25519.Sign(privKey, msg)
-
-	return sig, nil
+func (key Key) Sign(msg []byte) ([]byte, error) {
+	fmt.Printf("About to sign Sui MSG: %s\n", msg)
+	var noHash crypto.Hash
+	return key.signFn(cryptorand.Reader, msg, noHash) // no specific hash function used
 }
