@@ -6,8 +6,9 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"golang.org/x/crypto/blake2b"
 	"io"
+
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/internal"
 )
@@ -101,5 +102,17 @@ func (s Key) Raw() internal.Raw { return s.raw }
 
 // Sign is used to sign a message
 func (s Key) Sign(msg []byte) ([]byte, error) {
-	return s.signFn(cryptorand.Reader, msg, crypto.Hash(0)) // no specific hash function used
+	// Step 1: Prepend intent scope if not already included upstream
+	intentMsg := append([]byte{0x00, 0x00, 0x00}, msg...)
+
+	// Step 2: Hash using Blake2b-256
+	hash := blake2b.Sum256(intentMsg)
+
+	// Step 3: Create Ed25519 private key from seed
+	privKey := ed25519.NewKeyFromSeed(internal.Bytes(s.raw))
+
+	// Step 4: Sign the Blake2b hash (no internal re-hashing!)
+	sig := ed25519.Sign(privKey, hash[:])
+
+	return sig, nil
 }
