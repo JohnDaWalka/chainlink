@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/config"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -58,13 +57,13 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 		}
 
 		// Build user configuration from TOML (optional for cron)
-		userConfig, err := config.BuildGlobalFromTOML(cronConfig.Config)
+		userConfig, err := jobs.BuildGlobalConfigFromTOML(cronConfig.Config)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to build config from TOML")
 		}
 
 		// Apply runtime fallbacks only for keys not specified by user
-		templateData := config.ApplyRuntimeFallbacks(userConfig, map[string]any{})
+		templateData := jobs.ApplyRuntimeFallbacks(userConfig, map[string]any{})
 
 		// If no custom config provided, use empty config (jobs.EmptyStdCapConfig)
 		var configStr string

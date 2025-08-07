@@ -386,15 +386,15 @@ func SetupTestEnvironment(
 
 	createJobsInput := CreateJobsWithJdOpInput{}
 	createJobsDeps := CreateJobsWithJdOpDeps{
-		Logger:                        testLogger,
-		SingleFileLogger:              singleFileLogger,
-		HomeChainBlockchainOutput:     homeChainOutput.BlockchainOutput,
-		AddressBook:                   allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		JobSpecFactoryFunctions:       input.JobSpecFactoryFunctions,
-		FullCLDEnvOutput:              fullCldOutput,
-		CapabilitiesAwareNodeSets:     input.CapabilitiesAwareNodeSets,
-		InfraInput:                    &input.InfraInput,
-		AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
+		Logger:                    testLogger,
+		SingleFileLogger:          singleFileLogger,
+		HomeChainBlockchainOutput: homeChainOutput.BlockchainOutput,
+		AddressBook:               allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		JobSpecFactoryFunctions:   input.JobSpecFactoryFunctions,
+		FullCLDEnvOutput:          fullCldOutput,
+		CapabilitiesAwareNodeSets: input.CapabilitiesAwareNodeSets,
+		InfraInput:                &input.InfraInput,
+		// AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
 	}
 	_, createJobsErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, CreateJobsWithJdOp, createJobsDeps, createJobsInput)
 	if createJobsErr != nil {

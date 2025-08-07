@@ -22,7 +22,6 @@ import (
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -140,7 +139,7 @@ func generateJobSpecs(
 			logger.Debug().Msgf("Found CRE Forwarder contract on chain %d at %s", chainID, creForwarderAddress.Address)
 
 			// Build user configuration from TOML (global config is required)
-			userConfig, err := config.BuildFromTOML(evmConfig.Config, evmConfig.Config, chainID)
+			userConfig, err := jobs.BuildConfigFromTOML(evmConfig.Config, evmConfig.Config, chainID)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to build config from TOML")
 			}
@@ -212,7 +211,7 @@ func generateJobSpecs(
 				runtimeFallbacks := buildEVMRuntimeFallbacks(creForwarderAddress.Address, nodeAddress)
 
 				// Apply runtime fallbacks only for keys not specified by user
-				templateData := config.ApplyRuntimeFallbacks(userConfig, runtimeFallbacks)
+				templateData := jobs.ApplyRuntimeFallbacks(userConfig, runtimeFallbacks)
 
 				// Parse and execute template
 				tmpl, err := template.New("evmConfig").Parse(evmConfigTemplate)

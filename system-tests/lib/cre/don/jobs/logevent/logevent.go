@@ -10,8 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/config"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -63,7 +63,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 		}
 
 		// Build user configuration from TOML (optional for cron)
-		globalConfig, err := config.BuildGlobalFromTOML(logEventConfig.Config)
+		globalConfig, err := jobs.BuildGlobalConfigFromTOML(logEventConfig.Config)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to build config from TOML")
 		}
@@ -76,7 +76,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 
 			// Extract chain ID from template data to pass to BuildFromTOML
 			// We need to get it from the first chain in the chains list or from config
-			templateData, err := config.BuildFromTOML(globalConfig, logEventConfig.Config, chainID)
+			templateData, err := jobs.BuildConfigFromTOML(globalConfig, logEventConfig.Config, chainID)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to build config from TOML")
 			}

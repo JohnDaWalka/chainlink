@@ -1,4 +1,4 @@
-package config
+package jobs
 
 import (
 	"maps"
@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BuildFromTOML builds configuration from TOML config, requiring global config section
+// BuildConfigFromTOML builds configuration from TOML config, requiring global config section
 // Applies in order: global config (required) -> chain-specific config (optional)
-func BuildFromTOML(globalConfig, config map[string]any, chainID int) (map[string]any, error) {
+func BuildConfigFromTOML(globalConfig, config map[string]any, chainID int) (map[string]any, error) {
 	result := make(map[string]any)
 
 	// Start with global config
@@ -35,8 +35,8 @@ func BuildFromTOML(globalConfig, config map[string]any, chainID int) (map[string
 	return result, nil
 }
 
-// BuildGlobalFromTOML builds global configuration from TOML
-func BuildGlobalFromTOML(config map[string]any) (map[string]any, error) {
+// BuildGlobalConfigFromTOML builds global configuration from TOML
+func BuildGlobalConfigFromTOML(config map[string]any) (map[string]any, error) {
 	result := make(map[string]any)
 
 	// Global config is optional
@@ -56,12 +56,9 @@ func ApplyRuntimeFallbacks(userConfig map[string]any, runtimeFallbacks map[strin
 	result := make(map[string]any)
 	maps.Copy(result, userConfig)
 
-	// Add runtime fallbacks only for keys not already specified by user
-	for key, value := range runtimeFallbacks {
-		if _, exists := result[key]; !exists {
-			result[key] = value
-		}
-	}
+	// Merge runtime fallbacks without overriding existing user values
+	// By default, mergo.Merge won't override existing keys (no WithOverride flag)
+	mergo.Merge(&result, runtimeFallbacks)
 
 	return result
 }

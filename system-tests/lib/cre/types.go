@@ -410,12 +410,12 @@ type DonTopology struct {
 
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
-	Capabilities       []string
-	DONTypes           []string
-	SupportedChains    []uint64          // chain IDs that the DON supports, empty means all chains
-	BootstrapNodeIndex int               // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
-	GatewayNodeIndex   int               // -1 -> no gateway, only used if the DON has the GatewayDON flag
-	EnvVars            map[string]string // additional environment variables to be set on each node
+	Capabilities       []string          `toml:"capabilities"`
+	DONTypes           []string          `toml:"don_types"`
+	SupportedChains    []uint64          `toml:"supported_chains"`     // chain IDs that the DON supports, empty means all chains
+	BootstrapNodeIndex int               `toml:"bootstrap_node_index"` // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
+	GatewayNodeIndex   int               `toml:"gateway_node_index"`   // -1 -> no gateway, only used if the DON has the GatewayDON flag
+	EnvVars            map[string]string `toml:"env_vars"`             // additional environment variables to be set on each node
 }
 
 type CapabilitiesPeeringData struct {
