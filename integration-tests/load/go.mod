@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.66
 	github.com/smartcontractkit/chainlink-ccip v0.1.0-solana.0.20250801185822-4d19f7e5570f
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
-	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250702115140-93959a95eba4
+	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250807174108-141496ece254
 	github.com/smartcontractkit/chainlink-deployments-framework v0.15.1
 	github.com/smartcontractkit/chainlink-evm v0.0.0-20250704141053-c351643e0b06
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.9.6
