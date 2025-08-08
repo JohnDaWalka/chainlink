@@ -115,24 +115,7 @@ func generateJobSpecs(
 			return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 		}
 
-		// New: iterate enabled chains from nodeset chain capabilities resolver
-		nodeSet := nodeSetInput[donIdx]
-
-		// Defaults for capability configs come from AdditionalCapabilities[flag].Config
-		// These are global defaults per capability.
-		defaults := map[string]map[string]any{}
-		if capCfg, ok := capabilitiesConfig[flag]; ok {
-			defaults[string(flag)] = capCfg.Config
-		}
-
-		enabledChains := []uint64{}
-		if nodeSet.ChainCapabilities != nil {
-			if cc, ok := nodeSet.ChainCapabilities[string(flag)]; ok {
-				enabledChains = append(enabledChains, cc.EnabledChains...)
-			}
-		}
-
-		for _, chainIDUint64 := range enabledChains {
+		for _, chainIDUint64 := range nodeSetInput[donIdx].ChainCapabilities[flag].EnabledChains {
 			chainID := int(chainIDUint64)
 			chainIDStr := strconv.Itoa(chainID)
 			chain, ok := chainsel.ChainByEvmChainID(chainIDUint64)
@@ -158,7 +141,7 @@ func generateJobSpecs(
 			logger.Debug().Msgf("Found CRE Forwarder contract on chain %d at %s", chainID, creForwarderAddress.Address)
 
 			// Build user configuration from defaults + chain overrides
-			enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(string(flag), nodeSet.ChainCapabilities, defaults, chainIDUint64)
+			enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(string(flag), nodeSetInput[donIdx].ChainCapabilities, evmConfig.Config, chainIDUint64)
 			if rErr != nil {
 				return nil, errors.Wrap(rErr, "failed to resolve capability config for chain")
 			}

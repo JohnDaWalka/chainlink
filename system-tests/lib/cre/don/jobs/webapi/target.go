@@ -52,7 +52,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilities
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		// Apply runtime fallbacks only for keys not specified by user
+		// Apply runtime values only for keys not specified by user
 		templateData := jobs.ApplyRuntimeValues(webAPITargetConfig.Config, map[string]any{})
 
 		// If no custom config provided, use default config

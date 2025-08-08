@@ -537,7 +537,7 @@ func parseChainID(v any) (uint64, error) {
 func ResolveCapabilityForChain(
 	capName string,
 	caps map[string]*ChainCapabilityConfig,
-	defaults map[string]map[string]any,
+	defaults map[string]any,
 	chainID uint64,
 ) (bool, map[string]any, error) {
 	if caps == nil {
@@ -552,9 +552,9 @@ func ResolveCapabilityForChain(
 		return false, nil, nil
 	}
 	merged := map[string]any{}
-	if d, ok := defaults[capName]; ok {
+	if defaults != nil {
 		// copy defaults
-		maps.Copy(merged, d)
+		maps.Copy(merged, defaults)
 	}
 	if co, ok := cfg.ChainOverrides[chainID]; ok {
 		// override with chain-specific values
