@@ -2,7 +2,9 @@ package cre
 
 import (
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -428,33 +430,6 @@ type CapabilitiesAwareNodeSet struct {
 	ChainCapabilities map[string]*ChainCapabilityConfig `toml:"-"`
 }
 
-// UnmarshalTOML implements custom TOML unmarshaling for CapabilitiesAwareNodeSet.
-// func (c *CapabilitiesAwareNodeSet) UnmarshalTOML(data any) error {
-// 	// Create a type alias to avoid infinite recursion
-// 	type Alias CapabilitiesAwareNodeSet
-
-// 	// Create an anonymous struct that embeds the alias but overrides the problematic field
-// 	var raw struct {
-// 		Alias
-// 		// This will capture the raw chain_capabilities data
-// 		RawChainCapabilities any `toml:"chain_capabilities"`
-// 	}
-
-// 	// The TOML library should handle the standard unmarshaling automatically
-// 	// Since we're using the alias pattern, this should work without recursion
-
-// 	// Copy all the standard fields that were unmarshaled automatically
-// 	*c = CapabilitiesAwareNodeSet(raw.Alias)
-
-// 	// Now handle the custom chain_capabilities field using our existing logic
-// 	dataMap, ok := data.(map[string]interface{})
-// 	if !ok {
-// 		return fmt.Errorf("expected map[string]interface{}, got %T", data)
-// 	}
-
-// 	return c.ParseChainCapabilities(dataMap)
-// }
-
 type CapabilitiesPeeringData struct {
 	GlobalBootstraperPeerID string
 	GlobalBootstraperHost   string
@@ -469,14 +444,15 @@ type OCRPeeringData struct {
 
 // ParseChainCapabilities parses chain_capabilities from raw TOML data and sets it on the CapabilitiesAwareNodeSet.
 // This allows us to handle the flexible chain_capabilities syntax without a complex custom unmarshaler.
-func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]interface{}) error {
+func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any) error {
 	c.ChainCapabilities = make(map[string]*ChainCapabilityConfig)
 
 	for capName, capValue := range capMap {
 		config := &ChainCapabilityConfig{}
+		capabilities := []string{}
 
 		switch v := capValue.(type) {
-		case []interface{}:
+		case []any:
 			// Handle array syntax: capability = ["1337", "2337"]
 			for _, chainIDVal := range v {
 				chainID, err := parseChainID(chainIDVal)
@@ -484,11 +460,12 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]inte
 					return fmt.Errorf("invalid chain ID in %s: %v", capName, err)
 				}
 				config.EnabledChains = append(config.EnabledChains, chainID)
+				capabilities = append(capabilities, capName+"-"+fmt.Sprint(chainID))
 			}
-		case map[string]interface{}:
+		case map[string]any:
 			// Handle map syntax: capability = { enabled_chains = [...], chain_overrides = {...} }
 			if enabledChainsVal, ok := v["enabled_chains"]; ok {
-				enabledChains, ok := enabledChainsVal.([]interface{})
+				enabledChains, ok := enabledChainsVal.([]any)
 				if !ok {
 					return fmt.Errorf("enabled_chains must be an array in %s", capName)
 				}
@@ -498,11 +475,12 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]inte
 						return fmt.Errorf("invalid chain ID in %s.enabled_chains: %v", capName, err)
 					}
 					config.EnabledChains = append(config.EnabledChains, chainID)
+					capabilities = append(capabilities, capName+"-"+fmt.Sprint(chainID))
 				}
 			}
 
 			if chainOverridesVal, ok := v["chain_overrides"]; ok {
-				chainOverrides, ok := chainOverridesVal.(map[string]interface{})
+				chainOverrides, ok := chainOverridesVal.(map[string]any)
 				if !ok {
 					return fmt.Errorf("chain_overrides must be a map in %s", capName)
 				}
@@ -512,7 +490,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]inte
 					if err != nil {
 						return fmt.Errorf("invalid chain ID key %s in %s.chain_overrides: %v", chainIDStr, capName, err)
 					}
-					if overridesMap, ok := overrides.(map[string]interface{}); ok {
+					if overridesMap, ok := overrides.(map[string]any); ok {
 						config.ChainOverrides[chainID] = overridesMap
 					} else {
 						return fmt.Errorf("chain override for %d in %s must be a map", chainID, capName)
@@ -524,6 +502,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]inte
 		}
 
 		c.ChainCapabilities[capName] = config
+		c.Capabilities = append(c.Capabilities, capabilities...)
 	}
 
 	return nil
@@ -568,28 +547,18 @@ func ResolveCapabilityForChain(
 	if !ok {
 		return false, nil, nil
 	}
-	enabled := false
-	for _, id := range cfg.EnabledChains {
-		if id == chainID {
-			enabled = true
-			break
-		}
-	}
+	enabled := slices.Contains(cfg.EnabledChains, chainID)
 	if !enabled {
 		return false, nil, nil
 	}
 	merged := map[string]any{}
 	if d, ok := defaults[capName]; ok {
 		// copy defaults
-		for k, v := range d {
-			merged[k] = v
-		}
+		maps.Copy(merged, d)
 	}
 	if co, ok := cfg.ChainOverrides[chainID]; ok {
 		// override with chain-specific values
-		for k, v := range co {
-			merged[k] = v
-		}
+		maps.Copy(merged, co)
 	}
 	return true, merged, nil
 }

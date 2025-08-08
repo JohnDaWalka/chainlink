@@ -23,12 +23,12 @@ const cronConfigTemplate = `""` // Empty config by default
 var CronJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
-		*input.InfraInput,
+		input.InfraInput,
 		input.AdditionalCapabilities,
 	)
 }
 
-func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}

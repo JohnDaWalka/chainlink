@@ -35,7 +35,7 @@ func BootstrapOCR3(nodeID string, name string, ocr3CapabilityAddress string, cha
 	providerType = "ocr3-capability"
 `,
 			uuid,
-			"ocr3-bootstrap-"+name,
+			"ocr3-bootstrap-"+name+fmt.Sprintf("-%d", chainID),
 			ocr3CapabilityAddress,
 			chainID),
 	}

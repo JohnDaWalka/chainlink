@@ -117,6 +117,7 @@ func generateJobSpecs(
 
 		// New: iterate enabled chains from nodeset chain capabilities resolver
 		nodeSet := nodeSetInput[donIdx]
+
 		// Defaults for capability configs come from AdditionalCapabilities[flag].Config
 		// These are global defaults per capability.
 		defaults := map[string]map[string]any{}
@@ -134,13 +135,17 @@ func generateJobSpecs(
 		for _, chainIDUint64 := range enabledChains {
 			chainID := int(chainIDUint64)
 			chainIDStr := strconv.Itoa(chainID)
+			chain, ok := chainsel.ChainByEvmChainID(chainIDUint64)
+			if !ok {
+				return nil, fmt.Errorf("failed to get chain selector for chain ID %d", chainIDUint64)
+			}
 
 			// create job specs for the bootstrap node
 			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "evm-capability", evmOCR3CapabilityAddress.Address, chainIDUint64))
 			logger.Debug().Msgf("Deployed EVM OCR3 contract on chain %d at %s", chainIDUint64, evmOCR3CapabilityAddress.Address)
 
 			creForwarderKey := datastore.NewAddressRefKey(
-				donTopology.HomeChainSelector,
+				chain.Selector,
 				datastore.ContractType(keystone_changeset.KeystoneForwarder.String()),
 				semver.MustParse("1.0.0"),
 				"",
@@ -167,11 +172,6 @@ func generateJobSpecs(
 			userConfig, err := jobs.BuildGlobalConfigFromTOML(map[string]any{"config": mergedConfig})
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to build config from TOML")
-			}
-
-			chain, ok := chainsel.ChainByEvmChainID(chainIDUint64)
-			if !ok {
-				return nil, fmt.Errorf("failed to get chain selector for chain ID %d", chainIDUint64)
 			}
 
 			for _, workerNode := range workflowNodeSet {

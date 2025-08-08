@@ -80,6 +80,7 @@ type SetupInput struct {
 	OCR3Config                           *keystone_changeset.OracleConfig
 	VaultOCR3Config                      *keystone_changeset.OracleConfig
 	S3ProviderInput                      *s3provider.Input
+	AdditionalCapabilitiesConfigs        cre.AdditionalCapabilitiesConfigs
 }
 
 type backgroundStageResult struct {
@@ -209,7 +210,7 @@ func SetupTestEnvironment(
 		allNodeFlags = append(allNodeFlags, nodeFlags...)
 	}
 	vaultOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.VaultCapability)
-	evmOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.EVMCapability)
+	evmOCR3AddrFlag := flags.HasFlagForAnyChain(allNodeFlags, cre.EVMCapability)
 
 	deployKeystoneReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
@@ -386,15 +387,15 @@ func SetupTestEnvironment(
 
 	createJobsInput := CreateJobsWithJdOpInput{}
 	createJobsDeps := CreateJobsWithJdOpDeps{
-		Logger:                    testLogger,
-		SingleFileLogger:          singleFileLogger,
-		HomeChainBlockchainOutput: homeChainOutput.BlockchainOutput,
-		AddressBook:               allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		JobSpecFactoryFunctions:   input.JobSpecFactoryFunctions,
-		FullCLDEnvOutput:          fullCldOutput,
-		CapabilitiesAwareNodeSets: input.CapabilitiesAwareNodeSets,
-		InfraInput:                &input.InfraInput,
-		// AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
+		Logger:                        testLogger,
+		SingleFileLogger:              singleFileLogger,
+		HomeChainBlockchainOutput:     homeChainOutput.BlockchainOutput,
+		AddressBook:                   allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		JobSpecFactoryFunctions:       input.JobSpecFactoryFunctions,
+		FullCLDEnvOutput:              fullCldOutput,
+		CapabilitiesAwareNodeSets:     input.CapabilitiesAwareNodeSets,
+		InfraInput:                    &input.InfraInput,
+		AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
 	}
 	_, createJobsErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, CreateJobsWithJdOp, createJobsDeps, createJobsInput)
 	if createJobsErr != nil {

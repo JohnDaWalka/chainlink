@@ -2,6 +2,7 @@ package flags
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -46,6 +47,20 @@ func HasFlagForChain(nodeSet *cre.CapabilitiesAwareNodeSet, capability string, c
 		return false
 	}
 	return slices.Contains(cfg.EnabledChains, chainID)
+}
+
+func HasFlagForAnyChain(values []string, capability string) bool {
+	if HasFlag(values, capability) {
+		return true
+	}
+
+	for _, value := range values {
+		if strings.HasPrefix(value, capability+"-") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func OneDonMetadataWithFlag(donTopologies []*cre.DonMetadata, flag string) (*cre.DonMetadata, error) {

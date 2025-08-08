@@ -310,10 +310,13 @@ func startCmd() *cobra.Command {
 				return errors.Wrap(err, "failed to load test configuration")
 			}
 
+			// TODO add correct handling. UnmarshalTOML is not supported by the library we use :head_exploding:
+			// Maybe we should add hooks to Load()?
 			for _, nodeSet := range in.NodeSets {
 				if asMap, ok := nodeSet.RawChainCapabilities.(map[string]any); ok {
-					caps := nodeSet.ParseChainCapabilities(asMap)
-					_ = caps
+					if err := nodeSet.ParseChainCapabilities(asMap); err != nil {
+						return errors.Wrap(err, "failed to parse chain capabilities")
+					}
 				}
 			}
 
@@ -687,11 +690,11 @@ func StartCLIEnvironment(
 		capabilityFactoryFns = append(capabilityFactoryFns, readcontractcap.ReadContractCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 		capabilityFactoryFns = append(capabilityFactoryFns, logeventtriggercap.LogEventTriggerCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
 		capabilityFactoryFns = append(capabilityFactoryFns, evm.EVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
-
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn)
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crelogevent.LogEventTriggerJobSpecFactoryFn)
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crereadcontract.ReadContractJobSpecFactoryFn)
 	}
+
+	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn)
+	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crelogevent.LogEventTriggerJobSpecFactoryFn)
+	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crereadcontract.ReadContractJobSpecFactoryFn)
 
 	if in.JD.CSAEncryptionKey == "" {
 		// generate a new key
@@ -712,7 +715,8 @@ func StartCLIEnvironment(
 		ConfigFactoryFunctions: []cre.ConfigFactoryFn{
 			gatewayconfig.GenerateConfig,
 		},
-		S3ProviderInput: in.S3ProviderInput,
+		S3ProviderInput:               in.S3ProviderInput,
+		AdditionalCapabilitiesConfigs: in.AdditionalCapabilities,
 	}
 
 	// TODO: we could/should probably build these from capabilities configuration

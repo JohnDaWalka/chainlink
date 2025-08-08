@@ -2,6 +2,7 @@ package environment
 
 import (
 	"fmt"
+	"maps"
 	"os"
 
 	"github.com/pkg/errors"
@@ -235,9 +236,12 @@ func copyCapabilityAwareNodeSets(
 
 		if originalNs.EnvVars != nil {
 			newNs.EnvVars = make(map[string]string, len(originalNs.EnvVars))
-			for k, v := range originalNs.EnvVars {
-				newNs.EnvVars[k] = v
-			}
+			maps.Copy(newNs.EnvVars, originalNs.EnvVars)
+		}
+
+		if originalNs.ChainCapabilities != nil {
+			newNs.ChainCapabilities = make(map[string]*cre.ChainCapabilityConfig, len(originalNs.ChainCapabilities))
+			maps.Copy(newNs.ChainCapabilities, originalNs.ChainCapabilities)
 		}
 
 		copiedNodeSets[i] = newNs
