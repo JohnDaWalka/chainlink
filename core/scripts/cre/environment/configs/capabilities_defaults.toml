@@ -2,28 +2,15 @@
   binary_path = "./cron"
 
 # Global config for cron is optional - uses empty config by default
-# [additional_capabilities.cron.config]
+[additional_capabilities.cron.config]
 #   CustomField = "value"  # Add custom fields if needed
 
-[additional_capabilities.log_event_trigger]
+[additional_capabilities.log-event-trigger]
   binary_path = "./logtrigger"
-  chains = ["1337", "2337"]
 
-# Global config for log event trigger (REQUIRED - all values must be specified)
-[additional_capabilities.log_event_trigger.config]
+[additional_capabilities.log-event-trigger.config]
   LookbackBlocks = 2000        # Default lookback blocks
   PollPeriod = 1500            # Default poll period in milliseconds
-
-# Chain-specific overrides for log event trigger
-[additional_capabilities.log_event_trigger.chain_configs."1337"]
-  ChainID = 1337
-  NetworkFamily = "evm"   # Explicit network family for chain
-
-[additional_capabilities.log_event_trigger.chain_configs."2337"]
-  ChainID = 2337
-  NetworkFamily = "evm"    # Explicit network family for chain
-  LookbackBlocks = 3000        # Override for chain
-  PollPeriod = 1000            # Override for chain
 
 [additional_capabilities.evm]
   # Defaults for the EVM capability
@@ -37,24 +24,28 @@
   # CreForwarderAddress = "0x0000000000000000000000000000000000000000"
   # NodeAddress = "0x0000000000000000000000000000000000000000"
 
-# Read Contract Capability Configuration
-[additional_capabilities.read_contract]
+[additional_capabilities.read-contract]
   binary_path = "./readcontract"
-  chains = ["1337", "2337"]
 
-# Chain-specific overrides for read contract
-[additional_capabilities.read_contract.chain_configs."1337"]
-  ChainID = 1337
-  NetworkFamily = "evm"   # Explicit network family for chain
+#[additional_capabilities.web-api-target]
+#  no binary path for web API target, it's built-in
 
-[additional_capabilities.read_contract.chain_configs."2337"]
-  ChainID = 2337
-  NetworkFamily = "evm"    # Explicit network family for chain
+[additional_capabilities.web-api-target.config]
+  # Rate limiter configuration for web API target
+  GlobalRPS = 1000.0
+  GlobalBurst = 1000
+  PerSenderRPS = 1000.0
+  PerSenderBurst = 1000
 
-# Mock Capability Configuration
+#[additional_capabilities.web-api-trigger]
+#  no binary path for web API trigger, it's built-in
+
+# Web API trigger uses empty config by default
+[additional_capabilities.web-api-trigger.config]
+#   CustomField = "value"  # Add custom fields if needed
+
 #[additional_capabilities.mock]
 #  binary_path = "mock"
 
-# Global config for mock capability (optional - uses runtime port by default)
 #[additional_capabilities.mock.config]
 #  Port = 8080  # Port for mock service

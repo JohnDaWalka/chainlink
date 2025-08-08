@@ -11,22 +11,22 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
 const flag = cre.ReadContractCapability
 const readContractConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}"}'`
 
-// Read contract is now fully configurable via TOML - no runtime fallbacks needed
+// Read contract capability with per-chain configuration support
 
 var ReadContractJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
 		*input.InfraInput,
 		input.AdditionalCapabilities,
+		input.CapabilitiesAwareNodeSets,
 	)
 }
 
@@ -34,14 +34,18 @@ var ReadContractJobName = func(chainID string) string {
 	return "read-contract-" + chainID
 }
 
-func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
 	donToJobSpecs := make(cre.DonsToJobSpecs)
 
-	for _, donWithMetadata := range donTopology.DonsWithMetadata {
-		if !flags.HasFlag(donWithMetadata.Flags, cre.ReadContractCapability) {
+	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
+		// Read contract capability is enabled strictly per-chain via ChainCapabilities
+		if donIdx >= len(nodeSetInput) || nodeSetInput[donIdx] == nil || nodeSetInput[donIdx].ChainCapabilities == nil {
+			continue
+		}
+		if cc, ok := nodeSetInput[donIdx].ChainCapabilities[string(flag)]; !ok || cc == nil || len(cc.EnabledChains) == 0 {
 			continue
 		}
 
@@ -62,22 +66,44 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		globalConfig, err := jobs.BuildGlobalConfigFromTOML(readContractConfig.Config)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to build config from TOML")
+		// Get nodeset and defaults for capability configs
+		nodeSet := nodeSetInput[donIdx]
+
+		// Defaults for capability configs come from AdditionalCapabilities[flag].Config
+		defaults := map[string]map[string]any{}
+		if capCfg, ok := capabilitiesConfig[flag]; ok {
+			defaults[string(flag)] = capCfg.Config
 		}
 
-		for _, chainIDStr := range readContractConfig.Chains {
-			chainID, err := strconv.Atoi(chainIDStr)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert chain ID %s to int", chainIDStr)
+		enabledChains := []uint64{}
+		if nodeSet.ChainCapabilities != nil {
+			if cc, ok := nodeSet.ChainCapabilities[string(flag)]; ok {
+				enabledChains = append(enabledChains, cc.EnabledChains...)
+			}
+		}
+
+		for _, chainIDUint64 := range enabledChains {
+			chainID := int(chainIDUint64)
+			chainIDStr := strconv.Itoa(chainID)
+
+			// Build user configuration from defaults + chain overrides
+			enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(string(flag), nodeSet.ChainCapabilities, defaults, chainIDUint64)
+			if rErr != nil {
+				return nil, errors.Wrap(rErr, "failed to resolve capability config for chain")
+			}
+			if !enabled {
+				// should not happen because we derived enabledChains from the same source, but guard anyway
+				continue
 			}
 
-			// Build user configuration from TOML (global config is required)
-			templateData, err := jobs.BuildConfigFromTOML(globalConfig, readContractConfig.Config, chainID)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to build config from TOML")
+			// Build runtime fallbacks for any missing values
+			runtimeFallbacks := map[string]any{
+				"ChainID":       chainID,
+				"NetworkFamily": "evm",
 			}
+
+			// Apply runtime fallbacks only for keys not specified by user
+			templateData := jobs.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
 
 			// Parse and execute template
 			tmpl, err := template.New("readContractConfig").Parse(readContractConfigTemplate)
@@ -97,7 +123,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				jobSpec := libjobs.WorkerStandardCapability(nodeID, ReadContractJobName(chainIDStr), readContractBinaryPath, configStr, "")
+				jobSpec := jobs.WorkerStandardCapability(nodeID, ReadContractJobName(chainIDStr), readContractBinaryPath, configStr, "")
 
 				if _, ok := donToJobSpecs[donWithMetadata.ID]; !ok {
 					donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)

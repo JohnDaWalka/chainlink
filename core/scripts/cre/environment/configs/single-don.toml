@@ -50,6 +50,10 @@
     write-evm = ["1337"]
     # EVM capability with a chain-specific override example
     # evm = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { ReceiverGasMinimum = 1000 } } }
+    # Read contract capability
+    #read-contract = ["1337", "2337"]
+    # Log trigger capability
+    #log-trigger = ["1337", "2337"]
 
   [nodesets.db]
     image = "postgres:12.0"

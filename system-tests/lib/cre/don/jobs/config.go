@@ -51,14 +51,14 @@ func BuildGlobalConfigFromTOML(config map[string]any) (map[string]any, error) {
 	return result, nil
 }
 
-// ApplyRuntimeFallbacks fills in any missing config values with runtime-generated fallbacks
-func ApplyRuntimeFallbacks(userConfig map[string]any, runtimeFallbacks map[string]any) map[string]any {
+// ApplyRuntimeValues fills in any missing config values with runtime-generated values
+func ApplyRuntimeValues(userConfig map[string]any, runtimeValues map[string]any) map[string]any {
 	result := make(map[string]any)
 	maps.Copy(result, userConfig)
 
 	// Merge runtime fallbacks without overriding existing user values
 	// By default, mergo.Merge won't override existing keys (no WithOverride flag)
-	mergo.Merge(&result, runtimeFallbacks)
+	mergo.Merge(&result, runtimeValues)
 
 	return result
 }

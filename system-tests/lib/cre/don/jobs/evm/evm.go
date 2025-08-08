@@ -167,12 +167,7 @@ func generateJobSpecs(
 				continue
 			}
 
-			// To preserve current behavior, treat mergedConfig as the "user" config post-merge
-			// and pass globalConfig = mergedConfig, chain-specific section unused here
-			userConfig, err := jobs.BuildGlobalConfigFromTOML(map[string]any{"config": mergedConfig})
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to build config from TOML")
-			}
+			// mergedConfig already contains the resolved config (defaults + chain overrides)
 
 			for _, workerNode := range workflowNodeSet {
 				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
@@ -236,7 +231,7 @@ func generateJobSpecs(
 				runtimeFallbacks := buildEVMRuntimeFallbacks(chainID, "evm", creForwarderAddress.Address, nodeAddress)
 
 				// Apply runtime fallbacks only for keys not specified by user
-				templateData := jobs.ApplyRuntimeFallbacks(userConfig, runtimeFallbacks)
+				templateData := jobs.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
 
 				// Parse and execute template
 				tmpl, err := template.New("evmConfig").Parse(evmConfigTemplate)

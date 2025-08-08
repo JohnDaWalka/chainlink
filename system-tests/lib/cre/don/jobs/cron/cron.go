@@ -56,14 +56,8 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		// Build user configuration from TOML (optional for cron)
-		userConfig, err := jobs.BuildGlobalConfigFromTOML(cronConfig.Config)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to build config from TOML")
-		}
-
-		// Apply runtime fallbacks only for keys not specified by user
-		templateData := jobs.ApplyRuntimeFallbacks(userConfig, map[string]any{})
+		// Apply runtime values only for keys not specified by user
+		templateData := jobs.ApplyRuntimeValues(cronConfig.Config, map[string]any{})
 
 		// If no custom config provided, use empty config (jobs.EmptyStdCapConfig)
 		var configStr string

@@ -55,11 +55,8 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		// Build user configuration from TOML (optional for cron)
-		globalConfig, err := jobs.BuildGlobalConfigFromTOML(mockConfig.Config)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to build config from TOML")
-		}
+		// Apply runtime values only for keys not specified by user
+		templateData := jobs.ApplyRuntimeValues(mockConfig.Config, map[string]any{})
 
 		// Parse and execute template
 		tmpl, err := template.New("mockConfig").Parse(mockConfigTemplate)
@@ -68,7 +65,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 		}
 
 		var configBuffer bytes.Buffer
-		if err := tmpl.Execute(&configBuffer, globalConfig); err != nil {
+		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
 			return nil, errors.Wrap(err, "failed to execute mock config template")
 		}
 		configStr := configBuffer.String()
