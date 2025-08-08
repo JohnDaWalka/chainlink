@@ -60,13 +60,22 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 		if !exists {
 			return configOverrides, errors.Errorf("failed to find selector for chain ID %d", bcOut.ChainID)
 		}
+		// Determine write-evm enablement per chain via node-set ChainCapabilities
+		hasWriteEVM := false
+		if input.NodeSet != nil && input.NodeSet.ChainCapabilities != nil {
+			if cc, ok := input.NodeSet.ChainCapabilities[string(cre.WriteEVMCapability)]; ok && cc != nil {
+				if slices.Contains(cc.EnabledChains, bcOut.ChainID) {
+					hasWriteEVM = true
+				}
+			}
+		}
 		workerEVMInputs = append(workerEVMInputs, &WorkerEVMInput{
-			Name:                 fmt.Sprintf("node-%d", chainSelector),
-			ChainID:              bcOut.ChainID,
-			ChainSelector:        c.Selector,
-			HTTPRPC:              bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
-			WSRPC:                bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
-			HasForwarderContract: !bcOut.ReadOnly,
+			Name:          fmt.Sprintf("node-%d", chainSelector),
+			ChainID:       bcOut.ChainID,
+			ChainSelector: c.Selector,
+			HTTPRPC:       bcOut.BlockchainOutput.Nodes[0].InternalHTTPUrl,
+			WSRPC:         bcOut.BlockchainOutput.Nodes[0].InternalWSUrl,
+			WritesToEVM:   hasWriteEVM,
 		})
 	}
 
@@ -147,9 +156,9 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 			}
 		}
 
-		// get all the forwarders and add workflow config for each node ETH key + Forwarder for that chain
+		// get all the forwarders and add workflow config (FromAddress + Forwarder) for chains that have write-evm enabled
 		for _, wi := range workerEVMInputs {
-			if !wi.HasForwarderContract {
+			if !wi.WritesToEVM {
 				continue
 			}
 

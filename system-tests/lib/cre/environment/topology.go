@@ -108,6 +108,7 @@ func BuildTopology(
 					AddressBook:            addressBook,
 					HomeChainSelector:      topology.HomeChainSelector,
 					GatewayConnectorOutput: topology.GatewayConnectorOutput,
+					NodeSet:                localNodeSets[i],
 				},
 				configFactoryFunctions,
 			)

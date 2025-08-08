@@ -71,14 +71,14 @@ func BoostrapDon2DonPeering(peeringData cre.CapabilitiesPeeringData) string {
 }
 
 type WorkerEVMInput struct {
-	Name                 string
-	ChainID              uint64
-	ChainSelector        uint64
-	HTTPRPC              string
-	WSRPC                string
-	FromAddress          common.Address
-	ForwarderAddress     string
-	HasForwarderContract bool
+	Name             string
+	ChainID          uint64
+	ChainSelector    uint64
+	HTTPRPC          string
+	WSRPC            string
+	FromAddress      common.Address
+	ForwarderAddress string
+	WritesToEVM      bool
 }
 
 func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*WorkerEVMInput) string {
@@ -103,7 +103,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 			chain.HTTPRPC,
 		)
 
-		if chain.HasForwarderContract {
+		if chain.WritesToEVM {
 			evmChainsConfig += fmt.Sprintf(`
 
 	[EVM.Workflow]

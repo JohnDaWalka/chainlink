@@ -3,6 +3,8 @@ package cre
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -332,6 +334,8 @@ type GenerateConfigsInput struct {
 	PeeringData            CapabilitiesPeeringData
 	AddressBook            cldf.AddressBook
 	GatewayConnectorOutput *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
+	// NodeSet provides access to chain-scoped capability configuration for this DON
+	NodeSet *CapabilitiesAwareNodeSet
 }
 
 func (g *GenerateConfigsInput) Validate() error {
@@ -410,13 +414,46 @@ type DonTopology struct {
 
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
-	Capabilities       []string          `toml:"capabilities"`
-	DONTypes           []string          `toml:"don_types"`
-	SupportedChains    []uint64          `toml:"supported_chains"`     // chain IDs that the DON supports, empty means all chains
-	BootstrapNodeIndex int               `toml:"bootstrap_node_index"` // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
-	GatewayNodeIndex   int               `toml:"gateway_node_index"`   // -1 -> no gateway, only used if the DON has the GatewayDON flag
-	EnvVars            map[string]string `toml:"env_vars"`             // additional environment variables to be set on each node
+	Capabilities         []string          `toml:"capabilities"`
+	DONTypes             []string          `toml:"don_types"`
+	SupportedChains      []uint64          `toml:"supported_chains"`     // chain IDs that the DON supports, empty means all chains
+	BootstrapNodeIndex   int               `toml:"bootstrap_node_index"` // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
+	GatewayNodeIndex     int               `toml:"gateway_node_index"`   // -1 -> no gateway, only used if the DON has the GatewayDON flag
+	EnvVars              map[string]string `toml:"env_vars"`             // additional environment variables to be set on each node
+	RawChainCapabilities any               `toml:"chain_capabilities"`
+	// ChainCapabilities allows enabling capabilities per chain with optional per-chain overrides.
+	// Example syntaxes accepted per capability key:
+	//   evm = ["1337", "2337"]
+	//   evm = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { ReceiverGasMinimum = 1000 } } }
+	ChainCapabilities map[string]*ChainCapabilityConfig `toml:"-"`
 }
+
+// UnmarshalTOML implements custom TOML unmarshaling for CapabilitiesAwareNodeSet.
+// func (c *CapabilitiesAwareNodeSet) UnmarshalTOML(data any) error {
+// 	// Create a type alias to avoid infinite recursion
+// 	type Alias CapabilitiesAwareNodeSet
+
+// 	// Create an anonymous struct that embeds the alias but overrides the problematic field
+// 	var raw struct {
+// 		Alias
+// 		// This will capture the raw chain_capabilities data
+// 		RawChainCapabilities any `toml:"chain_capabilities"`
+// 	}
+
+// 	// The TOML library should handle the standard unmarshaling automatically
+// 	// Since we're using the alias pattern, this should work without recursion
+
+// 	// Copy all the standard fields that were unmarshaled automatically
+// 	*c = CapabilitiesAwareNodeSet(raw.Alias)
+
+// 	// Now handle the custom chain_capabilities field using our existing logic
+// 	dataMap, ok := data.(map[string]interface{})
+// 	if !ok {
+// 		return fmt.Errorf("expected map[string]interface{}, got %T", data)
+// 	}
+
+// 	return c.ParseChainCapabilities(dataMap)
+// }
 
 type CapabilitiesPeeringData struct {
 	GlobalBootstraperPeerID string
@@ -428,6 +465,133 @@ type OCRPeeringData struct {
 	OCRBootstraperPeerID string
 	OCRBootstraperHost   string
 	Port                 int
+}
+
+// ParseChainCapabilities parses chain_capabilities from raw TOML data and sets it on the CapabilitiesAwareNodeSet.
+// This allows us to handle the flexible chain_capabilities syntax without a complex custom unmarshaler.
+func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]interface{}) error {
+	c.ChainCapabilities = make(map[string]*ChainCapabilityConfig)
+
+	for capName, capValue := range capMap {
+		config := &ChainCapabilityConfig{}
+
+		switch v := capValue.(type) {
+		case []interface{}:
+			// Handle array syntax: capability = ["1337", "2337"]
+			for _, chainIDVal := range v {
+				chainID, err := parseChainID(chainIDVal)
+				if err != nil {
+					return fmt.Errorf("invalid chain ID in %s: %v", capName, err)
+				}
+				config.EnabledChains = append(config.EnabledChains, chainID)
+			}
+		case map[string]interface{}:
+			// Handle map syntax: capability = { enabled_chains = [...], chain_overrides = {...} }
+			if enabledChainsVal, ok := v["enabled_chains"]; ok {
+				enabledChains, ok := enabledChainsVal.([]interface{})
+				if !ok {
+					return fmt.Errorf("enabled_chains must be an array in %s", capName)
+				}
+				for _, chainIDVal := range enabledChains {
+					chainID, err := parseChainID(chainIDVal)
+					if err != nil {
+						return fmt.Errorf("invalid chain ID in %s.enabled_chains: %v", capName, err)
+					}
+					config.EnabledChains = append(config.EnabledChains, chainID)
+				}
+			}
+
+			if chainOverridesVal, ok := v["chain_overrides"]; ok {
+				chainOverrides, ok := chainOverridesVal.(map[string]interface{})
+				if !ok {
+					return fmt.Errorf("chain_overrides must be a map in %s", capName)
+				}
+				config.ChainOverrides = make(map[uint64]map[string]any)
+				for chainIDStr, overrides := range chainOverrides {
+					chainID, err := strconv.ParseUint(chainIDStr, 10, 64)
+					if err != nil {
+						return fmt.Errorf("invalid chain ID key %s in %s.chain_overrides: %v", chainIDStr, capName, err)
+					}
+					if overridesMap, ok := overrides.(map[string]interface{}); ok {
+						config.ChainOverrides[chainID] = overridesMap
+					} else {
+						return fmt.Errorf("chain override for %d in %s must be a map", chainID, capName)
+					}
+				}
+			}
+		default:
+			return fmt.Errorf("unsupported chain capability format for %s: %T", capName, capValue)
+		}
+
+		c.ChainCapabilities[capName] = config
+	}
+
+	return nil
+}
+
+// ChainCapabilityConfig is a universal, static envelope for per-capability configuration.
+// It supports both simple and complex TOML syntaxes via UnmarshalTOML:
+// - capability = ["1337", "2337"]
+// - capability = { enabled_chains=["1337","2337"], chain_overrides={"1337"={ ... }} }
+type ChainCapabilityConfig struct {
+	EnabledChains  []uint64                  `toml:"-"`
+	ChainOverrides map[uint64]map[string]any `toml:"-"`
+}
+
+func parseChainID(v any) (uint64, error) {
+	switch t := v.(type) {
+	case string:
+		return strconv.ParseUint(strings.TrimSpace(t), 10, 64)
+	case int64:
+		return uint64(t), nil
+	case int:
+		return uint64(t), nil
+	case uint64:
+		return t, nil
+	default:
+		return 0, fmt.Errorf("invalid chain id type: %T", v)
+	}
+}
+
+// ResolveCapabilityForChain merges defaults with chain override for a capability on a given chain.
+// Returns (enabled, mergedConfig).
+func ResolveCapabilityForChain(
+	capName string,
+	caps map[string]*ChainCapabilityConfig,
+	defaults map[string]map[string]any,
+	chainID uint64,
+) (bool, map[string]any, error) {
+	if caps == nil {
+		return false, nil, nil
+	}
+	cfg, ok := caps[capName]
+	if !ok {
+		return false, nil, nil
+	}
+	enabled := false
+	for _, id := range cfg.EnabledChains {
+		if id == chainID {
+			enabled = true
+			break
+		}
+	}
+	if !enabled {
+		return false, nil, nil
+	}
+	merged := map[string]any{}
+	if d, ok := defaults[capName]; ok {
+		// copy defaults
+		for k, v := range d {
+			merged[k] = v
+		}
+	}
+	if co, ok := cfg.ChainOverrides[chainID]; ok {
+		// override with chain-specific values
+		for k, v := range co {
+			merged[k] = v
+		}
+	}
+	return true, merged, nil
 }
 
 type GenerateKeysInput struct {

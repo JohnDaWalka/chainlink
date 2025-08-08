@@ -26,24 +26,16 @@
   PollPeriod = 1000            # Override for chain
 
 [additional_capabilities.evm]
-  binary_path = "./evm"
-  chains = "1337" # will be intialised only for this chain
+  # Defaults for the EVM capability
+  # These are merged with per-DON chain_overrides
+  binary_path = "/Users/bartektofel/Desktop/repos/capabilities-compiled/evm"
 
-# Global config for all chains (REQUIRED - no hardcoded defaults in code)
 [additional_capabilities.evm.config]
-  LogTriggerPollInterval = 1500000000  # 1.5s in nanoseconds - applies to all chains
-  ReceiverGasMinimum = 500             # global default
-  # Runtime values like ChainID, NetworkFamily, CreForwarderAddress, NodeAddress
-  # are auto-filled if not specified, but can be overridden here if needed
-
-# Chain-specific overrides (optional)
-[additional_capabilities.evm.chain_configs."1337"]
-  ChainID = 1337
-  LogTriggerPollInterval = 2000000000  # 2s in nanoseconds - overrides global for chain
-  ReceiverGasMinimum = 1000            # overrides global for chain
-  # Example: Override runtime values with pre-deployed contracts:
-  # CreForwarderAddress = "0x1234567890123456789012345678901234567890"
-  # NodeAddress = "0x0987654321098765432109876543210987654321"
+  LogTriggerPollInterval = 1500000000  # 1.5s in nanoseconds
+  ReceiverGasMinimum = 500
+  # Runtime values below are typically filled at runtime, but may be overridden
+  # CreForwarderAddress = "0x0000000000000000000000000000000000000000"
+  # NodeAddress = "0x0000000000000000000000000000000000000000"
 
 # Read Contract Capability Configuration
 [additional_capabilities.read_contract]

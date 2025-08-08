@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
@@ -32,8 +31,10 @@ const flag = cre.EVMCapability
 const evmConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","logTriggerPollInterval":{{.LogTriggerPollInterval}}, "creForwarderAddress":"{{.CreForwarderAddress}}","receiverGasMinimum":{{.ReceiverGasMinimum}},"nodeAddress":"{{.NodeAddress}}"}'`
 
 // buildEVMRuntimeFallbacks creates runtime-generated fallback values for any keys not specified in TOML
-func buildEVMRuntimeFallbacks(creForwarderAddress, nodeAddress string) map[string]any {
+func buildEVMRuntimeFallbacks(chainID int, networkFamily, creForwarderAddress, nodeAddress string) map[string]any {
 	return map[string]any{
+		"ChainID":             chainID,
+		"NetworkFamily":       networkFamily,
 		"CreForwarderAddress": creForwarderAddress,
 		"NodeAddress":         nodeAddress,
 	}
@@ -62,7 +63,11 @@ func generateJobSpecs(
 	logger := framework.L
 
 	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
-		if !flags.HasFlag(donWithMetadata.Flags, cre.EVMCapability) {
+		// EVM capability is enabled strictly per-chain via ChainCapabilities
+		if donIdx >= len(nodeSetInput) || nodeSetInput[donIdx] == nil || nodeSetInput[donIdx].ChainCapabilities == nil {
+			continue
+		}
+		if cc, ok := nodeSetInput[donIdx].ChainCapabilities[string(flag)]; !ok || cc == nil || len(cc.EnabledChains) == 0 {
 			continue
 		}
 
@@ -110,16 +115,25 @@ func generateJobSpecs(
 			return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 		}
 
-		for _, chainIDStr := range evmConfig.Chains {
-			chainID, err := strconv.Atoi(chainIDStr)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert chain ID %s to int", chainIDStr)
-			}
+		// New: iterate enabled chains from nodeset chain capabilities resolver
+		nodeSet := nodeSetInput[donIdx]
+		// Defaults for capability configs come from AdditionalCapabilities[flag].Config
+		// These are global defaults per capability.
+		defaults := map[string]map[string]any{}
+		if capCfg, ok := capabilitiesConfig[flag]; ok {
+			defaults[string(flag)] = capCfg.Config
+		}
 
-			chainIDUint64, err := strconv.ParseUint(chainIDStr, 10, 64)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to convert chain ID %s to uint64", chainIDStr)
+		enabledChains := []uint64{}
+		if nodeSet.ChainCapabilities != nil {
+			if cc, ok := nodeSet.ChainCapabilities[string(flag)]; ok {
+				enabledChains = append(enabledChains, cc.EnabledChains...)
 			}
+		}
+
+		for _, chainIDUint64 := range enabledChains {
+			chainID := int(chainIDUint64)
+			chainIDStr := strconv.Itoa(chainID)
 
 			// create job specs for the bootstrap node
 			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "evm-capability", evmOCR3CapabilityAddress.Address, chainIDUint64))
@@ -138,8 +152,19 @@ func generateJobSpecs(
 
 			logger.Debug().Msgf("Found CRE Forwarder contract on chain %d at %s", chainID, creForwarderAddress.Address)
 
-			// Build user configuration from TOML (global config is required)
-			userConfig, err := jobs.BuildConfigFromTOML(evmConfig.Config, evmConfig.Config, chainID)
+			// Build user configuration from defaults + chain overrides
+			enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(string(flag), nodeSet.ChainCapabilities, defaults, chainIDUint64)
+			if rErr != nil {
+				return nil, errors.Wrap(rErr, "failed to resolve capability config for chain")
+			}
+			if !enabled {
+				// should not happen because we derived enabledChains from the same source, but guard anyway
+				continue
+			}
+
+			// To preserve current behavior, treat mergedConfig as the "user" config post-merge
+			// and pass globalConfig = mergedConfig, chain-specific section unused here
+			userConfig, err := jobs.BuildGlobalConfigFromTOML(map[string]any{"config": mergedConfig})
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to build config from TOML")
 			}
@@ -208,7 +233,7 @@ func generateJobSpecs(
 				oracleStr := strings.ReplaceAll(oracleBuffer.String(), "\n", "\n\t")
 
 				// Build runtime fallbacks for any missing values
-				runtimeFallbacks := buildEVMRuntimeFallbacks(creForwarderAddress.Address, nodeAddress)
+				runtimeFallbacks := buildEVMRuntimeFallbacks(chainID, "evm", creForwarderAddress.Address, nodeAddress)
 
 				// Apply runtime fallbacks only for keys not specified by user
 				templateData := jobs.ApplyRuntimeFallbacks(userConfig, runtimeFallbacks)

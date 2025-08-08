@@ -28,6 +28,26 @@ func HasOnlyOneFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag) && len(values) == 1
 }
 
+// HasFlagForChain checks if a capability is enabled for a specific chain on a nodeset.
+// Returns true if the capability is listed in global Capabilities, or if it's enabled
+// in ChainCapabilities for the given chain ID.
+func HasFlagForChain(nodeSet *cre.CapabilitiesAwareNodeSet, capability string, chainID uint64) bool {
+	if nodeSet == nil {
+		return false
+	}
+	if HasFlag(nodeSet.Capabilities, capability) {
+		return true
+	}
+	if nodeSet.ChainCapabilities == nil {
+		return false
+	}
+	cfg, ok := nodeSet.ChainCapabilities[capability]
+	if !ok || cfg == nil {
+		return false
+	}
+	return slices.Contains(cfg.EnabledChains, chainID)
+}
+
 func OneDonMetadataWithFlag(donTopologies []*cre.DonMetadata, flag string) (*cre.DonMetadata, error) {
 	donTopologies = DonMetadataWithFlag(donTopologies, flag)
 	if len(donTopologies) != 1 {

@@ -309,6 +309,14 @@ func startCmd() *cobra.Command {
 			if err != nil {
 				return errors.Wrap(err, "failed to load test configuration")
 			}
+
+			for _, nodeSet := range in.NodeSets {
+				if asMap, ok := nodeSet.RawChainCapabilities.(map[string]any); ok {
+					caps := nodeSet.ParseChainCapabilities(asMap)
+					_ = caps
+				}
+			}
+
 			if err := in.Validate(); err != nil {
 				return errors.Wrap(err, "failed to validate test configuration")
 			}
@@ -802,6 +810,12 @@ func defaultCtfConfigs(topologyFlag string) error {
 				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
 			}
 		}
+
+		defaultsSetErr := os.Setenv("CTF_CONFIGS", os.Getenv("CTF_CONFIGS")+",configs/capabilities_defaults.toml")
+		if defaultsSetErr != nil {
+			return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", defaultsSetErr)
+		}
+
 		fmt.Printf("Set CTF_CONFIGS environment variable to default value: %s\n", os.Getenv("CTF_CONFIGS"))
 	}
 

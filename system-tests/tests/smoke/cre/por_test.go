@@ -42,7 +42,6 @@ import (
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	computecap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
 	consensuscap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
 	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
@@ -232,18 +231,18 @@ func setupPoRTestEnvironment(
 	}
 
 	customBinariesPaths := map[string]string{}
-	containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.Type)
-	require.NoError(t, pathErr, "failed to get default container directory")
-	var cronBinaryPathInTheContainer string
-	if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
-		// where cron binary is located in the container
-		cronBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.CronCapabilityBinaryPath))
-		// where cron binary is located on the host
-		customBinariesPaths[cre.CronCapability] = in.DependenciesConfig.CronCapabilityBinaryPath
-	} else {
-		// assume that if cron binary is already in the image it is in the default location and has default name
-		cronBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
-	}
+	// containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.Type)
+	// require.NoError(t, pathErr, "failed to get default container directory")
+	// var cronBinaryPathInTheContainer string
+	// if in.DependenciesConfig.CronCapabilityBinaryPath != "" {
+	// 	// where cron binary is located in the container
+	// 	cronBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.CronCapabilityBinaryPath))
+	// 	// where cron binary is located on the host
+	// 	customBinariesPaths[cre.CronCapability] = in.DependenciesConfig.CronCapabilityBinaryPath
+	// } else {
+	// 	// assume that if cron binary is already in the image it is in the default location and has default name
+	// 	cronBinaryPathInTheContainer = filepath.Join(containerPath, "cron")
+	// }
 
 	firstBlockchain := in.Blockchains[0]
 
@@ -260,7 +259,7 @@ func setupPoRTestEnvironment(
 		CustomBinariesPaths:                  customBinariesPaths,
 		JobSpecFactoryFunctions: []cre.JobSpecFactoryFn{
 			creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
-			crecron.CronJobSpecFactoryFn(cronBinaryPathInTheContainer),
+			crecron.CronJobSpecFactoryFn,
 			cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 			crecompute.ComputeJobSpecFactoryFn,
 		},

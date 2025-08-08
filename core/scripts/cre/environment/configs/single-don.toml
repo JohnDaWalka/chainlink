@@ -33,7 +33,7 @@
 [[nodesets]]
   nodes = 5
 
-  capabilities = ["ocr3", "custom-compute", "write-evm[1337,2337]", "web-api-target", "web-api-trigger", "vault"]
+  capabilities = ["ocr3", "custom-compute", "web-api-target", "web-api-trigger", "vault"]
   don_types = ["workflow", "gateway"]
   bootstrap_node_index = 0 # index of node in the nodeset that will act as the bootsrap node (not required, but added for visiblity)
   gateway_node_index = 0 # added for visiblity, required always, when don_types include "gateway"
@@ -43,6 +43,13 @@
   override_mode = "each"
   http_port_range_start = 10100
   name = "workflow"
+
+  # Enable capabilities per chain with optional per-chain overrides
+  [nodesets.chain_capabilities]
+    # Simple: enable write-evm on listed chains
+    write-evm = ["1337"]
+    # EVM capability with a chain-specific override example
+    evm = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { ReceiverGasMinimum = 1000 } } }
 
   [nodesets.db]
     image = "postgres:12.0"
