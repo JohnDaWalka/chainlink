@@ -327,7 +327,7 @@ func TestVault_E2E(t *testing.T) {
             chainID = "%s"
 
 			[pluginConfig]
-			requestExpiryDuration = "60s"
+			requestExpiryDuration = "5s"
 		`, ocr3Addr, nodeOCRKeyID, nodeTransmitterAddresses[0], bootstrapP2PLocator, c.Blockchain.ChainID)
 
 		job, resp, err := client.CreateJobRaw(vaultJobSpec)
@@ -371,6 +371,8 @@ func TestVault_E2E(t *testing.T) {
 
 			req.Header.Set("Content-Type", "application/jsonrpc")
 			req.Header.Set("Accept", "application/json")
+
+			println("Sending request to:", req.URL.String())
 
 			client := &http.Client{}
 			resp, err := client.Do(req)

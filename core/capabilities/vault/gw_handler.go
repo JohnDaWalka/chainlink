@@ -22,7 +22,7 @@ import (
 var (
 	_ connector.GatewayConnectorHandler = (*GatewayHandler)(nil)
 
-	ConnectorMethod = "capability"
+	ConnectorMethod = "vault"
 	HandlerName     = "VaultHandler"
 )
 
@@ -110,6 +110,7 @@ func (h *GatewayHandler) handleSecretsCreate(ctx context.Context, gatewayID stri
 	if err := json.Unmarshal(*req.Params, &requestData); err != nil {
 		return h.errorResponse(ctx, gatewayID, req, api.UserMessageParseError, err)
 	}
+	h.lggr.Infof("Debugging: handleSecretsCreate 1 %s: %v", gatewayID, req)
 	vaultCapRequest := vault.CreateSecretsRequest{
 		EncryptedSecrets: []*vault.EncryptedSecret{
 			{
@@ -124,13 +125,16 @@ func (h *GatewayHandler) handleSecretsCreate(ctx context.Context, gatewayID stri
 	}
 	vaultCapResponse, err := h.secretsService.CreateSecrets(ctx, &vaultCapRequest)
 	if err != nil {
+		h.lggr.Infof("Debugging: h.secretsService.CreateSecrets failed, erro: %s", err.Error())
 		return h.errorResponse(ctx, gatewayID, req, api.FatalError, err)
 	}
+	h.lggr.Infof("Debugging: handleSecretsCreate 2 %s: %v", gatewayID, req)
 
 	resultBytes, err := json.Marshal(vaultCapResponse)
 	if err != nil {
 		return h.errorResponse(ctx, gatewayID, req, api.NodeReponseEncodingError, err)
 	}
+	h.lggr.Infof("Debugging: handleSecretsCreate 3 %s: %v", gatewayID, req)
 
 	return &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
@@ -146,7 +150,7 @@ func (h *GatewayHandler) errorResponse(
 	errorCode api.ErrorCode,
 	err error,
 ) *jsonrpc.Response[json.RawMessage] {
-	h.lggr.Errorf("error code: %d, err: %s", errorCode, err.Error())
+	h.lggr.Infof("GatewayHandler error code: %d, err: %s", errorCode, err.Error())
 	h.metrics.requestInternalError.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("gateway_id", gatewayID),
 		attribute.String("error", errorCode.String()),

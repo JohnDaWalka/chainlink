@@ -23,6 +23,7 @@ var _ SecretsService = (*Capability)(nil)
 
 type Capability struct {
 	clock        clockwork.Clock
+	lggr         logger.Logger
 	expiresAfter time.Duration
 	handler      *requests.Handler[*vault2.Request, *vault2.Response]
 }
@@ -116,7 +117,7 @@ func (s *Capability) handleRequest(ctx context.Context, id string, request proto
 		ExpiryTimeVal: s.clock.Now().Add(s.expiresAfter),
 		IDVal:         id,
 	})
-
+	s.lggr.Infof("Sent Request to Vault OCR: %s", request)
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -130,6 +131,7 @@ func (s *Capability) handleRequest(ctx context.Context, id string, request proto
 }
 
 func (s *Capability) CreateSecrets(ctx context.Context, request *vault.CreateSecretsRequest) (*vault2.Response, error) {
+	s.lggr.Infof("Received CreateSecrets call: %s", request.String())
 	return s.handleRequest(ctx, request.RequestId, request)
 }
 
@@ -141,6 +143,7 @@ func NewCapability(
 ) *Capability {
 	return &Capability{
 		clock:        clock,
+		lggr:         lggr.Named("VaultCapability"),
 		expiresAfter: expiresAfter,
 		handler:      requests.NewHandler(lggr, store, clock, expiresAfter),
 	}

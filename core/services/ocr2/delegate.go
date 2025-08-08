@@ -740,8 +740,9 @@ func (d *Delegate) newServicesVaultPlugin(
 		MetricsRegisterer:       prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 	// TODO: use properly generated config
-	oracleArgs.ReportingPluginFactory = vault.NewReportingPluginFactory(lggr, store, &vault.ReportingPluginConfig{})
-
+	service := vault.NewReportingPluginFactory(lggr, store, &vault.ReportingPluginConfig{})
+	oracleArgs.ReportingPluginFactory = service
+	srvs = append(srvs, service)
 	oracle, err := libocr2.NewOracle(oracleArgs)
 	if err != nil {
 		return nil, err
