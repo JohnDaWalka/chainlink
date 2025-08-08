@@ -274,7 +274,7 @@ func SetupTestEnvironment(
 		bcOuts,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		input.ConfigFactoryFunctions,
-		input.CustomBinariesPaths,
+		input.AdditionalCapabilitiesConfigs,
 	)
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")

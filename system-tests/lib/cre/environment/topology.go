@@ -15,6 +15,7 @@ import (
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	creconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	cresecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
+	creflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
@@ -26,7 +27,7 @@ func BuildTopology(
 	blockchainOutput map[uint64]*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	configFactoryFunctions []cre.ConfigFactoryFn,
-	customBinariesPaths map[cre.CapabilityFlag]string,
+	additionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
 	topologyErr := libdon.ValidateTopology(nodeSets, infraInput)
 	if topologyErr != nil {
@@ -146,6 +147,13 @@ func BuildTopology(
 
 			for j := range donMetadata.NodesMetadata {
 				localNodeSets[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
+			}
+		}
+
+		customBinariesPaths := make(map[cre.CapabilityFlag]string)
+		for flag, config := range additionalCapabilitiesConfigs {
+			if creflags.HasFlagForAnyChain(donMetadata.Flags, flag) && config.BinaryPath != "" {
+				customBinariesPaths[flag] = config.BinaryPath
 			}
 		}
 

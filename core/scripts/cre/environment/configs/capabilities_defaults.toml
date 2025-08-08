@@ -1,12 +1,12 @@
 [additional_capabilities.cron]
-  binary_path = "./cron"
+  binary_path = "./binaries/cron"
 
 # Global config for cron is optional - uses empty config by default
 [additional_capabilities.cron.config]
 #   CustomField = "value"  # Add custom fields if needed
 
 [additional_capabilities.log-event-trigger]
-  binary_path = "./logtrigger"
+  binary_path = "./binaries/logtrigger"
 
 [additional_capabilities.log-event-trigger.config]
   LookbackBlocks = 2000        # Default lookback blocks
@@ -15,7 +15,7 @@
 [additional_capabilities.evm]
   # Defaults for the EVM capability
   # These are merged with per-DON chain_overrides
-  binary_path = "/Users/bartektofel/Desktop/repos/capabilities-compiled/evm"
+  binary_path = "./binaries/evm"
 
 [additional_capabilities.evm.config]
   LogTriggerPollInterval = 1500000000  # 1.5s in nanoseconds
@@ -25,7 +25,7 @@
   # NodeAddress = "0x0000000000000000000000000000000000000000"
 
 [additional_capabilities.read-contract]
-  binary_path = "./readcontract"
+  binary_path = "./binaries/readcontract"
 
 #[additional_capabilities.web-api-target]
 #  no binary path for web API target, it's built-in
@@ -45,7 +45,7 @@
 #   CustomField = "value"  # Add custom fields if needed
 
 #[additional_capabilities.mock]
-#  binary_path = "mock"
+  binary_path = "./binaries/mock"
 
 #[additional_capabilities.mock.config]
 #  Port = 8080  # Port for mock service

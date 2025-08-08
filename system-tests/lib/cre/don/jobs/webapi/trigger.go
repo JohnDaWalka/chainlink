@@ -23,16 +23,17 @@ var WebAPITriggerJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.Do
 		input.DonTopology,
 		input.InfraInput,
 		input.AdditionalCapabilities,
+		input.CapabilitiesAwareNodeSets,
 	)
 }
 
-func generateTriggerJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
+func generateTriggerJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
 	donToJobSpecs := make(cre.DonsToJobSpecs)
 
-	for _, donWithMetadata := range donTopology.DonsWithMetadata {
+	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
 		if !flags.HasFlag(donWithMetadata.Flags, cre.WebAPITriggerCapability) {
 			continue
 		}
@@ -47,8 +48,16 @@ func generateTriggerJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capab
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
+		// Merge global defaults with DON-specific overrides
+		var donOverrides map[string]map[string]any
+		if donIdx < len(nodeSetInput) && nodeSetInput[donIdx] != nil {
+			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
+		}
+
+		mergedConfig := cre.ResolveCapabilityConfigForDON(string(triggerFlag), webAPITriggerConfig.Config, donOverrides)
+
 		// Apply runtime values only for keys not specified by user
-		templateData := jobs.ApplyRuntimeValues(webAPITriggerConfig.Config, map[string]any{})
+		templateData := jobs.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		// If no custom config provided, use empty config (jobs.EmptyStdCapConfig)
 		var configStr string

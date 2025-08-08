@@ -29,16 +29,17 @@ var WebAPITargetJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.Don
 		input.DonTopology,
 		input.InfraInput,
 		input.AdditionalCapabilities,
+		input.CapabilitiesAwareNodeSets,
 	)
 }
 
-func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
 	donToJobSpecs := make(cre.DonsToJobSpecs)
 
-	for _, donWithMetadata := range donTopology.DonsWithMetadata {
+	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
 		if !flags.HasFlag(donWithMetadata.Flags, cre.WebAPITargetCapability) {
 			continue
 		}
@@ -47,13 +48,22 @@ func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilities
 		if !ok {
 			return nil, errors.New("web-api-target config not found in capabilities config")
 		}
+
 		workflowNodeSet, err := libnode.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: libnode.NodeTypeKey, Value: cre.WorkerNode}, libnode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
+		// Merge global defaults with DON-specific overrides
+		var donOverrides map[string]map[string]any
+		if donIdx < len(nodeSetInput) && nodeSetInput[donIdx] != nil {
+			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
+		}
+
+		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), webAPITargetConfig.Config, donOverrides)
+
 		// Apply runtime values only for keys not specified by user
-		templateData := jobs.ApplyRuntimeValues(webAPITargetConfig.Config, map[string]any{})
+		templateData := jobs.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		// If no custom config provided, use default config
 		var configStr string

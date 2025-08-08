@@ -24,16 +24,17 @@ var MockJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSp
 		input.DonTopology,
 		*input.InfraInput,
 		input.AdditionalCapabilities,
+		input.CapabilitiesAwareNodeSets,
 	)
 }
 
-func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
 	donToJobSpecs := make(cre.DonsToJobSpecs)
 
-	for _, donWithMetadata := range donTopology.DonsWithMetadata {
+	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
 		if !flags.HasFlag(donWithMetadata.Flags, cre.MockCapability) {
 			continue
 		}
@@ -55,8 +56,16 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
+		// Merge global defaults with DON-specific overrides
+		var donOverrides map[string]map[string]any
+		if donIdx < len(nodeSetInput) && nodeSetInput[donIdx] != nil {
+			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
+		}
+
+		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), mockConfig.Config, donOverrides)
+
 		// Apply runtime values only for keys not specified by user
-		templateData := jobs.ApplyRuntimeValues(mockConfig.Config, map[string]any{})
+		templateData := jobs.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		// Parse and execute template
 		tmpl, err := template.New("mockConfig").Parse(mockConfigTemplate)

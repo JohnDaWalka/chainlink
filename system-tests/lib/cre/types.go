@@ -428,6 +428,10 @@ type CapabilitiesAwareNodeSet struct {
 	//   evm = ["1337", "2337"]
 	//   evm = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { ReceiverGasMinimum = 1000 } } }
 	ChainCapabilities map[string]*ChainCapabilityConfig `toml:"-"`
+
+	// CapabilityOverrides allows overriding global capability configuration per DON.
+	// Example: [nodesets.capability_overrides.web-api-target] GlobalRPS = 2000.0
+	CapabilityOverrides map[string]map[string]any `toml:"capability_overrides"`
 }
 
 type CapabilitiesPeeringData struct {
@@ -561,6 +565,31 @@ func ResolveCapabilityForChain(
 		maps.Copy(merged, co)
 	}
 	return true, merged, nil
+}
+
+// ResolveCapabilityConfigForDON merges global defaults with DON-specific overrides for capabilities
+// that don't have chain-specific configuration (like cron, web-api-target, web-api-trigger).
+// Returns the merged configuration.
+func ResolveCapabilityConfigForDON(
+	capabilityName string,
+	globalDefaults map[string]any,
+	donOverrides map[string]map[string]any,
+) map[string]any {
+	merged := map[string]any{}
+
+	// Start with global defaults
+	if globalDefaults != nil {
+		maps.Copy(merged, globalDefaults)
+	}
+
+	// Apply DON-specific overrides
+	if donOverrides != nil {
+		if overrides, ok := donOverrides[capabilityName]; ok {
+			maps.Copy(merged, overrides)
+		}
+	}
+
+	return merged
 }
 
 type GenerateKeysInput struct {
