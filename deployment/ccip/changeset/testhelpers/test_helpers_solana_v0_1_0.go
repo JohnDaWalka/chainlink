@@ -70,7 +70,11 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+<<<<<<< HEAD
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+=======
+	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
+>>>>>>> develop
 
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
@@ -200,7 +204,7 @@ func SleepAndReplay(t *testing.T, env cldf.Environment, duration time.Duration, 
 
 // ReplayLogs replays logs for the given blocks using the provided offchain client.
 // By default, it will assert on errors. Use WithAssertOnError(false) to change this behavior.
-func ReplayLogs(t *testing.T, oc cldf.OffchainClient, replayBlocks map[uint64]uint64, opts ...ReplayLogsOption) {
+func ReplayLogs(t *testing.T, oc cldf_offchain.Client, replayBlocks map[uint64]uint64, opts ...ReplayLogsOption) {
 	options := &replayLogsOptions{
 		assertOnError: true,
 	}
@@ -229,7 +233,7 @@ func ReplayLogs(t *testing.T, oc cldf.OffchainClient, replayBlocks map[uint64]ui
 	}
 }
 
-func WaitForEventFilterRegistration(t *testing.T, oc cldf.OffchainClient, chainSel uint64, eventName string, address []byte) error {
+func WaitForEventFilterRegistration(t *testing.T, oc cldf_offchain.Client, chainSel uint64, eventName string, address []byte) error {
 	family, err := chainsel.GetSelectorFamily(chainSel)
 	if err != nil {
 		return err
@@ -272,7 +276,7 @@ func WaitForEventFilterRegistration(t *testing.T, oc cldf.OffchainClient, chainS
 	return nil
 }
 
-func isLogFilterRegistered(t *testing.T, oc cldf.OffchainClient, chainSel uint64, eventName string, address []byte) (bool, error) {
+func isLogFilterRegistered(t *testing.T, oc cldf_offchain.Client, chainSel uint64, eventName string, address []byte) (bool, error) {
 	var registered bool
 	var err error
 	switch oc := oc.(type) {
@@ -284,7 +288,7 @@ func isLogFilterRegistered(t *testing.T, oc cldf.OffchainClient, chainSel uint64
 	return registered, err
 }
 
-func WaitForEventFilterRegistrationOnLane(t *testing.T, onchainState stateview.CCIPOnChainState, onchainClient cldf.OffchainClient, sourceChainSel, destChainSel uint64) {
+func WaitForEventFilterRegistrationOnLane(t *testing.T, onchainState stateview.CCIPOnChainState, onchainClient cldf_offchain.Client, sourceChainSel, destChainSel uint64) {
 	onRampAddr, err := onchainState.GetOnRampAddressBytes(sourceChainSel)
 	require.NoError(t, err)
 	// Ensure CCIPMessageSent event filter is registered
