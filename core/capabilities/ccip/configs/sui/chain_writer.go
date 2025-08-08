@@ -20,8 +20,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 	}
 
 	pubKeyBytes := ed25519.PublicKey(rawPubKey)
-
-	isClockMutable := false
+	nonMutable := false
 
 	return chainwriter.ChainWriterConfig{
 		Modules: map[string]*chainwriter.ChainWriterModule{
@@ -52,7 +51,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 										Name:      "clock",
 										Type:      "object_id",
 										Required:  true,
-										IsMutable: &isClockMutable,
+										IsMutable: &nonMutable,
 									},
 									{
 										Name:     "report_context",
@@ -74,18 +73,43 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 						},
 					},
 					consts.MethodExecute: {
-						Name:      "execute",
+						Name:      "init_execute",
 						PublicKey: pubKeyBytes,
-						Params: []codec.SuiFunctionParam{
+						Params:    []codec.SuiFunctionParam{},
+						PTBCommands: []config.ChainWriterPTBCommand{
 							{
-								Name:     "ReportContext",
-								Type:     "vector<vector<u8>>",
-								Required: true,
-							},
-							{
-								Name:     "Report",
-								Type:     "vector<u8>",
-								Required: true,
+								Type:     codec.SuiPTBCommandMoveCall,
+								ModuleId: strPtr("offramp"),
+								Function: strPtr("init_execute"),
+								Params: []codec.SuiFunctionParam{
+									{
+										Name:      "ref",
+										Type:      "object_id",
+										Required:  true,
+										IsMutable: &nonMutable,
+									},
+									{
+										Name:     "state",
+										Type:     "object_id",
+										Required: true,
+									},
+									{
+										Name:      "clock",
+										Type:      "object_id",
+										Required:  true,
+										IsMutable: &nonMutable,
+									},
+									{
+										Name:     "report_context",
+										Type:     "vector<vector<u8>>",
+										Required: true,
+									},
+									{
+										Name:     "report",
+										Type:     "vector<u8>",
+										Required: true,
+									},
+								},
 							},
 						},
 					},
