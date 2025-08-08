@@ -1,7 +1,9 @@
 package sui
 
 import (
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -14,11 +16,16 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"golang.org/x/crypto/blake2b"
 )
 
 var _ cldf.ChangeSetV2[v1_6.SetOCR3OffRampConfig] = SetOCR3Offramp{}
 
 type SetOCR3Offramp struct{}
+
+// Ed25519Scheme Ed25519 signature scheme flag
+// https://docs.sui.io/concepts/cryptography/transaction-auth/keys-addresses#address-format
+const Ed25519Scheme byte = 0x00
 
 // Apply implements deployment.ChangeSetV2.
 func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConfig) (cldf.ChangesetOutput, error) {
@@ -81,6 +88,28 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			}
 		}
 
+		// convert transmitters to account address
+		var commitTransmitters []string
+
+		for _, transmitter := range commitArgs.Transmitters {
+			fmt.Println("COMMIT TRANSMITTER: ", transmitter)
+			// 1) Strip any “0x” prefix
+			clean := strings.TrimPrefix(transmitter, "0x")
+
+			// 2) Decode the clean hex into bytes
+			pubKeyBytes, err := hex.DecodeString(clean)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to decode transmitter %q: %w", transmitter, err)
+			}
+			flagged := append([]byte{Ed25519Scheme}, pubKeyBytes...)
+
+			hash := blake2b.Sum256(flagged)
+			addr := "0x" + hex.EncodeToString(hash[:])
+			commitTransmitters = append(commitTransmitters, addr)
+		}
+
+		fmt.Println("COMIT TRANSMITTERS: ", commitTransmitters)
+
 		setOCR3ConfigCommitInput := offrampops.SetOCR3ConfigInput{
 			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
 			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
@@ -91,9 +120,31 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			BigF:                           commitArgs.F,
 			IsSignatureVerificationEnabled: commitArgs.IsSignatureVerificationEnabled,
 			Signers:                        commitArgs.Signers,
-			Transmitters:                   commitArgs.Transmitters,
+			Transmitters:                   commitTransmitters,
 		}
 
+		// convert exec transmitters to account address
+		var execTransmitters []string
+
+		for _, transmitter := range execArgs.Transmitters {
+			fmt.Println("EXEC TRANSMITTER: ", transmitter)
+			// 1) Strip any “0x” prefix
+			clean := strings.TrimPrefix(transmitter, "0x")
+
+			// 2) Decode the clean hex into bytes
+			pubKeyBytes, err := hex.DecodeString(clean)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to decode transmitter %q: %w", transmitter, err)
+			}
+
+			flagged := append([]byte{Ed25519Scheme}, pubKeyBytes...)
+
+			hash := blake2b.Sum256(flagged)
+			addr := "0x" + hex.EncodeToString(hash[:])
+			execTransmitters = append(execTransmitters, addr)
+		}
+
+		fmt.Println("EXEC TRANSMITTERS: ", execTransmitters)
 		_, err = operations.ExecuteOperation(e.OperationsBundle, offrampops.SetOCR3ConfigOp, deps.SuiChain, setOCR3ConfigCommitInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
@@ -109,7 +160,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			BigF:                           execArgs.F,
 			IsSignatureVerificationEnabled: execArgs.IsSignatureVerificationEnabled,
 			Signers:                        execArgs.Signers,
-			Transmitters:                   execArgs.Transmitters,
+			Transmitters:                   commitTransmitters,
 		}
 
 		_, err = operations.ExecuteOperation(e.OperationsBundle, offrampops.SetOCR3ConfigOp, deps.SuiChain, setOCR3ConfigExecInput)

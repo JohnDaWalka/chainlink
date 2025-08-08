@@ -52,7 +52,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.0
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250804223734-02018e687bcd
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250807225159-29db749df563
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250808075451-3eb64e0d51f1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.9
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/freeport v0.1.1
@@ -67,6 +67,7 @@ require (
 	github.com/xssnick/tonutils-go v1.13.0
 	github.com/zksync-sdk/zksync2-go v1.1.1-0.20250620124214-2c742ee399c6
 	go.uber.org/zap v1.27.0
+	golang.org/x/crypto v0.40.0
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 	golang.org/x/mod v0.26.0
 	golang.org/x/oauth2 v0.30.0
@@ -465,7 +466,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
 	golang.org/x/arch v0.11.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/term v0.33.0 // indirect
