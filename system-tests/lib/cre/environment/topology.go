@@ -67,10 +67,13 @@ func BuildTopology(
 		return nil, nil, errors.Wrap(addKeysErr, "failed to add keys to topology")
 	}
 
-	peeringData, peeringErr := libdon.FindPeeringData(topology)
+	capabilitiesPeeringData, ocrPeeringData, peeringErr := libdon.FindPeeringData(topology)
 	if peeringErr != nil {
 		return nil, nil, errors.Wrap(peeringErr, "failed to find peering data")
 	}
+
+	topology.CapabilitiesPeeringData = capabilitiesPeeringData
+	topology.OCRPeeringData = ocrPeeringData
 
 	for i, donMetadata := range topology.DonsMetadata {
 		configsFound := 0
@@ -103,14 +106,15 @@ func BuildTopology(
 		if configsFound == 0 {
 			config, configErr := creconfig.Generate(
 				cre.GenerateConfigsInput{
-					DonMetadata:            donMetadata,
-					BlockchainOutput:       blockchainOutput,
-					Flags:                  donMetadata.Flags,
-					PeeringData:            peeringData,
-					AddressBook:            addressBook,
-					HomeChainSelector:      topology.HomeChainSelector,
-					GatewayConnectorOutput: topology.GatewayConnectorOutput,
-					NodeSet:                localNodeSets[i],
+					DonMetadata:             donMetadata,
+					BlockchainOutput:        blockchainOutput,
+					Flags:                   donMetadata.Flags,
+					CapabilitiesPeeringData: capabilitiesPeeringData,
+					OCRPeeringData:          ocrPeeringData,
+					AddressBook:             addressBook,
+					HomeChainSelector:       topology.HomeChainSelector,
+					GatewayConnectorOutput:  topology.GatewayConnectorOutput,
+					NodeSet:                 localNodeSets[i],
 				},
 				configFactoryFunctions,
 			)

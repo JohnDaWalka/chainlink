@@ -47,12 +47,12 @@ var CreateJobsWithJdOp = operations.NewOperation[CreateJobsWithJdOpInput, Create
 
 		for _, jobSpecGeneratingFn := range deps.JobSpecFactoryFunctions {
 			singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecFactoryInput{
-				CldEnvironment:            deps.FullCLDEnvOutput.Environment,
-				BlockchainOutput:          deps.HomeChainBlockchainOutput,
-				DonTopology:               deps.FullCLDEnvOutput.DonTopology,
-				InfraInput:                deps.InfraInput,
-				AdditionalCapabilities:    deps.AdditionalCapabilitiesConfigs,
-				CapabilitiesAwareNodeSets: deps.CapabilitiesAwareNodeSets,
+				CldEnvironment:              deps.FullCLDEnvOutput.Environment,
+				BlockchainOutput:            deps.HomeChainBlockchainOutput,
+				DonTopology:                 deps.FullCLDEnvOutput.DonTopology,
+				InfraInput:                  deps.InfraInput,
+				AdditionalCapabilityConfigs: deps.AdditionalCapabilitiesConfigs,
+				CapabilitiesAwareNodeSets:   deps.CapabilitiesAwareNodeSets,
 			})
 			if jobSpecsErr != nil {
 				return CreateJobsWithJdOpOutput{}, pkgerrors.Wrap(jobSpecsErr, "failed to generate job specs")
@@ -91,12 +91,12 @@ func CreateJobsWithJdOpFactory(id string, version string) *operations.Operation[
 
 			for _, jobSpecGeneratingFn := range deps.JobSpecFactoryFunctions {
 				singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecFactoryInput{
-					CldEnvironment:            deps.FullCLDEnvOutput.Environment,
-					BlockchainOutput:          deps.HomeChainBlockchainOutput,
-					DonTopology:               deps.FullCLDEnvOutput.DonTopology,
-					CapabilitiesAwareNodeSets: deps.CapabilitiesAwareNodeSets,
-					AdditionalCapabilities:    deps.AdditionalCapabilitiesConfigs,
-					InfraInput:                deps.InfraInput,
+					CldEnvironment:              deps.FullCLDEnvOutput.Environment,
+					BlockchainOutput:            deps.HomeChainBlockchainOutput,
+					DonTopology:                 deps.FullCLDEnvOutput.DonTopology,
+					CapabilitiesAwareNodeSets:   deps.CapabilitiesAwareNodeSets,
+					AdditionalCapabilityConfigs: deps.AdditionalCapabilitiesConfigs,
+					InfraInput:                  deps.InfraInput,
 				})
 				if jobSpecsErr != nil {
 					return CreateJobsWithJdOpOutput{}, pkgerrors.Wrap(jobSpecsErr, "failed to generate job specs")

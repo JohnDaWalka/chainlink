@@ -24,7 +24,7 @@ var CronJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSp
 	return generateJobSpecs(
 		input.DonTopology,
 		input.InfraInput,
-		input.AdditionalCapabilities,
+		input.AdditionalCapabilityConfigs,
 		input.CapabilitiesAwareNodeSets,
 	)
 }

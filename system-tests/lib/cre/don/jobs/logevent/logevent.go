@@ -25,7 +25,7 @@ var LogEventTriggerJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.
 	return generateJobSpecs(
 		input.DonTopology,
 		*input.InfraInput,
-		input.AdditionalCapabilities,
+		input.AdditionalCapabilityConfigs,
 		input.CapabilitiesAwareNodeSets,
 	)
 }

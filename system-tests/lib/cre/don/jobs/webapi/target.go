@@ -28,7 +28,7 @@ var WebAPITargetJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.Don
 	return generateJobSpecs(
 		input.DonTopology,
 		input.InfraInput,
-		input.AdditionalCapabilities,
+		input.AdditionalCapabilityConfigs,
 		input.CapabilitiesAwareNodeSets,
 	)
 }

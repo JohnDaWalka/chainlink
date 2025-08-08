@@ -22,7 +22,7 @@ var WebAPITriggerJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.Do
 	return generateTriggerJobSpecs(
 		input.DonTopology,
 		input.InfraInput,
-		input.AdditionalCapabilities,
+		input.AdditionalCapabilityConfigs,
 		input.CapabilitiesAwareNodeSets,
 	)
 }

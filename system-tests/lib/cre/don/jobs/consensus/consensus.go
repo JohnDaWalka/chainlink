@@ -1,13 +1,19 @@
 package consensus
 
 import (
+	"bytes"
+	"html/template"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
@@ -78,7 +84,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 		ocrPeeringData := cre.OCRPeeringData{
 			OCRBootstraperPeerID: donBootstrapNodePeerID,
 			OCRBootstraperHost:   donBootstrapNodeHost,
-			Port:                 5001,
+			Port:                 config.OCRPeeringPort,
 		}
 
 		for _, workerNode := range workflowNodeSet {
@@ -101,4 +107,52 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 	}
 
 	return donToJobSpecs, nil
+}
+
+const flag = cre.ConsensusCapability
+const consensusConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","nodeAddress":"{{.NodeAddress}}"}'`
+
+func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[string]any {
+	return map[string]any{
+		"ChainID":       chainID,
+		"NetworkFamily": networkFamily,
+		"NodeAddress":   nodeAddress,
+	}
+}
+
+var ConsensusV2JobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+	configGen := func(_ zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
+		// Build runtime fallbacks for any missing values
+		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
+
+		// Apply runtime fallbacks only for keys not specified by user
+		templateData := jobs.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+
+		// Parse and execute template
+		tmpl, err := template.New("consensusConfig").Parse(consensusConfigTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to parse consensus config template")
+		}
+
+		var configBuffer bytes.Buffer
+		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+			return "", errors.Wrap(err, "failed to execute consensus config template")
+		}
+
+		return configBuffer.String(), nil
+	}
+
+	return ocr.GenerateJobSpecsForStandardCapabilityWithOCR(
+		input.DonTopology,
+		input.CldEnvironment.DataStore,
+		input.CapabilitiesAwareNodeSets,
+		input.InfraInput,
+		"capability_consensus",
+		cre.ConsensusCapability,
+		ocr.CapabilityAppliesPerDonFn,
+		ocr.EnabledForHomeChainFn,
+		configGen,
+		ocr.ConfigMergePerDonFn,
+		input.AdditionalCapabilityConfigs,
+	)
 }
