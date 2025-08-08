@@ -12,7 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
@@ -20,16 +19,15 @@ import (
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 )
 
-var GenerateConfigFn = func(handlerType jobs.HandlerType) cre.ConfigFactoryFn {
+var GenerateConfigFn = func() cre.ConfigFactoryFn {
 	return func(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverride, error) {
 		return GenerateConfig(
 			input,
-			handlerType,
 		)
 	}
 }
 
-func GenerateConfig(input cre.GenerateConfigsInput, handlerType jobs.HandlerType) (cre.NodeIndexToConfigOverride, error) {
+func GenerateConfig(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverride, error) {
 	configOverrides := make(cre.NodeIndexToConfigOverride)
 
 	if input.GatewayConnectorOutput == nil {
@@ -86,7 +84,6 @@ func GenerateConfig(input cre.GenerateConfigsInput, handlerType jobs.HandlerType
 			}
 
 			configOverrides[nodeIndex] += config.WorkerGateway(
-				handlerType,
 				nodeEthAddr,
 				homeChainID,
 				input.DonMetadata.ID,

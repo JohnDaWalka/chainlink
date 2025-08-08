@@ -167,7 +167,7 @@ func newGatewayWithMockHandler(t *testing.T) (gateway.Gateway, *handler_mocks.Ha
 	handlers := map[string]handlers.Handler{
 		"testDON": handler,
 	}
-	gw := gateway.NewGateway(&api.JsonRPCCodec{}, httpServer, handlers, nil, logger.Test(t))
+	gw := gateway.NewGateway(&api.JsonRPCCodec{}, httpServer, handlers, map[string]string{"testDON": "testDON"}, nil, logger.Test(t))
 	return gw, handler
 }
 
@@ -230,7 +230,7 @@ func TestGateway_ProcessRequest_MissingDonId(t *testing.T) {
 	gw, _ := newGatewayWithMockHandler(t)
 	req := newSignedLegacyRequest(t, "abc", "request", "", []byte{})
 	response, statusCode := gw.ProcessRequest(testutils.Context(t), req, "")
-	requireJSONRPCError(t, response, "abc", jsonrpc.ErrInvalidParams, "Unsupported DON ID or Handler: request")
+	requireJSONRPCError(t, response, "abc", jsonrpc.ErrInvalidRequest, "Service name not found: request")
 	require.Equal(t, 400, statusCode)
 }
 

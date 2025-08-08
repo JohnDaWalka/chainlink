@@ -45,7 +45,7 @@ type Config struct {
 	NodeSets   []*simple_node_set.Input `toml:"nodesets" validate:"required"`
 }
 
-const VaultDonID = "vault"
+const VaultDonID = "1"
 const VaultHandlerName = "vault"
 const VaultGatewayID = "vault_gateway"
 const VaultNode1Name = "node_1"
@@ -282,6 +282,7 @@ func TestVault_E2E(t *testing.T) {
 
 		[[gatewayConfig.Dons.Handlers]]
 		Name = "%s"
+		ServiceName = "%s"
 		[gatewayConfig.Dons.Handlers.Config]
 		RequestTimeoutSec = 30
 		NodeRateLimiter = {
@@ -299,6 +300,7 @@ func TestVault_E2E(t *testing.T) {
 		GatewayPortForNodes,
 		GatewayPortForUsers,
 		VaultDonID,
+		VaultHandlerName,
 		VaultHandlerName,
 		VaultNode1Name,
 		ethAddresses[0],

@@ -294,6 +294,7 @@ func (c *ConfigureKeystoneInput) Validate() error {
 type GatewayConnectorDons struct {
 	MembersEthAddresses []string
 	ID                  string
+	Handlers            []string
 }
 
 type GatewayConnectorOutput struct {
