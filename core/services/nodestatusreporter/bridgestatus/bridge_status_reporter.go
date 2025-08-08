@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
@@ -158,11 +159,11 @@ func (s *Service) pollBridge(ctx context.Context, bridgeName string, bridgeURL s
 		return
 	}
 
-	// Construct status endpoint URL (bridge::8080/status)
+	// Construct status endpoint URL following codebase pattern (e.g., bridge::8080/v1/bridge/status)
 	statusURL := &url.URL{
 		Scheme: parsedURL.Scheme,
 		Host:   parsedURL.Host,
-		Path:   s.config.StatusPath(),
+		Path:   path.Join(parsedURL.Path, s.config.StatusPath()),
 	}
 
 	// Make HTTP request

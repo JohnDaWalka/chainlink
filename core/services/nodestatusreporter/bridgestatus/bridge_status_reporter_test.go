@@ -291,6 +291,61 @@ func TestService_pollBridge_InvalidURL(t *testing.T) {
 	jobORM.AssertExpectations(t)
 }
 
+func TestService_pollBridge_EmptyURL(t *testing.T) {
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM call that now happens at the start of pollBridge
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
+
+	ctx := context.Background()
+
+	assert.NotPanics(t, func() {
+		service.pollBridge(ctx, "test-bridge", "")
+	})
+
+	emitter.AssertNotCalled(t, "Emit", mock.Anything, mock.Anything, mock.Anything)
+	emitter.AssertNotCalled(t, "With", mock.Anything)
+
+	jobORM.AssertExpectations(t)
+}
+
+func TestService_pollBridge_URLPathPreservation(t *testing.T) {
+	// Create a test HTTP server that captures the request path
+	var capturedPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(loadFixture(t, "bridge_status_response.json")))
+	}))
+	defer server.Close()
+
+	httpClient := &http.Client{}
+	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
+
+	// Mock job ORM calls
+	jobORM.On("FindJobIDsWithBridge", mock.Anything, "test-bridge").Return([]int32{}, nil)
+	emitter.On("Emit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	// Parse server URL and add a bridge path to it
+	serverURL, _ := url.Parse(server.URL)
+	bridgeURL := &url.URL{
+		Scheme: serverURL.Scheme,
+		Host:   serverURL.Host,
+		Path:   "/bridge/v1", // This path should be preserved and extended
+	}
+
+	ctx := context.Background()
+	service.pollBridge(ctx, "test-bridge", bridgeURL.String())
+
+	// Verify the original path was preserved and status path was appended
+	assert.Equal(t, "/bridge/v1/status", capturedPath, "Bridge URL path should be preserved and status path appended")
+
+	jobORM.AssertExpectations(t)
+	emitter.AssertExpectations(t)
+}
+
 func TestService_pollBridge_Non200Status(t *testing.T) {
 	httpClient := mocks.NewMockHTTPClient("Not Found", http.StatusNotFound)
 	service, _, jobORM, emitter := setupTestService(t, true, testPollingInterval, httpClient)
