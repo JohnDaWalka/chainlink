@@ -70,11 +70,8 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-<<<<<<< HEAD
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-=======
+		"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
->>>>>>> develop
 
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
