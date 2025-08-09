@@ -24,7 +24,7 @@ var (
 	// const LEAF_DOMAIN_SEPARATOR: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 	leafDomainSeparator = [32]byte{}
 
-	// see aptos_hash::keccak256(b"Any2AptosMessageHashV1") in calculate_metadata_hash
+	// see aptos_hash::keccak256(b"Any2SuiMessageHashV1") in calculate_metadata_hash
 	any2AptosMessageHash = utils.Keccak256Fixed([]byte("Any2SuiMessageHashV1"))
 )
 
