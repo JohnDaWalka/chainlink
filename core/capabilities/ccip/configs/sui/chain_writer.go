@@ -73,7 +73,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 						},
 					},
 					consts.MethodExecute: {
-						Name:      "init_execute",
+						Name:      "execute",
 						PublicKey: pubKeyBytes,
 						Params:    []codec.SuiFunctionParam{},
 						PTBCommands: []config.ChainWriterPTBCommand{
@@ -108,6 +108,26 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 										Name:     "report",
 										Type:     "vector<u8>",
 										Required: true,
+									},
+								},
+							},
+							{
+								Type:     codec.SuiPTBCommandMoveCall,
+								ModuleId: strPtr("offramp"),
+								Function: strPtr("finish_execute"),
+								Params: []codec.SuiFunctionParam{
+									{
+										Name:     "state",
+										Type:     "object_id",
+										Required: true,
+									},
+									{
+										Name:     "receiver_params",
+										Type:     "ptb_dependency",
+										Required: true,
+										PTBDependency: &codec.PTBCommandDependency{
+											CommandIndex: uint16(0),
+										},
 									},
 								},
 							},
