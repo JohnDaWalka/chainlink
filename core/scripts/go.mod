@@ -53,7 +53,8 @@ require (
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250806152407-159881c7589c
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.21.0
-	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250801102619-bf75f8afcd90
+	github.com/smartcontractkit/chainlink-evm v0.2.2
+	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.11
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.7
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
@@ -484,7 +485,7 @@ require (
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250810054738-e096fa2076db // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
-	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250701132001-f8be142155b6 // indirect
+	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250805160549-9c2255ee818e // indirect
 	github.com/smartcontractkit/cre-sdk-go v0.2.1-0.20250729190115-fa322d3f3238 // indirect
 	github.com/smartcontractkit/crib-sdk v0.4.0 // indirect
 	github.com/smartcontractkit/freeport v0.1.1 // indirect
