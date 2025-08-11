@@ -57,7 +57,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 
 		httpActionConfig, ok := capabilitiesConfig[flag]
 		if !ok {
-			return nil, errors.New("http-action config not found in capabilities config")
+			return nil, errors.Errorf("%s config not found in capabilities config", flag)
 		}
 
 		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
@@ -82,14 +82,18 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 
 		tmpl, err := template.New("httpActionConfig").Parse(httpActionConfigTemplate)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse http-action config template")
+			return nil, errors.Wrapf(err, "failed to parse %s config template", flag)
 		}
 
 		var configBuffer bytes.Buffer
 		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-			return nil, errors.Wrap(err, "failed to execute http-action config template")
+			return nil, errors.Wrapf(err, "failed to execute %s config template", flag)
 		}
 		configStr := configBuffer.String()
+
+		if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+			return nil, errors.Wrapf(err, "%s template validation failed", flag)
+		}
 
 		for _, workerNode := range workflowNodeSet {
 			nodeID, nodeIDErr := crenode.FindLabelValue(workerNode, crenode.NodeIDKey)

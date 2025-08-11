@@ -2,7 +2,9 @@ package jobs
 
 import (
 	"maps"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"dario.cat/mergo"
 	"github.com/pkg/errors"
@@ -61,4 +63,32 @@ func ApplyRuntimeValues(userConfig map[string]any, runtimeValues map[string]any)
 	mergo.Merge(&result, runtimeValues)
 
 	return result
+}
+
+// ValidateTemplateSubstitution checks that all template variables have been properly substituted
+// Returns an error if any {{.Variable}} patterns are found in the rendered output
+//
+// This function helps catch configuration issues early by ensuring all template variables
+// have been provided and substituted. Common causes of unsubstituted variables:
+// - Missing fields in templateData map
+// - Typos in template variable names
+// - Missing values in runtimeValues
+//
+// Usage:
+//
+//	configStr := configBuffer.String()
+//	if err := ValidateTemplateSubstitution(configStr, "capability-name"); err != nil {
+//	    return nil, errors.Wrap(err, "template validation failed")
+//	}
+func ValidateTemplateSubstitution(rendered string, templateName string) error {
+	// Regex to find unsubstituted template variables like {{.Variable}}
+	templateVarRegex := regexp.MustCompile(`\{\{\s*\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}`)
+
+	matches := templateVarRegex.FindAllString(rendered, -1)
+	if len(matches) > 0 {
+		return errors.Errorf("template '%s' contains unsubstituted variables: %s",
+			templateName, strings.Join(matches, ", "))
+	}
+
+	return nil
 }

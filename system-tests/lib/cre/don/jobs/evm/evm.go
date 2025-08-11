@@ -61,15 +61,21 @@ var EVMJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpe
 		// Parse and execute template
 		tmpl, err := template.New("evmConfig").Parse(evmConfigTemplate)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to parse EVM config template")
+			return "", errors.Wrapf(err, "failed to parse %s config template", flag)
 		}
 
 		var configBuffer bytes.Buffer
 		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-			return "", errors.Wrap(err, "failed to execute EVM config template")
+			return "", errors.Wrapf(err, "failed to execute %s config template", flag)
 		}
 
-		return configBuffer.String(), nil
+		configStr := configBuffer.String()
+
+		if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+			return "", errors.Wrapf(err, "%s template validation failed", flag)
+		}
+
+		return configStr, nil
 	}
 
 	return ocr.GenerateJobSpecsForStandardCapabilityWithOCR(
@@ -78,7 +84,7 @@ var EVMJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpe
 		input.CapabilitiesAwareNodeSets,
 		input.InfraInput,
 		"capability_evm",
-		cre.EVMCapability,
+		flag,
 		ocr.CapabilityAppliesPerChainsFn,
 		ocr.EnabledPerChainFn,
 		configGen,

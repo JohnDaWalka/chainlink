@@ -42,7 +42,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 
 		cronConfig, ok := capabilitiesConfig[flag]
 		if !ok {
-			return nil, errors.New("cron config not found in capabilities config")
+			return nil, errors.Errorf("%s config not found in capabilities config", flag)
 		}
 
 		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
@@ -76,14 +76,18 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 			// Parse and execute template with custom config
 			tmpl, err := template.New("cronConfig").Parse(cronConfigTemplate)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse cron config template")
+				return nil, errors.Wrapf(err, "failed to parse %s config template", flag)
 			}
 
 			var configBuffer bytes.Buffer
 			if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-				return nil, errors.Wrap(err, "failed to execute cron config template")
+				return nil, errors.Wrapf(err, "failed to execute %s config template", flag)
 			}
 			configStr = configBuffer.String()
+
+			if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+				return nil, errors.Wrapf(err, "%s template validation failed", flag)
+			}
 		}
 
 		for _, workerNode := range workflowNodeSet {

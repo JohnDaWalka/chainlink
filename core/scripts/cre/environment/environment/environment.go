@@ -861,35 +861,6 @@ func StartCLIEnvironment(
 	return universalSetupOutput, nil
 }
 
-//TODO refactor this
-// func validateCapabilitiesConfig(in *creenv.Config) error {
-// 	// if CapabilitiesConfig has values, EVM capability binary must be present
-// 	if len(in.CapabilitiesConfig.EVM) > 0 && in.ExtraCapabilities.EVMCapabilityBinaryPath == "" {
-// 		return errors.New("evm_capability_binary_path must be provided when capabilities_configs is set")
-// 	}
-// 	for chainID, config := range in.CapabilitiesConfig.EVM {
-// 		// check the chain exists in the blockchain list
-// 		found := false
-// 		for _, blockchain := range in.Blockchains {
-// 			if blockchain.ChainID == chainID {
-// 				found = true
-// 				break
-// 			}
-// 		}
-// 		if !found {
-// 			return errors.Errorf("capabilities_configs.evm.%q does not match any configured blockchains ChainID", chainID)
-// 		}
-// 		// check the configs per chain is a map[string]string
-// 		for subK, subV := range config {
-// 			_, okVal := subV.(string)
-// 			if !okVal {
-// 				return errors.Errorf("capabilities_configs.evm.%q[%s] must be a map[string]string (got %T)", chainID, subK, subV)
-// 			}
-// 		}
-// 	}
-// 	return nil
-// }
-
 func isBlockscoutRunning(cmdContext context.Context) bool {
 	dockerClient, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
 	if err != nil {

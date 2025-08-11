@@ -46,7 +46,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilities
 
 		webAPITargetConfig, ok := capabilitiesConfig[flag]
 		if !ok {
-			return nil, errors.New("web-api-target config not found in capabilities config")
+			return nil, errors.Errorf("%s config not found in capabilities config", flag)
 		}
 
 		workflowNodeSet, err := libnode.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: libnode.NodeTypeKey, Value: cre.WorkerNode}, libnode.EqualLabels)
@@ -73,14 +73,18 @@ func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilities
 			// Parse and execute template with custom config
 			tmpl, err := template.New("webAPITargetConfig").Parse(webAPITargetConfigTemplate)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse web-api-target config template")
+				return nil, errors.Wrapf(err, "failed to parse %s config template", flag)
 			}
 
 			var configBuffer bytes.Buffer
 			if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-				return nil, errors.Wrap(err, "failed to execute web-api-target config template")
+				return nil, errors.Wrapf(err, "failed to execute %s config template", flag)
 			}
 			configStr = configBuffer.String()
+
+			if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+				return nil, errors.Wrapf(err, "%s template validation failed", flag)
+			}
 		}
 
 		for _, workerNode := range workflowNodeSet {
