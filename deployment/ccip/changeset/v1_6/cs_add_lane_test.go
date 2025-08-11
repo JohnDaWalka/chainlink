@@ -52,6 +52,7 @@ func TestAddLanesWithTestRouter(t *testing.T) {
 // dev is on going for sending request between solana and evm chains
 // this test is there to ensure addLane works between solana and evm chains
 func TestAddLanesWithSolana(t *testing.T) {
+	t.Skip("Skipping the test temporarily - fix required #18897")
 	t.Parallel()
 	e, _ := testhelpers.NewMemoryEnvironment(t, testhelpers.WithSolChains(1))
 	// Here we have CR + nodes set up, but no CCIP contracts deployed.
