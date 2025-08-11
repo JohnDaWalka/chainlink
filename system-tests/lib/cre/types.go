@@ -331,16 +331,16 @@ type Incoming struct {
 type ConfigFactoryFn = func(input GenerateConfigsInput) (NodeIndexToConfigOverride, error)
 
 type GenerateConfigsInput struct {
-	DonMetadata             *DonMetadata
-	BlockchainOutput        map[uint64]*WrappedBlockchainOutput
-	HomeChainSelector       uint64
-	Flags                   []string
-	CapabilitiesPeeringData CapabilitiesPeeringData
-	OCRPeeringData          OCRPeeringData
-	AddressBook             cldf.AddressBook
-	GatewayConnectorOutput  *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
-	// NodeSet provides access to chain-scoped capability configuration for this DON
-	NodeSet *CapabilitiesAwareNodeSet
+	DonMetadata                   *DonMetadata
+	BlockchainOutput              map[uint64]*WrappedBlockchainOutput
+	HomeChainSelector             uint64
+	Flags                         []string
+	CapabilitiesPeeringData       CapabilitiesPeeringData
+	OCRPeeringData                OCRPeeringData
+	AddressBook                   cldf.AddressBook
+	NodeSet                       *CapabilitiesAwareNodeSet
+	AdditionalCapabilitiesConfigs AdditionalCapabilitiesConfigs
+	GatewayConnectorOutput        *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
 }
 
 func (g *GenerateConfigsInput) Validate() error {

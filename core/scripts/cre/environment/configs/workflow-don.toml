@@ -50,8 +50,10 @@
   [nodesets.chain_capabilities]
     # Simple: enable write-evm on listed chains
     write-evm = ["1337"]
+    # write-evm with per-chain configuration overrides
+    # "write-evm" = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { GasLimitDefault = 500_000, PollPeriod = "1s", AcceptanceTimeout = "45s" }, "2337" = { GasLimitDefault = 300_000, AcceptanceTimeout = "60s" } } }
     # EVM capability with a chain-specific override example
-    # evm = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { ReceiverGasMinimum = 1000 } } }
+    # evm = { enabled_chains = ["1337"], chain_overrides = { "1337" = { ReceiverGasMinimum = 1000 } } }
     # Read contract capability
     # read-contract = ["1337", "2337"]
     # Log trigger capability

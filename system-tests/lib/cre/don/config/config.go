@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
@@ -191,11 +192,43 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 					}
 				}
 			}
+
+			if input.AdditionalCapabilitiesConfigs == nil {
+				return nil, errors.New("additional capabilities configs are nil, but are required to configure the write-evm capability")
+			}
+
+			if writeEvmConfig, ok := input.AdditionalCapabilitiesConfigs[cre.WriteEVMCapability]; ok {
+				enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(
+					string(cre.WriteEVMCapability),
+					input.NodeSet.ChainCapabilities,
+					writeEvmConfig.Config,
+					wi.ChainID,
+				)
+				if rErr != nil {
+					return nil, errors.Wrapf(rErr, "failed to resolve write-evm config for chain %d", wi.ChainID)
+				}
+
+				if !enabled {
+					// This should never happen, but guard anyway. We have already checked that the capability is enabled in the chain capabilities, when we generated the workerEVMInputs.
+					continue
+				}
+
+				runtimeValues := map[string]any{
+					"FromAddress":      wi.FromAddress.Hex(),
+					"ForwarderAddress": wi.ForwarderAddress,
+				}
+
+				wi.WorkflowConfig = jobs.ApplyRuntimeValues(mergedConfig, runtimeValues)
+			}
 		}
 
 		// connect worker nodes to all the chains, add chain ID for registry (home chain)
 		// we configure both EVM chains, nodes and EVM.Workflow with Forwarder
-		configOverrides[nodeIndex] = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.OCRPeeringData, input.CapabilitiesPeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs)
+		var workerErr error
+		configOverrides[nodeIndex], workerErr = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.OCRPeeringData, input.CapabilitiesPeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs)
+		if workerErr != nil {
+			return nil, errors.Wrap(workerErr, "failed to generate worker [EVM.Workflow] config")
+		}
 	}
 
 	for _, factoryFn := range factoryFns {

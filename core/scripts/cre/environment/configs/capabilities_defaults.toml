@@ -73,6 +73,19 @@
   OutgoingPerSenderBurst = 10
   OutgoingPerSenderRPS = 10
 
+[additional_capabilities.write-evm]
+  # No binary_path needed - this is a built-in capability, it doesn't exist as a separate binary
+
+[additional_capabilities.write-evm.config]
+  # EVM Workflow configuration for write capabilities
+  GasLimitDefault = 400_000
+  TxAcceptanceState = 2
+  PollPeriod = "2s"
+  AcceptanceTimeout = "30s"
+  # Runtime values below are typically filled at runtime, but may be overridden
+  # FromAddress = "0x0000000000000000000000000000000000000000"
+  # ForwarderAddress = "0x0000000000000000000000000000000000000000"
+
 #[additional_capabilities.mock]
   binary_path = "./binaries/mock"
 

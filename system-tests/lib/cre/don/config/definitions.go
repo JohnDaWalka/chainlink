@@ -1,12 +1,29 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"text/template"
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 )
+
+// Template for EVM workflow configuration
+const evmWorkflowConfigTemplate = `
+[EVM.Workflow]
+FromAddress = '{{.FromAddress}}'
+ForwarderAddress = '{{.ForwarderAddress}}'
+GasLimitDefault = {{.GasLimitDefault}}
+TxAcceptanceState = {{.TxAcceptanceState}}
+PollPeriod = '{{.PollPeriod}}'
+AcceptanceTimeout = '{{.AcceptanceTimeout}}'
+
+[EVM.Transactions]
+ForwardersEnabled = true
+`
 
 func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitiesRegistryAddress common.Address, chains []*WorkerEVMInput) string {
 	evmChainsConfig := ""
@@ -80,9 +97,10 @@ type WorkerEVMInput struct {
 	FromAddress      common.Address
 	ForwarderAddress string
 	WritesToEVM      bool
+	WorkflowConfig   map[string]any // Configuration for EVM.Workflow section
 }
 
-func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData, capabilitiesPeeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*WorkerEVMInput) string {
+func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData, capabilitiesPeeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*WorkerEVMInput) (string, error) {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -105,22 +123,16 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		)
 
 		if chain.WritesToEVM {
-			evmChainsConfig += fmt.Sprintf(`
-
-	[EVM.Workflow]
-	FromAddress = '%s'
-	ForwarderAddress = '%s'
-	GasLimitDefault = 400_000
-	TxAcceptanceState = 2
-	PollPeriod = '2s'
-	AcceptanceTimeout = '30s'
-
-	[EVM.Transactions]
-	ForwardersEnabled = true
-	`,
-				chain.FromAddress,
-				chain.ForwarderAddress,
-			)
+			// Execute template with chain's workflow configuration
+			tmpl, err := template.New("evmWorkflowConfig").Parse(evmWorkflowConfigTemplate)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to parse evm workflow config template")
+			}
+			var configBuffer bytes.Buffer
+			if executeErr := tmpl.Execute(&configBuffer, chain.WorkflowConfig); executeErr != nil {
+				return "", errors.Wrap(executeErr, "failed to execute evm workflow config template")
+			}
+			evmChainsConfig += configBuffer.String()
 		}
 	}
 
@@ -162,7 +174,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		evmChainsConfig,
 		capabilitiesRegistryAddress,
 		homeChainID,
-	)
+	), nil
 }
 
 func WorkerWorkflowRegistry(workflowRegistryAddr common.Address, homeChainID uint64) string {

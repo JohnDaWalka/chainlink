@@ -106,15 +106,16 @@ func BuildTopology(
 		if configsFound == 0 {
 			config, configErr := creconfig.Generate(
 				cre.GenerateConfigsInput{
-					DonMetadata:             donMetadata,
-					BlockchainOutput:        blockchainOutput,
-					Flags:                   donMetadata.Flags,
-					CapabilitiesPeeringData: capabilitiesPeeringData,
-					OCRPeeringData:          ocrPeeringData,
-					AddressBook:             addressBook,
-					HomeChainSelector:       topology.HomeChainSelector,
-					GatewayConnectorOutput:  topology.GatewayConnectorOutput,
-					NodeSet:                 localNodeSets[i],
+					DonMetadata:                   donMetadata,
+					BlockchainOutput:              blockchainOutput,
+					Flags:                         donMetadata.Flags,
+					CapabilitiesPeeringData:       capabilitiesPeeringData,
+					OCRPeeringData:                ocrPeeringData,
+					AddressBook:                   addressBook,
+					HomeChainSelector:             topology.HomeChainSelector,
+					GatewayConnectorOutput:        topology.GatewayConnectorOutput,
+					NodeSet:                       localNodeSets[i],
+					AdditionalCapabilitiesConfigs: additionalCapabilitiesConfigs,
 				},
 				configFactoryFunctions,
 			)
