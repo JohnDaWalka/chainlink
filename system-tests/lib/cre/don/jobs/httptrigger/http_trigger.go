@@ -1,55 +1,94 @@
 package httptrigger
 
 import (
+	"bytes"
+	"path/filepath"
+	"text/template"
+
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
-const triggerServiceConfigTemplate = `"""
+const flag = cre.HTTPTriggerCapability
+
+const httpTriggerConfigTemplate = `"""
 {
 	"incomingRateLimiter": {
-		"globalBurst": 10,
-		"globalRPS": 50,
-		"perSenderBurst": 10,
-		"perSenderRPS": 10
+		"globalBurst": {{.IncomingGlobalBurst}},
+		"globalRPS": {{.IncomingGlobalRPS}},
+		"perSenderBurst": {{.IncomingPerSenderBurst}},
+		"perSenderRPS": {{.IncomingPerSenderRPS}}
 	},
 	"outgoingRateLimiter": {
-		"globalBurst": 10,
-		"globalRPS": 50,
-		"perSenderBurst": 10,
-		"perSenderRPS": 10
+		"globalBurst": {{.OutgoingGlobalBurst}},
+		"globalRPS": {{.OutgoingGlobalRPS}},
+		"perSenderBurst": {{.OutgoingPerSenderBurst}},
+		"perSenderRPS": {{.OutgoingPerSenderRPS}}
 	}
 }
-"""
-`
+"""`
 
-var HTTPTriggerJobSpecFactoryFn = func(httpTriggerBinaryPath string) cre.JobSpecFactoryFn {
-	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
-		return GenerateJobSpecs(
-			input.DonTopology,
-			httpTriggerBinaryPath,
-		)
-	}
+var HTTPTriggerJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+	return generateJobSpecs(
+		input.DonTopology,
+		input.InfraInput,
+		input.AdditionalCapabilityConfigs,
+		input.CapabilitiesAwareNodeSets,
+	)
 }
 
-func GenerateJobSpecs(donTopology *cre.DonTopology, httpTriggerBinaryPath string) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
 	donToJobSpecs := make(cre.DonsToJobSpecs)
 
-	for _, donWithMetadata := range donTopology.DonsWithMetadata {
+	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
 		if !flags.HasFlag(donWithMetadata.Flags, cre.HTTPTriggerCapability) {
 			continue
 		}
+
+		httpTriggerConfig, ok := capabilitiesConfig[flag]
+		if !ok {
+			return nil, errors.New("http-trigger config not found in capabilities config")
+		}
+
+		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
+		if pathErr != nil {
+			return nil, errors.Wrapf(pathErr, "failed to get default container directory for infra type %s", infraInput.Type)
+		}
+
+		httpTriggerBinaryPath := filepath.Join(containerPath, filepath.Base(httpTriggerConfig.BinaryPath))
+
 		workflowNodeSet, err := crenode.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.WorkerNode}, crenode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
+
+		var donOverrides map[string]map[string]any
+		if donIdx < len(nodeSetInput) && nodeSetInput[donIdx] != nil {
+			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
+		}
+
+		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), httpTriggerConfig.Config, donOverrides)
+		templateData := jobs.ApplyRuntimeValues(mergedConfig, map[string]any{})
+
+		tmpl, err := template.New("httpTriggerConfig").Parse(httpTriggerConfigTemplate)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse http-trigger config template")
+		}
+
+		var configBuffer bytes.Buffer
+		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+			return nil, errors.Wrap(err, "failed to execute http-trigger config template")
+		}
+		configStr := configBuffer.String()
 
 		for _, workerNode := range workflowNodeSet {
 			nodeID, nodeIDErr := crenode.FindLabelValue(workerNode, crenode.NodeIDKey)
@@ -57,7 +96,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, httpTriggerBinaryPath string
 				return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 			}
 
-			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerStandardCapability(nodeID, cre.HTTPTriggerCapability, httpTriggerBinaryPath, triggerServiceConfigTemplate, ""))
+			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerStandardCapability(nodeID, cre.HTTPTriggerCapability, httpTriggerBinaryPath, configStr, ""))
 		}
 	}
 

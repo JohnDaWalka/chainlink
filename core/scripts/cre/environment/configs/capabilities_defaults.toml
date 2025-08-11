@@ -44,6 +44,35 @@
 [additional_capabilities.web-api-trigger.config]
 #   CustomField = "value"  # Add custom fields if needed
 
+[additional_capabilities.http-action]
+  binary_path = "./binaries/http-action"
+
+[additional_capabilities.http-action.config]
+  # HTTP Action capability configuration
+  ProxyMode = "gateway"
+  IncomingGlobalBurst = 10
+  IncomingGlobalRPS = 50
+  IncomingPerSenderBurst = 10
+  IncomingPerSenderRPS = 10
+  OutgoingGlobalBurst = 10
+  OutgoingGlobalRPS = 50
+  OutgoingPerSenderBurst = 10
+  OutgoingPerSenderRPS = 10
+
+[additional_capabilities.http-trigger]
+  binary_path = "./binaries/http-trigger"
+
+[additional_capabilities.http-trigger.config]
+  # HTTP Trigger capability configuration
+  IncomingGlobalBurst = 10
+  IncomingGlobalRPS = 50
+  IncomingPerSenderBurst = 10
+  IncomingPerSenderRPS = 10
+  OutgoingGlobalBurst = 10
+  OutgoingGlobalRPS = 50
+  OutgoingPerSenderBurst = 10
+  OutgoingPerSenderRPS = 10
+
 #[additional_capabilities.mock]
   binary_path = "./binaries/mock"
 

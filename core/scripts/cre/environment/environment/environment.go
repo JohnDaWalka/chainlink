@@ -519,10 +519,10 @@ func StartCLIEnvironment(
 ) (*creenv.SetupOutput, error) {
 	testLogger := framework.L
 
-	// make sure that either cron is enabled or withPluginsDockerImageFlag is set, but only if workflowTrigger is cron
-	if withExampleFlag && workflowTrigger == WorkflowTriggerCron && (in.ExtraCapabilities.CronCapabilityBinaryPath == "" && withPluginsDockerImageFlag == "") {
-		return nil, fmt.Errorf("either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag", os.Getenv("CTF_CONFIGS"))
-	}
+	// TODO fix: make sure that either cron is enabled or withPluginsDockerImageFlag is set, but only if workflowTrigger is cron
+	// if withExampleFlag && workflowTrigger == WorkflowTriggerCron && (in.ExtraCapabilities.CronCapabilityBinaryPath == "" && withPluginsDockerImageFlag == "") {
+	// return nil, fmt.Errorf("either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag", os.Getenv("CTF_CONFIGS"))
+	// }
 
 	// if evmCapErr := validateCapabilitiesConfig(in); evmCapErr != nil {
 	// 	return nil, evmCapErr
@@ -531,234 +531,234 @@ func StartCLIEnvironment(
 	// TODO:
 	// validate if all capabilities have corresponding flags
 
-	capabilitiesBinaryPaths := map[cre.CapabilityFlag]string{}
-	var capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
+	// capabilitiesBinaryPaths := map[cre.CapabilityFlag]string{}
+	// var capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
 
 	// TODO move this out completely to TOML config
-	switch topologyFlag {
-	case TopologyWorkflow:
-		capabilitiesAwareNodeSets = in.NodeSets
-		// if len(in.NodeSets) != 1 {
-		// 	return nil, fmt.Errorf("expected 1 nodeset, got %d", len(in.NodeSets))
-		// }
-		// // add support for more binaries if needed
-		// workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WriteEVMCapability, cre.WebAPITriggerCapability, cre.WebAPITargetCapability, cre.VaultCapability}
-		// if in.ExtraCapabilities.CronCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
-		// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.CronCapability)
-		// 	capabilitiesBinaryPaths[cre.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
-		// }
+	// switch topologyFlag {
+	// case TopologyWorkflow:
+	// capabilitiesAwareNodeSets = in.NodeSets
+	// if len(in.NodeSets) != 1 {
+	// 	return nil, fmt.Errorf("expected 1 nodeset, got %d", len(in.NodeSets))
+	// }
+	// // add support for more binaries if needed
+	// workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WriteEVMCapability, cre.WebAPITriggerCapability, cre.WebAPITargetCapability, cre.VaultCapability}
+	// if in.ExtraCapabilities.CronCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.CronCapability)
+	// 	capabilitiesBinaryPaths[cre.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
+	// }
 
-		// if in.ExtraCapabilities.EVMCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
-		// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.EVMCapability)
-		// 	capabilitiesBinaryPaths[cre.EVMCapability] = in.ExtraCapabilities.EVMCapabilityBinaryPath
-		// }
+	// if in.ExtraCapabilities.EVMCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.EVMCapability)
+	// 	capabilitiesBinaryPaths[cre.EVMCapability] = in.ExtraCapabilities.EVMCapabilityBinaryPath
+	// }
 
-		if in.ExtraCapabilities.ConsensusCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.ConsensusCapability)
-			capabilitiesBinaryPaths[cre.ConsensusCapability] = in.ExtraCapabilities.ConsensusCapabilityBinaryPath
-		}
+	// if in.ExtraCapabilities.ConsensusCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.ConsensusCapability)
+	// 	capabilitiesBinaryPaths[cre.ConsensusCapability] = in.ExtraCapabilities.ConsensusCapabilityBinaryPath
+	// }
 
-		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
-			capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
-		}
+	// if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
+	// 	capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
+	// }
 
-		if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.ReadContractCapability)
-			capabilitiesBinaryPaths[cre.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
-		}
+	// if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.ReadContractCapability)
+	// 	capabilitiesBinaryPaths[cre.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
+	// }
 
-		if in.ExtraCapabilities.HTTPTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPTriggerCapability)
-			capabilitiesBinaryPaths[cre.HTTPTriggerCapability] = in.ExtraCapabilities.HTTPTriggerBinaryPath
-		}
+	// if in.ExtraCapabilities.HTTPTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPTriggerCapability)
+	// 	capabilitiesBinaryPaths[cre.HTTPTriggerCapability] = in.ExtraCapabilities.HTTPTriggerBinaryPath
+	// }
 
-		if in.ExtraCapabilities.HTTPActionBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPActionCapability)
-			capabilitiesBinaryPaths[cre.HTTPActionCapability] = in.ExtraCapabilities.HTTPActionBinaryPath
-		}
+	// if in.ExtraCapabilities.HTTPActionBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPActionCapability)
+	// 	capabilitiesBinaryPaths[cre.HTTPActionCapability] = in.ExtraCapabilities.HTTPActionBinaryPath
+	// }
 
-		for capabilityName, binaryPath := range extraBinaries {
-			if binaryPath != "" || withPluginsDockerImageFlag != "" {
-				workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
-				capabilitiesBinaryPaths[capabilityName] = binaryPath
-			}
-		}
+	// for capabilityName, binaryPath := range extraBinaries {
+	// 	if binaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 		workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
+	// 		capabilitiesBinaryPaths[capabilityName] = binaryPath
+	// 	}
+	// }
 
-		capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
-			{
-				Input:              in.NodeSets[0],
-				Capabilities:       workflowDONCapabilities,
-				DONTypes:           []string{cre.WorkflowDON, cre.GatewayDON},
-				BootstrapNodeIndex: 0,
-				GatewayNodeIndex:   0,
-			},
-		}
-	case TopologyWorkflowGateway:
-		if len(in.NodeSets) != 2 {
-			return nil, fmt.Errorf("expected 2 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
-		}
-		// add support for more binaries if needed
-		workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WriteEVMCapability, cre.WebAPITriggerCapability, cre.WebAPITargetCapability, cre.VaultCapability}
-		if in.ExtraCapabilities.CronCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.CronCapability)
-			capabilitiesBinaryPaths[cre.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
-		}
+	// capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
+	// 	{
+	// 		Input:              in.NodeSets[0],
+	// 		Capabilities:       workflowDONCapabilities,
+	// 		DONTypes:           []string{cre.WorkflowDON, cre.GatewayDON},
+	// 		BootstrapNodeIndex: 0,
+	// 		GatewayNodeIndex:   0,
+	// 	},
+	// }
+	// case TopologyWorkflowGateway:
+	// if len(in.NodeSets) != 2 {
+	// 	return nil, fmt.Errorf("expected 2 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
+	// }
+	// add support for more binaries if needed
+	// workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WriteEVMCapability, cre.WebAPITriggerCapability, cre.WebAPITargetCapability, cre.VaultCapability}
+	// if in.ExtraCapabilities.CronCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.CronCapability)
+	// 	capabilitiesBinaryPaths[cre.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
+	// }
 
-		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
-			capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
-		}
+	// if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
+	// 	capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
+	// }
 
-		// if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
-		// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.ReadContractCapability)
-		// 	capabilitiesBinaryPaths[cre.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
-		// }
+	// if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.ReadContractCapability)
+	// 	capabilitiesBinaryPaths[cre.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
+	// }
 
-		// for capabilityName, binaryPath := range extraBinaries {
-		// 	if binaryPath != "" || withPluginsDockerImageFlag != "" {
-		// 		workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
-		// 		capabilitiesBinaryPaths[capabilityName] = binaryPath
-		// 	}
-		// }
+	// for capabilityName, binaryPath := range extraBinaries {
+	// 	if binaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 		workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
+	// 		capabilitiesBinaryPaths[capabilityName] = binaryPath
+	// 	}
+	// }
 
-		capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
-			{
-				Input:              in.NodeSets[0],
-				Capabilities:       workflowDONCapabilities,
-				DONTypes:           []string{cre.WorkflowDON},
-				BootstrapNodeIndex: 0,
-				GatewayNodeIndex:   -1,
-			},
-			{
-				Input:              in.NodeSets[1],
-				Capabilities:       []string{},
-				DONTypes:           []string{cre.GatewayDON},
-				BootstrapNodeIndex: -1,
-				GatewayNodeIndex:   0,
-			},
-		}
-	case TopologyWorkflowGatewayCapabilities:
-		if len(in.NodeSets) != 3 {
-			return nil, fmt.Errorf("expected 3 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
-		}
+	// capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
+	// 	{
+	// 		Input:              in.NodeSets[0],
+	// 		Capabilities:       workflowDONCapabilities,
+	// 		DONTypes:           []string{cre.WorkflowDON},
+	// 		BootstrapNodeIndex: 0,
+	// 		GatewayNodeIndex:   -1,
+	// 	},
+	// 	{
+	// 		Input:              in.NodeSets[1],
+	// 		Capabilities:       []string{},
+	// 		DONTypes:           []string{cre.GatewayDON},
+	// 		BootstrapNodeIndex: -1,
+	// 		GatewayNodeIndex:   0,
+	// 	},
+	// }
+	// case TopologyWorkflowGatewayCapabilities:
+	// 	if len(in.NodeSets) != 3 {
+	// 		return nil, fmt.Errorf("expected 3 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
+	// 	}
 
-		// add support for more binaries if needed
-		workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WebAPITriggerCapability}
-		if in.ExtraCapabilities.CronCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.CronCapability)
-			capabilitiesBinaryPaths[cre.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
-		}
+	// add support for more binaries if needed
+	// workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WebAPITriggerCapability}
+	// if in.ExtraCapabilities.CronCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.CronCapability)
+	// 	capabilitiesBinaryPaths[cre.CronCapability] = in.ExtraCapabilities.CronCapabilityBinaryPath
+	// }
 
-		if in.ExtraCapabilities.EVMCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.EVMCapability)
-			capabilitiesBinaryPaths[cre.EVMCapability] = in.ExtraCapabilities.EVMCapabilityBinaryPath
-		}
+	// if in.ExtraCapabilities.EVMCapabilityBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.EVMCapability)
+	// 	capabilitiesBinaryPaths[cre.EVMCapability] = in.ExtraCapabilities.EVMCapabilityBinaryPath
+	// }
 
-		if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
-			capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
-		}
+	// if in.ExtraCapabilities.LogEventTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.LogTriggerCapability)
+	// 	capabilitiesBinaryPaths[cre.LogTriggerCapability] = in.ExtraCapabilities.LogEventTriggerBinaryPath
+	// }
 
-		for capabilityName, binaryPath := range extraBinaries {
-			if binaryPath != "" || withPluginsDockerImageFlag != "" {
-				workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
-				capabilitiesBinaryPaths[capabilityName] = binaryPath
-			}
-		}
+	// for capabilityName, binaryPath := range extraBinaries {
+	// 	if binaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 		workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
+	// 		capabilitiesBinaryPaths[capabilityName] = binaryPath
+	// 	}
+	// }
 
-		capabilitiesDONCapabilities := []string{cre.WriteEVMCapability, cre.VaultCapability}
-		if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			capabilitiesDONCapabilities = append(capabilitiesDONCapabilities, cre.ReadContractCapability)
-			capabilitiesBinaryPaths[cre.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
-		}
+	// capabilitiesDONCapabilities := []string{cre.WriteEVMCapability, cre.VaultCapability}
+	// if in.ExtraCapabilities.ReadContractBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	capabilitiesDONCapabilities = append(capabilitiesDONCapabilities, cre.ReadContractCapability)
+	// 	capabilitiesBinaryPaths[cre.ReadContractCapability] = in.ExtraCapabilities.ReadContractBinaryPath
+	// }
 
-		if in.ExtraCapabilities.HTTPTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPTriggerCapability)
-			capabilitiesBinaryPaths[cre.HTTPTriggerCapability] = in.ExtraCapabilities.HTTPTriggerBinaryPath
-		}
+	// if in.ExtraCapabilities.HTTPTriggerBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPTriggerCapability)
+	// 	capabilitiesBinaryPaths[cre.HTTPTriggerCapability] = in.ExtraCapabilities.HTTPTriggerBinaryPath
+	// }
 
-		if in.ExtraCapabilities.HTTPActionBinaryPath != "" || withPluginsDockerImageFlag != "" {
-			workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPActionCapability)
-			capabilitiesBinaryPaths[cre.HTTPActionCapability] = in.ExtraCapabilities.HTTPActionBinaryPath
-		}
+	// if in.ExtraCapabilities.HTTPActionBinaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 	workflowDONCapabilities = append(workflowDONCapabilities, cre.HTTPActionCapability)
+	// 	capabilitiesBinaryPaths[cre.HTTPActionCapability] = in.ExtraCapabilities.HTTPActionBinaryPath
+	// }
 
-		capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
-			// {
-			// 	Input:              in.NodeSets[0],
-			// 	Capabilities:       workflowDONCapabilities,
-			// 	DONTypes:           []string{cre.WorkflowDON},
-			// 	BootstrapNodeIndex: 0,
-			// },
-			// {
-			// 	Input:              in.NodeSets[1],
-			// 	Capabilities:       capabilitiesDONCapabilities,
-			// 	DONTypes:           []string{cre.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
-			// 	BootstrapNodeIndex: -1,                            // <----- it's crucial to indicate there's no bootstrap node
-			// },
-			// {
-			// 	Input:              in.NodeSets[2],
-			// 	Capabilities:       []string{},
-			// 	DONTypes:           []string{cre.GatewayDON}, // <----- it's crucial to set the correct DON type
-			// 	BootstrapNodeIndex: -1,                       // <----- it's crucial to indicate there's no bootstrap node
-			// 	GatewayNodeIndex:   0,
-			// },
-		}
-	case TopologyMock:
-		if len(in.NodeSets) != 3 {
-			return nil, fmt.Errorf("expected 3 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
-		}
+	// capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
+	// {
+	// 	Input:              in.NodeSets[0],
+	// 	Capabilities:       workflowDONCapabilities,
+	// 	DONTypes:           []string{cre.WorkflowDON},
+	// 	BootstrapNodeIndex: 0,
+	// },
+	// {
+	// 	Input:              in.NodeSets[1],
+	// 	Capabilities:       capabilitiesDONCapabilities,
+	// 	DONTypes:           []string{cre.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
+	// 	BootstrapNodeIndex: -1,                            // <----- it's crucial to indicate there's no bootstrap node
+	// },
+	// {
+	// 	Input:              in.NodeSets[2],
+	// 	Capabilities:       []string{},
+	// 	DONTypes:           []string{cre.GatewayDON}, // <----- it's crucial to set the correct DON type
+	// 	BootstrapNodeIndex: -1,                       // <----- it's crucial to indicate there's no bootstrap node
+	// 	GatewayNodeIndex:   0,
+	// },
+	// }
+	// case TopologyMock:
+	// 	if len(in.NodeSets) != 3 {
+	// 		return nil, fmt.Errorf("expected 3 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
+	// 	}
 
-		// add support for more binaries if needed
-		// workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WebAPITriggerCapability}
+	// 	// add support for more binaries if needed
+	// 	// workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WebAPITriggerCapability}
 
-		capabilitiesDONCapabilities := make([]string, 0)
-		for capabilityName, binaryPath := range extraBinaries {
-			if binaryPath != "" || withPluginsDockerImageFlag != "" {
-				capabilitiesDONCapabilities = append(capabilitiesDONCapabilities, capabilityName)
-				capabilitiesBinaryPaths[capabilityName] = binaryPath
-			}
-		}
-		capabilitiesDONCapabilities = append(capabilitiesDONCapabilities, cre.MockCapability)
+	// 	capabilitiesDONCapabilities := make([]string, 0)
+	// 	for capabilityName, binaryPath := range extraBinaries {
+	// 		if binaryPath != "" || withPluginsDockerImageFlag != "" {
+	// 			capabilitiesDONCapabilities = append(capabilitiesDONCapabilities, capabilityName)
+	// 			capabilitiesBinaryPaths[capabilityName] = binaryPath
+	// 		}
+	// 	}
+	// 	capabilitiesDONCapabilities = append(capabilitiesDONCapabilities, cre.MockCapability)
 
-		capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
-			// {
-			// 	Input:              in.NodeSets[0],
-			// 	Capabilities:       workflowDONCapabilities,
-			// 	DONTypes:           []string{cre.WorkflowDON},
-			// 	BootstrapNodeIndex: 0,
-			// },
-			// {
-			// 	Input:              in.NodeSets[1],
-			// 	Capabilities:       capabilitiesDONCapabilities,
-			// 	DONTypes:           []string{cre.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
-			// 	BootstrapNodeIndex: -1,
-			// },
-			// {
-			// 	Input:              in.NodeSets[2],
-			// 	Capabilities:       []string{},
-			// 	DONTypes:           []string{cre.GatewayDON}, // <----- it's crucial to set the correct DON type
-			// 	BootstrapNodeIndex: -1,                       // <----- it's crucial to indicate there's no bootstrap node
-			// 	GatewayNodeIndex:   0,
-			// },
-		}
-	default:
-		return nil, fmt.Errorf("invalid topology flag: %s", topologyFlag)
-	}
+	// 	capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
+	// {
+	// 	Input:              in.NodeSets[0],
+	// 	Capabilities:       workflowDONCapabilities,
+	// 	DONTypes:           []string{cre.WorkflowDON},
+	// 	BootstrapNodeIndex: 0,
+	// },
+	// {
+	// 	Input:              in.NodeSets[1],
+	// 	Capabilities:       capabilitiesDONCapabilities,
+	// 	DONTypes:           []string{cre.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
+	// 	BootstrapNodeIndex: -1,
+	// },
+	// {
+	// 	Input:              in.NodeSets[2],
+	// 	Capabilities:       []string{},
+	// 	DONTypes:           []string{cre.GatewayDON}, // <----- it's crucial to set the correct DON type
+	// 	BootstrapNodeIndex: -1,                       // <----- it's crucial to indicate there's no bootstrap node
+	// 	GatewayNodeIndex:   0,
+	// },
+	// }
+	// default:
+	// 	return nil, fmt.Errorf("invalid topology flag: %s", topologyFlag)
+	// }
 
 	// unset DockerFilePath and DockerContext as we cannot use them with existing images
 	if withPluginsDockerImageFlag != "" {
-		for setIdx := range capabilitiesAwareNodeSets {
-			for nodeIdx := range capabilitiesAwareNodeSets[setIdx].NodeSpecs {
-				capabilitiesAwareNodeSets[setIdx].NodeSpecs[nodeIdx].Node.Image = withPluginsDockerImageFlag
-				capabilitiesAwareNodeSets[setIdx].NodeSpecs[nodeIdx].Node.DockerContext = ""
-				capabilitiesAwareNodeSets[setIdx].NodeSpecs[nodeIdx].Node.DockerFilePath = ""
+		for setIdx := range in.NodeSets {
+			for nodeIdx := range in.NodeSets[setIdx].NodeSpecs {
+				in.NodeSets[setIdx].NodeSpecs[nodeIdx].Node.Image = withPluginsDockerImageFlag
+				in.NodeSets[setIdx].NodeSpecs[nodeIdx].Node.DockerContext = ""
+				in.NodeSets[setIdx].NodeSpecs[nodeIdx].Node.DockerFilePath = ""
 			}
 		}
 	}
 
 	fmt.Print(libformat.PurpleText("DON topology:\n"))
-	for _, nodeSet := range capabilitiesAwareNodeSets {
+	for _, nodeSet := range in.NodeSets {
 		fmt.Print(libformat.PurpleText("%s\n", strings.ToUpper(nodeSet.Name)))
 		fmt.Print(libformat.PurpleText("\tNode count: %d\n", len(nodeSet.NodeSpecs)))
 		capabilitiesDesc := "none"
@@ -798,8 +798,8 @@ func StartCLIEnvironment(
 		crecompute.ComputeJobSpecFactoryFn,
 		crevault.VaultJobSpecFactoryFn(libc.MustSafeUint64(int64(homeChainIDInt))),
 		mock2.MockJobSpecFactoryFn,
-		crehttpaction.HTTPActionJobSpecFactoryFn(filepath.Join(containerPath, httpActionBinaryName)),
-		crehttptrigger.HTTPTriggerJobSpecFactoryFn(filepath.Join(containerPath, httpTriggerBinaryName)),
+		crehttpaction.HTTPActionJobSpecFactoryFn,
+		crehttptrigger.HTTPTriggerJobSpecFactoryFn,
 		creconsensus.ConsensusV2JobSpecFactoryFn,
 	}
 
@@ -833,7 +833,7 @@ func StartCLIEnvironment(
 		fmt.Printf("Generated new CSA encryption key for JD: %s\n", in.JD.CSAEncryptionKey)
 	}
 	universalSetupInput := creenv.SetupInput{
-		CapabilitiesAwareNodeSets:            capabilitiesAwareNodeSets,
+		CapabilitiesAwareNodeSets:            in.NodeSets,
 		CapabilitiesContractFactoryFunctions: capabilityFactoryFns,
 		BlockchainsInput:                     in.Blockchains,
 		JdInput:                              *in.JD,
@@ -847,9 +847,9 @@ func StartCLIEnvironment(
 	}
 
 	// TODO: we could/should probably build these from capabilities configuration
-	if withPluginsDockerImageFlag == "" {
-		universalSetupInput.CustomBinariesPaths = capabilitiesBinaryPaths
-	}
+	// if withPluginsDockerImageFlag == "" {
+	// 	universalSetupInput.CustomBinariesPaths = capabilitiesBinaryPaths
+	// }
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)
 	defer cancel()

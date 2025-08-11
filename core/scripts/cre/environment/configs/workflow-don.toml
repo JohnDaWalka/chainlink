@@ -79,6 +79,9 @@
   #  [nodesets.capability_overrides.mock]
   #    Port = 8081  # Override default port for this DON
 
+# [nodesets.capability_overrides.http-action]
+#    IncomingGlobalBurst = 20
+
   [nodesets.db]
     image = "postgres:12.0"
     port = 13000

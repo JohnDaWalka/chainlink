@@ -6,7 +6,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
-	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -14,13 +13,13 @@ import (
 
 type Config struct {
 	Blockchains            []*cre.WrappedBlockchainInput   `toml:"blockchains" validate:"required"`
-	NodeSets               []*ns.Input                     `toml:"nodesets" validate:"required"`
+	NodeSets               []*cre.CapabilitiesAwareNodeSet `toml:"nodesets" validate:"required"`
 	JD                     *jd.Input                       `toml:"jd" validate:"required"`
 	Infra                  *infra.Input                    `toml:"infra" validate:"required"`
 	Fake                   *fake.Input                     `toml:"fake" validate:"required"`
 	CapabilitiesConfig     CapabilitiesConfig              `toml:"capabilities_configs"`
 	S3ProviderInput        *s3provider.Input               `toml:"s3provider"`
-	AdditionalCapabilities map[string]cre.CapabilityConfig `toml:"additional_capabilities"` // capability name -> capability config
+	AdditionalCapabilities map[string]cre.CapabilityConfig `toml:"additional_capabilities"` // capability flag -> capability config
 }
 
 type CapabilitiesConfig struct {
@@ -33,13 +32,3 @@ func (c Config) Validate() error {
 	}
 	return nil
 }
-
-// type ExtraCapabilitiesConfig struct {
-// 	CronCapabilityBinaryPath      string `toml:"cron_capability_binary_path"`
-// 	EVMCapabilityBinaryPath       string `toml:"evm_capability_binary_path"`
-// 	LogEventTriggerBinaryPath     string `toml:"log_event_trigger_binary_path"`
-// 	ReadContractBinaryPath        string `toml:"read_contract_capability_binary_path"`
-// 	HTTPTriggerBinaryPath         string `toml:"http_trigger_capability_binary_path"`
-// 	HTTPActionBinaryPath          string `toml:"http_action_capability_binary_path"`
-// 	ConsensusCapabilityBinaryPath string `toml:"consensus_capability_binary_path"`
-// }
