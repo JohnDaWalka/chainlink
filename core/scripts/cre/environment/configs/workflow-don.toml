@@ -39,8 +39,10 @@
   override_mode = "each"
   http_port_range_start = 10100
 
-  bootstrap_node_index = 0 # index of node in the nodeset that will act as the bootsrap node (not required, but added for visiblity)
-  gateway_node_index = 0 # added for visiblity, required always, when don_types include "gateway"
+  # index of node in the nodeset that will act as the bootsrap node (not required, but added for visiblity)
+  bootstrap_node_index = 0
+  # added for visiblity, required always, when don_types include "gateway"
+  gateway_node_index = 0
 
   env_vars = { CL_EVM_CMD = "" }
 
@@ -49,7 +51,7 @@
   # Enable capabilities per chain with optional per-chain overrides
   [nodesets.chain_capabilities]
     # Simple: enable write-evm on listed chains
-    write-evm = ["1337"]
+    write-evm = ["1337", "2337"]
     # write-evm with per-chain configuration overrides
     # "write-evm" = { enabled_chains = ["1337", "2337"], chain_overrides = { "1337" = { GasLimitDefault = 500_000, PollPeriod = "1s", AcceptanceTimeout = "45s" }, "2337" = { GasLimitDefault = 300_000, AcceptanceTimeout = "60s" } } }
     # EVM capability with a chain-specific override example
