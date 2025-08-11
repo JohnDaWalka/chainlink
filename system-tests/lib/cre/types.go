@@ -59,6 +59,23 @@ const (
 	// Add more capabilities as needed
 )
 
+var KnownCapabilities = []CapabilityFlag{
+	OCR3Capability,
+	ConsensusCapability,
+	CronCapability,
+	EVMCapability,
+	CustomComputeCapability,
+	WriteEVMCapability,
+	ReadContractCapability,
+	LogTriggerCapability,
+	WebAPITargetCapability,
+	WebAPITriggerCapability,
+	MockCapability,
+	VaultCapability,
+	HTTPTriggerCapability,
+	HTTPActionCapability,
+}
+
 type NodeType = string
 
 const (

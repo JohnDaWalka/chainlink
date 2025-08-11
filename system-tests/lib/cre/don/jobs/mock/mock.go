@@ -9,7 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	libjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -65,7 +65,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), mockConfig.Config, donOverrides)
 
 		// Apply runtime values only for keys not specified by user
-		templateData := jobs.ApplyRuntimeValues(mergedConfig, map[string]any{})
+		templateData := don.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		// Parse and execute template
 		tmpl, err := template.New("mockConfig").Parse(mockConfigTemplate)
@@ -79,7 +79,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 		}
 		configStr := configBuffer.String()
 
-		if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+		if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
 			return nil, errors.Wrapf(err, "%s template validation failed", flag)
 		}
 

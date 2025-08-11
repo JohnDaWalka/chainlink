@@ -76,11 +76,11 @@ type SetupInput struct {
 	BlockchainsInput                     []*cre.WrappedBlockchainInput
 	JdInput                              jd.Input
 	InfraInput                           infra.Input
-	CustomBinariesPaths                  map[cre.CapabilityFlag]string
 	OCR3Config                           *keystone_changeset.OracleConfig
 	VaultOCR3Config                      *keystone_changeset.OracleConfig
 	S3ProviderInput                      *s3provider.Input
 	AdditionalCapabilitiesConfigs        cre.AdditionalCapabilitiesConfigs
+	CopyCapabilityBinaries               bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
 }
 
 type backgroundStageResult struct {
@@ -277,6 +277,7 @@ func SetupTestEnvironment(
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		input.ConfigFactoryFunctions,
 		input.AdditionalCapabilitiesConfigs,
+		input.CopyCapabilityBinaries,
 	)
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")

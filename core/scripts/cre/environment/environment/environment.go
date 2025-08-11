@@ -279,8 +279,8 @@ func startCmd() *cobra.Command {
 				return errors.Wrap(err, "failed to load test configuration")
 			}
 
-			// TODO add correct handling. UnmarshalTOML is not supported by the library we use :head_exploding:
-			// Maybe we should add hooks to Load()?
+			// TODO since UnmarshalTOML is not supported by the TOML library we use :head_exploding:
+			// we need to parse chain capabilities manually, but we need to handle it properly, maybe by adding hooks to Load()?
 			for _, nodeSet := range in.NodeSets {
 				if asMap, ok := nodeSet.RawChainCapabilities.(map[string]any); ok {
 					if err := nodeSet.ParseChainCapabilities(asMap); err != nil {
@@ -295,7 +295,7 @@ func startCmd() *cobra.Command {
 
 			extraAllowedGatewayPorts = append(extraAllowedGatewayPorts, in.Fake.Port)
 
-			output, startErr := StartCLIEnvironment(cmdContext, in, topology, exampleWorkflowTrigger, withPluginsDockerImage, withExampleFlag, extraAllowedGatewayPorts, nil, nil)
+			output, startErr := StartCLIEnvironment(cmdContext, in, topology, exampleWorkflowTrigger, withPluginsDockerImage, withExampleFlag, extraAllowedGatewayPorts, nil)
 			if startErr != nil {
 				fmt.Fprintf(os.Stderr, "Error: %s\n", startErr)
 				fmt.Fprintf(os.Stderr, "Stack trace: %s\n", string(debug.Stack()))
@@ -514,22 +514,13 @@ func StartCLIEnvironment(
 	withPluginsDockerImageFlag string,
 	withExampleFlag bool,
 	extraAllowedGatewayPorts []int,
-	extraBinaries map[string]string,
 	extraJobFactoryFns []cre.JobSpecFactoryFn,
 ) (*creenv.SetupOutput, error) {
 	testLogger := framework.L
 
-	// TODO fix: make sure that either cron is enabled or withPluginsDockerImageFlag is set, but only if workflowTrigger is cron
-	// if withExampleFlag && workflowTrigger == WorkflowTriggerCron && (in.ExtraCapabilities.CronCapabilityBinaryPath == "" && withPluginsDockerImageFlag == "") {
-	// return nil, fmt.Errorf("either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag", os.Getenv("CTF_CONFIGS"))
-	// }
-
-	// if evmCapErr := validateCapabilitiesConfig(in); evmCapErr != nil {
-	// 	return nil, evmCapErr
-	// }
-
-	// TODO:
-	// validate if all capabilities have corresponding flags
+	if err := validateWorkflowTriggerAndCapabilities(in, withExampleFlag, workflowTrigger, withPluginsDockerImageFlag); err != nil {
+		return nil, errors.Wrap(err, "either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag")
+	}
 
 	// capabilitiesBinaryPaths := map[cre.CapabilityFlag]string{}
 	// var capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
@@ -844,12 +835,8 @@ func StartCLIEnvironment(
 		},
 		S3ProviderInput:               in.S3ProviderInput,
 		AdditionalCapabilitiesConfigs: in.AdditionalCapabilities,
+		CopyCapabilityBinaries:        withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
 	}
-
-	// TODO: we could/should probably build these from capabilities configuration
-	// if withPluginsDockerImageFlag == "" {
-	// 	universalSetupInput.CustomBinariesPaths = capabilitiesBinaryPaths
-	// }
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)
 	defer cancel()
@@ -967,4 +954,31 @@ func initDxTracker() {
 		fmt.Fprintf(os.Stderr, "failed to create DX tracker: %s\n", trackerErr)
 		dxTracker = &tracking.NoOpTracker{}
 	}
+}
+
+func validateWorkflowTriggerAndCapabilities(in *creenv.Config, withExampleFlag bool, workflowTrigger, withPluginsDockerImageFlag string) error {
+	if withExampleFlag && workflowTrigger == WorkflowTriggerCron {
+		// assume it has cron binary if we are using plugins image
+		if withPluginsDockerImageFlag != "" {
+			return nil
+		}
+
+		// otherwise, make sure we have cron binary path set in TOML config
+		if in.AdditionalCapabilities == nil {
+			return errors.New("additional capabilities config is not set in TOML config")
+		}
+
+		cronCapConfig, ok := in.AdditionalCapabilities[cre.CronCapability]
+		if !ok {
+			return errors.New("cron capability is not set in TOML config")
+		}
+
+		if cronCapConfig.BinaryPath == "" {
+			return errors.New("cron binary path must be set in TOML config")
+		}
+
+		return nil
+	}
+
+	return nil
 }

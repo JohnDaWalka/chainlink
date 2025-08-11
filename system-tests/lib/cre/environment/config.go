@@ -2,6 +2,8 @@ package environment
 
 import (
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
@@ -17,18 +19,38 @@ type Config struct {
 	JD                     *jd.Input                       `toml:"jd" validate:"required"`
 	Infra                  *infra.Input                    `toml:"infra" validate:"required"`
 	Fake                   *fake.Input                     `toml:"fake" validate:"required"`
-	CapabilitiesConfig     CapabilitiesConfig              `toml:"capabilities_configs"`
 	S3ProviderInput        *s3provider.Input               `toml:"s3provider"`
 	AdditionalCapabilities map[string]cre.CapabilityConfig `toml:"additional_capabilities"` // capability flag -> capability config
-}
-
-type CapabilitiesConfig struct {
-	EVM map[string]map[string]any `toml:"evm"`
 }
 
 func (c Config) Validate() error {
 	if c.JD.CSAEncryptionKey == "" {
 		return errors.New("jd.csa_encryption_key must be provided")
 	}
+
+	for _, nodeSet := range c.NodeSets {
+		for _, capability := range nodeSet.Capabilities {
+			if !slices.Contains(cre.KnownCapabilities, capability) {
+				return errors.New("unknown capability: " + capability)
+			}
+		}
+
+		for chainCapability := range nodeSet.ChainCapabilities {
+			for _, knownCapability := range cre.KnownCapabilities {
+				if chainCapability == knownCapability {
+					continue
+				}
+
+				// check if it's a chain-specific capability, where the naming pattern is "capability-chainID"
+				if strings.HasPrefix(chainCapability, knownCapability+"-") {
+					continue
+				}
+
+				return errors.New("unknown capability: " + chainCapability)
+			}
+		}
+
+	}
+
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 )
 
 // Template for EVM workflow configuration
@@ -132,7 +133,15 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 			if executeErr := tmpl.Execute(&configBuffer, chain.WorkflowConfig); executeErr != nil {
 				return "", errors.Wrap(executeErr, "failed to execute evm workflow config template")
 			}
-			evmChainsConfig += configBuffer.String()
+
+			flag := cre.WriteEVMCapability
+			configStr := configBuffer.String()
+
+			if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
+				return "", errors.Wrapf(err, "%s template validation failed", flag)
+			}
+
+			evmChainsConfig += configStr
 		}
 	}
 

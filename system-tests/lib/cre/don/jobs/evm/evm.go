@@ -15,7 +15,7 @@ import (
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 )
 
@@ -56,7 +56,7 @@ var EVMJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpe
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", creForwarderAddress.Address, nodeAddress)
 
 		// Apply runtime fallbacks only for keys not specified by user
-		templateData := jobs.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		templateData := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
 
 		// Parse and execute template
 		tmpl, err := template.New("evmConfig").Parse(evmConfigTemplate)
@@ -71,7 +71,7 @@ var EVMJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpe
 
 		configStr := configBuffer.String()
 
-		if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+		if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
 			return "", errors.Wrapf(err, "%s template validation failed", flag)
 		}
 

@@ -19,16 +19,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-)
-
-const (
-	OCRPeeringPort          = 5001
-	CapabilitiesPeeringPort = 6690
-	GatewayIncomingPort     = 5002
-	GatewayOutgoingPort     = 5003
 )
 
 func Set(t *testing.T, nodeInput *cre.CapabilitiesAwareNodeSet, bc *blockchain.Output) (*cre.WrappedNodeOutput, error) {
@@ -218,7 +211,7 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.ConfigFactoryFn) 
 					"ForwarderAddress": wi.ForwarderAddress,
 				}
 
-				wi.WorkflowConfig = jobs.ApplyRuntimeValues(mergedConfig, runtimeValues)
+				wi.WorkflowConfig = don.ApplyRuntimeValues(mergedConfig, runtimeValues)
 			}
 		}
 

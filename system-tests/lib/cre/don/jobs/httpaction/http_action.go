@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -78,7 +79,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 		}
 
 		mergedConfig := cre.ResolveCapabilityConfigForDON(flag, httpActionConfig.Config, donOverrides)
-		templateData := jobs.ApplyRuntimeValues(mergedConfig, map[string]any{})
+		templateData := don.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		tmpl, err := template.New("httpActionConfig").Parse(httpActionConfigTemplate)
 		if err != nil {
@@ -91,7 +92,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 		}
 		configStr := configBuffer.String()
 
-		if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+		if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
 			return nil, errors.Wrapf(err, "%s template validation failed", flag)
 		}
 

@@ -28,6 +28,7 @@ func BuildTopology(
 	addressBook deployment.AddressBook,
 	configFactoryFunctions []cre.ConfigFactoryFn,
 	additionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs,
+	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
 	topologyErr := libdon.ValidateTopology(nodeSets, infraInput)
 	if topologyErr != nil {
@@ -153,6 +154,10 @@ func BuildTopology(
 			for j := range donMetadata.NodesMetadata {
 				localNodeSets[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
 			}
+		}
+
+		if !copyCapabilityBinaries {
+			continue
 		}
 
 		customBinariesPaths := make(map[cre.CapabilityFlag]string)

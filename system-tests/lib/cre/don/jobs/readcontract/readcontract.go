@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 
@@ -87,7 +88,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			}
 
 			// Apply runtime fallbacks only for keys not specified by user
-			templateData := jobs.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+			templateData := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
 
 			// Parse and execute template
 			tmpl, err := template.New("readContractConfig").Parse(readContractConfigTemplate)
@@ -101,7 +102,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			}
 			configStr := configBuffer.String()
 
-			if err := jobs.ValidateTemplateSubstitution(configStr, flag); err != nil {
+			if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
 				return nil, errors.Wrapf(err, "%s template validation failed", flag)
 			}
 

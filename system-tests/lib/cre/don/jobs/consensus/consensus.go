@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -84,7 +84,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 		ocrPeeringData := cre.OCRPeeringData{
 			OCRBootstraperPeerID: donBootstrapNodePeerID,
 			OCRBootstraperHost:   donBootstrapNodeHost,
-			Port:                 config.OCRPeeringPort,
+			Port:                 don.OCRPeeringPort,
 		}
 
 		for _, workerNode := range workflowNodeSet {
@@ -126,7 +126,7 @@ var ConsensusV2JobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.Dons
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
 
 		// Apply runtime fallbacks only for keys not specified by user
-		templateData := jobs.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		templateData := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
 
 		// Parse and execute template
 		tmpl, err := template.New("consensusConfig").Parse(consensusConfigTemplate)
