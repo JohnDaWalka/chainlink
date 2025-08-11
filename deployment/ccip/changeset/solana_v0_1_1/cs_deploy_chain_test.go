@@ -241,6 +241,9 @@ func TestUpgrade(t *testing.T) {
 				SetAfterInitialDeploy: true,
 				SetOffRamp:            true,
 				SetMCMSPrograms:       true,
+				TransferKeys: []solana.PublicKey{
+					state.SolChains[solChainSelectors[0]].CCTPTokenPool,
+				},
 			},
 		),
 		// build the upgraded contracts and deploy/replace them onchain
@@ -366,26 +369,6 @@ func TestUpgrade(t *testing.T) {
 	require.NoError(t, err)
 	// solana verification
 	err = testhelpers.ValidateSolanaState(e, solChainSelectors)
-	require.NoError(t, err)
-
-	e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
-		commonchangeset.Configure(
-			cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
-			ccipChangesetSolana.TokenPoolConfigWithMCM{
-				ChainSelector: solChainSelectors[0],
-				PoolType:      shared.BurnMintTokenPool,
-				Metadata:      shared.CLLMetadata,
-			},
-		),
-		commonchangeset.Configure(
-			cldf.CreateLegacyChangeSet(ccipChangesetSolana.InitGlobalConfigTokenPoolProgram),
-			ccipChangesetSolana.TokenPoolConfigWithMCM{
-				ChainSelector: solChainSelectors[0],
-				PoolType:      shared.LockReleaseTokenPool,
-				Metadata:      shared.CLLMetadata,
-			},
-		),
-	})
 	require.NoError(t, err)
 }
 
