@@ -193,6 +193,7 @@ func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte, auth st
 	if isLegacyRequest {
 		err = h.HandleLegacyUserMessage(ctx, msg, responseCh)
 	} else {
+		g.lggr.Infof("Debugging Gateway HandleJSONRPCUserMessage")
 		err = h.HandleJSONRPCUserMessage(ctx, jsonRequest, responseCh)
 	}
 	if err != nil {
@@ -202,11 +203,13 @@ func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte, auth st
 	var response handlers.UserCallbackPayload
 	select {
 	case <-ctx.Done():
+		g.lggr.Infof("Debugging Gateway timed out without response: %s", ctx.Err())
 		return newError(jsonRequest.ID, api.RequestTimeoutError, "handler timeout")
 	case response = <-responseCh:
 		break
 	}
 	promRequest.WithLabelValues(response.ErrorCode.String()).Inc()
+	g.lggr.Infof("Debugging Gateway Got response: %s", response.ErrorCode.String())
 	return response.RawResponse, api.ToHttpErrorCode(response.ErrorCode)
 }
 

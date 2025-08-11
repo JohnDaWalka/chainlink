@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
 const (
@@ -48,6 +49,7 @@ type ReportingPluginConfig struct {
 }
 
 func NewReportingPluginFactory(lggr logger.Logger, store *requests.Store[*Request], publicKey *tdh2easy.PublicKey, privateKeyShare *tdh2easy.PrivateShare) (*ReportingPluginFactory, error) {
+	lggr.Infof("Debugging: VaultOCR NewReportingPluginFactory.")
 	if publicKey == nil {
 		return nil, errors.New("public key cannot be nil")
 	}
@@ -73,12 +75,24 @@ func NewReportingPluginFactory(lggr logger.Logger, store *requests.Store[*Reques
 }
 
 type ReportingPluginFactory struct {
+	job.ServiceCtx
 	lggr  logger.Logger
 	store *requests.Store[*Request]
 	cfg   *ReportingPluginConfig
 }
 
+func (r *ReportingPluginFactory) Start(context.Context) error {
+	r.lggr.Infof("Debugging: VaultOCR ReportingPluginFactory Start.")
+	return nil
+}
+
+func (r *ReportingPluginFactory) Close() error {
+	r.lggr.Infof("Debugging: VaultOCR ReportingPluginFactory Close.")
+	return nil
+}
+
 func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig, fetcher ocr3_1types.BlobBroadcastFetcher) (ocr3_1types.ReportingPlugin[[]byte], ocr3_1types.ReportingPluginInfo, error) {
+	r.lggr.Infof("Debugging: VaultOCR NewReportingPlugin.")
 	return &ReportingPlugin{
 		lggr:  r.lggr.Named("VaultReportingPlugin"),
 		store: r.store,
@@ -94,6 +108,7 @@ type ReportingPlugin struct {
 }
 
 func (r *ReportingPlugin) Query(ctx context.Context, seqNr uint64, keyValueReader ocr3_1types.KeyValueReader, blobBroadcastFetcher ocr3_1types.BlobBroadcastFetcher) (types.Query, error) {
+	r.lggr.Infof("Debugging: VaultOCR Query.")
 	return types.Query{}, nil
 }
 
@@ -106,10 +121,12 @@ func (r *ReportingPlugin) Observation(ctx context.Context, seqNr uint64, aq type
 		return nil, fmt.Errorf("could not fetch batch of requests: %w", err)
 	}
 
+	r.lggr.Infof("Debugging: VaultOCR Observation. Batch-size: %d", len(batch))
 	ids := []string{}
 	obs := []*vault.Observation{}
 	newSecretsByOwner := map[string]map[string]bool{}
 	for _, req := range batch {
+		r.lggr.Infof("Debugging: VaultOCR Observation. Found id in batch: %s", req.ID())
 		o := &vault.Observation{
 			Id: req.ID(),
 		}

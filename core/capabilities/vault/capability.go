@@ -14,41 +14,45 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	vault2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/vault"
 )
 
-var _ capabilities.ExecutableCapability = (*Service)(nil)
+var _ capabilities.ExecutableCapability = (*Capability)(nil)
 
-type Service struct {
+var _ SecretsService = (*Capability)(nil)
+
+type Capability struct {
 	clock        clockwork.Clock
+	lggr         logger.Logger
 	expiresAfter time.Duration
-	handler      *requests.Handler[*Request, *Response]
+	handler      *requests.Handler[*vault2.Request, *vault2.Response]
 }
 
-func (s *Service) Start(ctx context.Context) error {
+func (s *Capability) Start(ctx context.Context) error {
 	return s.handler.Start(ctx)
 }
 
-func (s *Service) Close() error {
+func (s *Capability) Close() error {
 	return s.handler.Close()
 }
 
-func (s *Service) Info(ctx context.Context) (capabilities.CapabilityInfo, error) {
-	return capabilities.NewCapabilityInfo(vault.CapabilityID, capabilities.CapabilityTypeAction, "Vault Service")
+func (s *Capability) Info(ctx context.Context) (capabilities.CapabilityInfo, error) {
+	return capabilities.NewCapabilityInfo(vault.CapabilityID, capabilities.CapabilityTypeAction, "Vault Capability")
 }
 
-func (s *Service) RegisterToWorkflow(ctx context.Context, request capabilities.RegisterToWorkflowRequest) error {
+func (s *Capability) RegisterToWorkflow(ctx context.Context, request capabilities.RegisterToWorkflowRequest) error {
 	// Left unimplemented as this method will never be called
 	// for this capability
 	return nil
 }
 
-func (s *Service) UnregisterFromWorkflow(ctx context.Context, request capabilities.UnregisterFromWorkflowRequest) error {
+func (s *Capability) UnregisterFromWorkflow(ctx context.Context, request capabilities.UnregisterFromWorkflowRequest) error {
 	// Left unimplemented as this method will never be called
 	// for this capability
 	return nil
 }
 
-func (s *Service) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
+func (s *Capability) Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error) {
 	if request.Payload == nil {
 		return capabilities.CapabilityResponse{}, errors.New("capability does not support v1 requests")
 	}
@@ -64,7 +68,7 @@ func (s *Service) Execute(ctx context.Context, request capabilities.CapabilityRe
 	}
 
 	// Validate the request: we only check that the request contains at least one secret request.
-	// All other validation is done in the plugin and subject to consensus.
+	// All other validations are done in the plugin and subject to consensus.
 	if len(r.Requests) == 0 {
 		return capabilities.CapabilityResponse{}, errors.New("no secret request specified in request")
 	}
@@ -81,7 +85,7 @@ func (s *Service) Execute(ctx context.Context, request capabilities.CapabilityRe
 	}
 	id := fmt.Sprintf("%s::%s::%s", md.WorkflowID, phaseOrExecution, md.ReferenceID)
 
-	resp, err := handleRequest(ctx, s, id, r)
+	resp, err := s.handleRequest(ctx, id, r)
 	if err != nil {
 		return capabilities.CapabilityResponse{}, err
 	}
@@ -104,16 +108,16 @@ func (s *Service) Execute(ctx context.Context, request capabilities.CapabilityRe
 	}, nil
 }
 
-func handleRequest(ctx context.Context, s *Service, id string, request proto.Message) (*Response, error) {
-	respCh := make(chan *Response, 1)
-	s.handler.SendRequest(ctx, &Request{
+func (s *Capability) handleRequest(ctx context.Context, id string, request proto.Message) (*vault2.Response, error) {
+	respCh := make(chan *vault2.Response, 1)
+	s.handler.SendRequest(ctx, &vault2.Request{
 		Payload:      request,
 		ResponseChan: respCh,
 
-		expiryTime: s.clock.Now().Add(s.expiresAfter),
-		id:         id,
+		ExpiryTimeVal: s.clock.Now().Add(s.expiresAfter),
+		IDVal:         id,
 	})
-
+	s.lggr.Infof("Sent Request to Vault OCR: %s", request)
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -126,18 +130,20 @@ func handleRequest(ctx context.Context, s *Service, id string, request proto.Mes
 	}
 }
 
-func (s *Service) CreateSecrets(ctx context.Context, request *vault.CreateSecretsRequest) (*Response, error) {
-	return handleRequest(ctx, s, request.RequestId, request)
+func (s *Capability) CreateSecrets(ctx context.Context, request *vault.CreateSecretsRequest) (*vault2.Response, error) {
+	s.lggr.Infof("Received CreateSecrets call: %s", request.String())
+	return s.handleRequest(ctx, request.RequestId, request)
 }
 
-func NewService(
+func NewCapability(
 	lggr logger.Logger,
-	store *requests.Store[*Request],
+	store *requests.Store[*vault2.Request],
 	clock clockwork.Clock,
 	expiresAfter time.Duration,
-) *Service {
-	return &Service{
+) *Capability {
+	return &Capability{
 		clock:        clock,
+		lggr:         lggr.Named("VaultCapability"),
 		expiresAfter: expiresAfter,
 		handler:      requests.NewHandler(lggr, store, clock, expiresAfter),
 	}
