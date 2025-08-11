@@ -61,14 +61,9 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, ext
 		}
 
 		for idx := range gatewayConnectorOutput.Configurations {
-			donID := donWithMetadata.Name
-			if flags.HasFlag(donWithMetadata.Flags, cre.VaultCapability) {
-				donID = cre.VaultGatewayDonID
-			}
-
 			gatewayConnectorOutput.Configurations[idx].Dons = append(gatewayConnectorOutput.Configurations[idx].Dons, cre.GatewayConnectorDons{
 				MembersEthAddresses: ethAddresses,
-				ID:                  donID,
+				ID:                  donWithMetadata.Name,
 			})
 		}
 	}
@@ -121,6 +116,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, ext
 		// if any of the DONs have http action or http trigger capability, we need to add a http handler to the jobspec for the gateway node
 		if don.AnyDonHasCapability(donMetadata, cre.HTTPActionCapability) || don.AnyDonHasCapability(donMetadata, cre.HTTPTriggerCapability) {
 			handlerConfig := `
+			ServiceName = "workflows"
 			[gatewayConfig.Dons.Handlers.Config]
 			maxTriggerRequestDurationMs = 5_000
 			` + nodeRateLimiterConfig + `
@@ -136,6 +132,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, ext
 		// if any of the DONs have vault capability, we need to add a vault handler to the jobspec for the gateway node
 		if don.AnyDonHasCapability(donMetadata, cre.VaultCapability) {
 			handlerConfig := `
+			ServiceName = "vault"
 			[gatewayConfig.Dons.Handlers.Config]
 			requestTimeoutSec = 30
 			` + nodeRateLimiterConfig
