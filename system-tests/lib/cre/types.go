@@ -493,8 +493,18 @@ type OCRPeeringData struct {
 
 // ParseChainCapabilities parses chain_capabilities from raw TOML data and sets it on the CapabilitiesAwareNodeSet.
 // This allows us to handle the flexible chain_capabilities syntax without a complex custom unmarshaler.
-func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any) error {
+func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 	c.ChainCapabilities = make(map[string]*ChainCapabilityConfig)
+	c.ComputedCapabilities = append(c.ComputedCapabilities, c.Capabilities...)
+
+	if c.RawChainCapabilities == nil {
+		return nil
+	}
+
+	capMap, ok := c.RawChainCapabilities.(map[string]any)
+	if !ok {
+		return fmt.Errorf("chain_capabilities must be a map")
+	}
 
 	for capName, capValue := range capMap {
 		config := &ChainCapabilityConfig{}
@@ -553,8 +563,6 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any)
 		c.ChainCapabilities[capName] = config
 		c.ComputedCapabilities = append(c.ComputedCapabilities, computedCapabilities...)
 	}
-
-	c.ComputedCapabilities = append(c.ComputedCapabilities, c.Capabilities...)
 
 	return nil
 }

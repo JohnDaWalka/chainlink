@@ -22,7 +22,11 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 		return nil, errors.New("node set input is nil or chain capabilities is nil")
 	}
 
-	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
+	if _, ok := nodeSetInput.ChainCapabilities[cre.EVMCapability]; !ok {
+		return nil, nil
+	}
+
+	for _, chainID := range nodeSetInput.ChainCapabilities[cre.EVMCapability].EnabledChains {
 		if flags.HasFlag(donFlags, cre.EVMCapability) {
 			selector, selectorErr := chainselectors.SelectorFromChainId(chainID)
 			if selectorErr != nil {

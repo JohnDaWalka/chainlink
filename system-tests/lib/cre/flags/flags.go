@@ -10,7 +10,7 @@ import (
 )
 
 func HasFlag(values []string, flag string) bool {
-	return slices.Contains(values, flag)
+	return HasFlagForAnyChain(values, flag)
 }
 
 func HasOnlyOneFlag(values []string, flag string) bool {
@@ -38,7 +38,7 @@ func HasFlagForChain(nodeSet *cre.CapabilitiesAwareNodeSet, capability string, c
 }
 
 func HasFlagForAnyChain(values []string, capability string) bool {
-	if HasFlag(values, capability) {
+	if slices.Contains(values, capability) {
 		return true
 	}
 

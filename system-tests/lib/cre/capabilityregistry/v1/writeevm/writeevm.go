@@ -22,6 +22,10 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 		return nil, errors.New("node set input is nil or chain capabilities is nil")
 	}
 
+	if _, ok := nodeSetInput.ChainCapabilities[cre.WriteEVMCapability]; !ok {
+		return nil, nil
+	}
+
 	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
 		fullName := corevm.GenerateWriteTargetName(chainID)
 		splitName := strings.Split(fullName, "@")

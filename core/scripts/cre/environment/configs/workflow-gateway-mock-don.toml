@@ -42,6 +42,9 @@
 
     capabilities = ["ocr3", "custom-compute", "web-api-trigger"]
 
+   [nodesets.chain_capabilities]
+    write-evm = ["1337"]
+
     [nodesets.db]
     image = "postgres:12.0"
     port = 13000

@@ -20,7 +20,11 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 		return nil, errors.New("node set input is nil or chain capabilities is nil")
 	}
 
-	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
+	if _, ok := nodeSetInput.ChainCapabilities[cre.ReadContractCapability]; !ok {
+		return nil, nil
+	}
+
+	for _, chainID := range nodeSetInput.ChainCapabilities[cre.ReadContractCapability].EnabledChains {
 		if flags.HasFlag(donFlags, cre.ReadContractCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{

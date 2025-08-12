@@ -60,6 +60,8 @@ const manualBeholderCleanupMsg = `unexpected startup error. this may have strand
 
 var (
 	binDir string
+
+	defaultCapabilitiesConfigFile = "configs/capability_defaults.toml"
 )
 
 // DX tracking
@@ -273,10 +275,8 @@ func startCmd() *cobra.Command {
 			// TODO since UnmarshalTOML is not supported by the TOML library we use :head_exploding:
 			// we need to parse chain capabilities manually, but we need to handle it properly, maybe by adding hooks to Load()?
 			for _, nodeSet := range in.NodeSets {
-				if asMap, ok := nodeSet.RawChainCapabilities.(map[string]any); ok {
-					if err := nodeSet.ParseChainCapabilities(asMap); err != nil {
-						return errors.Wrap(err, "failed to parse chain capabilities")
-					}
+				if err := nodeSet.ParseChainCapabilities(); err != nil {
+					return errors.Wrap(err, "failed to parse chain capabilities")
 				}
 			}
 
@@ -357,20 +357,8 @@ func startCmd() *cobra.Command {
 			fmt.Print(libformat.PurpleText("\nEnvironment setup completed successfully in %.2f seconds\n\n", time.Since(provisioningStartTime).Seconds()))
 			fmt.Print("To terminate execute:`go run . env stop`\n\n")
 
-			// Store the config with cached output so subsequent runs can reuse the
-			// environment without full setup. Then persist absolute paths to the
-			// generated artifacts (env artifact JSON and the cached CTF config) in
-			// `artifact_paths.json`. System tests use these to reload environment
-			// state across runs (see `system-tests/tests/smoke/cre/capabilities_test.go`),
-			// where the cached config and env artifact are consumed to reconstruct
-			// the in-memory CLDF environment without re-provisioning.
-			//
-			// This makes local iteration and CI reruns faster and deterministic.
-			_ = framework.Store(in)
-
-			saveArtifactPathsErr := saveArtifactPaths()
-			if saveArtifactPathsErr != nil {
-				return errors.Wrap(saveArtifactPathsErr, "failed to save artifact paths")
+			if err := storeArtifacts(in); err != nil {
+				return errors.Wrap(err, "failed to store artifacts")
 			}
 
 			return nil
@@ -388,6 +376,35 @@ func startCmd() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&protoConfigs, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 	cmd.Flags().BoolVarP(&doSetup, "auto-setup", "a", false, "Run setup before starting the environment")
 	return cmd
+}
+
+// Store the config with cached output so subsequent runs can reuse the
+// environment without full setup. Then persist absolute paths to the
+// generated artifacts (env artifact JSON and the cached CTF config) in
+// `artifact_paths.json`. System tests use these to reload environment
+// state across runs (see `system-tests/tests/smoke/cre/capabilities_test.go`),
+// where the cached config and env artifact are consumed to reconstruct
+// the in-memory CLDF environment without re-provisioning.
+//
+// This makes local iteration and CI reruns faster and deterministic.
+func storeArtifacts(in *creenv.Config) error {
+	// hack, because CTF takes the first config file from the list to select the name of the cache file, we need to remove the default capabilities config file (which we added as the first one, so that other configs can override it)
+	ctfConfigs := os.Getenv("CTF_CONFIGS")
+	splitConfigs := strings.Split(ctfConfigs, ",")
+	if len(splitConfigs) > 1 {
+		if strings.Contains(splitConfigs[0], defaultCapabilitiesConfigFile) {
+			splitConfigs = splitConfigs[1:]
+		}
+
+		setErr := os.Setenv("CTF_CONFIGS", strings.Join(splitConfigs, ","))
+		if setErr != nil {
+			return errors.Wrap(setErr, "failed to set CTF_CONFIGS env var")
+		}
+	}
+
+	_ = framework.Store(in)
+
+	return saveArtifactPaths()
 }
 
 func saveArtifactPaths() error {
@@ -657,7 +674,7 @@ func defaultCtfConfigs(topologyFlag string) error {
 	}
 
 	// set the defaults before the configs, so that they can be overridden by the configs
-	defaultsSetErr := os.Setenv("CTF_CONFIGS", "configs/capabilities_defaults.toml,"+os.Getenv("CTF_CONFIGS"))
+	defaultsSetErr := os.Setenv("CTF_CONFIGS", defaultCapabilitiesConfigFile+","+os.Getenv("CTF_CONFIGS"))
 	if defaultsSetErr != nil {
 		return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", defaultsSetErr)
 	}

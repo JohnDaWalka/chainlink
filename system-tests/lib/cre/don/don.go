@@ -160,7 +160,7 @@ func BuildTopology(nodeSetInput []*cre.CapabilitiesAwareNodeSet, infraInput infr
 
 func AnyDonHasCapability(donMetadata []*cre.DonMetadata, capability cre.CapabilityFlag) bool {
 	for _, don := range donMetadata {
-		if slices.Contains(don.Flags, capability) {
+		if flags.HasFlagForAnyChain(don.Flags, capability) {
 			return true
 		}
 	}
