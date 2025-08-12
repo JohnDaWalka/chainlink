@@ -67,7 +67,7 @@ func proposeWFJobsToJDLogic(env cldf.Environment, c types.ProposeWFJobsConfig) (
 
 	var deltaStageSec int
 	if workflowSpecConfig.DeltaStageSec == nil {
-		deltaStageSec = 45
+		deltaStageSec = 4
 	} else {
 		deltaStageSec = *workflowSpecConfig.DeltaStageSec
 	}

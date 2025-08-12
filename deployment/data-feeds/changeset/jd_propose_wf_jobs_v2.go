@@ -274,7 +274,7 @@ func getMaxFrequencyMs(maxFrequencyMs *int) int {
 
 func getDeltaStage(deltaStageSec *int) int {
 	if deltaStageSec == nil {
-		return 45
+		return 4
 	}
 	return *deltaStageSec
 }
