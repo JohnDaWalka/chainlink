@@ -107,13 +107,13 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, extraAllowedPorts []int,
 	RequestTimeoutMillis = 10_000
 	WriteTimeoutMillis = 1_000
 	[gatewayConfig.UserServerConfig]
-	ContentTypeHeader = "application/jsonrpc"
+	ContentTypeHeader = "application/json"
 	MaxRequestBytes = 100_000
 	Path = "%s"
 	Port = %d
-	ReadTimeoutMillis = 1_000
-	RequestTimeoutMillis = 10_000
-	WriteTimeoutMillis = 1_000
+	ReadTimeoutMillis = 60_000
+	RequestTimeoutMillis = 60_000
+	WriteTimeoutMillis = 60_000
 	CORSEnabled = false
 	CORSAllowedOrigins = []
 	[gatewayConfig.HTTPClientConfig]

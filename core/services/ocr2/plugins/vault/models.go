@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -60,6 +61,26 @@ type Response struct {
 	Format     string
 	Context    []byte
 	Signatures [][]byte
+}
+
+func (r *Response) MarshalJSON() ([]byte, error) {
+	payload := string(r.Payload)
+	response := struct {
+		ID         string
+		Error      string
+		Payload    string
+		Format     string
+		Context    []byte
+		Signatures [][]byte
+	}{
+		ID:         r.ID,
+		Error:      r.Error,
+		Payload:    payload,
+		Format:     r.Format,
+		Context:    r.Context,
+		Signatures: r.Signatures,
+	}
+	return json.Marshal(response)
 }
 
 func (r *Response) RequestID() string {

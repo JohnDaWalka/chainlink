@@ -105,24 +105,14 @@ func (h *GatewayHandler) HandleGatewayMessage(ctx context.Context, gatewayID str
 }
 
 func (h *GatewayHandler) handleSecretsCreate(ctx context.Context, gatewayID string, req *jsonrpc.Request[json.RawMessage]) *jsonrpc.Response[json.RawMessage] {
-	var requestData vault_api.SecretsCreateRequest
-	if err := json.Unmarshal(*req.Params, &requestData); err != nil {
+	requestData := &vault.CreateSecretsRequest{
+		RequestId: req.ID,
+	}
+	if err := json.Unmarshal(*req.Params, requestData); err != nil {
 		return h.errorResponse(ctx, gatewayID, req, api.UserMessageParseError, err)
 	}
 	h.lggr.Infof("Debugging: handleSecretsCreate 1 %s: %v", gatewayID, req)
-	vaultCapRequest := vault.CreateSecretsRequest{
-		EncryptedSecrets: []*vault.EncryptedSecret{
-			{
-				Id: &vault.SecretIdentifier{
-					Owner:     "", // TBD
-					Namespace: "", // TBD
-					Key:       requestData.ID,
-				},
-				EncryptedValue: requestData.Value,
-			},
-		},
-	}
-	vaultCapResponse, err := h.secretsService.CreateSecrets(ctx, &vaultCapRequest)
+	vaultCapResponse, err := h.secretsService.CreateSecrets(ctx, requestData)
 	if err != nil {
 		h.lggr.Infof("Debugging: h.secretsService.CreateSecrets failed, erro: %s", err.Error())
 		return h.errorResponse(ctx, gatewayID, req, api.FatalError, err)
@@ -159,6 +149,7 @@ func (h *GatewayHandler) errorResponse(
 	return &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      req.ID,
+		Method:  req.Method,
 		Error: &jsonrpc.WireError{
 			Code:    api.ToJSONRPCErrorCode(errorCode),
 			Message: err.Error(),

@@ -353,7 +353,7 @@ func (h *handler) sendResponse(ctx context.Context, userRequest activeRequest, r
 
 	select {
 	case userRequest.callbackCh <- resp:
-		h.lggr.Debugw("sent response", "request_id", userRequest.req.ID)
+		h.lggr.Debugw("sent response", "request_id", userRequest.req.ID, "request", string(resp.RawResponse))
 		h.mu.Lock()
 		delete(h.activeRequests, userRequest.req.ID)
 		h.mu.Unlock()

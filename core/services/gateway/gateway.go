@@ -209,7 +209,7 @@ func (g *gateway) ProcessRequest(ctx context.Context, rawRequest []byte, auth st
 		break
 	}
 	promRequest.WithLabelValues(response.ErrorCode.String()).Inc()
-	g.lggr.Infof("Debugging Gateway Got response: %s", response.ErrorCode.String())
+	g.lggr.Infof("Debugging Gateway Got response: %s", string(response.RawResponse))
 	return response.RawResponse, api.ToHttpErrorCode(response.ErrorCode)
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/libocr/quorumhelper"
 	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
@@ -94,10 +95,22 @@ func (r *ReportingPluginFactory) Close() error {
 func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig, fetcher ocr3_1types.BlobBroadcastFetcher) (ocr3_1types.ReportingPlugin[[]byte], ocr3_1types.ReportingPluginInfo, error) {
 	r.lggr.Infof("Debugging: VaultOCR NewReportingPlugin.")
 	return &ReportingPlugin{
-		lggr:  r.lggr.Named("VaultReportingPlugin"),
-		store: r.store,
-		cfg:   r.cfg,
-	}, ocr3_1types.ReportingPluginInfo{}, nil
+			lggr:  r.lggr.Named("VaultReportingPlugin"),
+			store: r.store,
+			cfg:   r.cfg,
+		}, ocr3_1types.ReportingPluginInfo{
+			Name: "VaultReportingPlugin",
+			// TODO get this from config
+			// See how OCR3 capability does it.
+			Limits: ocr3_1types.ReportingPluginLimits{
+				MaxQueryLength:                          512 * 1024, // 500 KB
+				MaxObservationLength:                    512 * 1024, // 500 KB
+				MaxReportLength:                         512 * 1024, // 500 KB
+				MaxReportsPlusPrecursorLength:           512 * 1024, // 500 KB
+				MaxReportCount:                          100,
+				MaxKeyValueModifiedKeysPlusValuesLength: 512 * 1024, // 500 KB
+			},
+		}, nil
 }
 
 type ReportingPlugin struct {
@@ -188,11 +201,11 @@ func (r *ReportingPlugin) Observation(ctx context.Context, seqNr uint64, aq type
 			for _, sr := range tp.EncryptedSecrets {
 				validatedID, ierr := r.observeCreateSecretRequest(ctx, NewReadStore(keyValueReader), sr, requestsCountForID, newSecretsByOwner)
 				if ierr != nil {
-					r.lggr.Errorw("failed to handle create secret request", "id", sr.Id, "error", ierr)
 					errorMsg := "failed to handle create secret request"
 					if errors.Is(ierr, &userError{}) {
 						errorMsg = ierr.Error()
 					}
+					r.lggr.Errorw("failed to handle create secret request", "id", sr.Id, "error", ierr)
 					resps = append(resps, &vault.CreateSecretResponse{
 						Id:      sr.Id,
 						Success: false,
@@ -518,6 +531,7 @@ func (r *ReportingPlugin) StateTransition(ctx context.Context, seqNr uint64, aq 
 		// TODO -- we need to validate that a single oracle doesn't submit multiple observations for the same request.
 	}
 
+	r.lggr.Debugw("StateTransition started", "observationCount", len(obsMap))
 	os := &vault.Outcomes{
 		Outcomes: []*vault.Outcome{},
 	}
@@ -821,10 +835,7 @@ func (r *ReportingPlugin) generateProtoReport(id string, requestType vault.Reque
 		return ocr3types.ReportWithInfo[[]byte]{}, fmt.Errorf("failed to marshal report info: %w", err)
 	}
 
-	return ocr3types.ReportWithInfo[[]byte]{
-		Report: rpb,
-		Info:   rip,
-	}, nil
+	return wrapReportWithKeyBundleInfo(rpb, rip)
 }
 
 func (r *ReportingPlugin) generateJSONReport(id string, requestType vault.RequestType, msg proto.Message) (ocr3types.ReportWithInfo[[]byte], error) {
@@ -846,9 +857,27 @@ func (r *ReportingPlugin) generateJSONReport(id string, requestType vault.Reques
 		return ocr3types.ReportWithInfo[[]byte]{}, fmt.Errorf("failed to marshal report info: %w", err)
 	}
 
+	return wrapReportWithKeyBundleInfo(jsonb, rip)
+}
+
+func wrapReportWithKeyBundleInfo(report []byte, reportInfo []byte) (ocr3types.ReportWithInfo[[]byte], error) {
+	infos, err := structpb.NewStruct(map[string]any{
+		// Use the EVM key bundle to sign the report.
+		"keyBundleName": "evm",
+		"reportInfo":    reportInfo,
+	})
+	if err != nil {
+		return ocr3types.ReportWithInfo[[]byte]{}, err
+	}
+
+	ip, err := proto.MarshalOptions{Deterministic: true}.Marshal(infos)
+	if err != nil {
+		return ocr3types.ReportWithInfo[[]byte]{}, err
+	}
+
 	return ocr3types.ReportWithInfo[[]byte]{
-		Report: jsonb,
-		Info:   rip,
+		Report: report,
+		Info:   ip,
 	}, nil
 }
 
