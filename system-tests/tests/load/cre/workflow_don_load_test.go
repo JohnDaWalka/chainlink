@@ -43,6 +43,7 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	writeevmregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/writeevm"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
@@ -116,7 +117,7 @@ func setupLoadTestEnvironment(
 	testLogger zerolog.Logger,
 	in *TestConfigLoadTest,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*cretypes.CapabilitiesAwareNodeSet,
-	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
+	capabilityFactoryFns []cretypes.CapabilityRegistryConfigFactoryFn,
 	jobSpecFactoryFns []cretypes.JobSpecFactoryFn,
 	workflowJobsFn cretypes.JobSpecFactoryFn,
 ) *loadTestSetupOutput {
@@ -181,16 +182,20 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*cretypes.CapabilitiesAwareNodeSet {
 		return []*cretypes.CapabilitiesAwareNodeSet{
 			{
-				Input:              input[0],
-				Capabilities:       []string{cretypes.OCR3Capability},
-				DONTypes:           []string{cretypes.WorkflowDON},
-				BootstrapNodeIndex: 0,
+				Input:        input[0],
+				Capabilities: []string{cretypes.ConsensusCapability},
+				// TODO quick hack, this needs to be removed after the migration to TOML
+				ComputedCapabilities: []string{cretypes.ConsensusCapability},
+				DONTypes:             []string{cretypes.WorkflowDON},
+				BootstrapNodeIndex:   0,
 			},
 			{
-				Input:              input[1],
-				Capabilities:       []string{cretypes.MockCapability},
-				DONTypes:           []string{cretypes.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
-				BootstrapNodeIndex: -1,
+				Input:        input[1],
+				Capabilities: []string{cretypes.MockCapability},
+				// TODO quick hack, this needs to be removed after the migration to TOML
+				ComputedCapabilities: []string{cretypes.MockCapability},
+				DONTypes:             []string{cretypes.CapabilitiesDON}, // <----- it's crucial to set the correct DON type
+				BootstrapNodeIndex:   -1,
 			},
 		}
 	}
@@ -278,7 +283,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		return donTojobSpecs, nil
 	}
 
-	WorkflowDONLoadTestCapabilitiesFactoryFn := func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+	WorkflowDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cretypes.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		if flags.HasFlag(donFlags, cretypes.MockCapability) {
@@ -305,7 +310,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 			})
 		}
 
-		if flags.HasFlag(donFlags, cretypes.OCR3Capability) {
+		if flags.HasFlag(donFlags, cretypes.ConsensusCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "offchain_reporting",
@@ -329,8 +334,8 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		testLogger,
 		in,
 		mustSetCapabilitiesFn,
-		[]func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig{WorkflowDONLoadTestCapabilitiesFactoryFn, crecontracts.ChainWriterCapabilityFactory(homeChainIDUint64)},
-		[]cretypes.JobSpecFactoryFn{mockJobSpecsFactoryFn, consensus.ConsensusJobSpecFactoryFn(homeChainIDUint64)},
+		[]func(donFlags []string, nodeSetInput *cretypes.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig{WorkflowDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
+		[]cretypes.JobSpecFactoryFn{mockJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
 		loadTestJobSpecsFactoryFn,
 	)
 

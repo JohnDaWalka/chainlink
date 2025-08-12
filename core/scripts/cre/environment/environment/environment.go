@@ -652,13 +652,15 @@ func defaultCtfConfigs(topologyFlag string) error {
 				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
 			}
 		}
-
-		defaultsSetErr := os.Setenv("CTF_CONFIGS", os.Getenv("CTF_CONFIGS")+",configs/capabilities_defaults.toml")
-		if defaultsSetErr != nil {
-			return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", defaultsSetErr)
-		}
+		// TODO add mock topology
 
 		fmt.Printf("Set CTF_CONFIGS environment variable to default value: %s\n", os.Getenv("CTF_CONFIGS"))
+	}
+
+	// set the defaults before the configs, so that they can be overridden by the configs
+	defaultsSetErr := os.Setenv("CTF_CONFIGS", "configs/capabilities_defaults.toml,"+os.Getenv("CTF_CONFIGS"))
+	if defaultsSetErr != nil {
+		return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", defaultsSetErr)
 	}
 
 	return nil

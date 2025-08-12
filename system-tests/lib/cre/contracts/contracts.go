@@ -22,8 +22,6 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 
-	corevm "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
-
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -100,62 +98,6 @@ var WebAPICapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DON
 	}
 
 	return capabilities
-}
-
-// deprecated, use capabilities.chainwriter.ChainWriterCapabilityFactory instead
-var ChainWriterCapabilityFactory = func(chainID uint64) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-		var capabilities []keystone_changeset.DONCapabilityWithConfig
-
-		fullName := corevm.GenerateWriteTargetName(chainID)
-		splitName := strings.Split(fullName, "@")
-
-		if flags.HasFlag(donFlags, cre.WriteEVMCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   splitName[0],
-					Version:        splitName[1],
-					CapabilityType: 3, // TARGET
-					ResponseType:   1, // OBSERVATION_IDENTICAL
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
-
-		return capabilities
-	}
-}
-
-// deprecated, use capabilities.chainreader.ChainReaderCapabilityFactory instead
-var ChainReaderCapabilityFactory = func(chainID uint64, chainFamily string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-		var capabilities []keystone_changeset.DONCapabilityWithConfig
-
-		if flags.HasFlag(donFlags, cre.LogTriggerCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   fmt.Sprintf("log-event-trigger-%s-%d", chainFamily, chainID),
-					Version:        "1.0.0",
-					CapabilityType: 0, // TRIGGER
-					ResponseType:   0, // REPORT
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
-
-		if flags.HasFlag(donFlags, cre.ReadContractCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   fmt.Sprintf("read-contract-%s-%d", chainFamily, chainID),
-					Version:        "1.0.0",
-					CapabilityType: 1, // ACTION
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
-
-		return capabilities
-	}
 }
 
 func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []cre.CapabilityRegistryConfigFactoryFn) error {

@@ -44,8 +44,9 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
-	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	writeevmregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/writeevm"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	lidebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
@@ -80,7 +81,7 @@ func setupLoadTestWriterEnvironment(
 	testLogger zerolog.Logger,
 	in *TestConfigLoadTestWriter,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*cretypes.CapabilitiesAwareNodeSet,
-	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
+	capabilityFactoryFns []cretypes.CapabilityRegistryConfigFactoryFn,
 	jobSpecFactoryFns []cretypes.JobSpecFactoryFn,
 	feedIDs []string,
 	workflowNames []string,
@@ -153,10 +154,18 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	mustSetCapabilitiesFn := func(input []*ns.Input) []*cretypes.CapabilitiesAwareNodeSet {
 		return []*cretypes.CapabilitiesAwareNodeSet{
 			{
-				Input:              input[0],
-				Capabilities:       []string{cretypes.WriteEVMCapability, cretypes.MockCapability, cretypes.OCR3Capability},
-				DONTypes:           []string{cretypes.CapabilitiesDON, cretypes.WorkflowDON},
-				BootstrapNodeIndex: 0,
+				Input:        input[0],
+				Capabilities: []string{cretypes.MockCapability, cretypes.ConsensusCapability},
+				// TODO quick hack, this needs to be migrated to TOML
+				ChainCapabilities: map[string]*cretypes.ChainCapabilityConfig{
+					cretypes.WriteEVMCapability: {
+						EnabledChains: []uint64{1337},
+					},
+				},
+				// TODO quick hack, this needs to be removed after the migration to TOML
+				ComputedCapabilities: []string{cretypes.MockCapability, cretypes.ConsensusCapability, "write-evm-1337"},
+				DONTypes:             []string{cretypes.CapabilitiesDON, cretypes.WorkflowDON},
+				BootstrapNodeIndex:   0,
 			},
 		}
 	}
@@ -188,7 +197,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		return donTojobSpecs, nil
 	}
 
-	WriterDONLoadTestCapabilitiesFactoryFn := func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+	WriterDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		if flags.HasFlag(donFlags, cretypes.MockCapability) {
@@ -204,7 +213,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 			}
 		}
 
-		if flags.HasFlag(donFlags, cretypes.OCR3Capability) {
+		if flags.HasFlag(donFlags, cretypes.ConsensusCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
 					LabelledName:   "offchain_reporting",
@@ -235,8 +244,8 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		in,
 		mustSetCapabilitiesFn,
 		//nolint:gosec // disable G115
-		[]func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig{WriterDONLoadTestCapabilitiesFactoryFn, libcontracts.ChainWriterCapabilityFactory(libc.MustSafeUint64(int64(homeChainIDUint64)))},
-		[]cretypes.JobSpecFactoryFn{loadTestJobSpecsFactoryFn, consensus.ConsensusJobSpecFactoryFn(homeChainIDUint64)},
+		[]func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig{WriterDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
+		[]cretypes.JobSpecFactoryFn{loadTestJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
 		feedIDs,
 		[]string{in.WriterTest.WorkflowName},
 	)
@@ -308,7 +317,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	f := 0
 	// Nr of signatures needs to be equal with f+1, compute f based on the nr of ocr3 worker nodes
 	for _, donMetadata := range setupOutput.donTopology.DonsWithMetadata {
-		if flags.HasFlag(donMetadata.Flags, cretypes.OCR3Capability) {
+		if flags.HasFlag(donMetadata.Flags, cretypes.ConsensusCapability) {
 			workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{
 				Key:   node.NodeTypeKey,
 				Value: cretypes.WorkerNode,

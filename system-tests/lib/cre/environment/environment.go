@@ -79,6 +79,13 @@ type SetupInput struct {
 	CapabilityConfigs         cre.CapabilityConfigs
 	CopyCapabilityBinaries    bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
 	Capabilities              []cre.InstallableCapability
+
+	// Deprecated, use Capabilities instead
+	ConfigFactoryFunctions []cre.NodeConfigFactoryFn
+	// Deprecated, use Capabilities instead
+	JobSpecFactoryFunctions []cre.JobSpecFactoryFn
+	// Deprecated, use Capabilities instead
+	CapabilitiesContractFactoryFunctions []cre.CapabilityRegistryConfigFactoryFn
 }
 
 type backgroundStageResult struct {
@@ -407,6 +414,9 @@ func SetupTestEnvironment(
 		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, capability.JobSpecFactoryFn())
 	}
 
+	// Deprecated, use Capabilities instead
+	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, input.JobSpecFactoryFunctions...)
+
 	createJobsDeps := CreateJobsWithJdOpDeps{
 		Logger:                    testLogger,
 		SingleFileLogger:          singleFileLogger,
@@ -583,6 +593,9 @@ func SetupTestEnvironment(
 	for _, capability := range input.Capabilities {
 		capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, capability.CapabilityRegistryV1ConfigFactoryFn())
 	}
+
+	// Deprecated, use Capabilities instead
+	capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, input.CapabilitiesContractFactoryFunctions...)
 
 	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, capabilitiesContractFactoryFunctions)
 	if keystoneErr != nil {
