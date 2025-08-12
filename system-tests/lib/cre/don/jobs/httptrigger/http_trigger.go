@@ -77,7 +77,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
 		}
 
-		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), httpTriggerConfig.Config, donOverrides)
+		mergedConfig := cre.ResolveCapabilityConfigForDON(flag, httpTriggerConfig.Config, donOverrides)
 		templateData := don.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		tmpl, err := template.New("httpTriggerConfig").Parse(httpTriggerConfigTemplate)

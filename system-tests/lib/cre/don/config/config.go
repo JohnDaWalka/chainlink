@@ -33,7 +33,7 @@ func Set(t *testing.T, nodeInput *cre.CapabilitiesAwareNodeSet, bc *blockchain.O
 	return &cre.WrappedNodeOutput{Output: nodeset, NodeSetName: nodeInput.Name, Capabilities: nodeInput.ComputedCapabilities}, nil
 }
 
-func Generate(input cre.GenerateConfigsInput, factoryFns []cre.NodeConfigFn) (cre.NodeIndexToConfigOverride, error) {
+func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) (cre.NodeIndexToConfigOverride, error) {
 	if err := input.Validate(); err != nil {
 		return nil, errors.Wrap(err, "input validation failed")
 	}
@@ -224,11 +224,11 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.NodeConfigFn) (cr
 		}
 	}
 
-	for _, factoryFn := range factoryFns {
-		if factoryFn == nil {
+	for _, configFn := range nodeConfigFns {
+		if configFn == nil {
 			continue
 		}
-		newOverrides, err := factoryFn(input)
+		newOverrides, err := configFn(input)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate nodeset configs")
 		}

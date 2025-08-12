@@ -247,7 +247,7 @@ type JobConfigGenFn func(zerolog.Logger, uint64, string, map[string]any) (string
 
 var ConfigMergePerChainFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
 	// Build user configuration from defaults + chain overrides
-	enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(string(flag), nodeSetInput.ChainCapabilities, capabilityConfig.Config, chainIDUint64)
+	enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(flag, nodeSetInput.ChainCapabilities, capabilityConfig.Config, chainIDUint64)
 	if rErr != nil {
 		return nil, false, errors.Wrap(rErr, "failed to resolve capability config for chain")
 	}
@@ -264,7 +264,7 @@ var ConfigMergePerDonFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.Capabi
 		return nil, false, nil
 	}
 
-	return cre.ResolveCapabilityConfigForDON(string(flag), capabilityConfig.Config, nodeSetInput.CapabilityOverrides), true, nil
+	return cre.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSetInput.CapabilityOverrides), true, nil
 }
 
 type HowCapabilityAppliesFn func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
@@ -273,7 +273,7 @@ var CapabilityAppliesPerChainsFn = func(nodeSetInput *cre.CapabilitiesAwareNodeS
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
 		return false
 	}
-	if cc, ok := nodeSetInput.ChainCapabilities[string(flag)]; !ok || cc == nil || len(cc.EnabledChains) == 0 {
+	if cc, ok := nodeSetInput.ChainCapabilities[flag]; !ok || cc == nil || len(cc.EnabledChains) == 0 {
 		return false
 	}
 
@@ -295,7 +295,7 @@ var EnabledPerChainFn = func(_ *cre.DonTopology, nodeSetInput *cre.CapabilitiesA
 		return []uint64{}
 	}
 
-	return nodeSetInput.ChainCapabilities[string(flag)].EnabledChains
+	return nodeSetInput.ChainCapabilities[flag].EnabledChains
 }
 
 var EnabledForHomeChainFn = func(donTopology *cre.DonTopology, _ *cre.CapabilitiesAwareNodeSet, _ cre.CapabilityFlag) []uint64 {

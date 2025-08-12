@@ -62,7 +62,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
 		}
 
-		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), mockConfig.Config, donOverrides)
+		mergedConfig := cre.ResolveCapabilityConfigForDON(flag, mockConfig.Config, donOverrides)
 
 		// Apply runtime values only for keys not specified by user
 		templateData := don.ApplyRuntimeValues(mergedConfig, map[string]any{})

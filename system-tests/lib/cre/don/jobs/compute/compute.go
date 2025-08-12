@@ -60,7 +60,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilities
 			donOverrides = nodeSetInput[donIdx].CapabilityOverrides
 		}
 
-		mergedConfig := cre.ResolveCapabilityConfigForDON(string(flag), customComputeConfig.Config, donOverrides)
+		mergedConfig := cre.ResolveCapabilityConfigForDON(flag, customComputeConfig.Config, donOverrides)
 		templateData := don.ApplyRuntimeValues(mergedConfig, map[string]any{})
 
 		tmpl, err := template.New("customComputeConfig").Parse(customComputeConfigTemplate)

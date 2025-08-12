@@ -46,7 +46,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 		if donIdx >= len(nodeSetInput) || nodeSetInput[donIdx] == nil || nodeSetInput[donIdx].ChainCapabilities == nil {
 			continue
 		}
-		if cc, ok := nodeSetInput[donIdx].ChainCapabilities[string(flag)]; !ok || cc == nil || len(cc.EnabledChains) == 0 {
+		if cc, ok := nodeSetInput[donIdx].ChainCapabilities[flag]; !ok || cc == nil || len(cc.EnabledChains) == 0 {
 			continue
 		}
 
@@ -67,12 +67,12 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capa
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		for _, chainIDUint64 := range nodeSetInput[donIdx].ChainCapabilities[string(flag)].EnabledChains {
+		for _, chainIDUint64 := range nodeSetInput[donIdx].ChainCapabilities[flag].EnabledChains {
 			chainID := int(chainIDUint64)
 			chainIDStr := strconv.Itoa(chainID)
 
 			// Build user configuration from defaults + chain overrides
-			enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(string(flag), nodeSetInput[donIdx].ChainCapabilities, logEventConfig.Config, chainIDUint64)
+			enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(flag, nodeSetInput[donIdx].ChainCapabilities, logEventConfig.Config, chainIDUint64)
 			if rErr != nil {
 				return nil, errors.Wrap(rErr, "failed to resolve capability config for chain")
 			}
