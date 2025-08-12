@@ -1,43 +1,34 @@
 package evm
 
 import (
-	"fmt"
-	"strconv"
-
-	chainselectors "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	evmregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/evm"
+	evmjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/evm"
 )
 
-var EVMCapabilityFactory = func(chainID uint64, chainFamily string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-		var capabilities []keystone_changeset.DONCapabilityWithConfig
+type Capability struct {
+}
 
-		if flags.HasFlag(donFlags, cre.EVMCapability) {
-			selector, err := chainselectors.SelectorFromChainId(chainID)
-			if err != nil {
-				fmt.Printf("Error getting selector from chainID: %d, err: %s\n", chainID, err.Error())
-				selector = 0
-			}
-			labelledName := "evm" + ":ChainSelector:" + strconv.FormatUint(selector, 10)
-			fmt.Println("EVM Capability Labelled Name:", labelledName)
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   labelledName,
-					Version:        "1.0.0",
-					CapabilityType: 3, // TARGET
-					ResponseType:   1, // OBSERVATION_IDENTICAL
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
+func (c *Capability) Validate() error {
+	return nil
+}
 
-		return capabilities
-	}
+func (c *Capability) Flag() cre.CapabilityFlag {
+	return cre.EVMCapability
+}
+
+func (c *Capability) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+	return evmjobs.JobSpecFn
+}
+
+func (c *Capability) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+	return nil
+}
+
+func (c *Capability) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+	return nil
+}
+
+func (c *Capability) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+	return evmregistry.CapabilityRegistryConfigFn
 }

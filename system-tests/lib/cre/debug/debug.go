@@ -79,7 +79,7 @@ func PrintTestDebug(ctx context.Context, testName string, l zerolog.Logger, inpu
 			l.Info().Msg("✅ Workflow was executing")
 		}
 
-		if flags.HasFlag(debugDon.Flags, cre.OCR3Capability) {
+		if flags.HasFlag(debugDon.Flags, cre.ConsensusCapability) {
 			if detectedCount := checkHowManyNodesLogsHaveText(logFiles, workflowNodeCount, "✅ committed outcome"); detectedCount != workflowNodeCount {
 				l.Error().Msgf("❌ OCR was not executing on all nodes (%d/%d)", detectedCount, workflowNodeCount)
 				return

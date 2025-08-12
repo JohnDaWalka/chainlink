@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -22,7 +22,7 @@ const logEventTriggerConfigTemplate = `'{"chainId":"{{.ChainID}}","network":"{{.
 
 // Log event trigger capability with per-chain configuration support
 
-var LogEventTriggerJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
 		*input.InfraInput,

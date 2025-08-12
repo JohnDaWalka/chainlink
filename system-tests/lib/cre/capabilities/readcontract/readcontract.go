@@ -1,32 +1,34 @@
 package readcontract
 
 import (
-	"fmt"
-
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	readcontractregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/readcontract"
+	readcontractjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/readcontract"
 )
 
-var ReadContractCapabilityFactory = func(chainID uint64, chainFamily string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-		var capabilities []keystone_changeset.DONCapabilityWithConfig
+type Capability struct {
+}
 
-		if flags.HasFlag(donFlags, cre.ReadContractCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   fmt.Sprintf("read-contract-%s-%d", chainFamily, chainID),
-					Version:        "1.0.0",
-					CapabilityType: 1, // ACTION
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
+func (c *Capability) Flag() cre.CapabilityFlag {
+	return cre.ReadContractCapability
+}
 
-		return capabilities
-	}
+func (c *Capability) Validate() error {
+	return nil
+}
+
+func (c *Capability) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+	return readcontractjobs.JobSpecFn
+}
+
+func (c *Capability) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+	return nil
+}
+
+func (c *Capability) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+	return nil
+}
+
+func (c *Capability) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+	return readcontractregistry.CapabilityRegistryConfigFn
 }

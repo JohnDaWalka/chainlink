@@ -229,7 +229,7 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	evm = "%s"
 `,
 			uuid,
-			cre.OCR3Capability,
+			cre.ConsensusCapability,
 			ocr3CapabilityAddress,
 			ocr2KeyBundleID,
 			ocrPeeringData.OCRBootstraperPeerID,

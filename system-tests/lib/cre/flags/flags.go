@@ -24,7 +24,7 @@ func HasFlagForChain(nodeSet *cre.CapabilitiesAwareNodeSet, capability string, c
 	if nodeSet == nil {
 		return false
 	}
-	if HasFlag(nodeSet.Capabilities, capability) {
+	if HasFlag(nodeSet.ComputedCapabilities, capability) {
 		return true
 	}
 	if nodeSet.ChainCapabilities == nil {
@@ -75,5 +75,5 @@ func OneDonMetadataWithFlag(donTopologies []*cre.DonMetadata, flag string) (*cre
 func NodeSetFlags(nodeSet *cre.CapabilitiesAwareNodeSet) ([]string, error) {
 	var stringCaps []string
 
-	return append(stringCaps, append(nodeSet.Capabilities, nodeSet.DONTypes...)...), nil
+	return append(stringCaps, append(nodeSet.ComputedCapabilities, nodeSet.DONTypes...)...), nil
 }

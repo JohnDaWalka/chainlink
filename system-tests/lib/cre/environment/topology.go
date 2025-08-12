@@ -11,7 +11,7 @@ import (
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	libcaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	libcaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	creconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	cresecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
@@ -26,7 +26,7 @@ func BuildTopology(
 	chainIDs []int,
 	blockchainOutput map[uint64]*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
-	configFactoryFunctions []cre.ConfigFactoryFn,
+	capabilities []cre.InstallableCapability,
 	additionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs,
 	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
@@ -101,6 +101,11 @@ func BuildTopology(
 		// And that configs match the secrets
 		if configsFound > 0 && secretsFound == 0 {
 			return nil, nil, fmt.Errorf("nodese config overrides are provided for DON %d, but not secrets. You need to either provide both, only secrets or nothing at all", donMetadata.ID)
+		}
+
+		configFactoryFunctions := make([]cre.NodeConfigFactoryFn, 0)
+		for _, capability := range capabilities {
+			configFactoryFunctions = append(configFactoryFunctions, capability.OptionalNodeConfigFactoryFn())
 		}
 
 		// generate configs only if they are not provided
@@ -240,6 +245,11 @@ func copyCapabilityAwareNodeSets(
 		if originalNs.Capabilities != nil {
 			newNs.Capabilities = make([]string, len(originalNs.Capabilities))
 			copy(newNs.Capabilities, originalNs.Capabilities)
+		}
+
+		if originalNs.ComputedCapabilities != nil {
+			newNs.ComputedCapabilities = make([]string, len(originalNs.ComputedCapabilities))
+			copy(newNs.ComputedCapabilities, originalNs.ComputedCapabilities)
 		}
 
 		if originalNs.DONTypes != nil {

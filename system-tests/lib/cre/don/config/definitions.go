@@ -123,6 +123,8 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 			chain.HTTPRPC,
 		)
 
+		// won't move this to a separate factory function, because this bit needs to be added in the very specific part of the node config
+		// it can't be just concatenated to the config in any random place
 		if chain.WritesToEVM {
 			// Execute template with chain's workflow configuration
 			tmpl, err := template.New("evmWorkflowConfig").Parse(evmWorkflowConfigTemplate)

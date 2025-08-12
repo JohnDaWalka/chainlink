@@ -1,4 +1,4 @@
-package logevent
+package readcontract
 
 import (
 	"fmt"
@@ -12,22 +12,25 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var LogEventTriggerCapabilityFactory = func(chainID uint64, chainFamily string) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-		var capabilities []keystone_changeset.DONCapabilityWithConfig
+var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
-		if flags.HasFlag(donFlags, cre.LogTriggerCapability) {
+	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
+		return capabilities
+	}
+
+	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
+		if flags.HasFlag(donFlags, cre.ReadContractCapability) {
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   fmt.Sprintf("log-event-trigger-%s-%d", chainFamily, chainID),
+					LabelledName:   fmt.Sprintf("read-contract-evm-%d", chainID),
 					Version:        "1.0.0",
-					CapabilityType: 0, // TRIGGER
-					ResponseType:   0, // REPORT
+					CapabilityType: 1, // ACTION
 				},
 				Config: &capabilitiespb.CapabilityConfig{},
 			})
 		}
-
-		return capabilities
 	}
+
+	return capabilities
 }

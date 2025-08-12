@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var ConsensusJobSpecFactoryFn = func(chainID uint64) cre.JobSpecFactoryFn {
+var V1JobSpecFn = func(chainID uint64) cre.JobSpecFactoryFn {
 	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(
 			input.DonTopology,
@@ -46,7 +46,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 	}
 
 	for _, donWithMetadata := range donTopology.DonsWithMetadata {
-		if !flags.HasFlag(donWithMetadata.Flags, cre.OCR3Capability) {
+		if !flags.HasFlag(donWithMetadata.Flags, cre.ConsensusCapability) {
 			continue
 		}
 
@@ -109,7 +109,6 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 	return donToJobSpecs, nil
 }
 
-const flag = cre.ConsensusCapability
 const consensusConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","nodeAddress":"{{.NodeAddress}}"}'`
 
 func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[string]any {
@@ -120,7 +119,7 @@ func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[s
 	}
 }
 
-var ConsensusV2JobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var V2JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 	configGen := func(_ zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
 		// Build runtime fallbacks for any missing values
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
@@ -148,7 +147,7 @@ var ConsensusV2JobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.Dons
 		input.CapabilitiesAwareNodeSets,
 		input.InfraInput,
 		"capability_consensus",
-		cre.ConsensusCapability,
+		cre.ConsensusCapabilityV2,
 		ocr.CapabilityAppliesPerDonFn,
 		ocr.EnabledForHomeChainFn,
 		configGen,

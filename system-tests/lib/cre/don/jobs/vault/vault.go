@@ -26,7 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var VaultJobSpecFactoryFn = func(chainID uint64) cre.JobSpecFactoryFn {
+var JobSpecFn = func(chainID uint64) cre.JobSpecFactoryFn {
 	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(
 			input.CldEnvironment.Offchain,

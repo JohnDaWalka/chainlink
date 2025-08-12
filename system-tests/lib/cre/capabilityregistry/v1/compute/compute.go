@@ -1,4 +1,4 @@
-package http
+package compute
 
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -10,14 +10,14 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var HTTPActionCapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
-	if flags.HasFlag(donFlags, cre.HTTPActionCapability) {
+	if flags.HasFlag(donFlags, cre.CustomComputeCapability) {
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "http-actions",
-				Version:        "1.0.0-alpha",
+				LabelledName:   "custom-compute",
+				Version:        "1.0.0",
 				CapabilityType: 1, // ACTION
 			},
 			Config: &capabilitiespb.CapabilityConfig{},

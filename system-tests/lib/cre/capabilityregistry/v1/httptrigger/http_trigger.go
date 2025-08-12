@@ -1,4 +1,4 @@
-package webapi
+package httptrigger
 
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -10,16 +10,15 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var WebAPITargetCapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
-	if flags.HasFlag(donFlags, cre.WebAPITargetCapability) {
+	if flags.HasFlag(donFlags, cre.HTTPTriggerCapability) {
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "web-api-target",
-				Version:        "1.0.0",
-				CapabilityType: 3, // TARGET
-				ResponseType:   1, // OBSERVATION_IDENTICAL
+				LabelledName:   "http-trigger",
+				Version:        "1.0.0-alpha",
+				CapabilityType: 0, // TRIGGER
 			},
 			Config: &capabilitiespb.CapabilityConfig{},
 		})

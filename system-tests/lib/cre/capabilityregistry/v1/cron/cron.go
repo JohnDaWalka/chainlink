@@ -1,4 +1,4 @@
-package webapi
+package cron
 
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -10,13 +10,13 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var WebAPITriggerCapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
-	if flags.HasFlag(donFlags, cre.WebAPITriggerCapability) {
+	if flags.HasFlag(donFlags, cre.CronCapability) {
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "web-api-trigger",
+				LabelledName:   "cron-trigger",
 				Version:        "1.0.0",
 				CapabilityType: 0, // TRIGGER
 			},

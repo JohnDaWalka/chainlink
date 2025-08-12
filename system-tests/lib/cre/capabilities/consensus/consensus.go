@@ -1,47 +1,83 @@
 package consensus
 
 import (
+	"fmt"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	consensusregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/consensus"
+	consensusjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 )
 
-var OCR3CapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	var capabilities []keystone_changeset.DONCapabilityWithConfig
-
-	if flags.HasFlag(donFlags, cre.OCR3Capability) {
-		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "offchain_reporting",
-				Version:        "1.0.0",
-				CapabilityType: 2, // CONSENSUS
-				ResponseType:   0, // REPORT
-			},
-			Config: &capabilitiespb.CapabilityConfig{},
-		})
-	}
-
-	return capabilities
+type CapabilityV1 struct {
+	chainID uint64
 }
 
-var ConsensusCapabilityV2FactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	var capabilities []keystone_changeset.DONCapabilityWithConfig
-
-	if flags.HasFlag(donFlags, cre.ConsensusCapability) {
-		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "consensus",
-				Version:        "1.0.0",
-				CapabilityType: 2, // CONSENSUS
-				ResponseType:   0, // REPORT
-			},
-			Config: &capabilitiespb.CapabilityConfig{},
-		})
+func NewCapabilityV1(chainID uint64) *CapabilityV1 {
+	return &CapabilityV1{
+		chainID: chainID,
 	}
+}
 
-	return capabilities
+func (c *CapabilityV1) Validate() error {
+	if c.chainID == 0 {
+		return fmt.Errorf("chainID is required, got %d", c.chainID)
+	}
+	return nil
+}
+
+func (c *CapabilityV1) Flag() cre.CapabilityFlag {
+	return cre.ConsensusCapability
+}
+
+func (c *CapabilityV1) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+	return consensusjobs.V1JobSpecFn(c.chainID)
+}
+
+func (c *CapabilityV1) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+	return nil
+}
+
+func (c *CapabilityV1) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+	return nil
+}
+
+func (c *CapabilityV1) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+	return consensusregistry.CapabilityV1RegistryConfigFn
+}
+
+type CapabilityV2 struct {
+	chainID uint64
+}
+
+func NewCapabilityV2(chainID uint64) *CapabilityV2 {
+	return &CapabilityV2{
+		chainID: chainID,
+	}
+}
+
+func (c *CapabilityV2) Validate() error {
+	if c.chainID == 0 {
+		return fmt.Errorf("chainID is required, got %d", c.chainID)
+	}
+	return nil
+}
+
+func (c *CapabilityV2) Flag() cre.CapabilityFlag {
+	return cre.ConsensusCapabilityV2
+}
+
+func (c *CapabilityV2) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+	return consensusjobs.V2JobSpecFn
+}
+
+func (c *CapabilityV2) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+	return nil
+}
+
+func (c *CapabilityV2) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+	return nil
+}
+
+func (c *CapabilityV2) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+	return consensusregistry.ConsensusV2CapabilityFactoryFn
 }

@@ -3,7 +3,6 @@ package environment
 import (
 	"errors"
 	"slices"
-	"strings"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
@@ -30,26 +29,16 @@ func (c Config) Validate() error {
 
 	for _, nodeSet := range c.NodeSets {
 		for _, capability := range nodeSet.Capabilities {
-			if !slices.Contains(cre.KnownCapabilities, capability) {
+			if !slices.Contains(cre.KnownCapabilities(), capability) {
 				return errors.New("unknown capability: " + capability)
 			}
 		}
 
-		for chainCapability := range nodeSet.ChainCapabilities {
-			for _, knownCapability := range cre.KnownCapabilities {
-				if chainCapability == knownCapability {
-					continue
-				}
-
-				// check if it's a chain-specific capability, where the naming pattern is "capability-chainID"
-				if strings.HasPrefix(chainCapability, knownCapability+"-") {
-					continue
-				}
-
-				return errors.New("unknown capability: " + chainCapability)
+		for capability := range nodeSet.ChainCapabilities {
+			if !slices.Contains(cre.KnownCapabilities(), capability) {
+				return errors.New("unknown capability: " + capability)
 			}
 		}
-
 	}
 
 	return nil

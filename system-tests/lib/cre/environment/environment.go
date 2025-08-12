@@ -69,18 +69,16 @@ type SetupOutput struct {
 }
 
 type SetupInput struct {
-	CapabilitiesAwareNodeSets            []*cre.CapabilitiesAwareNodeSet
-	CapabilitiesContractFactoryFunctions []func([]cre.CapabilityFlag) []keystone_changeset.DONCapabilityWithConfig
-	ConfigFactoryFunctions               []cre.ConfigFactoryFn
-	JobSpecFactoryFunctions              []cre.JobSpecFactoryFn
-	BlockchainsInput                     []*cre.WrappedBlockchainInput
-	JdInput                              jd.Input
-	InfraInput                           infra.Input
-	OCR3Config                           *keystone_changeset.OracleConfig
-	VaultOCR3Config                      *keystone_changeset.OracleConfig
-	S3ProviderInput                      *s3provider.Input
-	AdditionalCapabilitiesConfigs        cre.AdditionalCapabilitiesConfigs
-	CopyCapabilityBinaries               bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
+	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
+	BlockchainsInput              []*cre.WrappedBlockchainInput
+	JdInput                       jd.Input
+	InfraInput                    infra.Input
+	OCR3Config                    *keystone_changeset.OracleConfig
+	VaultOCR3Config               *keystone_changeset.OracleConfig
+	S3ProviderInput               *s3provider.Input
+	AdditionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs
+	CopyCapabilityBinaries        bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
+	Capabilities                  []cre.InstallableCapability
 }
 
 type backgroundStageResult struct {
@@ -113,6 +111,12 @@ func SetupTestEnvironment(
 	topologyErr := libdon.ValidateTopology(input.CapabilitiesAwareNodeSets, input.InfraInput)
 	if topologyErr != nil {
 		return nil, pkgerrors.Wrap(topologyErr, "failed to validate topology")
+	}
+
+	for _, capability := range input.Capabilities {
+		if err := capability.Validate(); err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to validate capability")
+		}
 	}
 
 	// Shell is only required, when using CRIB, because we want to run commands in the same "nix develop" context
@@ -211,7 +215,7 @@ func SetupTestEnvironment(
 	}
 	vaultOCR3AddrFlag := flags.HasFlag(allNodeFlags, cre.VaultCapability)
 	evmOCR3AddrFlag := flags.HasFlagForAnyChain(allNodeFlags, cre.EVMCapability)
-	consensusAddrFlag := flags.HasFlag(allNodeFlags, cre.ConsensusCapability)
+	consensusAddrFlag := flags.HasFlag(allNodeFlags, cre.ConsensusCapabilityV2)
 
 	deployKeystoneReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
@@ -275,7 +279,7 @@ func SetupTestEnvironment(
 		chainIDs,
 		bcOuts,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		input.ConfigFactoryFunctions,
+		input.Capabilities,
 		input.AdditionalCapabilitiesConfigs,
 		input.CopyCapabilityBinaries,
 	)
@@ -397,16 +401,23 @@ func SetupTestEnvironment(
 	}
 
 	createJobsInput := CreateJobsWithJdOpInput{}
+
+	jobSpecFactoryFunctions := make([]cre.JobSpecFactoryFn, 0)
+	for _, capability := range input.Capabilities {
+		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, capability.JobSpecFactoryFn())
+	}
+
 	createJobsDeps := CreateJobsWithJdOpDeps{
 		Logger:                        testLogger,
 		SingleFileLogger:              singleFileLogger,
 		HomeChainBlockchainOutput:     homeChainOutput.BlockchainOutput,
 		AddressBook:                   allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		JobSpecFactoryFunctions:       input.JobSpecFactoryFunctions,
+		JobSpecFactoryFunctions:       jobSpecFactoryFunctions,
 		FullCLDEnvOutput:              fullCldOutput,
 		CapabilitiesAwareNodeSets:     input.CapabilitiesAwareNodeSets,
 		InfraInput:                    &input.InfraInput,
 		AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
+		Capabilities:                  input.Capabilities,
 	}
 	_, createJobsErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, CreateJobsWithJdOp, createJobsDeps, createJobsInput)
 	if createJobsErr != nil {
@@ -451,7 +462,7 @@ func SetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Waiting for Log Poller to start tracking OCR3 contract")))
 
 	for idx, nodeSetOut := range nodeSetOutput {
-		if !flags.HasFlag(updatedNodeSets[idx].Capabilities, cre.OCR3Capability) || !flags.HasFlag(updatedNodeSets[idx].Capabilities, cre.VaultCapability) {
+		if !flags.HasFlag(updatedNodeSets[idx].ComputedCapabilities, cre.ConsensusCapability) || !flags.HasFlag(updatedNodeSets[idx].ComputedCapabilities, cre.VaultCapability) {
 			continue
 		}
 		nsClients, cErr := clclient.New(nodeSetOut.CLNodes)
@@ -542,6 +553,7 @@ func SetupTestEnvironment(
 		VaultOCR3Address:            &vaultOCR3CommonAddr,
 		EVMOCR3Address:              &evmOCR3CommonAddr,
 		ConsensusV2OCR3Address:      &consensusV2OCR3CommonAddr,
+		NodeSets:                    input.CapabilitiesAwareNodeSets,
 	}
 
 	if input.OCR3Config != nil {
@@ -567,7 +579,12 @@ func SetupTestEnvironment(
 	configureKeystoneInput.EVMOCR3Config = *defaultOcr3Config
 	configureKeystoneInput.ConsensusV2OCR3Config = *defaultOcr3Config
 
-	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, input.CapabilitiesContractFactoryFunctions)
+	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFactoryFn, 0)
+	for _, capability := range input.Capabilities {
+		capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, capability.CapabilityRegistryV1ConfigFactoryFn())
+	}
+
+	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, capabilitiesContractFactoryFunctions)
 	if keystoneErr != nil {
 		return nil, pkgerrors.Wrap(keystoneErr, "failed to configure keystone contracts")
 	}
@@ -582,7 +599,8 @@ func SetupTestEnvironment(
 		*jdOutput,
 		*fullCldOutput.DonTopology,
 		fullCldOutput.Environment.Offchain,
-		input.CapabilitiesContractFactoryFunctions,
+		capabilitiesContractFactoryFunctions,
+		input.CapabilitiesAwareNodeSets,
 	)
 	if artifactErr != nil {
 		testLogger.Error().Err(artifactErr).Msg("failed to generate artifact")

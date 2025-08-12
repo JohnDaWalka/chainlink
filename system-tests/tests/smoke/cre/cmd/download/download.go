@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	keystonecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	keystonecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 )
 
 var (

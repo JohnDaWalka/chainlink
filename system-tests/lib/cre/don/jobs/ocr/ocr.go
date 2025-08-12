@@ -20,7 +20,7 @@ import (
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	creregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -64,7 +64,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			return nil, errors.New("evm config not found in capabilities config")
 		}
 
-		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
+		containerPath, pathErr := creregistry.DefaultContainerDirectory(infraInput.Type)
 		if pathErr != nil {
 			return nil, errors.Wrapf(pathErr, "failed to get default container directory for infra type %s", infraInput.Type)
 		}
@@ -212,7 +212,12 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					return nil, errors.Wrap(cErr, "failed to generate job config")
 				}
 
-				jobSpec := jobs.WorkerStandardCapability(nodeID, "capbility-"+contractName+"-"+chainIDStr, binaryPath, jobConfig, oracleStr)
+				jobName := contractName
+				if chainID != 0 {
+					jobName = jobName + "-" + strconv.Itoa(chainID)
+				}
+
+				jobSpec := jobs.WorkerStandardCapability(nodeID, jobName, binaryPath, jobConfig, oracleStr)
 
 				if _, ok := donToJobSpecs[donWithMetadata.ID]; !ok {
 					donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)
@@ -280,7 +285,7 @@ var CapabilityAppliesPerDonFn = func(nodeSetInput *cre.CapabilitiesAwareNodeSet,
 		return false
 	}
 
-	return flags.HasFlag(nodeSetInput.Capabilities, flag)
+	return flags.HasFlag(nodeSetInput.ComputedCapabilities, flag)
 }
 
 type EnabledChainsFn func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64

@@ -26,6 +26,7 @@ type CreateJobsWithJdOpDeps struct {
 	FullCLDEnvOutput              *cre.FullCLDEnvironmentOutput
 	CapabilitiesAwareNodeSets     []*cre.CapabilitiesAwareNodeSet
 	AdditionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs
+	Capabilities                  []cre.InstallableCapability
 	InfraInput                    *infra.Input
 }
 
@@ -46,6 +47,9 @@ var CreateJobsWithJdOp = operations.NewOperation[CreateJobsWithJdOpInput, Create
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
 		for _, jobSpecGeneratingFn := range deps.JobSpecFactoryFunctions {
+			if jobSpecGeneratingFn == nil {
+				continue
+			}
 			singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecFactoryInput{
 				CldEnvironment:              deps.FullCLDEnvOutput.Environment,
 				BlockchainOutput:            deps.HomeChainBlockchainOutput,
@@ -53,6 +57,7 @@ var CreateJobsWithJdOp = operations.NewOperation[CreateJobsWithJdOpInput, Create
 				InfraInput:                  deps.InfraInput,
 				AdditionalCapabilityConfigs: deps.AdditionalCapabilitiesConfigs,
 				CapabilitiesAwareNodeSets:   deps.CapabilitiesAwareNodeSets,
+				Capabilities:                deps.Capabilities,
 			})
 			if jobSpecsErr != nil {
 				return CreateJobsWithJdOpOutput{}, pkgerrors.Wrap(jobSpecsErr, "failed to generate job specs")

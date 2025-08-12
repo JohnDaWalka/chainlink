@@ -1,4 +1,4 @@
-package chainwriter
+package writeevm
 
 import (
 	"strings"
@@ -14,11 +14,14 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-// Deprecated: use capabilities.writeevm.WriteEVMCapabilityFactory instead
-var ChainWriterCapabilityFactory = func(chainID uint64) func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	return func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-		var capabilities []keystone_changeset.DONCapabilityWithConfig
+var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
+	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
+		return capabilities
+	}
+
+	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
 		fullName := corevm.GenerateWriteTargetName(chainID)
 		splitName := strings.Split(fullName, "@")
 
@@ -33,7 +36,7 @@ var ChainWriterCapabilityFactory = func(chainID uint64) func(donFlags []string) 
 				Config: &capabilitiespb.CapabilityConfig{},
 			})
 		}
-
-		return capabilities
 	}
+
+	return capabilities
 }

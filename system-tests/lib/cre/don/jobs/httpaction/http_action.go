@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	creregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -36,7 +36,7 @@ const httpActionConfigTemplate = `"""
 }
 """`
 
-var HTTPActionJobSpecFactoryFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
 		input.InfraInput,
@@ -61,7 +61,7 @@ func generateJobSpecs(donTopology *cre.DonTopology, infraInput *infra.Input, cap
 			return nil, errors.Errorf("%s config not found in capabilities config", flag)
 		}
 
-		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
+		containerPath, pathErr := creregistry.DefaultContainerDirectory(infraInput.Type)
 		if pathErr != nil {
 			return nil, errors.Wrapf(pathErr, "failed to get default container directory for infra type %s", infraInput.Type)
 		}

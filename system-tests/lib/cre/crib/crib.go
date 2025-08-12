@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	crecaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	crecaps "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"

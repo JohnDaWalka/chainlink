@@ -1,28 +1,47 @@
 package vault
 
 import (
+	"fmt"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-
-	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-
-	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	vaultregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/vault"
+	vaulthandler "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway/handlers/vault"
+	vaultjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/vault"
 )
 
-var VaultCapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
-	var capabilities []keystone_changeset.DONCapabilityWithConfig
-
-	if flags.HasFlag(donFlags, cre.VaultCapability) {
-		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "vault",
-				Version:        "1.0.0",
-				CapabilityType: 1, // ACTION
-			},
-			Config: &capabilitiespb.CapabilityConfig{},
-		})
+func NewVaultCapability(chainID uint64) *Capability {
+	return &Capability{
+		chainID: chainID,
 	}
+}
 
-	return capabilities
+type Capability struct {
+	chainID uint64
+}
+
+func (c *Capability) Flag() cre.CapabilityFlag {
+	return cre.VaultCapability
+}
+
+func (c *Capability) Validate() error {
+	if c.chainID == 0 {
+		return fmt.Errorf("chainID is required, got %d", c.chainID)
+	}
+	return nil
+}
+
+func (c *Capability) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+	return vaultjobs.JobSpecFn(c.chainID)
+}
+
+func (c *Capability) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+	return nil
+}
+
+func (c *Capability) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+	return vaulthandler.HandlerConfigFn
+}
+
+func (c *Capability) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+	return vaultregistry.CapabilityRegistryConfigFn
 }

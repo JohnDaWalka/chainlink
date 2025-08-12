@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"maps"
+
 	"github.com/pkg/errors"
 
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
@@ -14,10 +16,11 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var GatewayJobSpecFactoryFn = func(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) cre.JobSpecFactoryFn {
+var JobSpecFn = func(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) cre.JobSpecFactoryFn {
 	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(
 			input.DonTopology,
+			input.Capabilities,
 			extraAllowedPorts,
 			extraAllowedIPs,
 			extraAllowedIPsCIDR,
@@ -26,7 +29,7 @@ var GatewayJobSpecFactoryFn = func(extraAllowedPorts []int, extraAllowedIPs, ext
 	}
 }
 
-func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string, gatewayConnectorOutput *cre.GatewayConnectorOutput) (cre.DonsToJobSpecs, error) {
+func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.InstallableCapability, extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string, gatewayConnectorOutput *cre.GatewayConnectorOutput) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}
@@ -96,19 +99,16 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, ext
 
 		handlers := make(map[string]string)
 
-		nodeRateLimiterConfig := `
-		[gatewayConfig.Dons.Handlers.Config.NodeRateLimiter]
-		globalBurst = 10
-		globalRPS = 50
-		perSenderBurst = 10
-		perSenderRPS = 10
-		`
-
 		if flags.HasFlag(donWithMetadata.Flags, cre.GatewayDON) {
 			handlerConfig := `
 			[gatewayConfig.Dons.Handlers.Config]
 			maxAllowedMessageAgeSec = 1_000
-			` + nodeRateLimiterConfig
+			[gatewayConfig.Dons.Handlers.Config.NodeRateLimiter]
+			globalBurst = 10
+			globalRPS = 50
+			perSenderBurst = 10
+			perSenderRPS = 10
+			`
 
 			handlers[coregateway.WebAPICapabilitiesType] = handlerConfig
 		}
@@ -118,29 +118,16 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, extraAllowedPorts []int, ext
 			donMetadata = append(donMetadata, don.DonMetadata)
 		}
 
-		// if any of the DONs have http action or http trigger capability, we need to add a http handler to the jobspec for the gateway node
-		if don.AnyDonHasCapability(donMetadata, cre.HTTPActionCapability) || don.AnyDonHasCapability(donMetadata, cre.HTTPTriggerCapability) {
-			handlerConfig := `
-			[gatewayConfig.Dons.Handlers.Config]
-			maxTriggerRequestDurationMs = 5_000
-			` + nodeRateLimiterConfig + `
-			[gatewayConfig.Dons.Handlers.Config.UserRateLimiter]
-			globalBurst = 10
-			globalRPS = 50
-			perSenderBurst = 10
-			perSenderRPS = 10`
+		for _, capability := range capabilities {
+			if capability.OptionalGatewayHandlerConfigFactoryFn() == nil {
+				continue
+			}
 
-			handlers[coregateway.HTTPCapabilityType] = handlerConfig
-		}
-
-		// if any of the DONs have vault capability, we need to add a vault handler to the jobspec for the gateway node
-		if don.AnyDonHasCapability(donMetadata, cre.VaultCapability) {
-			handlerConfig := `
-			[gatewayConfig.Dons.Handlers.Config]
-			requestTimeoutSec = 30
-			` + nodeRateLimiterConfig
-
-			handlers[coregateway.VaultHandlerType] = handlerConfig
+			handlerConfig, handlerConfigErr := capability.OptionalGatewayHandlerConfigFactoryFn()(donMetadata)
+			if handlerConfigErr != nil {
+				return nil, errors.Wrap(handlerConfigErr, "failed to get handler config")
+			}
+			maps.Copy(handlers, handlerConfig)
 		}
 
 		for _, gatewayConfiguration := range gatewayConnectorOutput.Configurations {

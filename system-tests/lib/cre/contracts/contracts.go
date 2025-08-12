@@ -57,7 +57,7 @@ var DefaultCapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DO
 		})
 	}
 
-	if flags.HasFlag(donFlags, cre.OCR3Capability) {
+	if flags.HasFlag(donFlags, cre.ConsensusCapability) {
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
 				LabelledName:   "offchain_reporting",
@@ -158,14 +158,14 @@ var ChainReaderCapabilityFactory = func(chainID uint64, chainFamily string) func
 	}
 }
 
-func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []cre.DONCapabilityWithConfigFactoryFn) error {
+func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []cre.CapabilityRegistryConfigFactoryFn) error {
 	if err := input.Validate(); err != nil {
 		return errors.Wrap(err, "input validation failed")
 	}
 
 	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.Topology.DonsMetadata))
 
-	for _, donMetadata := range input.Topology.DonsMetadata {
+	for donIdx, donMetadata := range input.Topology.DonsMetadata {
 		// if it's only a gateway DON, we don't want to register it with the Capabilities Registry
 		// since it doesn't have any capabilities
 		if flags.HasOnlyOneFlag(donMetadata.Flags, cre.GatewayDON) {
@@ -176,7 +176,11 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 
 		// check what capabilities each DON has and register them with Capabilities Registry contract
 		for _, factoryFn := range capabilityFactoryFns {
-			capabilities = append(capabilities, factoryFn(donMetadata.Flags)...)
+			if factoryFn == nil {
+				continue
+			}
+
+			capabilities = append(capabilities, factoryFn(donMetadata.Flags, input.NodeSets[donIdx])...)
 		}
 
 		workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
@@ -208,7 +212,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 		forwarderF := (len(workerNodes) - 1) / 3
 
 		if forwarderF == 0 {
-			if flags.HasFlag(donMetadata.Flags, cre.OCR3Capability) {
+			if flags.HasFlag(donMetadata.Flags, cre.ConsensusCapability) || flags.HasFlag(donMetadata.Flags, cre.ConsensusCapabilityV2) {
 				return fmt.Errorf("incorrect number of worker nodes: %d. Resulting F must conform to formula: mod((N-1)/3) = 0", len(workerNodes))
 			}
 			// for other capabilities, we can use 1 as F
@@ -227,7 +231,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []
 	var transmissionSchedule []int
 
 	for _, metaDon := range input.Topology.DonsMetadata {
-		if flags.HasFlag(metaDon.Flags, cre.OCR3Capability) {
+		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
 			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
 				Key:   crenode.NodeTypeKey,
 				Value: cre.WorkerNode,
@@ -404,7 +408,7 @@ func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig
 	var transmissionSchedule []int
 
 	for _, metaDon := range topology.DonsMetadata {
-		if flags.HasFlag(metaDon.Flags, cre.OCR3Capability) {
+		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
 			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
 				Key:   crenode.NodeTypeKey,
 				Value: cre.WorkerNode,

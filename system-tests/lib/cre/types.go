@@ -41,15 +41,15 @@ const (
 
 // Capabilities
 const (
-	OCR3Capability          CapabilityFlag = "ocr3"
-	ConsensusCapability     CapabilityFlag = "consensus" // v2
+	ConsensusCapability     CapabilityFlag = "ocr3"
+	ConsensusCapabilityV2   CapabilityFlag = "consensus" // v2
 	CronCapability          CapabilityFlag = "cron"
 	EVMCapability           CapabilityFlag = "evm"
 	CustomComputeCapability CapabilityFlag = "custom-compute"
 	WriteEVMCapability      CapabilityFlag = "write-evm"
 
 	ReadContractCapability  CapabilityFlag = "read-contract"
-	LogTriggerCapability    CapabilityFlag = "log-trigger"
+	LogTriggerCapability    CapabilityFlag = "log-event-trigger"
 	WebAPITargetCapability  CapabilityFlag = "web-api-target"
 	WebAPITriggerCapability CapabilityFlag = "web-api-trigger"
 	MockCapability          CapabilityFlag = "mock"
@@ -59,9 +59,9 @@ const (
 	// Add more capabilities as needed
 )
 
-var KnownCapabilities = []CapabilityFlag{
-	OCR3Capability,
+var capabilities = []CapabilityFlag{
 	ConsensusCapability,
+	ConsensusCapabilityV2,
 	CronCapability,
 	EVMCapability,
 	CustomComputeCapability,
@@ -74,6 +74,14 @@ var KnownCapabilities = []CapabilityFlag{
 	VaultCapability,
 	HTTPTriggerCapability,
 	HTTPActionCapability,
+}
+
+func KnownCapabilities() []CapabilityFlag {
+	return slices.Clone(capabilities)
+}
+
+func AddKnownCapabilities(caps []CapabilityFlag) {
+	capabilities = append(capabilities, caps...)
 }
 
 type NodeType = string
@@ -278,6 +286,7 @@ type ConfigureKeystoneInput struct {
 	ChainSelector uint64
 	Topology      *Topology
 	CldEnv        *cldf.Environment
+	NodeSets      []*CapabilitiesAwareNodeSet
 
 	OCR3Config  keystone_changeset.OracleConfig
 	OCR3Address *common.Address
@@ -303,6 +312,9 @@ func (c *ConfigureKeystoneInput) Validate() error {
 	}
 	if len(c.Topology.DonsMetadata) == 0 {
 		return errors.New("meta dons not set")
+	}
+	if len(c.NodeSets) != len(c.Topology.DonsMetadata) {
+		return errors.New("node sets and don metadata must have the same length")
 	}
 	if c.CldEnv == nil {
 		return errors.New("chainlink deployment env not set")
@@ -345,7 +357,10 @@ type Incoming struct {
 	ExternalPort int    `toml:"external_port" json:"external_port"`
 }
 
-type ConfigFactoryFn = func(input GenerateConfigsInput) (NodeIndexToConfigOverride, error)
+type NodeConfigFactoryFn = func(input GenerateConfigsInput) (NodeIndexToConfigOverride, error)
+
+type HandlerTypeToConfig = map[string]string
+type GatewayHandlerConfigFactoryFn = func(donMetadata []*DonMetadata) (HandlerTypeToConfig, error)
 
 type GenerateConfigsInput struct {
 	DonMetadata                   *DonMetadata
@@ -459,6 +474,8 @@ type CapabilitiesAwareNodeSet struct {
 	// CapabilityOverrides allows overriding global capability configuration per DON.
 	// Example: [nodesets.capability_overrides.web-api-target] GlobalRPS = 2000.0
 	CapabilityOverrides map[string]map[string]any `toml:"capability_overrides"`
+
+	ComputedCapabilities []string `toml:"-"`
 }
 
 type CapabilitiesPeeringData struct {
@@ -480,7 +497,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any)
 
 	for capName, capValue := range capMap {
 		config := &ChainCapabilityConfig{}
-		capabilities := []string{}
+		computedCapabilities := []string{}
 
 		switch v := capValue.(type) {
 		case []any:
@@ -491,7 +508,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any)
 					return fmt.Errorf("invalid chain ID in %s: %v", capName, err)
 				}
 				config.EnabledChains = append(config.EnabledChains, chainID)
-				capabilities = append(capabilities, capName+"-"+fmt.Sprint(chainID))
+				computedCapabilities = append(computedCapabilities, capName+"-"+fmt.Sprint(chainID))
 			}
 		case map[string]any:
 			// Handle map syntax: capability = { enabled_chains = [...], chain_overrides = {...} }
@@ -506,7 +523,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any)
 						return fmt.Errorf("invalid chain ID in %s.enabled_chains: %v", capName, err)
 					}
 					config.EnabledChains = append(config.EnabledChains, chainID)
-					capabilities = append(capabilities, capName+"-"+fmt.Sprint(chainID))
+					computedCapabilities = append(computedCapabilities, capName+"-"+fmt.Sprint(chainID))
 				}
 			}
 
@@ -533,8 +550,10 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities(capMap map[string]any)
 		}
 
 		c.ChainCapabilities[capName] = config
-		c.Capabilities = append(c.Capabilities, capabilities...)
+		c.ComputedCapabilities = append(c.ComputedCapabilities, computedCapabilities...)
 	}
+
+	c.ComputedCapabilities = append(c.ComputedCapabilities, c.Capabilities...)
 
 	return nil
 }
@@ -832,16 +851,15 @@ func (s *StartNixShellInput) Validate() error {
 	return nil
 }
 
-type DONCapabilityWithConfigFactoryFn = func(donFlags []CapabilityFlag) []keystone_changeset.DONCapabilityWithConfig
-type CapabilitiesBinaryPathFactoryFn = func(donMetadata *DonMetadata) ([]string, error)
+type CapabilityRegistryConfigFactoryFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig
 type JobSpecFactoryFn = func(input *JobSpecFactoryInput) (DonsToJobSpecs, error)
-
 type JobSpecFactoryInput struct {
 	CldEnvironment              *cldf.Environment
 	BlockchainOutput            *blockchain.Output
 	DonTopology                 *DonTopology
 	InfraInput                  *infra.Input
 	AdditionalCapabilityConfigs map[string]CapabilityConfig
+	Capabilities                []InstallableCapability
 	CapabilitiesAwareNodeSets   []*CapabilitiesAwareNodeSet
 }
 
@@ -895,4 +913,13 @@ func (w *ManageWorkflowWithCRECLIInput) Validate() error {
 	}
 
 	return nil
+}
+
+type InstallableCapability interface {
+	Flag() CapabilityFlag
+	Validate() error
+	JobSpecFactoryFn() JobSpecFactoryFn
+	OptionalNodeConfigFactoryFn() NodeConfigFactoryFn
+	OptionalGatewayHandlerConfigFactoryFn() GatewayHandlerConfigFactoryFn
+	CapabilityRegistryV1ConfigFactoryFn() CapabilityRegistryConfigFactoryFn
 }

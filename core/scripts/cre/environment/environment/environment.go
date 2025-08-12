@@ -23,36 +23,27 @@ import (
 	"github.com/spf13/cobra"
 
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/mock"
-	mock2 "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/mock"
+
+	computecapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
+	consensuscapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
+	croncapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
+	evmcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/evm"
+	gatewaycapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/gateway"
+	httpactioncapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/httpaction"
+	httptriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/httptrigger"
+	logeventtriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/logeventtrigger"
+	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/mock"
+	readcontractcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/readcontract"
+	vaultcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/vault"
+	webapitargetcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitarget"
+	webapitriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitrigger"
+	writeevmcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/tracking"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	computecap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
-	consensuscap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
-	croncap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/evm"
-	httpcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/http"
-	logeventtriggercap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/logevent"
-	readcontractcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/readcontract"
-	vaultcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/vault"
-	webapicap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapi"
-	writeevmcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
-	crecompute "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/compute"
-	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
-	crecron "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/cron"
-	evmJob "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/evm"
-	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
-	crehttpaction "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/httpaction"
-	crehttptrigger "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/httptrigger"
-	crelogevent "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/logevent"
-	crereadcontract "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/readcontract"
-	crevault "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/vault"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/webapi"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crecli"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
@@ -514,7 +505,7 @@ func StartCLIEnvironment(
 	withPluginsDockerImageFlag string,
 	withExampleFlag bool,
 	extraAllowedGatewayPorts []int,
-	extraJobFactoryFns []cre.JobSpecFactoryFn,
+	extraCapabilities []cre.InstallableCapability,
 ) (*creenv.SetupOutput, error) {
 	testLogger := framework.L
 
@@ -545,59 +536,35 @@ func StartCLIEnvironment(
 		fmt.Print(libformat.PurpleText("\tDON Types: %s\n\n", strings.Join(nodeSet.DONTypes, ", ")))
 	}
 
-	// add support for more capabilities if needed
-	capabilityFactoryFns := []cre.DONCapabilityWithConfigFactoryFn{
-		webapicap.WebAPITriggerCapabilityFactoryFn,
-		webapicap.WebAPITargetCapabilityFactoryFn,
-		computecap.ComputeCapabilityFactoryFn,
-		consensuscap.OCR3CapabilityFactoryFn,
-		consensuscap.ConsensusCapabilityV2FactoryFn,
-		croncap.CronCapabilityFactoryFn,
-		vaultcap.VaultCapabilityFactoryFn,
-		mock.CapabilityFactoryFn,
-		httpcap.HTTPTriggerCapabilityFactoryFn,
-		httpcap.HTTPActionCapabilityFactoryFn,
-	}
-
 	homeChainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
 	if chainErr != nil {
 		return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
 	}
 
-	jobSpecFactoryFunctions := []cre.JobSpecFactoryFn{
-		// add support for more job spec factory functions if needed
-		webapi.WebAPITriggerJobSpecFactoryFn,
-		webapi.WebAPITargetJobSpecFactoryFn,
-		creconsensus.ConsensusJobSpecFactoryFn(libc.MustSafeUint64(int64(homeChainIDInt))),
-		crecron.CronJobSpecFactoryFn,
-		cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
-		crecompute.ComputeJobSpecFactoryFn,
-		crevault.VaultJobSpecFactoryFn(libc.MustSafeUint64(int64(homeChainIDInt))),
-		mock2.MockJobSpecFactoryFn,
-		crehttpaction.HTTPActionJobSpecFactoryFn,
-		crehttptrigger.HTTPTriggerJobSpecFactoryFn,
-		creconsensus.ConsensusV2JobSpecFactoryFn,
+	capabilities := []cre.InstallableCapability{
+		&croncapability.Capability{},
+		consensuscapability.NewCapabilityV1(libc.MustSafeUint64FromInt(homeChainIDInt)),
+		consensuscapability.NewCapabilityV2(libc.MustSafeUint64FromInt(homeChainIDInt)),
+		&httpactioncapability.Capability{},
+		&httptriggercapability.Capability{},
+		&webapitriggercapability.Capability{},
+		&webapitargetcapability.Capability{},
+		&computecapability.Capability{},
+		vaultcapability.NewVaultCapability(libc.MustSafeUint64FromInt(homeChainIDInt)),
+		&mockcapability.Capability{},
+		&writeevmcapability.Capability{},
+		&readcontractcapability.Capability{},
+		&logeventtriggercapability.Capability{},
+		&evmcapability.Capability{},
+		gatewaycapability.NewGatewayCapability(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 	}
 
-	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, extraJobFactoryFns...)
-
-	for _, blockchain := range in.Blockchains {
-		chainIDInt, chainErr := strconv.Atoi(blockchain.ChainID)
-		if chainErr != nil {
-			return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
-		}
-
-		if !blockchain.ReadOnly {
-			capabilityFactoryFns = append(capabilityFactoryFns, writeevmcap.WriteEVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt))))
-		}
-		capabilityFactoryFns = append(capabilityFactoryFns, readcontractcap.ReadContractCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
-		capabilityFactoryFns = append(capabilityFactoryFns, logeventtriggercap.LogEventTriggerCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
-		capabilityFactoryFns = append(capabilityFactoryFns, evm.EVMCapabilityFactory(libc.MustSafeUint64(int64(chainIDInt)), "evm"))
+	capabilities = append(capabilities, extraCapabilities...)
+	newCapabilityFlags := make([]cre.CapabilityFlag, len(extraCapabilities))
+	for i, extraCapability := range extraCapabilities {
+		newCapabilityFlags[i] = extraCapability.Flag()
 	}
-
-	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, evmJob.EVMJobSpecFactoryFn)
-	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crelogevent.LogEventTriggerJobSpecFactoryFn)
-	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, crereadcontract.ReadContractJobSpecFactoryFn)
+	cre.AddKnownCapabilities(newCapabilityFlags)
 
 	if in.JD.CSAEncryptionKey == "" {
 		// generate a new key
@@ -609,18 +576,14 @@ func StartCLIEnvironment(
 		fmt.Printf("Generated new CSA encryption key for JD: %s\n", in.JD.CSAEncryptionKey)
 	}
 	universalSetupInput := creenv.SetupInput{
-		CapabilitiesAwareNodeSets:            in.NodeSets,
-		CapabilitiesContractFactoryFunctions: capabilityFactoryFns,
-		BlockchainsInput:                     in.Blockchains,
-		JdInput:                              *in.JD,
-		InfraInput:                           *in.Infra,
-		JobSpecFactoryFunctions:              jobSpecFactoryFunctions,
-		ConfigFactoryFunctions: []cre.ConfigFactoryFn{
-			gatewayconfig.GenerateConfigFn,
-		},
+		CapabilitiesAwareNodeSets:     in.NodeSets,
+		BlockchainsInput:              in.Blockchains,
+		JdInput:                       *in.JD,
+		InfraInput:                    *in.Infra,
 		S3ProviderInput:               in.S3ProviderInput,
 		AdditionalCapabilitiesConfigs: in.AdditionalCapabilities,
 		CopyCapabilityBinaries:        withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
+		Capabilities:                  capabilities,
 	}
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)
