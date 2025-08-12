@@ -103,9 +103,9 @@ func BuildTopology(
 			return nil, nil, fmt.Errorf("nodese config overrides are provided for DON %d, but not secrets. You need to either provide both, only secrets or nothing at all", donMetadata.ID)
 		}
 
-		configFactoryFunctions := make([]cre.NodeConfigFactoryFn, 0)
+		configFactoryFunctions := make([]cre.NodeConfigFn, 0)
 		for _, capability := range capabilities {
-			configFactoryFunctions = append(configFactoryFunctions, capability.OptionalNodeConfigFactoryFn())
+			configFactoryFunctions = append(configFactoryFunctions, capability.OptionalNodeConfigFn())
 		}
 
 		// generate configs only if they are not provided

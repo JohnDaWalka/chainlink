@@ -21,7 +21,7 @@ const flag = cre.CronCapability
 // Cron capability uses empty config by default, but can be overridden via TOML
 const cronConfigTemplate = `""` // Empty config by default
 
-var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
 		input.InfraInput,

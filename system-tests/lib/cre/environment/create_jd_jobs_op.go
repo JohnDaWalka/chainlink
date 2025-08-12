@@ -22,7 +22,7 @@ type CreateJobsWithJdOpDeps struct {
 	SingleFileLogger          common.Logger
 	HomeChainBlockchainOutput *blockchain.Output
 	AddressBook               deployment.AddressBook
-	JobSpecFactoryFunctions   []cre.JobSpecFactoryFn
+	JobSpecFactoryFunctions   []cre.JobSpecFn
 	FullCLDEnvOutput          *cre.FullCLDEnvironmentOutput
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
 	CapabilitiesConfigs       cre.CapabilityConfigs
@@ -50,7 +50,7 @@ var CreateJobsWithJdOp = operations.NewOperation[CreateJobsWithJdOpInput, Create
 			if jobSpecGeneratingFn == nil {
 				continue
 			}
-			singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecFactoryInput{
+			singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecInput{
 				CldEnvironment:            deps.FullCLDEnvOutput.Environment,
 				BlockchainOutput:          deps.HomeChainBlockchainOutput,
 				DonTopology:               deps.FullCLDEnvOutput.DonTopology,
@@ -95,7 +95,7 @@ func CreateJobsWithJdOpFactory(id string, version string) *operations.Operation[
 			donToJobSpecs := make(cre.DonsToJobSpecs)
 
 			for _, jobSpecGeneratingFn := range deps.JobSpecFactoryFunctions {
-				singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecFactoryInput{
+				singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecInput{
 					CldEnvironment:            deps.FullCLDEnvOutput.Environment,
 					BlockchainOutput:          deps.HomeChainBlockchainOutput,
 					DonTopology:               deps.FullCLDEnvOutput.DonTopology,

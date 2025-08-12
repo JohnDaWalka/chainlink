@@ -634,25 +634,24 @@ func PrintCRELogo() {
 
 func defaultCtfConfigs(topologyFlag string) error {
 	if os.Getenv("CTF_CONFIGS") == "" {
+		var setErr error
 		// use default config
 		switch topologyFlag {
 		case TopologyWorkflow:
-			setErr := os.Setenv("CTF_CONFIGS", "configs/workflow-don.toml")
-			if setErr != nil {
-				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
-			}
+			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-don.toml")
 		case TopologyWorkflowGateway:
-			setErr := os.Setenv("CTF_CONFIGS", "configs/workflow-gateway-don.toml")
-			if setErr != nil {
-				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
-			}
+			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-gateway-don.toml")
 		case TopologyWorkflowGatewayCapabilities:
-			setErr := os.Setenv("CTF_CONFIGS", "configs/workflow-gateway-capabilities-don.toml")
-			if setErr != nil {
-				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
-			}
+			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-gateway-capabilities-don.toml")
+		case TopologyMock:
+			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-gateway-mock-don.toml")
+		default:
+			return fmt.Errorf("unknown topology: %s", topologyFlag)
 		}
-		// TODO add mock topology
+
+		if setErr != nil {
+			return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
+		}
 
 		fmt.Printf("Set CTF_CONFIGS environment variable to default value: %s\n", os.Getenv("CTF_CONFIGS"))
 	}

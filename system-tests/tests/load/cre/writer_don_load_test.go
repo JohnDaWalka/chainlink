@@ -81,8 +81,8 @@ func setupLoadTestWriterEnvironment(
 	testLogger zerolog.Logger,
 	in *TestConfigLoadTestWriter,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*cretypes.CapabilitiesAwareNodeSet,
-	capabilityFactoryFns []cretypes.CapabilityRegistryConfigFactoryFn,
-	jobSpecFactoryFns []cretypes.JobSpecFactoryFn,
+	capabilityFactoryFns []cretypes.CapabilityRegistryConfigFn,
+	jobSpecFactoryFns []cretypes.JobSpecFn,
 	feedIDs []string,
 	workflowNames []string,
 ) *loadTestSetupOutput {
@@ -170,7 +170,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		}
 	}
 
-	loadTestJobSpecsFactoryFn := func(input *cretypes.JobSpecFactoryInput) (cretypes.DonsToJobSpecs, error) {
+	loadTestJobSpecsFactoryFn := func(input *cretypes.JobSpecInput) (cretypes.DonsToJobSpecs, error) {
 		donTojobSpecs := make(cretypes.DonsToJobSpecs, 0)
 
 		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
@@ -245,7 +245,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		mustSetCapabilitiesFn,
 		//nolint:gosec // disable G115
 		[]func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig{WriterDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
-		[]cretypes.JobSpecFactoryFn{loadTestJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
+		[]cretypes.JobSpecFn{loadTestJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
 		feedIDs,
 		[]string{in.WriterTest.WorkflowName},
 	)

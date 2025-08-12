@@ -92,7 +92,7 @@ func DumpArtifact(
 	jdOutput jd.Output,
 	donTopology cre.DonTopology,
 	offchainClient cldf_offchain.Client,
-	capabilityFactoryFns []cre.CapabilityRegistryConfigFactoryFn,
+	capabilityFactoryFns []cre.CapabilityRegistryConfigFn,
 	nodeSets []*cre.CapabilitiesAwareNodeSet,
 ) (string, error) {
 	artifact, err := GenerateArtifact(datastore, addressBook, jdOutput, donTopology, offchainClient, capabilityFactoryFns, nodeSets)
@@ -114,7 +114,7 @@ func GenerateArtifact(
 	jdOutput jd.Output,
 	donTopology cre.DonTopology,
 	offchainClient cldf_offchain.Client,
-	capabilityFactoryFns []cre.CapabilityRegistryConfigFactoryFn,
+	capabilityFactoryFns []cre.CapabilityRegistryConfigFn,
 	nodeSets []*cre.CapabilitiesAwareNodeSet,
 ) (*EnvArtifact, error) {
 	var err error

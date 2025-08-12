@@ -25,7 +25,7 @@ PerSenderRPS = {{.PerSenderRPS}}
 PerSenderBurst = {{.PerSenderBurst}}
 """`
 
-var TargetJobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var TargetJobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
 		input.InfraInput,

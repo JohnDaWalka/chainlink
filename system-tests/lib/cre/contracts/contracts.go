@@ -100,7 +100,7 @@ var WebAPICapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DON
 	return capabilities
 }
 
-func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []cre.CapabilityRegistryConfigFactoryFn) error {
+func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityFactoryFns []cre.CapabilityRegistryConfigFn) error {
 	if err := input.Validate(); err != nil {
 		return errors.Wrap(err, "input validation failed")
 	}

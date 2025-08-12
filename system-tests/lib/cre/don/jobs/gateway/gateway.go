@@ -16,8 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var JobSpecFn = func(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) cre.JobSpecFactoryFn {
-	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var JobSpecFn = func(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) cre.JobSpecFn {
+	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(
 			input.DonTopology,
 			input.Capabilities,
@@ -119,11 +119,11 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 		}
 
 		for _, capability := range capabilities {
-			if capability.OptionalGatewayHandlerConfigFactoryFn() == nil {
+			if capability.OptionalGatewayHandlerConfigFn() == nil {
 				continue
 			}
 
-			handlerConfig, handlerConfigErr := capability.OptionalGatewayHandlerConfigFactoryFn()(donMetadata)
+			handlerConfig, handlerConfigErr := capability.OptionalGatewayHandlerConfigFn()(donMetadata)
 			if handlerConfigErr != nil {
 				return nil, errors.Wrap(handlerConfigErr, "failed to get handler config")
 			}

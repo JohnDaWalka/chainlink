@@ -81,11 +81,11 @@ type SetupInput struct {
 	Capabilities              []cre.InstallableCapability
 
 	// Deprecated, use Capabilities instead
-	ConfigFactoryFunctions []cre.NodeConfigFactoryFn
+	ConfigFactoryFunctions []cre.NodeConfigFn
 	// Deprecated, use Capabilities instead
-	JobSpecFactoryFunctions []cre.JobSpecFactoryFn
+	JobSpecFactoryFunctions []cre.JobSpecFn
 	// Deprecated, use Capabilities instead
-	CapabilitiesContractFactoryFunctions []cre.CapabilityRegistryConfigFactoryFn
+	CapabilitiesContractFactoryFunctions []cre.CapabilityRegistryConfigFn
 }
 
 type backgroundStageResult struct {
@@ -409,9 +409,9 @@ func SetupTestEnvironment(
 
 	createJobsInput := CreateJobsWithJdOpInput{}
 
-	jobSpecFactoryFunctions := make([]cre.JobSpecFactoryFn, 0)
+	jobSpecFactoryFunctions := make([]cre.JobSpecFn, 0)
 	for _, capability := range input.Capabilities {
-		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, capability.JobSpecFactoryFn())
+		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, capability.JobSpecFn())
 	}
 
 	// Deprecated, use Capabilities instead
@@ -589,9 +589,9 @@ func SetupTestEnvironment(
 	configureKeystoneInput.EVMOCR3Config = *defaultOcr3Config
 	configureKeystoneInput.ConsensusV2OCR3Config = *defaultOcr3Config
 
-	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFactoryFn, 0)
+	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFn, 0)
 	for _, capability := range input.Capabilities {
-		capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, capability.CapabilityRegistryV1ConfigFactoryFn())
+		capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, capability.CapabilityRegistryV1ConfigFn())
 	}
 
 	// Deprecated, use Capabilities instead

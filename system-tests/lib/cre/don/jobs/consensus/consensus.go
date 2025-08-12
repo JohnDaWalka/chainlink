@@ -18,8 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var V1JobSpecFn = func(chainID uint64) cre.JobSpecFactoryFn {
-	return func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var V1JobSpecFn = func(chainID uint64) cre.JobSpecFn {
+	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		return GenerateJobSpecs(
 			input.DonTopology,
 			input.CldEnvironment.DataStore,
@@ -119,7 +119,7 @@ func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[s
 	}
 }
 
-var V2JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var V2JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	configGen := func(_ zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
 		// Build runtime fallbacks for any missing values
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)

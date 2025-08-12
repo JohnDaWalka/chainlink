@@ -19,7 +19,7 @@ const triggerFlag = cre.WebAPITriggerCapability
 // Web API trigger capability uses empty config by default, but can be overridden via TOML
 const webAPITriggerConfigTemplate = `""` // Empty config by default
 
-var TriggerJobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var TriggerJobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	return generateTriggerJobSpecs(
 		input.DonTopology,
 		input.InfraInput,

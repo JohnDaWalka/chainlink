@@ -20,7 +20,7 @@ import (
 const flag = cre.ReadContractCapability
 const readContractConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}"}'`
 
-var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	return generateJobSpecs(
 		input.DonTopology,
 		*input.InfraInput,

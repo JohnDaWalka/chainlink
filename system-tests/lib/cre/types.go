@@ -358,10 +358,10 @@ type Incoming struct {
 	ExternalPort int    `toml:"external_port" json:"external_port"`
 }
 
-type NodeConfigFactoryFn = func(input GenerateConfigsInput) (NodeIndexToConfigOverride, error)
+type NodeConfigFn = func(input GenerateConfigsInput) (NodeIndexToConfigOverride, error)
 
 type HandlerTypeToConfig = map[string]string
-type GatewayHandlerConfigFactoryFn = func(donMetadata []*DonMetadata) (HandlerTypeToConfig, error)
+type GatewayHandlerConfigFn = func(donMetadata []*DonMetadata) (HandlerTypeToConfig, error)
 
 type GenerateConfigsInput struct {
 	DonMetadata             *DonMetadata
@@ -852,9 +852,10 @@ func (s *StartNixShellInput) Validate() error {
 	return nil
 }
 
-type CapabilityRegistryConfigFactoryFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig
-type JobSpecFactoryFn = func(input *JobSpecFactoryInput) (DonsToJobSpecs, error)
-type JobSpecFactoryInput struct {
+type CapabilityRegistryConfigFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig
+type JobSpecFn = func(input *JobSpecInput) (DonsToJobSpecs, error)
+
+type JobSpecInput struct {
 	CldEnvironment            *cldf.Environment
 	BlockchainOutput          *blockchain.Output
 	DonTopology               *DonTopology
@@ -919,8 +920,8 @@ func (w *ManageWorkflowWithCRECLIInput) Validate() error {
 type InstallableCapability interface {
 	Flag() CapabilityFlag
 	Validate() error
-	JobSpecFactoryFn() JobSpecFactoryFn
-	OptionalNodeConfigFactoryFn() NodeConfigFactoryFn
-	OptionalGatewayHandlerConfigFactoryFn() GatewayHandlerConfigFactoryFn
-	CapabilityRegistryV1ConfigFactoryFn() CapabilityRegistryConfigFactoryFn
+	JobSpecFn() JobSpecFn
+	OptionalNodeConfigFn() NodeConfigFn
+	OptionalGatewayHandlerConfigFn() GatewayHandlerConfigFn
+	CapabilityRegistryV1ConfigFn() CapabilityRegistryConfigFn
 }

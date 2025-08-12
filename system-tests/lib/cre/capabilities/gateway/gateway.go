@@ -28,18 +28,18 @@ func (g *Capability) Validate() error {
 	return nil
 }
 
-func (g *Capability) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+func (g *Capability) JobSpecFn() cre.JobSpecFn {
 	return gatewayjobs.JobSpecFn(g.extraAllowedPorts, g.extraAllowedIPs, g.extraAllowedIPsCIDR)
 }
 
-func (g *Capability) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+func (g *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {
 	return gatewayconfig.GenerateConfigFn
 }
 
-func (g *Capability) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+func (g *Capability) OptionalGatewayHandlerConfigFn() cre.GatewayHandlerConfigFn {
 	return nil
 }
 
-func (g *Capability) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+func (g *Capability) CapabilityRegistryV1ConfigFn() cre.CapabilityRegistryConfigFn {
 	return nil
 }

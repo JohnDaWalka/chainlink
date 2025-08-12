@@ -32,7 +32,7 @@ func buildRuntimeValues(chainID uint64, networkFamily, creForwarderAddress, node
 	}
 }
 
-var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error) {
+var JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	configGen := func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
 		cs, ok := chainsel.EvmChainIdToChainSelector()[chainID]
 		if !ok {

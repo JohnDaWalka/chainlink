@@ -29,19 +29,19 @@ func (c *CapabilityV1) Flag() cre.CapabilityFlag {
 	return cre.ConsensusCapability
 }
 
-func (c *CapabilityV1) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+func (c *CapabilityV1) JobSpecFn() cre.JobSpecFn {
 	return consensusjobs.V1JobSpecFn(c.chainID)
 }
 
-func (c *CapabilityV1) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+func (c *CapabilityV1) OptionalNodeConfigFn() cre.NodeConfigFn {
 	return nil
 }
 
-func (c *CapabilityV1) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+func (c *CapabilityV1) OptionalGatewayHandlerConfigFn() cre.GatewayHandlerConfigFn {
 	return nil
 }
 
-func (c *CapabilityV1) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+func (c *CapabilityV1) CapabilityRegistryV1ConfigFn() cre.CapabilityRegistryConfigFn {
 	return consensusregistry.CapabilityV1RegistryConfigFn
 }
 
@@ -66,18 +66,18 @@ func (c *CapabilityV2) Flag() cre.CapabilityFlag {
 	return cre.ConsensusCapabilityV2
 }
 
-func (c *CapabilityV2) JobSpecFactoryFn() cre.JobSpecFactoryFn {
+func (c *CapabilityV2) JobSpecFn() cre.JobSpecFn {
 	return consensusjobs.V2JobSpecFn
 }
 
-func (c *CapabilityV2) OptionalNodeConfigFactoryFn() cre.NodeConfigFactoryFn {
+func (c *CapabilityV2) OptionalNodeConfigFn() cre.NodeConfigFn {
 	return nil
 }
 
-func (c *CapabilityV2) OptionalGatewayHandlerConfigFactoryFn() cre.GatewayHandlerConfigFactoryFn {
+func (c *CapabilityV2) OptionalGatewayHandlerConfigFn() cre.GatewayHandlerConfigFn {
 	return nil
 }
 
-func (c *CapabilityV2) CapabilityRegistryV1ConfigFactoryFn() cre.CapabilityRegistryConfigFactoryFn {
+func (c *CapabilityV2) CapabilityRegistryV1ConfigFn() cre.CapabilityRegistryConfigFn {
 	return consensusregistry.ConsensusV2CapabilityFactoryFn
 }

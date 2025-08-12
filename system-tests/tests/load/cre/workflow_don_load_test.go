@@ -117,9 +117,9 @@ func setupLoadTestEnvironment(
 	testLogger zerolog.Logger,
 	in *TestConfigLoadTest,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*cretypes.CapabilitiesAwareNodeSet,
-	capabilityFactoryFns []cretypes.CapabilityRegistryConfigFactoryFn,
-	jobSpecFactoryFns []cretypes.JobSpecFactoryFn,
-	workflowJobsFn cretypes.JobSpecFactoryFn,
+	capabilityFactoryFns []cretypes.CapabilityRegistryConfigFn,
+	jobSpecFactoryFns []cretypes.JobSpecFn,
+	workflowJobsFn cretypes.JobSpecFn,
 ) *loadTestSetupOutput {
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            mustSetCapabilitiesFn(in.NodeSets),
@@ -152,7 +152,7 @@ func setupLoadTestEnvironment(
 		SingleFileLogger:          singleFileLogger,
 		HomeChainBlockchainOutput: universalSetupOutput.BlockchainOutput[0].BlockchainOutput,
 		AddressBook:               universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // will not migrate now
-		JobSpecFactoryFunctions:   []cretypes.JobSpecFactoryFn{workflowJobsFn},
+		JobSpecFactoryFunctions:   []cretypes.JobSpecFn{workflowJobsFn},
 		FullCLDEnvOutput: &cretypes.FullCLDEnvironmentOutput{
 			Environment: universalSetupOutput.CldEnvironment,
 			DonTopology: universalSetupOutput.DonTopology,
@@ -212,7 +212,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		}
 	}
 
-	mockJobSpecsFactoryFn := func(input *cretypes.JobSpecFactoryInput) (cretypes.DonsToJobSpecs, error) {
+	mockJobSpecsFactoryFn := func(input *cretypes.JobSpecInput) (cretypes.DonsToJobSpecs, error) {
 		donTojobSpecs := make(cretypes.DonsToJobSpecs, 0)
 
 		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
@@ -239,7 +239,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		return donTojobSpecs, nil
 	}
 
-	loadTestJobSpecsFactoryFn := func(input *cretypes.JobSpecFactoryInput) (cretypes.DonsToJobSpecs, error) {
+	loadTestJobSpecsFactoryFn := func(input *cretypes.JobSpecInput) (cretypes.DonsToJobSpecs, error) {
 		donTojobSpecs := make(cretypes.DonsToJobSpecs, 0)
 
 		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
@@ -335,7 +335,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		in,
 		mustSetCapabilitiesFn,
 		[]func(donFlags []string, nodeSetInput *cretypes.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig{WorkflowDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
-		[]cretypes.JobSpecFactoryFn{mockJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
+		[]cretypes.JobSpecFn{mockJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
 		loadTestJobSpecsFactoryFn,
 	)
 
