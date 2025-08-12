@@ -8,10 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
@@ -256,13 +258,20 @@ func (h *handler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response[
 }
 
 func (h *handler) handleSecretsCreate(ctx context.Context, ar activeRequest) error {
-	var secretsCreateRequest SecretsCreateRequest
+	secretsCreateRequest := vault.CreateSecretsRequest{}
 	if err := json.Unmarshal(*ar.req.Params, &secretsCreateRequest); err != nil {
 		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.UserMessageParseError, err))
 	}
 
-	if secretsCreateRequest.ID == "" || secretsCreateRequest.Value == "" {
-		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("secret id and value cannot be empty")))
+	secretsCreateRequest.RequestId = uuid.New().String()
+	if len(secretsCreateRequest.EncryptedSecrets) == 0 {
+		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("encrypted secrets cannot be empty")))
+	}
+
+	for _, req := range secretsCreateRequest.EncryptedSecrets {
+		if req.Id.Key == "" || req.Id.Owner == "" || req.EncryptedValue == "" {
+			return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("secret id and value cannot be empty")))
+		}
 	}
 
 	// At this point, we know that the request is valid and we can send it to the nodes
