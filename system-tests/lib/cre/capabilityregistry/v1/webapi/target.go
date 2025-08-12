@@ -10,7 +10,7 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var TargetCapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+var TargetCapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if flags.HasFlag(donFlags, cre.WebAPITargetCapability) {
@@ -25,5 +25,5 @@ var TargetCapabilityRegistryConfigFn = func(donFlags []string, _ *cre.Capabiliti
 		})
 	}
 
-	return capabilities
+	return capabilities, nil
 }

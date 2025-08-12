@@ -1,6 +1,7 @@
 package logevent
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -12,11 +13,11 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
-		return capabilities
+		return nil, errors.New("node set input is nil or chain capabilities is nil")
 	}
 
 	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
@@ -33,5 +34,5 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 		}
 	}
 
-	return capabilities
+	return capabilities, nil
 }

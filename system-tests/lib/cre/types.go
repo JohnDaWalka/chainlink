@@ -852,7 +852,7 @@ func (s *StartNixShellInput) Validate() error {
 	return nil
 }
 
-type CapabilityRegistryConfigFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig
+type CapabilityRegistryConfigFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error)
 type JobSpecFn = func(input *JobSpecInput) (DonsToJobSpecs, error)
 
 type JobSpecInput struct {

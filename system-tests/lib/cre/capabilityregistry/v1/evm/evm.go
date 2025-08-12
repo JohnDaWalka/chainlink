@@ -1,9 +1,9 @@
 package evm
 
 import (
-	"fmt"
 	"strconv"
 
+	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -15,19 +15,18 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
-		return capabilities
+		return nil, errors.New("node set input is nil or chain capabilities is nil")
 	}
 
 	for _, chainID := range nodeSetInput.ChainCapabilities[cre.WriteEVMCapability].EnabledChains {
 		if flags.HasFlag(donFlags, cre.EVMCapability) {
-			selector, err := chainselectors.SelectorFromChainId(chainID)
-			if err != nil {
-				fmt.Printf("Error getting selector from chainID: %d, err: %s\n", chainID, err.Error())
-				selector = 0
+			selector, selectorErr := chainselectors.SelectorFromChainId(chainID)
+			if selectorErr != nil {
+				return nil, errors.Wrapf(selectorErr, "failed to get selector from chainID: %d", chainID)
 			}
 
 			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
@@ -42,5 +41,5 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 		}
 	}
 
-	return capabilities
+	return capabilities, nil
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var CapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	// Configuration details are irrelevant here; this is only included to satisfy validation requirements
@@ -23,5 +23,5 @@ var CapabilityRegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwar
 		})
 	}
 
-	return capabilities
+	return capabilities, nil
 }

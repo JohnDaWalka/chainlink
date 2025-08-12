@@ -10,7 +10,7 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var CapabilityV1RegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+var CapabilityV1RegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if flags.HasFlag(donFlags, cre.ConsensusCapability) {
@@ -25,10 +25,10 @@ var CapabilityV1RegistryConfigFn = func(donFlags []string, _ *cre.CapabilitiesAw
 		})
 	}
 
-	return capabilities
+	return capabilities, nil
 }
 
-var ConsensusV2CapabilityFactoryFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+var ConsensusV2CapabilityFn = func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if flags.HasFlag(donFlags, cre.ConsensusCapabilityV2) {
@@ -43,5 +43,5 @@ var ConsensusV2CapabilityFactoryFn = func(donFlags []string, _ *cre.Capabilities
 		})
 	}
 
-	return capabilities
+	return capabilities, nil
 }

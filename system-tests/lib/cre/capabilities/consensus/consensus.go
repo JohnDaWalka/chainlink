@@ -79,5 +79,5 @@ func (c *CapabilityV2) OptionalGatewayHandlerConfigFn() cre.GatewayHandlerConfig
 }
 
 func (c *CapabilityV2) CapabilityRegistryV1ConfigFn() cre.CapabilityRegistryConfigFn {
-	return consensusregistry.ConsensusV2CapabilityFactoryFn
+	return consensusregistry.ConsensusV2CapabilityFn
 }

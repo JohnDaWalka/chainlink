@@ -283,7 +283,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		return donTojobSpecs, nil
 	}
 
-	WorkflowDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cretypes.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+	WorkflowDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cretypes.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		if flags.HasFlag(donFlags, cretypes.MockCapability) {
@@ -322,7 +322,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 			})
 		}
 
-		return capabilities
+		return capabilities, nil
 	}
 
 	homeChain := in.Blockchains[0]
@@ -334,7 +334,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 		testLogger,
 		in,
 		mustSetCapabilitiesFn,
-		[]func(donFlags []string, nodeSetInput *cretypes.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig{WorkflowDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
+		[]cretypes.CapabilityRegistryConfigFn{WorkflowDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
 		[]cretypes.JobSpecFn{mockJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
 		loadTestJobSpecsFactoryFn,
 	)

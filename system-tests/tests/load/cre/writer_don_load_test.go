@@ -197,7 +197,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		return donTojobSpecs, nil
 	}
 
-	WriterDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig {
+	WriterDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		if flags.HasFlag(donFlags, cretypes.MockCapability) {
@@ -225,7 +225,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 			})
 		}
 
-		return capabilities
+		return capabilities, nil
 	}
 
 	registryChain := in.Blockchains[0]
@@ -244,7 +244,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		in,
 		mustSetCapabilitiesFn,
 		//nolint:gosec // disable G115
-		[]func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig{WriterDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
+		[]cretypes.CapabilityRegistryConfigFn{WriterDONLoadTestCapabilitiesFactoryFn, writeevmregistry.CapabilityRegistryConfigFn},
 		[]cretypes.JobSpecFn{loadTestJobSpecsFactoryFn, consensus.V1JobSpecFn(homeChainIDUint64)},
 		feedIDs,
 		[]string{in.WriterTest.WorkflowName},
