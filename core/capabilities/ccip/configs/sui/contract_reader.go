@@ -275,6 +275,9 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							Module: "offramp",
 							Event:  "ExecutionStateChanged",
 						},
+						EventFilterRenames: map[string]string{
+							"SourceChain": "SourceChainSelector",
+						},
 					},
 					"CommitReportAccepted": {
 						Name:      "offramp",
