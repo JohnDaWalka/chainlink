@@ -13,13 +13,13 @@ import (
 )
 
 type Config struct {
-	Blockchains            []*cre.WrappedBlockchainInput   `toml:"blockchains" validate:"required"`
-	NodeSets               []*cre.CapabilitiesAwareNodeSet `toml:"nodesets" validate:"required"`
-	JD                     *jd.Input                       `toml:"jd" validate:"required"`
-	Infra                  *infra.Input                    `toml:"infra" validate:"required"`
-	Fake                   *fake.Input                     `toml:"fake" validate:"required"`
-	S3ProviderInput        *s3provider.Input               `toml:"s3provider"`
-	AdditionalCapabilities map[string]cre.CapabilityConfig `toml:"additional_capabilities"` // capability flag -> capability config
+	Blockchains       []*cre.WrappedBlockchainInput   `toml:"blockchains" validate:"required"`
+	NodeSets          []*cre.CapabilitiesAwareNodeSet `toml:"nodesets" validate:"required"`
+	JD                *jd.Input                       `toml:"jd" validate:"required"`
+	Infra             *infra.Input                    `toml:"infra" validate:"required"`
+	Fake              *fake.Input                     `toml:"fake" validate:"required"`
+	S3ProviderInput   *s3provider.Input               `toml:"s3provider"`
+	CapabilityConfigs map[string]cre.CapabilityConfig `toml:"capability_configs"` // capability flag -> capability config
 }
 
 func (c Config) Validate() error {

@@ -70,15 +70,15 @@ type SetupOutput struct {
 
 type SetupInput struct {
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
-	BlockchainsInput              []*cre.WrappedBlockchainInput
-	JdInput                       jd.Input
-	InfraInput                    infra.Input
-	OCR3Config                    *keystone_changeset.OracleConfig
-	VaultOCR3Config               *keystone_changeset.OracleConfig
-	S3ProviderInput               *s3provider.Input
-	AdditionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs
-	CopyCapabilityBinaries        bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
-	Capabilities                  []cre.InstallableCapability
+	BlockchainsInput          []*cre.WrappedBlockchainInput
+	JdInput                   jd.Input
+	InfraInput                infra.Input
+	OCR3Config                *keystone_changeset.OracleConfig
+	VaultOCR3Config           *keystone_changeset.OracleConfig
+	S3ProviderInput           *s3provider.Input
+	CapabilityConfigs         cre.CapabilityConfigs
+	CopyCapabilityBinaries    bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
+	Capabilities              []cre.InstallableCapability
 }
 
 type backgroundStageResult struct {
@@ -280,7 +280,7 @@ func SetupTestEnvironment(
 		bcOuts,
 		allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		input.Capabilities,
-		input.AdditionalCapabilitiesConfigs,
+		input.CapabilityConfigs,
 		input.CopyCapabilityBinaries,
 	)
 	if topoErr != nil {
@@ -408,16 +408,16 @@ func SetupTestEnvironment(
 	}
 
 	createJobsDeps := CreateJobsWithJdOpDeps{
-		Logger:                        testLogger,
-		SingleFileLogger:              singleFileLogger,
-		HomeChainBlockchainOutput:     homeChainOutput.BlockchainOutput,
-		AddressBook:                   allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		JobSpecFactoryFunctions:       jobSpecFactoryFunctions,
-		FullCLDEnvOutput:              fullCldOutput,
-		CapabilitiesAwareNodeSets:     input.CapabilitiesAwareNodeSets,
-		InfraInput:                    &input.InfraInput,
-		AdditionalCapabilitiesConfigs: input.AdditionalCapabilitiesConfigs,
-		Capabilities:                  input.Capabilities,
+		Logger:                    testLogger,
+		SingleFileLogger:          singleFileLogger,
+		HomeChainBlockchainOutput: homeChainOutput.BlockchainOutput,
+		AddressBook:               allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		JobSpecFactoryFunctions:   jobSpecFactoryFunctions,
+		FullCLDEnvOutput:          fullCldOutput,
+		CapabilitiesAwareNodeSets: input.CapabilitiesAwareNodeSets,
+		InfraInput:                &input.InfraInput,
+		CapabilitiesConfigs:       input.CapabilityConfigs,
+		Capabilities:              input.Capabilities,
 	}
 	_, createJobsErr := operations.ExecuteOperation(allChainsCLDEnvironment.OperationsBundle, CreateJobsWithJdOp, createJobsDeps, createJobsInput)
 	if createJobsErr != nil {

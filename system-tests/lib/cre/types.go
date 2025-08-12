@@ -101,7 +101,8 @@ type DonsToJobSpecs = map[uint64]DonJobs
 type NodeIndexToConfigOverride = map[int]string
 type NodeIndexToSecretsOverride = map[int]string
 
-type AdditionalCapabilitiesConfigs = map[string]CapabilityConfig
+type CapabilityConfigs = map[string]CapabilityConfig
+
 type CapabilityConfig struct {
 	BinaryPath   string         `toml:"binary_path"`
 	Config       map[string]any `toml:"config"`
@@ -363,16 +364,16 @@ type HandlerTypeToConfig = map[string]string
 type GatewayHandlerConfigFactoryFn = func(donMetadata []*DonMetadata) (HandlerTypeToConfig, error)
 
 type GenerateConfigsInput struct {
-	DonMetadata                   *DonMetadata
-	BlockchainOutput              map[uint64]*WrappedBlockchainOutput
-	HomeChainSelector             uint64
-	Flags                         []string
-	CapabilitiesPeeringData       CapabilitiesPeeringData
-	OCRPeeringData                OCRPeeringData
-	AddressBook                   cldf.AddressBook
-	NodeSet                       *CapabilitiesAwareNodeSet
-	AdditionalCapabilitiesConfigs AdditionalCapabilitiesConfigs
-	GatewayConnectorOutput        *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
+	DonMetadata             *DonMetadata
+	BlockchainOutput        map[uint64]*WrappedBlockchainOutput
+	HomeChainSelector       uint64
+	Flags                   []string
+	CapabilitiesPeeringData CapabilitiesPeeringData
+	OCRPeeringData          OCRPeeringData
+	AddressBook             cldf.AddressBook
+	NodeSet                 *CapabilitiesAwareNodeSet
+	CapabilityConfigs       CapabilityConfigs
+	GatewayConnectorOutput  *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
 }
 
 func (g *GenerateConfigsInput) Validate() error {
@@ -854,13 +855,13 @@ func (s *StartNixShellInput) Validate() error {
 type CapabilityRegistryConfigFactoryFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) []keystone_changeset.DONCapabilityWithConfig
 type JobSpecFactoryFn = func(input *JobSpecFactoryInput) (DonsToJobSpecs, error)
 type JobSpecFactoryInput struct {
-	CldEnvironment              *cldf.Environment
-	BlockchainOutput            *blockchain.Output
-	DonTopology                 *DonTopology
-	InfraInput                  *infra.Input
-	AdditionalCapabilityConfigs map[string]CapabilityConfig
-	Capabilities                []InstallableCapability
-	CapabilitiesAwareNodeSets   []*CapabilitiesAwareNodeSet
+	CldEnvironment            *cldf.Environment
+	BlockchainOutput          *blockchain.Output
+	DonTopology               *DonTopology
+	InfraInput                *infra.Input
+	CapabilityConfigs         map[string]CapabilityConfig
+	Capabilities              []InstallableCapability
+	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet
 }
 
 type ManageWorkflowWithCRECLIInput struct {

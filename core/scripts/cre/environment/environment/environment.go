@@ -542,21 +542,21 @@ func StartCLIEnvironment(
 	}
 
 	capabilities := []cre.InstallableCapability{
-		&croncapability.Capability{},
-		consensuscapability.NewCapabilityV1(libc.MustSafeUint64FromInt(homeChainIDInt)),
-		consensuscapability.NewCapabilityV2(libc.MustSafeUint64FromInt(homeChainIDInt)),
-		&httpactioncapability.Capability{},
-		&httptriggercapability.Capability{},
-		&webapitriggercapability.Capability{},
-		&webapitargetcapability.Capability{},
-		&computecapability.Capability{},
+		croncapability.New(),
+		consensuscapability.NewV1(libc.MustSafeUint64FromInt(homeChainIDInt)),
+		consensuscapability.NewV2(libc.MustSafeUint64FromInt(homeChainIDInt)),
+		httpactioncapability.New(),
+		httptriggercapability.New(),
+		webapitriggercapability.New(),
+		webapitargetcapability.New(),
+		computecapability.New(),
 		vaultcapability.NewVaultCapability(libc.MustSafeUint64FromInt(homeChainIDInt)),
-		&mockcapability.Capability{},
-		&writeevmcapability.Capability{},
-		&readcontractcapability.Capability{},
-		&logeventtriggercapability.Capability{},
-		&evmcapability.Capability{},
-		gatewaycapability.NewGatewayCapability(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
+		mockcapability.New(),
+		writeevmcapability.New(),
+		readcontractcapability.New(),
+		logeventtriggercapability.New(),
+		evmcapability.New(),
+		gatewaycapability.New(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
 	}
 
 	capabilities = append(capabilities, extraCapabilities...)
@@ -576,14 +576,14 @@ func StartCLIEnvironment(
 		fmt.Printf("Generated new CSA encryption key for JD: %s\n", in.JD.CSAEncryptionKey)
 	}
 	universalSetupInput := creenv.SetupInput{
-		CapabilitiesAwareNodeSets:     in.NodeSets,
-		BlockchainsInput:              in.Blockchains,
-		JdInput:                       *in.JD,
-		InfraInput:                    *in.Infra,
-		S3ProviderInput:               in.S3ProviderInput,
-		AdditionalCapabilitiesConfigs: in.AdditionalCapabilities,
-		CopyCapabilityBinaries:        withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
-		Capabilities:                  capabilities,
+		CapabilitiesAwareNodeSets: in.NodeSets,
+		BlockchainsInput:          in.Blockchains,
+		JdInput:                   *in.JD,
+		InfraInput:                *in.Infra,
+		S3ProviderInput:           in.S3ProviderInput,
+		CapabilityConfigs:         in.CapabilityConfigs,
+		CopyCapabilityBinaries:    withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
+		Capabilities:              capabilities,
 	}
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)
@@ -712,13 +712,13 @@ func validateWorkflowTriggerAndCapabilities(in *creenv.Config, withExampleFlag b
 		}
 
 		// otherwise, make sure we have cron binary path set in TOML config
-		if in.AdditionalCapabilities == nil {
-			return errors.New("additional capabilities config is not set in TOML config")
+		if in.CapabilityConfigs == nil {
+			return errors.New("capability configs is not set in TOML config")
 		}
 
-		cronCapConfig, ok := in.AdditionalCapabilities[cre.CronCapability]
+		cronCapConfig, ok := in.CapabilityConfigs[cre.CronCapability]
 		if !ok {
-			return errors.New("cron capability is not set in TOML config")
+			return errors.New("cron capability config is not set in TOML config")
 		}
 
 		if cronCapConfig.BinaryPath == "" {

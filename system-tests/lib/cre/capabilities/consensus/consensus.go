@@ -12,7 +12,7 @@ type CapabilityV1 struct {
 	chainID uint64
 }
 
-func NewCapabilityV1(chainID uint64) *CapabilityV1 {
+func NewV1(chainID uint64) *CapabilityV1 {
 	return &CapabilityV1{
 		chainID: chainID,
 	}
@@ -49,7 +49,7 @@ type CapabilityV2 struct {
 	chainID uint64
 }
 
-func NewCapabilityV2(chainID uint64) *CapabilityV2 {
+func NewV2(chainID uint64) *CapabilityV2 {
 	return &CapabilityV2{
 		chainID: chainID,
 	}

@@ -9,6 +9,10 @@ import (
 type Capability struct {
 }
 
+func New() *Capability {
+	return &Capability{}
+}
+
 func (c *Capability) Validate() error {
 	return nil
 }

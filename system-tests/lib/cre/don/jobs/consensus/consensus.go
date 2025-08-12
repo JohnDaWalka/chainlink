@@ -152,6 +152,6 @@ var V2JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, erro
 		ocr.EnabledForHomeChainFn,
 		configGen,
 		ocr.ConfigMergePerDonFn,
-		input.AdditionalCapabilityConfigs,
+		input.CapabilityConfigs,
 	)
 }

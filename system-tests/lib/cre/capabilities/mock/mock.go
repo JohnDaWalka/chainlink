@@ -9,6 +9,10 @@ import (
 type Capability struct {
 }
 
+func New() *Capability {
+	return &Capability{}
+}
+
 func (c *Capability) Flag() cre.CapabilityFlag {
 	return cre.MockCapability
 }

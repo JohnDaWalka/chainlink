@@ -6,7 +6,7 @@ import (
 	gatewayjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
 )
 
-func NewGatewayCapability(extraAllowedPorts []int, extraAllowedIPs []string, extraAllowedIPsCIDR []string) *Capability {
+func New(extraAllowedPorts []int, extraAllowedIPs []string, extraAllowedIPsCIDR []string) *Capability {
 	return &Capability{
 		extraAllowedPorts:   extraAllowedPorts,
 		extraAllowedIPs:     extraAllowedIPs,

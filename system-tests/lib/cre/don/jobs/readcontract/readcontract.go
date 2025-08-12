@@ -24,7 +24,7 @@ var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error)
 	return generateJobSpecs(
 		input.DonTopology,
 		*input.InfraInput,
-		input.AdditionalCapabilityConfigs,
+		input.CapabilityConfigs,
 		input.CapabilitiesAwareNodeSets,
 	)
 }
@@ -33,7 +33,7 @@ var ReadContractJobName = func(chainID string) string {
 	return "read-contract-" + chainID
 }
 
-func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, infraInput infra.Input, capabilitiesConfig cre.CapabilityConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}

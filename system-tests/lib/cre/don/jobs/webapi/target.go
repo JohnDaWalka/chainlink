@@ -29,12 +29,12 @@ var TargetJobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, 
 	return generateJobSpecs(
 		input.DonTopology,
 		input.InfraInput,
-		input.AdditionalCapabilityConfigs,
+		input.CapabilityConfigs,
 		input.CapabilitiesAwareNodeSets,
 	)
 }
 
-func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilitiesConfig cre.AdditionalCapabilitiesConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
+func generateJobSpecs(donTopology *cre.DonTopology, _ *infra.Input, capabilitiesConfig cre.CapabilityConfigs, nodeSetInput []*cre.CapabilitiesAwareNodeSet) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
 		return nil, errors.New("topology is nil")
 	}

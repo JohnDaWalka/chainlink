@@ -186,11 +186,11 @@ func Generate(input cre.GenerateConfigsInput, factoryFns []cre.NodeConfigFactory
 				}
 			}
 
-			if input.AdditionalCapabilitiesConfigs == nil {
+			if input.CapabilityConfigs == nil {
 				return nil, errors.New("additional capabilities configs are nil, but are required to configure the write-evm capability")
 			}
 
-			if writeEvmConfig, ok := input.AdditionalCapabilitiesConfigs[cre.WriteEVMCapability]; ok {
+			if writeEvmConfig, ok := input.CapabilityConfigs[cre.WriteEVMCapability]; ok {
 				enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(
 					string(cre.WriteEVMCapability),
 					input.NodeSet.ChainCapabilities,

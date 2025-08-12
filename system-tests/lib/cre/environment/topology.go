@@ -27,7 +27,7 @@ func BuildTopology(
 	blockchainOutput map[uint64]*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	capabilities []cre.InstallableCapability,
-	additionalCapabilitiesConfigs cre.AdditionalCapabilitiesConfigs,
+	CapabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
 	topologyErr := libdon.ValidateTopology(nodeSets, infraInput)
@@ -112,16 +112,16 @@ func BuildTopology(
 		if configsFound == 0 {
 			config, configErr := creconfig.Generate(
 				cre.GenerateConfigsInput{
-					DonMetadata:                   donMetadata,
-					BlockchainOutput:              blockchainOutput,
-					Flags:                         donMetadata.Flags,
-					CapabilitiesPeeringData:       capabilitiesPeeringData,
-					OCRPeeringData:                ocrPeeringData,
-					AddressBook:                   addressBook,
-					HomeChainSelector:             topology.HomeChainSelector,
-					GatewayConnectorOutput:        topology.GatewayConnectorOutput,
-					NodeSet:                       localNodeSets[i],
-					AdditionalCapabilitiesConfigs: additionalCapabilitiesConfigs,
+					DonMetadata:             donMetadata,
+					BlockchainOutput:        blockchainOutput,
+					Flags:                   donMetadata.Flags,
+					CapabilitiesPeeringData: capabilitiesPeeringData,
+					OCRPeeringData:          ocrPeeringData,
+					AddressBook:             addressBook,
+					HomeChainSelector:       topology.HomeChainSelector,
+					GatewayConnectorOutput:  topology.GatewayConnectorOutput,
+					NodeSet:                 localNodeSets[i],
+					CapabilityConfigs:       CapabilityConfigs,
 				},
 				configFactoryFunctions,
 			)
@@ -166,7 +166,7 @@ func BuildTopology(
 		}
 
 		customBinariesPaths := make(map[cre.CapabilityFlag]string)
-		for flag, config := range additionalCapabilitiesConfigs {
+		for flag, config := range CapabilityConfigs {
 			if creflags.HasFlagForAnyChain(donMetadata.Flags, flag) && config.BinaryPath != "" {
 				customBinariesPaths[flag] = config.BinaryPath
 			}

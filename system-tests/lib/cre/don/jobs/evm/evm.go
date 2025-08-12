@@ -89,6 +89,6 @@ var JobSpecFn = func(input *cre.JobSpecFactoryInput) (cre.DonsToJobSpecs, error)
 		ocr.EnabledPerChainFn,
 		configGen,
 		ocr.ConfigMergePerChainFn,
-		input.AdditionalCapabilityConfigs,
+		input.CapabilityConfigs,
 	)
 }
