@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
-	
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -31,6 +31,7 @@ type MemoryEnvironmentConfig struct {
 	SuiChains          int
 	ZkChains           int
 	TonChains          int
+	TronChains         int
 	NumOfUsersPerChain int
 	Nodes              int
 	Bootstraps         int
@@ -111,6 +112,10 @@ func NewMemoryChainsZk(t *testing.T, numChains int) []cldf_chain.BlockChain {
 
 func NewMemoryChainsTon(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	return generateChainsTon(t, numChains)
+}
+
+func NewMemoryChainsTron(t *testing.T, numChains int) []cldf_chain.BlockChain {
+	return generateChainsTron(t, numChains)
 }
 
 func NewNodes(
@@ -205,15 +210,16 @@ func NewMemoryEnvironment(
 	suiChains := NewMemoryChainsSui(t, config.SuiChains)
 	zkChains := NewMemoryChainsZk(t, config.ZkChains)
 	tonChains := NewMemoryChainsTon(t, config.TonChains)
+	tronChains := NewMemoryChainsTron(t, config.TronChains)
 
 	chains := cldf_chain.NewBlockChainsFromSlice(
-		slices.Concat(evmChains, solChains, aptosChains, zkChains, suiChains, tonChains),
+		slices.Concat(evmChains, solChains, aptosChains, zkChains, suiChains, tonChains, tronChains),
 	)
 
 	c := NewNodesConfig{
 		LogLevel:       logLevel,
 		BlockChains:    chains,
-		NumNodes:       config.Nodes, 
+		NumNodes:       config.Nodes,
 		NumBootstraps:  config.Bootstraps,
 		RegistryConfig: config.RegistryConfig,
 		CustomDBSetup:  config.CustomDBSetup,
