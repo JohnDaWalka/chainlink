@@ -24,7 +24,7 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return factory.NewDonLevelFactory(
+	return factory.NewDonLevelCapabilityJobSpecFactory(
 		c.Flag(),
 		mockConfigTemplate,
 		factory.NoOpExtractor, // No runtime values extraction needed

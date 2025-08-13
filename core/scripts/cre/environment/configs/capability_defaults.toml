@@ -16,7 +16,7 @@
   PerSenderBurst = 5
 
 [capability_configs.log-event-trigger]
-  binary_path = "./binaries/logtrigger"
+  binary_path = "./binaries/log-event-trigger"
 
 [capability_configs.log-event-trigger.config]
   LookbackBlocks = 2000        # Default lookback blocks
@@ -55,7 +55,7 @@
 #   CustomField = "value"  # Add custom fields if needed
 
 [capability_configs.http-action]
-  binary_path = "./binaries/http-action"
+  binary_path = "./binaries/http_action"
 
 [capability_configs.http-action.config]
   # HTTP Action capability configuration
@@ -70,7 +70,7 @@
   OutgoingPerSenderRPS = 10
 
 [capability_configs.http-trigger]
-  binary_path = "./binaries/http-trigger"
+  binary_path = "./binaries/http_trigger"
 
 [capability_configs.http-trigger.config]
   # HTTP Trigger capability configuration

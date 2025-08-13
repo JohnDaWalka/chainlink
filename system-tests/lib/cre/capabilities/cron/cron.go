@@ -23,8 +23,7 @@ func (c *Capability) Flag() cre.CapabilityFlag {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	// return cronjobs.JobSpecFn
-	return factory.NewDonLevelFactory(
+	return factory.NewDonLevelCapabilityJobSpecFactory(
 		c.Flag(),
 		cronConfigTemplate,
 		factory.NoOpExtractor, // No runtime values extraction needed

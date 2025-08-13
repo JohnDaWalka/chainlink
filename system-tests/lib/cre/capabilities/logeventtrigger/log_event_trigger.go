@@ -31,7 +31,7 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return factory.NewChainSpecificFactory(
+	return factory.NewChainSpecificCapabilityJobSpecFactory(
 		c.Flag(),
 		logEventTriggerConfigTemplate,
 		func(chainID uint64, _ *cre.NodeMetadata) map[string]any {

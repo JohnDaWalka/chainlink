@@ -22,7 +22,7 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return factory.NewChainSpecificFactory(
+	return factory.NewChainSpecificCapabilityJobSpecFactory(
 		c.Flag(),
 		`'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}"}'`,
 		func(chainID uint64, _ *cre.NodeMetadata) map[string]any {
