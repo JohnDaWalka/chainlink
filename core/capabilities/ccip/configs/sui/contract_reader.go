@@ -180,7 +180,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
-						ResultTupleToStruct: []string{"OCRConfig"},
+						ResultTupleToStruct: []string{"ocr_config"},
 					},
 					consts.MethodNameGetLatestPriceSequenceNumber: {
 						Name:          "get_latest_price_sequence_number",
