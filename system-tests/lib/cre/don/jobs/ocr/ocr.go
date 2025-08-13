@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -247,7 +248,7 @@ type JobConfigGenFn func(zerolog.Logger, uint64, string, map[string]any) (string
 
 var ConfigMergePerChainFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
 	// Build user configuration from defaults + chain overrides
-	enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(flag, nodeSetInput.ChainCapabilities, capabilityConfig.Config, chainIDUint64)
+	enabled, mergedConfig, rErr := envconfig.ResolveCapabilityForChain(flag, nodeSetInput.ChainCapabilities, capabilityConfig.Config, chainIDUint64)
 	if rErr != nil {
 		return nil, false, errors.Wrap(rErr, "failed to resolve capability config for chain")
 	}
@@ -264,7 +265,7 @@ var ConfigMergePerDonFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.Capabi
 		return nil, false, nil
 	}
 
-	return cre.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSetInput.CapabilityOverrides), true, nil
+	return envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSetInput.CapabilityOverrides), true, nil
 }
 
 type HowCapabilityAppliesFn func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool

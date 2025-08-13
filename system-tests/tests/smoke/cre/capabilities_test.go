@@ -48,6 +48,7 @@ import (
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	credebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	creworkflow "github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -76,7 +77,7 @@ func Test_CRE_Workflow_Don(t *testing.T) {
 	/*
 		LOAD ENVIRONMENT STATE
 	*/
-	in, err := framework.Load[environment.Config](nil)
+	in, err := framework.Load[envconfig.Config](nil)
 	require.NoError(t, err, "couldn't load environment state")
 
 	var envArtifact environment.EnvArtifact
@@ -96,7 +97,7 @@ func Test_CRE_Workflow_Don(t *testing.T) {
 	})
 }
 
-func executePoRTest(t *testing.T, in *environment.Config, envArtifact environment.EnvArtifact, verificationTimeout time.Duration) {
+func executePoRTest(t *testing.T, in *envconfig.Config, envArtifact environment.EnvArtifact, verificationTimeout time.Duration) {
 	testLogger := framework.L
 	cldLogger := cldlogger.NewSingleFileLogger(t)
 
@@ -284,7 +285,7 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 	testLogger.Info().Msgf("All prices were found for all feeds")
 }
 
-func executeVaultTest(t *testing.T, in *environment.Config, envArtifact environment.EnvArtifact) {
+func executeVaultTest(t *testing.T, in *envconfig.Config, envArtifact environment.EnvArtifact) {
 	/*
 		BUILD ENVIRONMENT FROM SAVED STATE
 	*/
@@ -477,7 +478,7 @@ func createConfigFile(feedsConsumerAddress common.Address, workflowName, feedID,
 	return outputFileAbsPath, nil
 }
 
-func debugPoRTest(t *testing.T, testLogger zerolog.Logger, in *environment.Config, env *cre.FullCLDEnvironmentOutput, wrappedBlockchainOutputs []*cre.WrappedBlockchainOutput, feedIDs []string) {
+func debugPoRTest(t *testing.T, testLogger zerolog.Logger, in *envconfig.Config, env *cre.FullCLDEnvironmentOutput, wrappedBlockchainOutputs []*cre.WrappedBlockchainOutput, feedIDs []string) {
 	if t.Failed() {
 		counter := 0
 		for idx, feedID := range feedIDs {

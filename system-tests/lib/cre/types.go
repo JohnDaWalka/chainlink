@@ -2,7 +2,6 @@ package cre
 
 import (
 	"fmt"
-	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -76,10 +75,13 @@ var capabilities = []CapabilityFlag{
 	HTTPActionCapability,
 }
 
+// KnownCapabilities returns a copy of all capability flags currently registered in the system.
 func KnownCapabilities() []CapabilityFlag {
 	return slices.Clone(capabilities)
 }
 
+// AddKnownCapabilities registers additional capability flags to the global registry.
+// This is typically called during system initialization to register custom capabilities.
 func AddKnownCapabilities(caps []CapabilityFlag) {
 	capabilities = append(capabilities, caps...)
 }
@@ -486,6 +488,15 @@ type OCRPeeringData struct {
 	Port                 int    `toml:"port" json:"port"`
 }
 
+// ChainCapabilityConfig is a universal, static envelope for per-capability configuration.
+// It supports both simple and complex TOML syntaxes via UnmarshalTOML:
+// - capability = ["1337", "2337"]
+// - capability = { enabled_chains=["1337","2337"], chain_overrides={"1337"={ ... }} }
+type ChainCapabilityConfig struct {
+	EnabledChains  []uint64                  `toml:"-"`
+	ChainOverrides map[uint64]map[string]any `toml:"-"`
+}
+
 // ParseChainCapabilities parses chain_capabilities from raw TOML data and sets it on the CapabilitiesAwareNodeSet.
 // This allows us to handle the flexible chain_capabilities syntax without a complex custom unmarshaler.
 func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
@@ -499,6 +510,21 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 	capMap, ok := c.RawChainCapabilities.(map[string]any)
 	if !ok {
 		return fmt.Errorf("chain_capabilities must be a map")
+	}
+
+	var parseChainID = func(v any) (uint64, error) {
+		switch t := v.(type) {
+		case string:
+			return strconv.ParseUint(strings.TrimSpace(t), 10, 64)
+		case int64:
+			return uint64(t), nil
+		case int:
+			return uint64(t), nil
+		case uint64:
+			return t, nil
+		default:
+			return 0, fmt.Errorf("invalid chain id type: %T", v)
+		}
 	}
 
 	for capName, capValue := range capMap {
@@ -560,86 +586,6 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 	}
 
 	return nil
-}
-
-// ChainCapabilityConfig is a universal, static envelope for per-capability configuration.
-// It supports both simple and complex TOML syntaxes via UnmarshalTOML:
-// - capability = ["1337", "2337"]
-// - capability = { enabled_chains=["1337","2337"], chain_overrides={"1337"={ ... }} }
-type ChainCapabilityConfig struct {
-	EnabledChains  []uint64                  `toml:"-"`
-	ChainOverrides map[uint64]map[string]any `toml:"-"`
-}
-
-func parseChainID(v any) (uint64, error) {
-	switch t := v.(type) {
-	case string:
-		return strconv.ParseUint(strings.TrimSpace(t), 10, 64)
-	case int64:
-		return uint64(t), nil
-	case int:
-		return uint64(t), nil
-	case uint64:
-		return t, nil
-	default:
-		return 0, fmt.Errorf("invalid chain id type: %T", v)
-	}
-}
-
-// ResolveCapabilityForChain merges defaults with chain override for a capability on a given chain.
-// Returns (enabled, mergedConfig).
-func ResolveCapabilityForChain(
-	capName string,
-	caps map[string]*ChainCapabilityConfig,
-	defaults map[string]any,
-	chainID uint64,
-) (bool, map[string]any, error) {
-	if caps == nil {
-		return false, nil, nil
-	}
-	cfg, ok := caps[capName]
-	if !ok {
-		return false, nil, nil
-	}
-	enabled := slices.Contains(cfg.EnabledChains, chainID)
-	if !enabled {
-		return false, nil, nil
-	}
-	merged := map[string]any{}
-	if defaults != nil {
-		// copy defaults
-		maps.Copy(merged, defaults)
-	}
-	if co, ok := cfg.ChainOverrides[chainID]; ok {
-		// override with chain-specific values
-		maps.Copy(merged, co)
-	}
-	return true, merged, nil
-}
-
-// ResolveCapabilityConfigForDON merges global defaults with DON-specific overrides for capabilities
-// that don't have chain-specific configuration (like cron, web-api-target, web-api-trigger).
-// Returns the merged configuration.
-func ResolveCapabilityConfigForDON(
-	capabilityName string,
-	globalDefaults map[string]any,
-	donOverrides map[string]map[string]any,
-) map[string]any {
-	merged := map[string]any{}
-
-	// Start with global defaults
-	if globalDefaults != nil {
-		maps.Copy(merged, globalDefaults)
-	}
-
-	// Apply DON-specific overrides
-	if donOverrides != nil {
-		if overrides, ok := donOverrides[capabilityName]; ok {
-			maps.Copy(merged, overrides)
-		}
-	}
-
-	return merged
 }
 
 type GenerateKeysInput struct {
@@ -920,11 +866,29 @@ func (w *ManageWorkflowWithCRECLIInput) Validate() error {
 	return nil
 }
 
+// InstallableCapability defines the interface for capabilities that can be dynamically
+// registered and deployed across DONs. This interface enables plug-and-play capability
+// extension without modifying core infrastructure code.
 type InstallableCapability interface {
+	// Flag returns the unique identifier used in TOML configurations and internal references
 	Flag() CapabilityFlag
+
+	// Validate performs any precondition checks required before the capability can be installed
 	Validate() error
+
+	// JobSpecFn returns a function that generates job specifications for this capability
+	// based on the provided input configuration and topology
 	JobSpecFn() JobSpecFn
+
+	// OptionalNodeConfigFn returns a function to generate node-level configuration,
+	// or nil if no node-specific config is needed
 	OptionalNodeConfigFn() NodeConfigFn
+
+	// OptionalGatewayHandlerConfigFn returns a function to configure gateway handlers,
+	// or nil if no gateway integration is required
 	OptionalGatewayHandlerConfigFn() GatewayHandlerConfigFn
+
+	// CapabilityRegistryV1ConfigFn returns a function to generate capability registry
+	// configuration for the v1 registry format
 	CapabilityRegistryV1ConfigFn() CapabilityRegistryConfigFn
 }

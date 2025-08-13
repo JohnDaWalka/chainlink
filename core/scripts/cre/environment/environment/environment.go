@@ -38,6 +38,7 @@ import (
 	webapitargetcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitarget"
 	webapitriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitrigger"
 	writeevmcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/tracking"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -267,7 +268,7 @@ func startCmd() *cobra.Command {
 
 			cmdContext := cmd.Context()
 			// Load and validate test configuration
-			in, err := framework.Load[creenv.Config](nil)
+			in, err := framework.Load[envconfig.Config](nil)
 			if err != nil {
 				return errors.Wrap(err, "failed to load test configuration")
 			}
@@ -387,7 +388,7 @@ func startCmd() *cobra.Command {
 // the in-memory CLDF environment without re-provisioning.
 //
 // This makes local iteration and CI reruns faster and deterministic.
-func storeArtifacts(in *creenv.Config) error {
+func storeArtifacts(in *envconfig.Config) error {
 	// hack, because CTF takes the first config file from the list to select the name of the cache file, we need to remove the default capabilities config file (which we added as the first one, so that other configs can override it)
 	ctfConfigs := os.Getenv("CTF_CONFIGS")
 	splitConfigs := strings.Split(ctfConfigs, ",")
@@ -516,7 +517,7 @@ var stopCmd = &cobra.Command{
 
 func StartCLIEnvironment(
 	cmdContext context.Context,
-	in *creenv.Config,
+	in *envconfig.Config,
 	topologyFlag string,
 	workflowTrigger,
 	withPluginsDockerImageFlag string,
@@ -682,7 +683,7 @@ func defaultCtfConfigs(topologyFlag string) error {
 	return nil
 }
 
-func hasBuiltDockerImage(in *creenv.Config, withPluginsDockerImageFlag string) bool {
+func hasBuiltDockerImage(in *envconfig.Config, withPluginsDockerImageFlag string) bool {
 	if withPluginsDockerImageFlag != "" {
 		return false
 	}
@@ -722,7 +723,7 @@ func initDxTracker() {
 	}
 }
 
-func validateWorkflowTriggerAndCapabilities(in *creenv.Config, withExampleFlag bool, workflowTrigger, withPluginsDockerImageFlag string) error {
+func validateWorkflowTriggerAndCapabilities(in *envconfig.Config, withExampleFlag bool, workflowTrigger, withPluginsDockerImageFlag string) error {
 	if withExampleFlag && workflowTrigger == WorkflowTriggerCron {
 		// assume it has cron binary if we are using plugins image
 		if withPluginsDockerImageFlag != "" {

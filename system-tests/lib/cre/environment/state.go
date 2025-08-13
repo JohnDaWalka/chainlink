@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 )
 
 // BuildFromSavedState rebuilds the CLDF environment and per‑chain clients from
@@ -36,7 +37,7 @@ import (
 // Artifact paths are recorded in `artifact_paths.json` in the environment
 // directory (typically `core/scripts/cre/environment`).
 // Returns the reconstructed CLDF environment, wrapped blockchain outputs, and an error.
-func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInput *Config, envArtifact EnvArtifact) (*cre.FullCLDEnvironmentOutput, []*cre.WrappedBlockchainOutput, error) {
+func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInput *envconfig.Config, envArtifact EnvArtifact) (*cre.FullCLDEnvironmentOutput, []*cre.WrappedBlockchainOutput, error) {
 	if pkErr := SetDefaultPrivateKeyIfEmpty(blockchain.DefaultAnvilPrivateKey); pkErr != nil {
 		return nil, nil, pkErr
 	}

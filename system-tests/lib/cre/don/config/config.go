@@ -21,6 +21,7 @@ import (
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
@@ -191,7 +192,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 			}
 
 			if writeEvmConfig, ok := input.CapabilityConfigs[cre.WriteEVMCapability]; ok {
-				enabled, mergedConfig, rErr := cre.ResolveCapabilityForChain(
+				enabled, mergedConfig, rErr := envconfig.ResolveCapabilityForChain(
 					string(cre.WriteEVMCapability),
 					input.NodeSet.ChainCapabilities,
 					writeEvmConfig.Config,
