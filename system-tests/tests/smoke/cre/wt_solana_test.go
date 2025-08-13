@@ -2,6 +2,9 @@ package cre
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -11,9 +14,15 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	sol_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	ocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/report"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -22,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	df_cs "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
+	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_solana "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
@@ -37,9 +47,11 @@ import (
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
 	cremock "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/mock"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
 	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,7 +80,7 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 				Input:              input[0],
 				SupportedSolChains: solChains,
 				Capabilities:       SinglePoRDonCapabilitiesFlagsSolana,
-				DONTypes:           []string{cre.WorkflowDON, cre.GatewayDON},
+				DONTypes:           []string{cre.WorkflowDON, cre.CapabilitiesDON, cre.GatewayDON},
 				BootstrapNodeIndex: 0, // not required, but set to make the configuration explicit
 				GatewayNodeIndex:   0, // not required, but set to make the configuration explicit
 			},
@@ -96,10 +108,31 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 		mustSetCapabilitiesFn,
 		capabilityFactoryFns,
 	)
-	// Log extra information that might help debugging
-	// t.Cleanup(func() {
-	//	debugTest(t, testLogger, setupOutput, in)
-	// })
+
+	kb := make([]ocr2key.KeyBundle, 0)
+	for _, don := range setupOut.DonTopology.DonsWithMetadata {
+		if flags.HasFlag(don.Flags, cre.OCR3Capability) {
+			for i, n := range don.DON.Nodes {
+				if i == 0 {
+					continue
+				}
+				key, err2 := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
+				if err2 != nil {
+					testLogger.Error().Err(err).Msgf("failed to export ocr2 keys for node %d", i)
+					continue
+				}
+
+				b, err2 := json.Marshal(key)
+				require.NoError(t, err2, "failed to marshal ocr2 key")
+				kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
+				require.NoError(t, err3, "could not decrypt OCR2 key json")
+				kb = append(kb, kk)
+			}
+		}
+
+	}
+
+	fmt.Println("ocr2 keys", kb)
 
 	mocksClient := mock_capability.NewMockCapabilityController(testLogger)
 	mockClientsAddress := make([]string, 0)
@@ -125,40 +158,282 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 	fmt.Println("forwarder address", setupOut.ForwarderAddress, "forwarder state", setupOut.ForwarderState)
 	fmt.Println("cache address", setupOut.CacheAddress, "cache state", setupOut.CacheState)
 
-	//err = mocksClient.Execute(context.TODO(), &pb.ExecutableRequest{})
+	writer := newWriter(mocksClient, kb, setupOut)
+
+	err = writer.Call()
+	require.NoError(t, err, "failed to call write solana")
+}
+
+type writer struct {
+	mocksClient *mock_capability.Controller
+
+	wfID    string //
+	wfOwner string
+	wfName  string
+
+	seqNr    uint64
+	feedID   string
+	reportID uint8
+
+	cacheState   string
+	cacheAddress string
+
+	writeCapability           string
+	deriveRemainingCapability string
+
+	keys []ocr2key.KeyBundle
+}
+
+func newWriter(mclient *mock_capability.Controller, keys []ocr2key.KeyBundle, setup *setupWTOutput) *writer {
+	return &writer{
+		mocksClient: mclient,
+		keys:        keys,
+		wfOwner:     setup.WFOwner,
+		wfName:      setup.WFName,
+		wfID:        "5dbe5f217ff07d6b1dddb43519fe7bf13ccb10b540578fafdbea86b508abbd71",
+
+		seqNr:    1,
+		feedID:   setup.FeedID,
+		reportID: 1,
+
+		cacheState:   setup.CacheState,
+		cacheAddress: setup.CacheAddress,
+
+		writeCapability:           setup.WriteCap,
+		deriveRemainingCapability: setup.DeriveRemaining,
+	}
+}
+
+func (w *writer) Call() error {
+	remainings, err := w.getRemainings()
+	if err != nil {
+		return fmt.Errorf("failed to get remaining accounts: %w", err)
+	}
+
+	metadata, err := w.createWorkflowMetadata()
+	if err != nil {
+		return fmt.Errorf("failed to create workflow metadata: %w", err)
+	}
+
+	repCtx := report.GenerateReportContext(w.seqNr, [32]byte{1})
+
+	encodedReport, err := w.createEncodedReport(metadata, remainings)
+	if err != nil {
+		return fmt.Errorf("failed to create encoded report: %w", err)
+	}
+
+	sigs, err := w.generateSignatures(encodedReport, repCtx)
+	if err != nil {
+		return fmt.Errorf("failed to generate signatures: %w", err)
+	}
+
+	err = w.executeRequest(remainings, metadata, repCtx, encodedReport, sigs)
+	if err != nil {
+		return fmt.Errorf("failed to execute write capability: %w", err)
+	}
+
+	return nil
+}
+
+func (w *writer) executeRequest(remainings solana.AccountMetaSlice, metadata *pb.Metadata, repCtx []byte, encReport []byte, sigs [][]byte) error {
+	config, input, err := w.createRequestInputs(remainings, repCtx, encReport, sigs)
+	if err != nil {
+		return err
+	}
+
+	req := &pb.ExecutableRequest{
+		ID:              w.writeCapability,
+		CapabilityType:  4,
+		RequestMetadata: metadata,
+		Config:          config,
+		Inputs:          input,
+	}
+
+	return w.mocksClient.Execute(context.TODO(), req)
+}
+
+func (w *writer) createRequestInputs(remainings solana.AccountMetaSlice, repCtx []byte, encReport []byte, sigs [][]byte) ([]byte, []byte, error) {
+	inputs, err := values.NewMap(map[string]any{
+		"signed_report": map[string]any{
+			"report":     append(encReport, repCtx...),
+			"signatures": sigs,
+			"context":    repCtx,
+			"id":         [2]byte{0, w.reportID},
+		},
+		"remaining_accounts": remainings,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	retInputs, err := mock_capability.MapToBytes(inputs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	config, err := values.NewMap(map[string]any{
+		"Address": w.cacheAddress,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	retConfig, err := mock_capability.MapToBytes(config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return retConfig, retInputs, nil
+}
+
+func (w *writer) generateSignatures(report []byte, reportCtx []byte) ([][]byte, error) {
+	var ret [][]byte
+	sigData := append(report, reportCtx...)
+	for _, k := range w.keys {
+		hashed := sha256.Sum256(sigData)
+		sig, err := k.SignBlob(hashed[:])
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, sig)
+	}
+
+	return ret, nil
+}
+
+type decimalReport struct {
+	DataID    [16]byte
+	Timestamp uint32
+	Answer    uint128
+}
+
+type uint128 struct {
+	Lo uint64
+	Hi uint64
+}
+
+func (w *writer) getRemainings() (solana.AccountMetaSlice, error) {
 	val, err := values.WrapMap(struct {
 		State    string // State pubkey of df cache
 		Receiver string // df cache programID
 		FeedIDs  []string
 	}{
-		setupOut.CacheState,
-		setupOut.CacheAddress,
-		[]string{in.WorkflowConfigs[0].FeedID},
+		w.cacheState,
+		w.cacheAddress,
+		[]string{w.feedID},
 	})
-	require.NoError(t, err, "failed to wrap value")
+	if err != nil {
+		return nil, err
+	}
 	cfg, err := mockcapability.MapToBytes(val)
-	require.NoError(t, err, "failed map to bytes config")
-	ret, err := mocksClient.Nodes[1].API.Execute(context.TODO(), &pb.ExecutableRequest{
-		ID:             setupOut.DeriveRemaining,
+	if err != nil {
+		return nil, err
+	}
+
+	// get remaining accounts
+	ret, err := w.mocksClient.Nodes[1].API.Execute(context.TODO(), &pb.ExecutableRequest{
+		ID:             w.deriveRemainingCapability,
 		CapabilityType: 4,
 		Config:         cfg,
 		Inputs:         []byte{},
 		RequestMetadata: &pb.Metadata{
-			WorkflowOwner: setupOut.WFOwner,
-			WorkflowName:  setupOut.WFName,
+			WorkflowOwner: w.wfOwner,
+			WorkflowName:  w.wfName,
 		},
 	})
-
-	require.NoError(t, err, "execute capability failed")
+	if err != nil {
+		return nil, err
+	}
 	val, err = mockcapability.BytesToMap(ret.Value)
-	require.NoError(t, err, "unmarshal response failed")
+	if err != nil {
+		return nil, err
+	}
 
-	var res solana.AccountMetaSlice
+	var remainings solana.AccountMetaSlice
 
-	err = val.Underlying["remaining_accounts"].UnwrapTo(&res)
-	require.NoError(t, err, "unwrap response failed")
+	err = val.Underlying["remaining_accounts"].UnwrapTo(&remainings)
+	if err != nil {
+		return nil, err
+	}
 
-	require.Len(t, res, 3)
+	return remainings, nil
+}
+
+func (w *writer) createEncodedReport(m *pb.Metadata, remainings solana.AccountMetaSlice) ([]byte, error) {
+	ts := uint32(time.Now().Unix()) //nolint:gosec // disable G115
+
+	var reports []decimalReport
+
+	dataID, _ := new(big.Int).SetString(w.feedID, 0)
+	var data [16]byte
+	copy(data[:], dataID.Bytes())
+
+	reports = append(reports, decimalReport{
+		DataID:    data,
+		Timestamp: ts,
+		Answer:    uint128{10, 10},
+	})
+
+	payload, err := sol_binary.MarshalBorsh(reports)
+	if err != nil {
+		return nil, err
+	}
+	meta := ocr3types.Metadata{
+		Version:          1,
+		ExecutionID:      m.WorkflowExecutionID,
+		Timestamp:        ts,
+		DONID:            1,
+		DONConfigVersion: 1,
+		WorkflowID:       m.WorkflowID,
+		WorkflowName:     m.WorkflowName,
+		WorkflowOwner:    m.WorkflowOwner,
+		ReportID:         fmt.Sprintf("%04x", w.reportID),
+	}
+
+	encMeta, err := meta.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	var buff []byte
+	for _, acc := range remainings {
+		buff = append(buff, acc.PublicKey.Bytes()...)
+	}
+
+	accsHash := sha256.Sum256(buff)
+	ret := append(encMeta, accsHash[:]...)
+
+	// encoded raw_report is META|CTX_HASH|Payload|ctx
+	return append(ret, payload...), nil
+}
+
+func (w *writer) createWorkflowMetadata() (*pb.Metadata, error) {
+	executionID, err := workflows.EncodeExecutionID("someID", uuid.NewString())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.Metadata{
+		WorkflowID:    w.wfID,
+		WorkflowOwner: w.wfOwner,
+
+		WorkflowName:        convertToHashedWorkflowName(w.wfName),
+		WorkflowExecutionID: executionID,
+
+		WorkflowDonID:            1,
+		WorkflowDonConfigVersion: 1,
+		DecodedWorkflowName:      w.wfName,
+	}, nil
+}
+
+func convertToHashedWorkflowName(input string) string {
+	// Create SHA256 hash
+	hash := sha256.New()
+	hash.Write([]byte(input))
+
+	// Get the hex string of the hash
+	hashHex := hex.EncodeToString(hash.Sum(nil))
+
+	return hex.EncodeToString([]byte(hashHex[:10]))
 }
 
 type setupWTOutput struct {
@@ -172,9 +447,10 @@ type setupWTOutput struct {
 	CacheAddress string
 	CacheState   string
 
-	WFName  string
-	WFOwner string
-	FeedID  string
+	WFName      string
+	WFOwner     string
+	FeedID      string
+	DonTopology *cre.DonTopology
 }
 
 func setupWTTestEnvironment(
@@ -240,11 +516,14 @@ func setupWTTestEnvironment(
 		}
 	}
 	out := &setupWTOutput{}
+	out.DonTopology = universalSetupOutput.DonTopology
 	wfName := [][10]uint8{{1, 2, 3}}
 	wfDescription := [][32]uint8{{2, 3, 4}}
-	wfOwner := [20]uint8{1}
+	wfOwner := [20]byte{222, 173, 190}
+
 	out.WFName = string(wfName[0][:])
-	out.WFOwner = string(wfOwner[:])
+	out.WFOwner = hex.EncodeToString(wfOwner[:])
+	out.FeedID = in.WorkflowConfigs[0].FeedID
 	for _, bo := range universalSetupOutput.BlockchainOutput {
 		if bo.ReadOnly {
 			continue

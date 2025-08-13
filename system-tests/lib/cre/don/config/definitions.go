@@ -185,7 +185,6 @@ func WorkerSolana(chains []*WorkerSolanaInput) string {
 		ForwarderAddress = '%s'
 		FromAddress      = '%s'
 		ForwarderState   = '%s'
-		OraclesConfigPDA = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
 		LookupTable      = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
 		PollPeriod = '1s'
 		AcceptanceTimeout = '1s'
