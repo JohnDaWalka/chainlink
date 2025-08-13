@@ -294,6 +294,26 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 				panic("unhandled default case")
 			}
 			e.Logger.Debugf("MCMS Configured for token pool %v with token address %v", testCase.poolType, tokenAddress)
+
+			// Test modifying init global config PDA
+			if testCase.poolType == shared.BurnMintTokenPool || testCase.poolType == shared.LockReleaseTokenPool {
+				timelockSignerPDA, err := ccipChangesetSolana.FetchTimelockSigner(e, solChain)
+				require.NoError(t, err)
+				e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{commonchangeset.Configure(
+					cldf.CreateLegacyChangeSet(ccipChangesetSolana.EnableSelfServedInTokenPoolProgram),
+					ccipChangesetSolana.TokenPoolConfigWithMCM{
+						ChainSelector: solChain,
+						TokenPubKey:   tokenAddress,
+						PoolType:      testCase.poolType,
+						MCMS:          mcmsConfig,
+						Metadata:      tokenMetadata,
+						UpgradeConfig: ccipChangesetSolana.UpgradeConfig{
+							UpgradeAuthority: timelockSignerPDA,
+						},
+					},
+				)})
+				require.NoError(t, err)
+			}
 		}
 
 		e, _, err = commonchangeset.ApplyChangesets(t, e, []commonchangeset.ConfiguredChangeSet{
@@ -483,7 +503,7 @@ func doTestTokenPool(t *testing.T, e cldf.Environment, config TokenPoolTestConfi
 					panic("unhandled default case")
 				}
 				e.Logger.Debugf("MCMS Configured for token pool %v with token address %v", testCase.poolType, tokenAddress)
-				transferKeys := []solana.PublicKey{}
+				var transferKeys []solana.PublicKey
 				switch testCase.poolType {
 				case shared.BurnMintTokenPool:
 					transferKeys = append(transferKeys, state.SolChains[solChain].BurnMintTokenPools[tokenMetadata])
