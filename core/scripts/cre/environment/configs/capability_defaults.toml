@@ -96,8 +96,8 @@
   # FromAddress = "0x0000000000000000000000000000000000000000"
   # ForwarderAddress = "0x0000000000000000000000000000000000000000"
 
-#[capability_configs.mock]
+[capability_configs.mock]
   binary_path = "./binaries/mock"
 
-#[capability_configs.mock.config]
-#  Port = 8080  # Port for mock service
+[capability_configs.mock.config]
+  Port = 7777  # Default port for mock service
