@@ -13,6 +13,7 @@ var HandlerConfigFn = func(donMetadata []*cre.DonMetadata) (cre.HandlerTypeToCon
 	}
 
 	return map[string]string{coregateway.VaultHandlerType: `
+ServiceName = "vault"
 [gatewayConfig.Dons.Handlers.Config]
 requestTimeoutSec = 30
 [gatewayConfig.Dons.Handlers.Config.NodeRateLimiter]

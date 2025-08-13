@@ -14,6 +14,7 @@ var HandlerConfigFn = func(donMetadata []*cre.DonMetadata) (cre.HandlerTypeToCon
 	}
 
 	return map[string]string{coregateway.HTTPCapabilityType: `
+ServiceName = "workflows"
 [gatewayConfig.Dons.Handlers.Config]
 maxTriggerRequestDurationMs = 5_000
 [gatewayConfig.Dons.Handlers.Config.NodeRateLimiter]
