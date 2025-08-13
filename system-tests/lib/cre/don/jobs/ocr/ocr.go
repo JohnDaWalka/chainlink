@@ -126,8 +126,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 		chainIDs := enabledChainsFn(donTopology, nodeSetInput[donIdx], flag)
 
 		for _, chainIDUint64 := range chainIDs {
-			chainID := int(chainIDUint64)
-			chainIDStr := strconv.Itoa(chainID)
+			chainIDStr := strconv.FormatUint(chainIDUint64, 10)
 			chain, ok := chainsel.ChainByEvmChainID(chainIDUint64)
 			if !ok {
 				return nil, fmt.Errorf("failed to get chain selector for chain ID %d", chainIDUint64)
@@ -168,7 +167,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				if nodeAddressErr != nil {
 					return nil, errors.Wrap(nodeAddressErr, "failed to get node address from labels")
 				}
-				logger.Debug().Msgf("Deployed node on chain %d/%d at %s", chainID, chain.Selector, nodeAddress)
+				logger.Debug().Msgf("Deployed node on chain %d/%d at %s", chainIDUint64, chain.Selector, nodeAddress)
 
 				bootstrapNodeP2pKeyID, pErr := node.FindLabelValue(bootstrapNode, node.NodeP2PIDKey)
 				if pErr != nil {
@@ -206,7 +205,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				}
 				oracleStr := strings.ReplaceAll(oracleBuffer.String(), "\n", "\n\t")
 
-				logger.Debug().Msgf("Creating %s Capability job spec for chainID: %d, selector: %d, DON:%q, node:%q", flag, chainID, chain.Selector, donWithMetadata.Name, nodeID)
+				logger.Debug().Msgf("Creating %s Capability job spec for chainID: %d, selector: %d, DON:%q, node:%q", flag, chainIDUint64, chain.Selector, donWithMetadata.Name, nodeID)
 
 				jobConfig, cErr := jobConfigGenFn(logger, chainIDUint64, nodeAddress, mergedConfig)
 				if cErr != nil {
@@ -214,8 +213,8 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				}
 
 				jobName := contractName
-				if chainID != 0 {
-					jobName = jobName + "-" + strconv.Itoa(chainID)
+				if chainIDUint64 != 0 {
+					jobName = jobName + "-" + strconv.FormatUint(chainIDUint64, 10)
 				}
 
 				jobSpec := jobs.WorkerStandardCapability(nodeID, jobName, binaryPath, jobConfig, oracleStr)

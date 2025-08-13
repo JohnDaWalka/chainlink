@@ -125,7 +125,10 @@ var V2JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
 
 		// Apply runtime fallbacks only for keys not specified by user
-		templateData := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		templateData, aErr := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		if aErr != nil {
+			return "", errors.Wrap(aErr, "failed to apply runtime values")
+		}
 
 		// Parse and execute template
 		tmpl, err := template.New("consensusConfig").Parse(consensusConfigTemplate)

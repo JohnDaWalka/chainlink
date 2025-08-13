@@ -17,15 +17,18 @@ const (
 )
 
 // ApplyRuntimeValues fills in any missing config values with runtime-generated values
-func ApplyRuntimeValues(userConfig map[string]any, runtimeValues map[string]any) map[string]any {
+func ApplyRuntimeValues(userConfig map[string]any, runtimeValues map[string]any) (map[string]any, error) {
 	result := make(map[string]any)
 	maps.Copy(result, userConfig)
 
 	// Merge runtime fallbacks without overriding existing user values
 	// By default, mergo.Merge won't override existing keys (no WithOverride flag)
-	mergo.Merge(&result, runtimeValues)
+	err := mergo.Merge(&result, runtimeValues)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to merge runtime values")
+	}
 
-	return result
+	return result, nil
 }
 
 // ValidateTemplateSubstitution checks that all template variables have been properly substituted

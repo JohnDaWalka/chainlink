@@ -6,8 +6,8 @@ import (
 	"text/template"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 )

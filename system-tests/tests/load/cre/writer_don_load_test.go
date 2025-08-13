@@ -45,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	writeevmregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/writeevm"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
@@ -198,7 +197,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 		return donTojobSpecs, nil
 	}
 
-	WriterDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
+	WriterDONLoadTestCapabilitiesFactoryFn := func(donFlags []string, _ *cretypes.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		if flags.HasFlag(donFlags, cretypes.MockCapability) {

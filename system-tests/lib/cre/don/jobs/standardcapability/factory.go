@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	creregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
@@ -88,7 +89,7 @@ func NewChainSpecificCapabilityJobSpecFactory(
 		runtimeValuesExtractor: runtimeValuesExtractor,
 		commandBuilder:         commandBuilder,
 		enabledFn:              enabledForChainsFn,
-		enabledChainsFn:        enabledChainIdsFn,
+		enabledChainsFn:        enabledChainIDsFn,
 		configResolverFn:       perChainConfigResolverFn,
 		jobNameFn: func(chainID uint64, flag cre.CapabilityFlag) string {
 			return fmt.Sprintf("%s-%d", flag, chainID)
@@ -134,9 +135,9 @@ var enabledForDonFn = func(donWithMetadata *cre.DonWithMetadata, nodeSet *cre.Ca
 	return flags.HasFlag(donWithMetadata.Flags, flag)
 }
 
-// enabledChainIdsFn returns the list of chain IDs that a chain-specific capability
+// enabledChainIDsFn returns the list of chain IDs that a chain-specific capability
 // should be deployed to, as configured in the TOML chain_capabilities section.
-var enabledChainIdsFn = func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
+var enabledChainIDsFn = func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
 	chainCapConfig, ok := nodeSetInput.ChainCapabilities[flag]
 	if !ok || chainCapConfig == nil {
 		return []uint64{}
@@ -234,10 +235,13 @@ func (f *CapabilityJobSpecFactory) GenerateJobSpecs(input *cre.JobSpecInput) (cr
 				}
 
 				// Apply runtime values to merged config using the runtime value builder
-				templateData := don.ApplyRuntimeValues(mergedConfig, f.runtimeValuesExtractor(chainIDUint64, workerNode))
+				templateData, aErr := don.ApplyRuntimeValues(mergedConfig, f.runtimeValuesExtractor(chainIDUint64, workerNode))
+				if aErr != nil {
+					return nil, errors.Wrap(aErr, "failed to apply runtime values")
+				}
 
 				// Parse and execute template
-				tmpl, tmplErr := template.New(string(f.capabilityFlag) + "-config").Parse(f.configTemplate)
+				tmpl, tmplErr := template.New(f.capabilityFlag + "-config").Parse(f.configTemplate)
 				if tmplErr != nil {
 					return nil, errors.Wrapf(tmplErr, "failed to parse %s config template", f.capabilityFlag)
 				}

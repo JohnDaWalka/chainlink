@@ -27,7 +27,7 @@ func BuildTopology(
 	blockchainOutput map[uint64]*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	capabilities []cre.InstallableCapability,
-	CapabilityConfigs cre.CapabilityConfigs,
+	capabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
 	topologyErr := libdon.ValidateTopology(nodeSets, infraInput)
@@ -121,7 +121,7 @@ func BuildTopology(
 					HomeChainSelector:       topology.HomeChainSelector,
 					GatewayConnectorOutput:  topology.GatewayConnectorOutput,
 					NodeSet:                 localNodeSets[i],
-					CapabilityConfigs:       CapabilityConfigs,
+					CapabilityConfigs:       capabilityConfigs,
 				},
 				configFactoryFunctions,
 			)
@@ -166,7 +166,7 @@ func BuildTopology(
 		}
 
 		customBinariesPaths := make(map[cre.CapabilityFlag]string)
-		for flag, config := range CapabilityConfigs {
+		for flag, config := range capabilityConfigs {
 			if creflags.HasFlagForAnyChain(donMetadata.Flags, flag) && config.BinaryPath != "" {
 				customBinariesPaths[flag] = config.BinaryPath
 			}

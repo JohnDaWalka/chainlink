@@ -65,7 +65,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 		// Determine write-evm enablement per chain via node-set ChainCapabilities
 		hasWriteEVM := false
 		if input.NodeSet != nil && input.NodeSet.ChainCapabilities != nil {
-			if cc, ok := input.NodeSet.ChainCapabilities[string(cre.WriteEVMCapability)]; ok && cc != nil {
+			if cc, ok := input.NodeSet.ChainCapabilities[cre.WriteEVMCapability]; ok && cc != nil {
 				if slices.Contains(cc.EnabledChains, bcOut.ChainID) {
 					hasWriteEVM = true
 				}
@@ -193,7 +193,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 
 			if writeEvmConfig, ok := input.CapabilityConfigs[cre.WriteEVMCapability]; ok {
 				enabled, mergedConfig, rErr := envconfig.ResolveCapabilityForChain(
-					string(cre.WriteEVMCapability),
+					cre.WriteEVMCapability,
 					input.NodeSet.ChainCapabilities,
 					writeEvmConfig.Config,
 					wi.ChainID,
@@ -212,7 +212,11 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 					"ForwarderAddress": wi.ForwarderAddress,
 				}
 
-				wi.WorkflowConfig = don.ApplyRuntimeValues(mergedConfig, runtimeValues)
+				var mErr error
+				wi.WorkflowConfig, mErr = don.ApplyRuntimeValues(mergedConfig, runtimeValues)
+				if mErr != nil {
+					return nil, errors.Wrap(mErr, "failed to apply runtime values")
+				}
 			}
 		}
 

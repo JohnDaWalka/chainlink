@@ -6,12 +6,12 @@ import (
 	"html/template"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
-	"github.com/pkg/errors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -56,7 +56,10 @@ var JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", creForwarderAddress.Address, nodeAddress)
 
 		// Apply runtime fallbacks only for keys not specified by user
-		templateData := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		templateData, aErr := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		if aErr != nil {
+			return "", errors.Wrap(aErr, "failed to apply runtime values")
+		}
 
 		// Parse and execute template
 		tmpl, err := template.New("evmConfig").Parse(evmConfigTemplate)

@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
@@ -509,7 +510,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 
 	capMap, ok := c.RawChainCapabilities.(map[string]any)
 	if !ok {
-		return fmt.Errorf("chain_capabilities must be a map")
+		return fmt.Errorf("chain_capabilities must be a map, but got %T", c.RawChainCapabilities)
 	}
 
 	var parseChainID = func(v any) (uint64, error) {
@@ -517,13 +518,13 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 		case string:
 			return strconv.ParseUint(strings.TrimSpace(t), 10, 64)
 		case int64:
-			return uint64(t), nil
+			return libc.MustSafeUint64(t), nil
 		case int:
-			return uint64(t), nil
+			return libc.MustSafeUint64FromInt(t), nil
 		case uint64:
 			return t, nil
 		default:
-			return 0, fmt.Errorf("invalid chain id type: %T", v)
+			return 0, fmt.Errorf("invalid chain id type: %T. Supported types are string, int64, int, uint64", v)
 		}
 	}
 
@@ -537,10 +538,10 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 			for _, chainIDVal := range v {
 				chainID, err := parseChainID(chainIDVal)
 				if err != nil {
-					return fmt.Errorf("invalid chain ID in %s: %v", capName, err)
+					return errors.Wrapf(err, "invalid chain ID in %s", capName)
 				}
 				config.EnabledChains = append(config.EnabledChains, chainID)
-				computedCapabilities = append(computedCapabilities, capName+"-"+fmt.Sprint(chainID))
+				computedCapabilities = append(computedCapabilities, capName+"-"+strconv.FormatUint(chainID, 10))
 			}
 		case map[string]any:
 			// Handle map syntax: capability = { enabled_chains = [...], chain_overrides = {...} }
@@ -552,29 +553,29 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 				for _, chainIDVal := range enabledChains {
 					chainID, err := parseChainID(chainIDVal)
 					if err != nil {
-						return fmt.Errorf("invalid chain ID in %s.enabled_chains: %v", capName, err)
+						return errors.Wrapf(err, "invalid chain ID in %s.enabled_chains", capName)
 					}
 					config.EnabledChains = append(config.EnabledChains, chainID)
-					computedCapabilities = append(computedCapabilities, capName+"-"+fmt.Sprint(chainID))
+					computedCapabilities = append(computedCapabilities, capName+"-"+strconv.FormatUint(chainID, 10))
 				}
 			}
 
 			if chainOverridesVal, ok := v["chain_overrides"]; ok {
 				chainOverrides, ok := chainOverridesVal.(map[string]any)
 				if !ok {
-					return fmt.Errorf("chain_overrides must be a map in %s", capName)
+					return errors.Errorf("chain_overrides must be a map in %s", capName)
 				}
 				config.ChainOverrides = make(map[uint64]map[string]any)
 				for chainIDStr, overrides := range chainOverrides {
 					chainID, err := strconv.ParseUint(chainIDStr, 10, 64)
 					if err != nil {
-						return fmt.Errorf("invalid chain ID key %s in %s.chain_overrides: %v", chainIDStr, capName, err)
+						return errors.Wrapf(err, "invalid chain ID key %s in %s.chain_overrides", chainIDStr, capName)
 					}
-					if overridesMap, ok := overrides.(map[string]any); ok {
-						config.ChainOverrides[chainID] = overridesMap
-					} else {
-						return fmt.Errorf("chain override for %d in %s must be a map", chainID, capName)
+
+					if _, ok := overrides.(map[string]any); !ok {
+						return errors.Errorf("chain override for %d in %s must be a map", chainID, capName)
 					}
+					config.ChainOverrides[chainID] = overrides.(map[string]any)
 				}
 			}
 		default:

@@ -82,11 +82,11 @@ type SetupInput struct {
 	CopyCapabilityBinaries    bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
 	Capabilities              []cre.InstallableCapability
 
-	// Deprecated, use Capabilities instead
+	// Deprecated: use Capabilities []cre.InstallableCapability instead
 	ConfigFactoryFunctions []cre.NodeConfigFn
-	// Deprecated, use Capabilities instead
+	// Deprecated: use Capabilities []cre.InstallableCapability instead
 	JobSpecFactoryFunctions []cre.JobSpecFn
-	// Deprecated, use Capabilities instead
+	// Deprecated: use Capabilities []cre.InstallableCapability instead
 	CapabilitiesContractFactoryFunctions []cre.CapabilityRegistryConfigFn
 }
 
