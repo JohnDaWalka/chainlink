@@ -239,7 +239,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 						// is_enabled:true is_rmn_verification_disabled:true min_seq_nr:1 on_ramp
 						//     "msg": "MARSHAL BYTES: map[is_enabled:true is_rmn_verification_disabled:true min_seq_nr:1 on_ramp:[78 210 119 77 36 141 82 28 29 50 193 87 62 211 250 142 0 43 137 36] router:[71 145 97 186 101 79 170 178 238 182 160 140 157 245 196 235 206 177 221 167 225 231 209 122 247 22 52 218 63 101 87 77]]",
-						ResultTupleToStruct: []string{"source_chain_config"},
+						// ResultTupleToStruct: []string{"source_chain_config"},
 					},
 					// consts.MethodNameGetExecutionState:{
 					// 	"Name": "get_execution_state",
