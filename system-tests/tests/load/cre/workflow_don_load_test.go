@@ -59,6 +59,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
@@ -75,15 +76,15 @@ type Chaos struct {
 }
 
 type TestConfigLoadTest struct {
-	Duration                      string                             `toml:"duration"`
-	Blockchains                   []*cretypes.WrappedBlockchainInput `toml:"blockchains" validate:"required"`
-	NodeSets                      []*ns.Input                        `toml:"nodesets" validate:"required"`
-	JD                            *jd.Input                          `toml:"jd" validate:"required"`
-	WorkflowRegistryConfiguration *cretypes.WorkflowRegistryInput    `toml:"workflow_registry_configuration"`
-	Infra                         *infra.Input                       `toml:"infra" validate:"required"`
-	WorkflowDONLoad               *WorkflowLoad                      `toml:"workflow_load"`
-	MockCapabilities              []*MockCapabilities                `toml:"mock_capabilities"`
-	Chaos                         *Chaos                             `toml:"chaos"`
+	Duration                      string                          `toml:"duration"`
+	Blockchains                   []blockchain.Input              `toml:"blockchains" validate:"required"`
+	NodeSets                      []*ns.Input                     `toml:"nodesets" validate:"required"`
+	JD                            *jd.Input                       `toml:"jd" validate:"required"`
+	WorkflowRegistryConfiguration *cretypes.WorkflowRegistryInput `toml:"workflow_registry_configuration"`
+	Infra                         *infra.Input                    `toml:"infra" validate:"required"`
+	WorkflowDONLoad               *WorkflowLoad                   `toml:"workflow_load"`
+	MockCapabilities              []*MockCapabilities             `toml:"mock_capabilities"`
+	Chaos                         *Chaos                          `toml:"chaos"`
 }
 
 type MockCapabilities struct {

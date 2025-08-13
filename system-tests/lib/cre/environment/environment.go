@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
@@ -70,7 +72,7 @@ type SetupOutput struct {
 
 type SetupInput struct {
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
-	BlockchainsInput          []*cre.WrappedBlockchainInput
+	BlockchainsInput          []blockchain.Input
 	JdInput                   jd.Input
 	InfraInput                infra.Input
 	OCR3Config                *keystone_changeset.OracleConfig
@@ -206,10 +208,14 @@ func SetupTestEnvironment(
 
 	forwardersSelectors := make([]uint64, 0)
 	for _, bcOut := range blockchainOutputs {
-		if bcOut.ReadOnly {
+		if slices.Contains(forwardersSelectors, bcOut.ChainSelector) {
 			continue
 		}
-		forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
+		for _, donMetadata := range input.CapabilitiesAwareNodeSets {
+			if flags.RequiresForwarderContract(donMetadata.ComputedCapabilities, bcOut.ChainID) {
+				forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
+			}
+		}
 	}
 
 	var allNodeFlags []string
@@ -384,6 +390,10 @@ func SetupTestEnvironment(
 	// append the nodeset output, so that later it can be stored in the cached output, so that we can use the environment again without running setup
 	for idx, nsOut := range nodeSetOutput {
 		input.CapabilitiesAwareNodeSets[idx].Out = nsOut.Output
+	}
+
+	for idx, bcOut := range blockchainOutputs {
+		input.BlockchainsInput[idx].Out = bcOut.BlockchainOutput
 	}
 
 	// append the jd output, so that later it can be stored in the cached output, so that we can use the environment again without running setup

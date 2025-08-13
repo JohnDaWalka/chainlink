@@ -48,6 +48,7 @@ import (
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	credebug "github.com/smartcontractkit/chainlink/system-tests/lib/cre/debug"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	creworkflow "github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 
@@ -114,8 +115,10 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 	homeChainSelector := wrappedBlockchainOutputs[0].ChainSelector
 	numberOfWriteableChains := 0
 	for _, bcOutput := range wrappedBlockchainOutputs {
-		if !bcOutput.ReadOnly {
-			numberOfWriteableChains++
+		for _, donMetadata := range fullCldEnvOutput.DonTopology.DonsWithMetadata {
+			if flags.RequiresForwarderContract(donMetadata.Flags, bcOutput.ChainID) {
+				numberOfWriteableChains++
+			}
 		}
 	}
 	require.Len(t, feedIDs, numberOfWriteableChains, "number of writeable chains must match number of feed IDs (look for read-only chains in the environment)")
@@ -127,7 +130,17 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 		REGISTER ONE WORKFLOW PER CHAIN (except read-only ones)
 	*/
 	for idx, bcOutput := range wrappedBlockchainOutputs {
-		if bcOutput.ReadOnly {
+		// deploy data feeds cache contract only on chains that require a forwarder contract. It's required for the PoR workflow to work and we treat it as a proxy
+		// for deciding whether need to deploy the data feeds cache contract.
+		hasForwarderContract := false
+		for _, donMetadata := range fullCldEnvOutput.DonTopology.DonsWithMetadata {
+			if flags.RequiresForwarderContract(donMetadata.Flags, bcOutput.ChainID) {
+				hasForwarderContract = true
+				break
+			}
+		}
+
+		if !hasForwarderContract {
 			continue
 		}
 

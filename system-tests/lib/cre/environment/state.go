@@ -44,10 +44,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 	wrappedBlockchainOutputs := make([]*cre.WrappedBlockchainOutput, 0)
 
 	for _, bc := range cachedInput.Blockchains {
-		if bc.ReadOnly {
-			continue
-		}
-
 		sethClient, sethErr := seth.NewClientBuilder().
 			WithRpcUrl(bc.Out.Nodes[0].ExternalWSUrl).
 			WithPrivateKeys([]string{os.Getenv("PRIVATE_KEY")}).
@@ -74,7 +70,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			ChainSelector:      chainSelector,
 			ChainID:            chainID,
 			DeployerPrivateKey: sethClient.Cfg.Network.PrivateKeys[0],
-			ReadOnly:           bc.ReadOnly,
 		})
 	}
 

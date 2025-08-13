@@ -206,18 +206,12 @@ type WrappedNodeOutput struct {
 	Capabilities []string
 }
 
-type WrappedBlockchainInput struct {
-	blockchain.Input
-	ReadOnly bool `toml:"read_only"`
-}
-
 type WrappedBlockchainOutput struct {
 	ChainSelector      uint64
 	ChainID            uint64
 	BlockchainOutput   *blockchain.Output
 	SethClient         *seth.Client
 	DeployerPrivateKey string
-	ReadOnly           bool
 }
 
 type CreateJobsInput struct {

@@ -2,6 +2,7 @@ package flags
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -17,24 +18,8 @@ func HasOnlyOneFlag(values []string, flag string) bool {
 	return slices.Contains(values, flag) && len(values) == 1
 }
 
-// HasFlagForChain checks if a capability is enabled for a specific chain on a nodeset.
-// Returns true if the capability is listed in global Capabilities, or if it's enabled
-// in ChainCapabilities for the given chain ID.
-func HasFlagForChain(nodeSet *cre.CapabilitiesAwareNodeSet, capability string, chainID uint64) bool {
-	if nodeSet == nil {
-		return false
-	}
-	if HasFlag(nodeSet.ComputedCapabilities, capability) {
-		return true
-	}
-	if nodeSet.ChainCapabilities == nil {
-		return false
-	}
-	cfg, ok := nodeSet.ChainCapabilities[capability]
-	if !ok || cfg == nil {
-		return false
-	}
-	return slices.Contains(cfg.EnabledChains, chainID)
+func HasFlagForChain(values []string, capability string, chainID uint64) bool {
+	return slices.Contains(values, capability+"-"+strconv.FormatUint(chainID, 10))
 }
 
 func HasFlagForAnyChain(values []string, capability string) bool {
@@ -49,6 +34,10 @@ func HasFlagForAnyChain(values []string, capability string) bool {
 	}
 
 	return false
+}
+
+func RequiresForwarderContract(values []string, chainID uint64) bool {
+	return HasFlagForChain(values, cre.EVMCapability, chainID) || HasFlagForChain(values, cre.WriteEVMCapability, chainID)
 }
 
 func DonMetadataWithFlag(donTopologies []*cre.DonMetadata, flag string) []*cre.DonMetadata {
