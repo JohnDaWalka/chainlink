@@ -48,6 +48,8 @@ port = 7891
    [nodesets.chain_capabilities]
     write-evm = ["1337"]
 
+  # See ./examples/workflow-don-overrides.toml to learn how to override capability configs
+
     [nodesets.db]
     image = "postgres:12.0"
     port = 13000

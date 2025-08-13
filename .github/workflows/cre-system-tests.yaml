@@ -66,7 +66,7 @@ jobs:
         working-directory: system-tests/tests/smoke/cre
         run: |
           # Get the list of tests, for each test add each of supported DON topologies and convert to JSON format
-          tests=$(go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -list . | grep -v "ok" | grep -v "^$" | jq -R -s 'split("\n")[:-1] | map([{"test_name": ., "topology": "workflow", "configs":"configs/workflow-don.toml,configs/ci-config.toml"}, {"test_name": ., "topology": "workflow-gateway", "configs":"configs/workflow-gateway-don.toml,configs/ci-config.toml"}, {"test_name": ., "topology": "workflow-gateway-capabilities", "configs":"configs/workflow-gateway-capabilities-don.toml,configs/ci-config.toml"}]) | flatten')
+          tests=$(go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -list . | grep -v "ok" | grep -v "^$" | jq -R -s 'split("\n")[:-1] | map([{"test_name": ., "topology": "workflow", "configs":"configs/workflow-don.toml"}, {"test_name": ., "topology": "workflow-gateway", "configs":"configs/workflow-gateway-don.toml"}, {"test_name": ., "topology": "workflow-gateway-capabilities", "configs":"configs/workflow-gateway-capabilities-don.toml"}]) | flatten')
           tests=$(echo $tests | jq -c .)
 
           echo "matrix=$tests" | tee -a "${GITHUB_OUTPUT}"
@@ -135,18 +135,6 @@ jobs:
           gati-role-arn: ${{ secrets.AWS_OIDC_GLOBAL_READ_ONLY_TOKEN_ISSUER_ROLE_ARN }}
           gati-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
           gati-region: ${{ secrets.AWS_REGION }}
-
-      # TODO
-      # Add Flakeguard support
-
-      - name: Enable cron capability
-        shell: bash
-        working-directory: core/scripts/cre/environment/configs
-        run: |
-          echo "[extra_capabilities]" >> "ci-config.toml"
-          echo "cron_capability_binary_path = \"${GITHUB_WORKSPACE}/system-tests/tests/smoke/cre/cron\"" >> "ci-config.toml"
-
-          cat "ci-config.toml"
 
       - name: Start local CRE
         shell: bash
