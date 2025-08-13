@@ -66,6 +66,8 @@ jobs:
         working-directory: system-tests/tests/smoke/cre
         run: |
           # Get the list of tests, for each test add each of supported DON topologies and convert to JSON format
+          # This only needs to be updated if we want to run all tests on a new DON topology.
+          # Otherwise tests are auto-discovered and run on all topologies.
           tests=$(go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -list . | grep -v "ok" | grep -v "^$" | jq -R -s 'split("\n")[:-1] | map([{"test_name": ., "topology": "workflow", "configs":"configs/workflow-don.toml"}, {"test_name": ., "topology": "workflow-gateway", "configs":"configs/workflow-gateway-don.toml"}, {"test_name": ., "topology": "workflow-gateway-capabilities", "configs":"configs/workflow-gateway-capabilities-don.toml"}]) | flatten')
           tests=$(echo $tests | jq -c .)
 

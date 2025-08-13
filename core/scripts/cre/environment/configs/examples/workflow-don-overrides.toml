@@ -87,7 +87,12 @@
 
       [Telemetry]
       Enabled = true
+      # assumes that CTF's observability stack is running on the local host
+      # 4317 is OTEL ingress port of the stack (LGTM)
+      # command: ctf obs up
       Endpoint = 'host.docker.internal:4317'
+      # default service-name and port used by locally running Chip Ingress
+      # command: go run . env beholder start
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
       TraceSampleRatio = 1

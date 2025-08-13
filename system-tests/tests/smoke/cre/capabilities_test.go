@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -114,15 +115,17 @@ func executePoRTest(t *testing.T, in *envconfig.Config, envArtifact environment.
 	require.NoError(t, loadErr, "failed to load environment")
 
 	homeChainSelector := wrappedBlockchainOutputs[0].ChainSelector
-	numberOfWriteableChains := 0
+	writeableChains := []uint64{}
 	for _, bcOutput := range wrappedBlockchainOutputs {
 		for _, donMetadata := range fullCldEnvOutput.DonTopology.DonsWithMetadata {
 			if flags.RequiresForwarderContract(donMetadata.Flags, bcOutput.ChainID) {
-				numberOfWriteableChains++
+				if !slices.Contains(writeableChains, bcOutput.ChainID) {
+					writeableChains = append(writeableChains, bcOutput.ChainID)
+				}
 			}
 		}
 	}
-	require.Len(t, feedIDs, numberOfWriteableChains, "number of writeable chains must match number of feed IDs (look for read-only chains in the environment)")
+	require.Equal(t, len(feedIDs), len(writeableChains), "number of writeable chains must match number of feed IDs (check what chains 'evm' and 'write-evm' capabilities are enabled for)")
 
 	/*
 		DEPLOY DATA FEEDS CACHE CONTRACTS ON ALL CHAINS (except read-only ones)

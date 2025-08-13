@@ -4,12 +4,12 @@ import (
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var HandlerConfigFn = func(donMetadata []*cre.DonMetadata) (cre.HandlerTypeToConfig, error) {
+var HandlerConfigFn = func(donMetadata *cre.DonMetadata) (cre.HandlerTypeToConfig, error) {
 	// if any of the DONs have http action or http trigger capability, we need to add a http handler to the jobspec for the gateway node
-	if !don.AnyDonHasCapability(donMetadata, cre.HTTPActionCapability) && !don.AnyDonHasCapability(donMetadata, cre.HTTPTriggerCapability) {
+	if !flags.HasFlag(donMetadata.Flags, cre.HTTPActionCapability) || !flags.HasFlag(donMetadata.Flags, cre.HTTPTriggerCapability) {
 		return nil, nil
 	}
 

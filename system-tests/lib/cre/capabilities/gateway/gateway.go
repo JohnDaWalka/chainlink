@@ -36,7 +36,7 @@ func (g *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {
 	return gatewayconfig.GenerateConfigFn
 }
 
-func (g *Capability) OptionalGatewayHandlerConfigFn() cre.GatewayHandlerConfigFn {
+func (g *Capability) OptionalGatewayJobHandlerConfigFn() cre.GatewayHandlerConfigFn {
 	return nil
 }
 

@@ -4,11 +4,11 @@ import (
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-var HandlerConfigFn = func(donMetadata []*cre.DonMetadata) (cre.HandlerTypeToConfig, error) {
-	if !don.AnyDonHasCapability(donMetadata, cre.VaultCapability) {
+var HandlerConfigFn = func(donMetadata *cre.DonMetadata) (cre.HandlerTypeToConfig, error) {
+	if !flags.HasFlag(donMetadata.Flags, cre.VaultCapability) {
 		return nil, nil
 	}
 

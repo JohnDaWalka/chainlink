@@ -77,17 +77,12 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 			handlers[coregateway.WebAPICapabilitiesType] = handlerConfig
 		}
 
-		var donMetadata []*cre.DonMetadata
-		for _, don := range donTopology.DonsWithMetadata {
-			donMetadata = append(donMetadata, don.DonMetadata)
-		}
-
 		for _, capability := range capabilities {
-			if capability.OptionalGatewayHandlerConfigFn() == nil {
+			if capability.OptionalGatewayJobHandlerConfigFn() == nil {
 				continue
 			}
 
-			handlerConfig, handlerConfigErr := capability.OptionalGatewayHandlerConfigFn()(donMetadata)
+			handlerConfig, handlerConfigErr := capability.OptionalGatewayJobHandlerConfigFn()(donWithMetadata.DonMetadata)
 			if handlerConfigErr != nil {
 				return nil, errors.Wrap(handlerConfigErr, "failed to get handler config")
 			}

@@ -208,10 +208,10 @@ func SetupTestEnvironment(
 
 	forwardersSelectors := make([]uint64, 0)
 	for _, bcOut := range blockchainOutputs {
-		if slices.Contains(forwardersSelectors, bcOut.ChainSelector) {
-			continue
-		}
 		for _, donMetadata := range input.CapabilitiesAwareNodeSets {
+			if slices.Contains(forwardersSelectors, bcOut.ChainSelector) {
+				continue
+			}
 			if flags.RequiresForwarderContract(donMetadata.ComputedCapabilities, bcOut.ChainID) {
 				forwardersSelectors = append(forwardersSelectors, bcOut.ChainSelector)
 			}

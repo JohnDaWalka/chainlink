@@ -359,7 +359,7 @@ type Incoming struct {
 type NodeConfigFn = func(input GenerateConfigsInput) (NodeIndexToConfigOverride, error)
 
 type HandlerTypeToConfig = map[string]string
-type GatewayHandlerConfigFn = func(donMetadata []*DonMetadata) (HandlerTypeToConfig, error)
+type GatewayHandlerConfigFn = func(donMetadata *DonMetadata) (HandlerTypeToConfig, error)
 
 type GenerateConfigsInput struct {
 	DonMetadata             *DonMetadata
@@ -885,9 +885,9 @@ type InstallableCapability interface {
 	// or nil if no node-specific config is needed
 	OptionalNodeConfigFn() NodeConfigFn
 
-	// OptionalGatewayHandlerConfigFn returns a function to configure gateway handlers,
-	// or nil if no gateway integration is required
-	OptionalGatewayHandlerConfigFn() GatewayHandlerConfigFn
+	// OptionalGatewayJobHandlerConfigFn returns a function to configure gateway handlers in the gateway jobspec,
+	// or nil if no gateway handler configuration is required for this capability
+	OptionalGatewayJobHandlerConfigFn() GatewayHandlerConfigFn
 
 	// CapabilityRegistryV1ConfigFn returns a function to generate capability registry
 	// configuration for the v1 registry format

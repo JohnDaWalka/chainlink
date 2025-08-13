@@ -38,7 +38,7 @@ func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {
 	return nil
 }
 
-func (c *Capability) OptionalGatewayHandlerConfigFn() cre.GatewayHandlerConfigFn {
+func (c *Capability) OptionalGatewayJobHandlerConfigFn() cre.GatewayHandlerConfigFn {
 	return vaulthandler.HandlerConfigFn
 }
 
