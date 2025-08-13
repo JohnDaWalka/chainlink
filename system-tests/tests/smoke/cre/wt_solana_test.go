@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 	sol_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
@@ -127,6 +128,7 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 				kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
 				require.NoError(t, err3, "could not decrypt OCR2 key json")
 				kb = append(kb, kk)
+				fmt.Println("setup key ", common.BytesToAddress(kk.PublicKey()))
 			}
 		}
 
@@ -249,7 +251,12 @@ func (w *writer) executeRequest(remainings solana.AccountMetaSlice, metadata *pb
 		Inputs:          input,
 	}
 
-	return w.mocksClient.Execute(context.TODO(), req)
+	_, err = w.mocksClient.Nodes[1].API.Execute(context.TODO(), req)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (w *writer) createRequestInputs(remainings solana.AccountMetaSlice, repCtx []byte, encReport []byte, sigs [][]byte) ([]byte, []byte, error) {

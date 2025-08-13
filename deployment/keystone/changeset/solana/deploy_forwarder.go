@@ -354,6 +354,9 @@ func configureForwarders(env cldf.Environment, req *ConfigureForwarderRequest,
 			Chain:     chain,
 		}
 		signers := toSolSigners(wfdon.Signers(chainsel.FamilySolana))
+		for _, signer := range wfdon.Signers(chainsel.FamilySolana) {
+			fmt.Println("cs sol signer ", signer.Hex())
+		}
 
 		opOut, err := operations.ExecuteOperation(env.OperationsBundle, operation.ConfigureForwarderOp, deps, operation.ConfigureForwarderInput{
 			ProgramID:      solana.MustPublicKeyFromBase58(forwarderProgramID.Address),
