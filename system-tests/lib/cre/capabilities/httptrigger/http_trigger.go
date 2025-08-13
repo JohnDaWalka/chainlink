@@ -3,8 +3,25 @@ package httptrigger
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	httpregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/httptrigger"
-	httptriggerjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/httptrigger"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const httpTriggerConfigTemplate = `"""
+{
+	"incomingRateLimiter": {
+		"globalBurst": {{.IncomingGlobalBurst}},
+		"globalRPS": {{.IncomingGlobalRPS}},
+		"perSenderBurst": {{.IncomingPerSenderBurst}},
+		"perSenderRPS": {{.IncomingPerSenderRPS}}
+	},
+	"outgoingRateLimiter": {
+		"globalBurst": {{.OutgoingGlobalBurst}},
+		"globalRPS": {{.OutgoingGlobalRPS}},
+		"perSenderBurst": {{.OutgoingPerSenderBurst}},
+		"perSenderRPS": {{.OutgoingPerSenderRPS}}
+	}
+}
+"""`
 
 type Capability struct {
 }
@@ -22,7 +39,12 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return httptriggerjobs.JobSpecFn
+	return factory.NewDonLevelFactory(
+		c.Flag(),
+		httpTriggerConfigTemplate,
+		factory.NoOpExtractor, // No runtime values extraction needed
+		factory.BinaryPathBuilder,
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

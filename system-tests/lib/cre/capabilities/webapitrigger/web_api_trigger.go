@@ -3,8 +3,10 @@ package webapitrigger
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	webapiregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/webapi"
-	webapijobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/webapi"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const webAPITriggerConfigTemplate = `""`
 
 type Capability struct {
 }
@@ -22,7 +24,14 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return webapijobs.TriggerJobSpecFn
+	return factory.NewDonLevelFactory(
+		c.Flag(),
+		webAPITriggerConfigTemplate,
+		factory.NoOpExtractor, // No runtime values extraction needed
+		func(_ *cre.JobSpecInput, _ cre.CapabilityConfig) (string, error) {
+			return "__builtin_web-api-trigger", nil
+		},
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

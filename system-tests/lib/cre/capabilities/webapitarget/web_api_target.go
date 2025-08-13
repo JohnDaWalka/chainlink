@@ -3,8 +3,16 @@ package webapitarget
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	webapiregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/webapi"
-	webapijobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/webapi"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const webAPITargetConfigTemplate = `"""
+[rateLimiter]
+GlobalRPS = {{.GlobalRPS}}
+GlobalBurst = {{.GlobalBurst}}
+PerSenderRPS = {{.PerSenderRPS}}
+PerSenderBurst = {{.PerSenderBurst}}
+"""`
 
 type Capability struct {
 }
@@ -22,7 +30,14 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return webapijobs.TargetJobSpecFn
+	return factory.NewDonLevelFactory(
+		c.Flag(),
+		webAPITargetConfigTemplate,
+		factory.NoOpExtractor, // No runtime values extraction needed
+		func(_ *cre.JobSpecInput, _ cre.CapabilityConfig) (string, error) {
+			return "__builtin_web-api-target", nil
+		},
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

@@ -3,8 +3,17 @@ package compute
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	computeregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/compute"
-	computejobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/compute"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const customComputeConfigTemplate = `"""
+NumWorkers = {{.NumWorkers}}
+[rateLimiter]
+globalRPS = {{.GlobalRPS}}
+globalBurst = {{.GlobalBurst}}
+perSenderRPS = {{.PerSenderRPS}}
+perSenderBurst = {{.PerSenderBurst}}
+"""`
 
 type Capability struct {
 }
@@ -22,7 +31,14 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return computejobs.JobSpecFn
+	return factory.NewDonLevelFactory(
+		c.Flag(),
+		customComputeConfigTemplate,
+		factory.NoOpExtractor, // No runtime values extraction needed
+		func(_ *cre.JobSpecInput, _ cre.CapabilityConfig) (string, error) {
+			return "__builtin_custom-compute-action", nil
+		},
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

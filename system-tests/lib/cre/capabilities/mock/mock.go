@@ -3,8 +3,10 @@ package mock
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	mockregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/mock"
-	mockjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/mock"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const mockConfigTemplate = `"""port={{.Port}}"""`
 
 type Capability struct {
 }
@@ -22,7 +24,12 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return mockjobs.JobSpecFn
+	return factory.NewDonLevelFactory(
+		c.Flag(),
+		mockConfigTemplate,
+		factory.NoOpExtractor, // No runtime values extraction needed
+		factory.BinaryPathBuilder,
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

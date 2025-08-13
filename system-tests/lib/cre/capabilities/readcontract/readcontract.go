@@ -3,7 +3,7 @@ package readcontract
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	readcontractregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/readcontract"
-	readcontractjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/readcontract"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
 
 type Capability struct {
@@ -22,7 +22,17 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return readcontractjobs.JobSpecFn
+	return factory.NewChainSpecificFactory(
+		c.Flag(),
+		`'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}"}'`,
+		func(chainID uint64, _ *cre.NodeMetadata) map[string]any {
+			return map[string]any{
+				"ChainID":       chainID,
+				"NetworkFamily": "evm",
+			}
+		},
+		factory.BinaryPathBuilder,
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

@@ -4,8 +4,26 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	httpactionregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/httpaction"
 	httpactionhandler "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway/handlers/httpaction"
-	httpactionjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/httpaction"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const httpActionConfigTemplate = `"""
+{
+	"proxyMode": "{{.ProxyMode}}",
+	"incomingRateLimiter": {
+		"globalBurst": {{.IncomingGlobalBurst}},
+		"globalRPS": {{.IncomingGlobalRPS}},
+		"perSenderBurst": {{.IncomingPerSenderBurst}},
+		"perSenderRPS": {{.IncomingPerSenderRPS}}
+	},
+	"outgoingRateLimiter": {
+		"globalBurst": {{.OutgoingGlobalBurst}},
+		"globalRPS": {{.OutgoingGlobalRPS}},
+		"perSenderBurst": {{.OutgoingPerSenderBurst}},
+		"perSenderRPS": {{.OutgoingPerSenderRPS}}
+	}
+}
+"""`
 
 type Capability struct{}
 
@@ -22,7 +40,12 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return httpactionjobs.JobSpecFn
+	return factory.NewDonLevelFactory(
+		c.Flag(),
+		httpActionConfigTemplate,
+		factory.NoOpExtractor, // No runtime values extraction needed
+		factory.BinaryPathBuilder,
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {

@@ -3,8 +3,17 @@ package logeventtrigger
 import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	logeventtriggerregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/logevent"
-	logeventtriggerjobs "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/logevent"
+	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
+
+const logEventTriggerConfigTemplate = `"""
+{
+	"chainId": "{{.ChainID}}",
+	"network": "{{.NetworkFamily}}",
+	"lookbackBlocks": {{.LookbackBlocks}},
+	"pollPeriod": {{.PollPeriod}}
+}
+"""`
 
 type Capability struct {
 }
@@ -22,7 +31,17 @@ func (c *Capability) Validate() error {
 }
 
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
-	return logeventtriggerjobs.JobSpecFn
+	return factory.NewChainSpecificFactory(
+		c.Flag(),
+		logEventTriggerConfigTemplate,
+		func(chainID uint64, _ *cre.NodeMetadata) map[string]any {
+			return map[string]any{
+				"ChainID":       chainID,
+				"NetworkFamily": "evm",
+			}
+		},
+		factory.BinaryPathBuilder,
+	).GenerateJobSpecs
 }
 
 func (c *Capability) OptionalNodeConfigFn() cre.NodeConfigFn {
