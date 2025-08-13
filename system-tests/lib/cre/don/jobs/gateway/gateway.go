@@ -63,15 +63,44 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 			}
 		}
 
-		for idx := range gatewayConnectorOutput.Configurations {
-			donID := donWithMetadata.Name
-			if flags.HasFlag(donWithMetadata.Flags, cre.VaultCapability) {
-				donID = cre.VaultGatewayDonID
+
+		handlers := map[string]string{}
+		if flags.HasFlag(donWithMetadata.Flags, cre.WorkflowDON) || don.NodeNeedsGateway(donWithMetadata.Flags) {
+			handlerConfig := `
+			[gatewayConfig.Dons.Handlers.Config]
+			maxAllowedMessageAgeSec = 1_000
+			[gatewayConfig.Dons.Handlers.Config.NodeRateLimiter]
+			globalBurst = 10
+			globalRPS = 50
+			perSenderBurst = 10
+			perSenderRPS = 10
+			`
+			handlers[coregateway.WebAPICapabilitiesType] = handlerConfig
+		}
+
+		var donMetadata []*cre.DonMetadata
+		for _, don := range donTopology.DonsWithMetadata {
+			donMetadata = append(donMetadata, don.DonMetadata)
+		}
+
+		for _, capability := range capabilities {
+			if capability.OptionalGatewayHandlerConfigFn() == nil {
+				continue
 			}
 
+			handlerConfig, handlerConfigErr := capability.OptionalGatewayHandlerConfigFn()(donMetadata)
+			if handlerConfigErr != nil {
+				return nil, errors.Wrap(handlerConfigErr, "failed to get handler config")
+			}
+			maps.Copy(handlers, handlerConfig)
+		}
+
+		for idx := range gatewayConnectorOutput.Configurations {
+			// determine here what handlers we want to build.
 			gatewayConnectorOutput.Configurations[idx].Dons = append(gatewayConnectorOutput.Configurations[idx].Dons, cre.GatewayConnectorDons{
 				MembersEthAddresses: ethAddresses,
-				ID:                  donID,
+				ID:                  donWithMetadata.Name,
+				Handlers:            handlers,
 			})
 		}
 	}
@@ -97,41 +126,8 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 			return nil, errors.Wrap(homeChainErr, "failed to get home chain id from selector")
 		}
 
-		handlers := make(map[string]string)
-
-		if flags.HasFlag(donWithMetadata.Flags, cre.GatewayDON) {
-			handlerConfig := `
-			[gatewayConfig.Dons.Handlers.Config]
-			maxAllowedMessageAgeSec = 1_000
-			[gatewayConfig.Dons.Handlers.Config.NodeRateLimiter]
-			globalBurst = 10
-			globalRPS = 50
-			perSenderBurst = 10
-			perSenderRPS = 10
-			`
-
-			handlers[coregateway.WebAPICapabilitiesType] = handlerConfig
-		}
-
-		var donMetadata []*cre.DonMetadata
-		for _, don := range donTopology.DonsWithMetadata {
-			donMetadata = append(donMetadata, don.DonMetadata)
-		}
-
-		for _, capability := range capabilities {
-			if capability.OptionalGatewayHandlerConfigFn() == nil {
-				continue
-			}
-
-			handlerConfig, handlerConfigErr := capability.OptionalGatewayHandlerConfigFn()(donMetadata)
-			if handlerConfigErr != nil {
-				return nil, errors.Wrap(handlerConfigErr, "failed to get handler config")
-			}
-			maps.Copy(handlers, handlerConfig)
-		}
-
 		for _, gatewayConfiguration := range gatewayConnectorOutput.Configurations {
-			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.AnyGateway(gatewayNodeID, homeChainID, extraAllowedPorts, extraAllowedIPs, extraAllowedIPsCIDR, handlers, gatewayConfiguration))
+			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.AnyGateway(gatewayNodeID, homeChainID, extraAllowedPorts, extraAllowedIPs, extraAllowedIPsCIDR, gatewayConfiguration))
 		}
 	}
 

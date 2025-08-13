@@ -245,8 +245,8 @@ func startCmd() *cobra.Command {
 				}
 			}
 
-			if topology != TopologyWorkflow && topology != TopologyWorkflowGatewayCapabilities && topology != TopologyWorkflowGateway {
-				return fmt.Errorf("invalid topology: %s. Valid topologies are: %s, %s, %s", topology, TopologyWorkflow, TopologyWorkflowGatewayCapabilities, TopologyWorkflowGateway)
+			if topology != TopologyWorkflow && topology != TopologyWorkflowGatewayCapabilities && topology != TopologyWorkflowGateway && topology != TopologyMock {
+				framework.L.Warn().Msgf("'%s' is an unknown topology. Using whatever configuration was passed in CTF_CONFIGs", topology)
 			}
 
 			PrintCRELogo()
@@ -652,7 +652,7 @@ func PrintCRELogo() {
 func defaultCtfConfigs(topologyFlag string) error {
 	if os.Getenv("CTF_CONFIGS") == "" {
 		var setErr error
-		// use default config
+		// use default configs for each
 		switch topologyFlag {
 		case TopologyWorkflow:
 			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-don.toml")
