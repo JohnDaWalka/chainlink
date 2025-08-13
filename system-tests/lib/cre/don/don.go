@@ -168,11 +168,17 @@ func AnyDonHasCapability(donMetadata []*cre.DonMetadata, capability cre.Capabili
 	return false
 }
 
-func NodeNeedsGateway(nodeFlags []cre.CapabilityFlag) bool {
+func NodeNeedsAnyGateway(nodeFlags []cre.CapabilityFlag) bool {
 	return flags.HasFlag(nodeFlags, cre.CustomComputeCapability) ||
 		flags.HasFlag(nodeFlags, cre.WebAPITriggerCapability) ||
 		flags.HasFlag(nodeFlags, cre.WebAPITargetCapability) ||
 		flags.HasFlag(nodeFlags, cre.VaultCapability) ||
 		flags.HasFlag(nodeFlags, cre.HTTPActionCapability) ||
 		flags.HasFlag(nodeFlags, cre.HTTPTriggerCapability)
+}
+
+func NodeNeedsWebAPIGateway(nodeFlags []cre.CapabilityFlag) bool {
+	return flags.HasFlag(nodeFlags, cre.CustomComputeCapability) ||
+		flags.HasFlag(nodeFlags, cre.WebAPITriggerCapability) ||
+		flags.HasFlag(nodeFlags, cre.WebAPITargetCapability)
 }

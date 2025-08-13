@@ -45,7 +45,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 	// This map will be used to configure the gateway job on the node that runs it.
 	for _, donWithMetadata := range donTopology.DonsWithMetadata {
 		// if it's a workflow DON or it has custom compute capability or it has vault capability, it needs access to gateway connector
-		if !flags.HasFlag(donWithMetadata.Flags, cre.WorkflowDON) && !don.NodeNeedsGateway(donWithMetadata.Flags) {
+		if !flags.HasFlag(donWithMetadata.Flags, cre.WorkflowDON) && !don.NodeNeedsAnyGateway(donWithMetadata.Flags) {
 			continue
 		}
 
@@ -63,9 +63,8 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 			}
 		}
 
-
 		handlers := map[string]string{}
-		if flags.HasFlag(donWithMetadata.Flags, cre.WorkflowDON) || don.NodeNeedsGateway(donWithMetadata.Flags) {
+		if flags.HasFlag(donWithMetadata.Flags, cre.WorkflowDON) || don.NodeNeedsWebAPIGateway(donWithMetadata.Flags) {
 			handlerConfig := `
 			[gatewayConfig.Dons.Handlers.Config]
 			maxAllowedMessageAgeSec = 1_000

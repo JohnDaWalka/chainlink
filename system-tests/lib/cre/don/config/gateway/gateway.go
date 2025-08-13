@@ -64,7 +64,7 @@ func generateConfig(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverri
 		// workflow DON nodes might need gateway connector to download WASM workflow binaries,
 		// but if the workflowDON is using only workflow jobs, we don't need to set the gateway connector.
 		// gateway is also required by various capabilities
-		if flags.HasFlag(input.Flags, cre.WorkflowDON) || don.NodeNeedsGateway(input.Flags) {
+		if flags.HasFlag(input.Flags, cre.WorkflowDON) || don.NodeNeedsAnyGateway(input.Flags) {
 			var nodeEthAddr common.Address
 			expectedAddressKey := node.AddressKeyFromSelector(input.HomeChainSelector)
 			for _, label := range workflowNodeSet[i].Labels {
