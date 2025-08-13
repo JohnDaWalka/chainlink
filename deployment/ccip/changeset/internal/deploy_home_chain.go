@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/xssnick/tonutils-go/address"
-	"golang.org/x/crypto/blake2b"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/bytes"
 
@@ -640,29 +639,10 @@ func BuildOCR3ConfigForCCIPHome(
 				}
 				parsed = pk.Bytes()
 			case chain_selectors.FamilySui:
-				const Ed25519Scheme byte = 0x00
 				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to decode SUI address '%s': %w", transmitter, err)
 				}
-
-				hex1 := string(transmitter)
-				fmt.Println("hex1:", hex1)
-
-				pubKeyBytes, err := hex.DecodeString(string(transmitter))
-				if err != nil {
-					fmt.Println("FAILED TO DECODE")
-					return nil, err
-				}
-
-				flagged := append([]byte{Ed25519Scheme}, pubKeyBytes...)
-
-				hash := blake2b.Sum256(flagged)
-				addr := hex.EncodeToString(hash[:])
-				addrDecoded, _ := hex.DecodeString(addr)
-
-				fmt.Println("TRANSMITTER", addr, addrDecoded)
-
 			case chain_selectors.FamilyTon:
 				pk := address.MustParseAddr(string(transmitter))
 				if pk == nil || pk.IsAddrNone() {
