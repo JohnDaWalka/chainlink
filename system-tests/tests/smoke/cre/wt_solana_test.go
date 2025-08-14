@@ -251,18 +251,13 @@ func (w *writer) executeRequest(remainings solana.AccountMetaSlice, metadata *pb
 		Inputs:          input,
 	}
 
-	_, err = w.mocksClient.Nodes[1].API.Execute(context.TODO(), req)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return w.mocksClient.Execute(context.TODO(), req)
 }
 
 func (w *writer) createRequestInputs(remainings solana.AccountMetaSlice, repCtx []byte, encReport []byte, sigs [][]byte) ([]byte, []byte, error) {
 	inputs, err := values.NewMap(map[string]any{
 		"signed_report": map[string]any{
-			"report":     append(encReport, repCtx...),
+			"report":     encReport,
 			"signatures": sigs,
 			"context":    repCtx,
 			"id":         [2]byte{0, w.reportID},
@@ -308,9 +303,9 @@ func (w *writer) generateSignatures(report []byte, reportCtx []byte) ([][]byte, 
 }
 
 type decimalReport struct {
-	DataID    [16]byte
 	Timestamp uint32
 	Answer    uint128
+	DataID    [16]byte
 }
 
 type uint128 struct {
@@ -407,10 +402,19 @@ func (w *writer) createEncodedReport(m *pb.Metadata, remainings solana.AccountMe
 	}
 
 	accsHash := sha256.Sum256(buff)
-	ret := append(encMeta, accsHash[:]...)
+	forwarderReport, err := sol_binary.MarshalBorsh(struct {
+		AccountHash [32]byte
+		Payload     []byte
+	}{
+		AccountHash: accsHash,
+		Payload:     payload,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	// encoded raw_report is META|CTX_HASH|Payload|ctx
-	return append(ret, payload...), nil
+	// encoded raw_report is META|CTX_HASH|forwarderReport|ctx
+	return append(encMeta, forwarderReport...), nil
 }
 
 func (w *writer) createWorkflowMetadata() (*pb.Metadata, error) {
@@ -423,7 +427,7 @@ func (w *writer) createWorkflowMetadata() (*pb.Metadata, error) {
 		WorkflowID:    w.wfID,
 		WorkflowOwner: w.wfOwner,
 
-		WorkflowName:        convertToHashedWorkflowName(w.wfName),
+		WorkflowName:        w.wfName, // already has correct format
 		WorkflowExecutionID: executionID,
 
 		WorkflowDonID:            1,
@@ -524,11 +528,15 @@ func setupWTTestEnvironment(
 	}
 	out := &setupWTOutput{}
 	out.DonTopology = universalSetupOutput.DonTopology
-	wfName := [][10]uint8{{1, 2, 3}}
 	wfDescription := [][32]uint8{{2, 3, 4}}
 	wfOwner := [20]byte{222, 173, 190}
+	name := convertToHashedWorkflowName("wf_name")
+	out.WFName = name
+	bname, _ := hex.DecodeString(name)
+	var nname [10]uint8
+	copy(nname[:], bname)
+	wfName := [][10]uint8{nname}
 
-	out.WFName = string(wfName[0][:])
 	out.WFOwner = hex.EncodeToString(wfOwner[:])
 	out.FeedID = in.WorkflowConfigs[0].FeedID
 	for _, bo := range universalSetupOutput.BlockchainOutput {

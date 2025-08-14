@@ -180,6 +180,8 @@ func WorkerSolana(chains []*WorkerSolanaInput) string {
 		[[Solana]]
 		ChainID = '%s'
 		Enabled = true
+		TxRetentionTimeout = '5s'
+
 		[Solana.Workflow]
 		Enabled = true
 		ForwarderAddress = '%s'
@@ -187,7 +189,7 @@ func WorkerSolana(chains []*WorkerSolanaInput) string {
 		ForwarderState   = '%s'
 		LookupTable      = '5oNDL3swdJJF1g9DzJiZ4ynHXgszjAEpUkxVYejchzrY'
 		PollPeriod = '1s'
-		AcceptanceTimeout = '1s'
+		AcceptanceTimeout = '25s'
 		TxAcceptanceState = 3
 		Local = true
 		[[Solana.Nodes]]
