@@ -12,13 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	selectors "github.com/smartcontractkit/chain-selectors"
 
-<<<<<<< HEAD
-	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
-	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	ccipSolState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-=======
->>>>>>> db35ff0ac4 (Stash)
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
