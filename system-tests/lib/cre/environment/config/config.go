@@ -26,20 +26,20 @@ type Config struct {
 
 // Validate performs validation checks on the configuration, ensuring all required fields
 // are present and all referenced capabilities are known to the system.
-func (c Config) Validate() error {
+func (c Config) Validate(capabilityFlagsProvider cre.CapabilityFlagsProvider) error {
 	if c.JD.CSAEncryptionKey == "" {
 		return errors.New("jd.csa_encryption_key must be provided")
 	}
 
 	for _, nodeSet := range c.NodeSets {
 		for _, capability := range nodeSet.Capabilities {
-			if !slices.Contains(cre.KnownCapabilities(), capability) {
+			if !slices.Contains(capabilityFlagsProvider.SupportedCapabilityFlags(), capability) {
 				return errors.New("unknown capability: " + capability)
 			}
 		}
 
 		for capability := range nodeSet.ChainCapabilities {
-			if !slices.Contains(cre.KnownCapabilities(), capability) {
+			if !slices.Contains(capabilityFlagsProvider.SupportedCapabilityFlags(), capability) {
 				return errors.New("unknown capability: " + capability)
 			}
 		}

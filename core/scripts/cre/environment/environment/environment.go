@@ -39,6 +39,7 @@ import (
 	webapitriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitrigger"
 	writeevmcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/tracking"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -281,13 +282,42 @@ func startCmd() *cobra.Command {
 				}
 			}
 
-			if err := in.Validate(); err != nil {
+			capabilityFlagsProvider := flags.NewDefaultCapabilityFlagsProvider()
+
+			if err := in.Validate(capabilityFlagsProvider); err != nil {
 				return errors.Wrap(err, "failed to validate test configuration")
 			}
 
 			extraAllowedGatewayPorts = append(extraAllowedGatewayPorts, in.Fake.Port)
 
-			output, startErr := StartCLIEnvironment(cmdContext, in, topology, exampleWorkflowTrigger, withPluginsDockerImage, withExampleFlag, extraAllowedGatewayPorts, nil)
+			homeChainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
+			if chainErr != nil {
+				return fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
+			}
+
+			capabilities := []cre.InstallableCapability{
+				croncapability.New(),
+				consensuscapability.NewV1(libc.MustSafeUint64FromInt(homeChainIDInt)),
+				consensuscapability.NewV2(libc.MustSafeUint64FromInt(homeChainIDInt)),
+				httpactioncapability.New(),
+				httptriggercapability.New(),
+				webapitriggercapability.New(),
+				webapitargetcapability.New(),
+				computecapability.New(),
+				vaultcapability.NewVaultCapability(libc.MustSafeUint64FromInt(homeChainIDInt)),
+				mockcapability.New(),
+				writeevmcapability.New(),
+				readcontractcapability.New(),
+				logeventtriggercapability.New(),
+				evmcapability.New(),
+				gatewaycapability.New(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
+			}
+
+			if err := validateWorkflowTriggerAndCapabilities(in, withExampleFlag, exampleWorkflowTrigger, withPluginsDockerImage); err != nil {
+				return errors.Wrap(err, "either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag")
+			}
+
+			output, startErr := StartCLIEnvironment(cmdContext, in, topology, withPluginsDockerImage, capabilities, capabilityFlagsProvider)
 			if startErr != nil {
 				fmt.Fprintf(os.Stderr, "Error: %s\n", startErr)
 				fmt.Fprintf(os.Stderr, "Stack trace: %s\n", string(debug.Stack()))
@@ -519,17 +549,11 @@ func StartCLIEnvironment(
 	cmdContext context.Context,
 	in *envconfig.Config,
 	topologyFlag string,
-	workflowTrigger,
 	withPluginsDockerImageFlag string,
-	withExampleFlag bool,
-	extraAllowedGatewayPorts []int,
-	extraCapabilities []cre.InstallableCapability,
+	capabilities []cre.InstallableCapability,
+	capabilityFlagsProvider cre.CapabilityFlagsProvider,
 ) (*creenv.SetupOutput, error) {
 	testLogger := framework.L
-
-	if err := validateWorkflowTriggerAndCapabilities(in, withExampleFlag, workflowTrigger, withPluginsDockerImageFlag); err != nil {
-		return nil, errors.Wrap(err, "either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag")
-	}
 
 	// unset DockerFilePath and DockerContext as we cannot use them with existing images
 	if withPluginsDockerImageFlag != "" {
@@ -553,36 +577,6 @@ func StartCLIEnvironment(
 		fmt.Print(libformat.PurpleText("\tCapabilities: %s\n", capabilitiesDesc))
 		fmt.Print(libformat.PurpleText("\tDON Types: %s\n\n", strings.Join(nodeSet.DONTypes, ", ")))
 	}
-
-	homeChainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
-	if chainErr != nil {
-		return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
-	}
-
-	capabilities := []cre.InstallableCapability{
-		croncapability.New(),
-		consensuscapability.NewV1(libc.MustSafeUint64FromInt(homeChainIDInt)),
-		consensuscapability.NewV2(libc.MustSafeUint64FromInt(homeChainIDInt)),
-		httpactioncapability.New(),
-		httptriggercapability.New(),
-		webapitriggercapability.New(),
-		webapitargetcapability.New(),
-		computecapability.New(),
-		vaultcapability.NewVaultCapability(libc.MustSafeUint64FromInt(homeChainIDInt)),
-		mockcapability.New(),
-		writeevmcapability.New(),
-		readcontractcapability.New(),
-		logeventtriggercapability.New(),
-		evmcapability.New(),
-		gatewaycapability.New(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
-	}
-
-	capabilities = append(capabilities, extraCapabilities...)
-	newCapabilityFlags := make([]cre.CapabilityFlag, len(extraCapabilities))
-	for i, extraCapability := range extraCapabilities {
-		newCapabilityFlags[i] = extraCapability.Flag()
-	}
-	cre.AddKnownCapabilities(newCapabilityFlags)
 
 	if in.JD.CSAEncryptionKey == "" {
 		// generate a new key

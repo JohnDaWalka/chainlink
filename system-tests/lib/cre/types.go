@@ -3,7 +3,6 @@ package cre
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -59,32 +58,8 @@ const (
 	// Add more capabilities as needed
 )
 
-var capabilities = []CapabilityFlag{
-	ConsensusCapability,
-	ConsensusCapabilityV2,
-	CronCapability,
-	EVMCapability,
-	CustomComputeCapability,
-	WriteEVMCapability,
-	ReadContractCapability,
-	LogTriggerCapability,
-	WebAPITargetCapability,
-	WebAPITriggerCapability,
-	MockCapability,
-	VaultCapability,
-	HTTPTriggerCapability,
-	HTTPActionCapability,
-}
-
-// KnownCapabilities returns a copy of all capability flags currently registered in the system.
-func KnownCapabilities() []CapabilityFlag {
-	return slices.Clone(capabilities)
-}
-
-// AddKnownCapabilities registers additional capability flags to the global registry.
-// This is typically called during system initialization to register custom capabilities.
-func AddKnownCapabilities(caps []CapabilityFlag) {
-	capabilities = append(capabilities, caps...)
+type CapabilityFlagsProvider interface {
+	SupportedCapabilityFlags() []CapabilityFlag
 }
 
 type NodeType = string
