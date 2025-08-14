@@ -125,7 +125,7 @@ func executePoRTest(t *testing.T, in *envconfig.Config, envArtifact environment.
 			}
 		}
 	}
-	require.Equal(t, len(feedIDs), len(writeableChains), "number of writeable chains must match number of feed IDs (check what chains 'evm' and 'write-evm' capabilities are enabled for)")
+	require.Len(t, feedIDs, len(writeableChains), "number of writeable chains must match number of feed IDs (check what chains 'evm' and 'write-evm' capabilities are enabled for)")
 
 	/*
 		DEPLOY DATA FEEDS CACHE CONTRACTS ON ALL CHAINS (except read-only ones)
