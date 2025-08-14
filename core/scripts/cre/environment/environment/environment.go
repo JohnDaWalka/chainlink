@@ -280,6 +280,10 @@ func startCmd() *cobra.Command {
 				if err := nodeSet.ParseChainCapabilities(); err != nil {
 					return errors.Wrap(err, "failed to parse chain capabilities")
 				}
+
+				if err := nodeSet.ValidateChainCapabilities(in.Blockchains); err != nil {
+					return errors.Wrap(err, "failed to validate chain capabilities")
+				}
 			}
 
 			capabilityFlagsProvider := flags.NewDefaultCapabilityFlagsProvider()

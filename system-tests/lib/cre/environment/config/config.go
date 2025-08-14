@@ -34,13 +34,13 @@ func (c Config) Validate(capabilityFlagsProvider cre.CapabilityFlagsProvider) er
 	for _, nodeSet := range c.NodeSets {
 		for _, capability := range nodeSet.Capabilities {
 			if !slices.Contains(capabilityFlagsProvider.SupportedCapabilityFlags(), capability) {
-				return errors.New("unknown capability: " + capability)
+				return errors.New("unknown capability: " + capability + ". Make sure you have added it to the capabilityFlagsProvider")
 			}
 		}
 
 		for capability := range nodeSet.ChainCapabilities {
 			if !slices.Contains(capabilityFlagsProvider.SupportedCapabilityFlags(), capability) {
-				return errors.New("unknown capability: " + capability)
+				return errors.New("unknown capability: " + capability + ". Make sure you have added it to the capabilityFlagsProvider")
 			}
 		}
 	}

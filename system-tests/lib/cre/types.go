@@ -3,6 +3,7 @@ package cre
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -559,6 +560,27 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 
 		c.ChainCapabilities[capName] = config
 		c.ComputedCapabilities = append(c.ComputedCapabilities, computedCapabilities...)
+	}
+
+	return nil
+}
+
+func (c *CapabilitiesAwareNodeSet) ValidateChainCapabilities(bcInput []blockchain.Input) error {
+	knownChains := []uint64{}
+	for _, bc := range bcInput {
+		chainIDUint64, convErr := strconv.ParseUint(bc.ChainID, 10, 64)
+		if convErr != nil {
+			return errors.Wrapf(convErr, "failed to convert chain ID %s to uint64", bc.ChainID)
+		}
+		knownChains = append(knownChains, chainIDUint64)
+	}
+
+	for capName, chain := range c.ChainCapabilities {
+		for _, chainID := range chain.EnabledChains {
+			if !slices.Contains(knownChains, chainID) {
+				return fmt.Errorf("capability %s is enabled for chain %d, but chain %d is not present in the environment. Make sure you have added it to '[[blockchains]] table'", capName, chainID, chainID)
+			}
+		}
 	}
 
 	return nil
