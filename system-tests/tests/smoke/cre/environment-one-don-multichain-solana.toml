@@ -13,9 +13,6 @@
   public_key = "7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV"
   contracts_dir = "../tests/smoke/cre/solana_contracts"
 
-[custom_anvil_miner]
-  block_speed_seconds = 5
-
 [fake]
   port = 8171
 
@@ -29,7 +26,7 @@
 [[workflow_configs]]
   feed_id = "0x018e16c39e00032000000"
 
-[dependencies]
+[extra_capabilities]
   cron_capability_binary_path = "./cron"
   mock_capability_binary_path = "./mock"
 

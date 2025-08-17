@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
@@ -21,9 +22,6 @@ import (
 const (
 	timeoutV2 = 240 * time.Second
 )
-
-type NOPWorkflowMetadata struct {
-}
 
 // ProposeWFJobsToJDV2Changeset is a Durable Pipeline compatible changeset that reads a feed state file,
 // creates a workflow job spec from it and proposes it to JD.
@@ -36,6 +34,7 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 	chainInfo, _ := cldf_chain_utils.ChainInfo(c.ChainSelector)
 
 	domain := getDomain(c.Domain)
+
 	feedStatePath := filepath.Join("domains", domain, env.Name, "inputs", "feeds", chainInfo.ChainName+".json")
 	feedState, _ := readFeedStateFile(feedStatePath)
 
@@ -85,7 +84,7 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create workflow spec: %w", err)
 	}
 
-	// log the workflow spec for debugging purposes. We don't yet store it anywhere
+	// log the workflow spec for debugging purposes.
 	fmt.Println(workflowSpec)
 
 	// create workflow job spec TOML
@@ -100,6 +99,16 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 		env.Logger.Debugf("%s", workflowJobSpec)
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to propose workflow job spec: %w", err)
 	}
+
+	// Save workflow spec in the datastore
+	ds := datastore.NewMemoryDataStore()
+
+	err = UpdateWorkflowMetadataDS(env, ds, workflowSpecConfig.WorkflowName, workflowSpec)
+	if err != nil {
+		env.Logger.Errorf("failed to set workflow spec in datastore: %s", err)
+	}
+
+	out.DataStore = ds
 
 	return out, nil
 }
@@ -139,6 +148,7 @@ func proposeWFJobsToJDV2Precondition(env cldf.Environment, c types.ProposeWFJobs
 	if err != nil {
 		return fmt.Errorf("failed to get chain info for chain %d: %w", c.ChainSelector, err)
 	}
+
 	feedStatePath := filepath.Join("domains", domain, env.Name, "inputs", "feeds", chainInfo.ChainName+".json")
 
 	feedState, err := readFeedStateFile(feedStatePath)

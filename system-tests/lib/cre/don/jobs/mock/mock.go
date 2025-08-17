@@ -112,3 +112,4 @@ func MockCapabilitiesJob(nodeID, binaryPath string, mocks []*MockCapabilities) *
 		Spec:   renderedTemplate.String(),
 	}
 }
+

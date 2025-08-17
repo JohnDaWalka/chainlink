@@ -97,6 +97,7 @@ func GenerateSecrets(input *cre.GenerateSecretsInput) (cre.NodeIndexToSecretsOve
 		}
 
 		overrides[i] = string(nodeSecretString)
+		fmt.Println("secret override:", overrides[i])
 	}
 
 	return overrides, nil
@@ -255,10 +256,9 @@ func KeysOutputFromConfig(nodeSets []*cre.CapabilitiesAwareNodeSet) (*cre.Genera
 		SolKeys: make(cre.DonsToSolKeys),
 		P2PKeys: make(cre.DonsToP2PKeys),
 	}
+
 	p2pKeysFoundPerDon := make(map[uint32]int)
 	evmKeysFoundPerDon := make(map[uint32]int)
-	//TODO add sol keys from config?
-	//solKeysFoundPerDon := make(map[uint32]int)
 	for donIdx, nodeSet := range nodeSets {
 		donIdxUint32 := uint32(donIdx) // #nosec G115: ignore as this will NEVER happen, we don't have zillions of DONs
 		p2pKeys := crypto.P2PKeys{}
@@ -314,7 +314,7 @@ func KeysOutputFromConfig(nodeSets []*cre.CapabilitiesAwareNodeSet) (*cre.Genera
 			}
 		}
 		// +1 because we use 1-based indexing in the CRE
-		donIndexToUse := uint32(donIdx + 1) // #nosec G115
+		donIndexToUse := libc.MustSafeUint64FromInt(donIdx + 1)
 		output.P2PKeys[donIndexToUse] = &p2pKeys
 		output.EVMKeys[donIndexToUse] = evmKeysPerChainID
 	}
@@ -342,7 +342,7 @@ func KeysOutputFromConfig(nodeSets []*cre.CapabilitiesAwareNodeSet) (*cre.Genera
 	return output, nil
 }
 
-func GenereteKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error) {
+func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
 	}

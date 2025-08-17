@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,9 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/rpc"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	df_cs "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
@@ -38,15 +35,14 @@ import (
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	consensuscap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
 	mockcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/mock"
-	writesolcap "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writesolana"
 	gatewayconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/gateway"
 	solwriterconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config/writesolana"
 	creconsensus "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/consensus"
 	cregateway "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/gateway"
 	cremock "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/mock"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
@@ -59,14 +55,14 @@ import (
 var SinglePoRDonCapabilitiesFlagsSolana = []string{cre.OCR3Capability, cre.WriteSolanaCapability, cre.MockCapability}
 
 func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
-	configErr := setConfigurationIfMissing("environment-one-don-multichain-solana-ci.toml")
+	configErr := setConfigurationIfMissing("environment-one-don-multichain-solana-ci.toml", "workflow")
 	require.NoError(t, configErr, "failed to set CTF config")
 	testLogger := framework.L
 
 	// Load and validate test configuration
-	in, err := framework.Load[TestConfig](t)
+	in, err := framework.Load[environment.Config](t)
 	require.NoError(t, err, "couldn't load test config")
-	validateEnvVars(t)
+	//validateEnvVars(t)
 	require.Len(t, in.NodeSets, 1, "expected 1 node set in the test config")
 	// Assign all capabilities to the single node set
 	var solChains []string
@@ -95,11 +91,7 @@ func Test_WT_solana_with_mocked_capabilities(t *testing.T) {
 
 	capabilityFactoryFns := []cre.DONCapabilityWithConfigFactoryFn{
 		consensuscap.OCR3CapabilityFactoryFn,
-		mockcap.MockCapabilityFactoryFn,
-	}
-
-	for _, bc := range in.Blockchains {
-		capabilityFactoryFns = append(capabilityFactoryFns, writesolcap.WriteSolanaCapabilityFactory(bc.ChainID))
+		mockcap.CapabilityFactoryFn,
 	}
 
 	setupOut := setupWTTestEnvironment(
@@ -330,7 +322,7 @@ func (w *writer) getRemainings() (solana.AccountMetaSlice, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Println("remaining ID", w.deriveRemainingCapability)
 	// get remaining accounts
 	ret, err := w.mocksClient.Nodes[1].API.Execute(context.TODO(), &pb.ExecutableRequest{
 		ID:             w.deriveRemainingCapability,
@@ -467,21 +459,21 @@ type setupWTOutput struct {
 func setupWTTestEnvironment(
 	t *testing.T,
 	testLogger zerolog.Logger,
-	in *TestConfig,
+	in *environment.Config,
 	mustSetCapabilitiesFn func(input []*ns.Input) []*cre.CapabilitiesAwareNodeSet,
 	capabilityFactoryFns []func([]string) []keystone_changeset.DONCapabilityWithConfig,
 ) *setupWTOutput {
 	extraAllowedGatewayPorts := []int{}
 
 	customBinariesPaths := map[string]string{}
-	containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.Type)
-	require.NoError(t, pathErr, "failed to get default container directory")
-	var mockBinaryPathInTheContainer string
-	if in.DependenciesConfig.MockCapapilityBinaryPath != "" {
+	//containerPath, pathErr := capabilities.DefaultContainerDirectory(in.Infra.Type)
+	//require.NoError(t, pathErr, "failed to get default container directory")
+	//var mockBinaryPathInTheContainer string
+	if in.ExtraCapabilities.MockCapapilityBinaryPath != "" {
 		// where cron binary is located in the container
-		mockBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.MockCapapilityBinaryPath))
+		//	mockBinaryPathInTheContainer = filepath.Join(containerPath, filepath.Base(in.DependenciesConfig.MockCapapilityBinaryPath))
 		// where cron binary is located on the host
-		customBinariesPaths[cre.MockCapability] = in.DependenciesConfig.MockCapapilityBinaryPath
+		customBinariesPaths[cre.MockCapability] = in.ExtraCapabilities.MockCapapilityBinaryPath
 	}
 
 	t.Log("customBinariesPaths", customBinariesPaths)
@@ -502,10 +494,10 @@ func setupWTTestEnvironment(
 		JobSpecFactoryFunctions: []cre.JobSpecFactoryFn{
 			creconsensus.ConsensusJobSpecFactoryFn(chainIDUint64),
 			cregateway.GatewayJobSpecFactoryFn(extraAllowedGatewayPorts, []string{}, []string{"0.0.0.0/0"}),
-			cremock.MockJobSpecFactoryFn(mockBinaryPathInTheContainer),
+			cremock.MockJobSpecFactoryFn("mock"),
 		},
 		ConfigFactoryFunctions: []cre.ConfigFactoryFn{
-			gatewayconfig.GenerateConfig,
+			gatewayconfig.GenerateConfigFn,
 			cfg,
 		},
 	}
@@ -513,19 +505,6 @@ func setupWTTestEnvironment(
 	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, cldlogger.NewSingleFileLogger(t), universalSetupInput)
 	require.NoError(t, setupErr, "failed to setup test environment")
 
-	if in.CustomAnvilMiner != nil {
-		for _, bi := range universalSetupInput.BlockchainsInput {
-			if bi.Type == blockchain.TypeAnvil {
-				require.NotContains(t, bi.DockerCmdParamsOverrides, "-b", "custom_anvil_miner was specified but Anvil has '-b' key set, remove that parameter from 'docker_cmd_params' to run deployments instantly or remove custom_anvil_miner key from TOML config")
-			}
-		}
-		for _, bo := range universalSetupOutput.BlockchainOutput {
-			if bo.BlockchainOutput.Type == blockchain.TypeAnvil {
-				miner := rpc.NewRemoteAnvilMiner(bo.BlockchainOutput.Nodes[0].ExternalHTTPUrl, nil)
-				miner.MinePeriodically(time.Duration(in.CustomAnvilMiner.BlockSpeedSeconds) * time.Second)
-			}
-		}
-	}
 	out := &setupWTOutput{}
 	out.DonTopology = universalSetupOutput.DonTopology
 	wfDescription := [][32]uint8{{2, 3, 4}}

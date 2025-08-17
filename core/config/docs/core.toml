@@ -502,6 +502,8 @@ Address = '0x0' # Example
 NetworkID = 'evm' # Default
 # ChainID identifies the target chain id where the remote registry is located.
 ChainID = '1' # Default
+# ContractVersion identifies semantic version of the WorkflowRegistry contract.
+ContractVersion = '1.0.0' # Default
 # MaxBinarySize is the maximum size of a binary that can be fetched from the registry.
 MaxBinarySize = '20.00mb' # Default
 # MaxEncryptedSecretsSize is the maximum size of encrypted secrets that can be fetched from the given secrets url.
@@ -511,6 +513,12 @@ MaxConfigSize = '50.00kb' # Default
 # SyncStrategy is the strategy that will be used to bring the node up to date with the latest Workflow Registry contract state.
 # Options are: event which watches for contract events or reconciliation which diffs workflow metadata state.
 SyncStrategy = 'event' # Default
+
+[Capabilities.WorkflowRegistry.WorkflowStorage]
+# URL is the location for the workflow storage service to be communicated with.
+URL = "localhost:4566" # Default
+# TLSEnabled enables TLS to be used to secure communication with the workflow storage service. This is enabled by default.
+TLSEnabled = true # Default
 
 [Workflows]
 [Workflows.Limits]
@@ -526,6 +534,8 @@ Address = '0x0' # Example
 NetworkID = 'evm' # Default
 # ChainID identifies the target chain id where the remote registry is located.
 ChainID = '1' # Default
+# ContractVersion identifies semantic version of the CapabilitiesRegistry contract.
+ContractVersion = '1.0.0' # Default
 
 [Capabilities.Dispatcher]
 # SupportedVersion is the version of the version of message schema.

@@ -34,6 +34,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.6
 	github.com/go-viper/mapstructure/v2 v2.3.0
 	github.com/go-webauthn/webauthn v0.9.4
+	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
@@ -77,32 +78,35 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.3
 	github.com/shopspring/decimal v1.4.0
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3
-	github.com/smartcontractkit/chain-selectors v1.0.62
-	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250626122206-319db248496a
+	github.com/smartcontractkit/chain-selectors v1.0.67
+	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250813133852-d9ea5366a215
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250716191209-5639135b7716
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250707132450-d1f5f0be212a
-	github.com/smartcontractkit/chainlink-common v0.8.1-0.20250729221650-0f971f74a124
-	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250718143957-41236f9ef8b4
-	github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250718162715-0c70aa0d3a06
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250814153237-9a6c5a35e950
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250804184440-c0506474fc44
+	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250814111752-91ec077f29f5
+	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250806152407-159881c7589c
+	github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250806155403-1d805e639a0f
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2
-	github.com/smartcontractkit/chainlink-evm v0.1.1-0.20250729151842-3e61763566a5
+	github.com/smartcontractkit/chainlink-evm v0.3.1
+	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250729142306-508e798f6a5d
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250717121125-2350c82883e2
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250729142306-508e798f6a5d
 	github.com/smartcontractkit/chainlink-protos/billing/go v0.0.0-20250722175102-6dcdf5122683
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
+	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-d98d7674da89
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250814194057-3c0c9562c7b0
-	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250701132001-f8be142155b6
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250815133822-0f8b92c69168
+	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250805160549-9c2255ee818e
 	github.com/smartcontractkit/cre-sdk-go v0.2.1-0.20250729190115-fa322d3f3238
 	github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.2.1-0.20250729191525-ac1867f3ff34
 	github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron v0.2.1-0.20250729191525-ac1867f3ff34
-	github.com/smartcontractkit/freeport v0.1.1
+	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de
-	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20241009055228-33d0c0bf38de
+	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20250624150019-e49f7e125e6b
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
@@ -239,8 +243,7 @@ require (
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.3 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -329,7 +332,6 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
 	github.com/sethvargo/go-retry v0.2.4 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250728091106-f398970aa4bc // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20250717121125-2350c82883e2 // indirect
 	github.com/smartcontractkit/chainlink-protos/rmn/v1.6/go v0.0.0-20250131130834-15e0d4cde2a6 // indirect

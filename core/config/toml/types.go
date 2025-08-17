@@ -1937,9 +1937,10 @@ func (eerl *EngineExecutionRateLimit) setFrom(f *EngineExecutionRateLimit) {
 }
 
 type ExternalRegistry struct {
-	Address   *string
-	NetworkID *string
-	ChainID   *string
+	Address         *string
+	NetworkID       *string
+	ChainID         *string
+	ContractVersion *string
 }
 
 func (r *ExternalRegistry) setFrom(f *ExternalRegistry) {
@@ -1953,6 +1954,10 @@ func (r *ExternalRegistry) setFrom(f *ExternalRegistry) {
 
 	if f.ChainID != nil {
 		r.ChainID = f.ChainID
+	}
+
+	if f.ContractVersion != nil {
+		r.ContractVersion = f.ContractVersion
 	}
 }
 
@@ -1985,14 +1990,30 @@ func (r *Limits) setFrom(f *Limits) {
 	}
 }
 
+type WorkflowStorage struct {
+	URL        *string
+	TLSEnabled *bool
+}
+
+func (s *WorkflowStorage) setFrom(f *WorkflowStorage) {
+	if f.URL != nil {
+		s.URL = f.URL
+	}
+	if f.TLSEnabled != nil {
+		s.TLSEnabled = f.TLSEnabled
+	}
+}
+
 type WorkflowRegistry struct {
 	Address                 *string
 	NetworkID               *string
 	ChainID                 *string
+	ContractVersion         *string
 	MaxBinarySize           *utils.FileSize
 	MaxEncryptedSecretsSize *utils.FileSize
 	MaxConfigSize           *utils.FileSize
 	SyncStrategy            *string
+	WorkflowStorage         WorkflowStorage
 }
 
 func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
@@ -2006,6 +2027,10 @@ func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
 
 	if f.ChainID != nil {
 		r.ChainID = f.ChainID
+	}
+
+	if f.ContractVersion != nil {
+		r.ContractVersion = f.ContractVersion
 	}
 
 	if f.MaxBinarySize != nil {
@@ -2023,6 +2048,8 @@ func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
 	if f.SyncStrategy != nil {
 		r.SyncStrategy = f.SyncStrategy
 	}
+
+	r.WorkflowStorage.setFrom(&f.WorkflowStorage)
 }
 
 type Dispatcher struct {
@@ -2352,6 +2379,9 @@ type Billing struct {
 func (b *Billing) setFrom(f *Billing) {
 	if f.URL != nil {
 		b.URL = f.URL
+	}
+
+	if f.TLSEnabled != nil {
 		b.TLSEnabled = f.TLSEnabled
 	}
 }
@@ -2362,7 +2392,8 @@ func (b *Billing) ValidateConfig() error {
 	}
 
 	if b.TLSEnabled == nil {
-		return configutils.ErrInvalid{Name: "TLSEnabled", Value: "", Msg: "billing service TLS option must be set"}
+		val := true
+		b.TLSEnabled = &val
 	}
 
 	return nil

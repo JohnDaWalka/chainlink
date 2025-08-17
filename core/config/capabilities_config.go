@@ -9,6 +9,7 @@ type CapabilitiesExternalRegistry interface {
 	Address() string
 	NetworkID() string
 	ChainID() string
+	ContractVersion() string
 	RelayID() types.RelayID
 }
 
@@ -23,11 +24,18 @@ type CapabilitiesWorkflowRegistry interface {
 	Address() string
 	NetworkID() string
 	ChainID() string
+	ContractVersion() string
 	MaxEncryptedSecretsSize() utils.FileSize
 	MaxBinarySize() utils.FileSize
 	MaxConfigSize() utils.FileSize
 	RelayID() types.RelayID
 	SyncStrategy() string
+	WorkflowStorage() WorkflowStorage
+}
+
+type WorkflowStorage interface {
+	URL() string
+	TLSEnabled() bool
 }
 
 type GatewayConnector interface {

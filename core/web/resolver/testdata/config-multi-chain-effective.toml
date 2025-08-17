@@ -297,15 +297,21 @@ PerSenderBurst = 50
 Address = ''
 NetworkID = 'evm'
 ChainID = '1'
+ContractVersion = '1.0.0'
 
 [Capabilities.WorkflowRegistry]
 Address = ''
 NetworkID = 'evm'
 ChainID = '1'
+ContractVersion = '1.0.0'
 MaxBinarySize = '20.00mb'
 MaxEncryptedSecretsSize = '26.40kb'
 MaxConfigSize = '50.00kb'
 SyncStrategy = 'event'
+
+[Capabilities.WorkflowRegistry.WorkflowStorage]
+URL = 'localhost:4566'
+TLSEnabled = true
 
 [Capabilities.GatewayConnector]
 ChainIDForNodeKey = ''
@@ -447,6 +453,7 @@ EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 VerifyChainID = true
+ExternalRequestMaxResponseSize = 0
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -568,6 +575,7 @@ EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 VerifyChainID = true
+ExternalRequestMaxResponseSize = 0
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -683,6 +691,7 @@ EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
 NewHeadsPollInterval = '0s'
 VerifyChainID = true
+ExternalRequestMaxResponseSize = 0
 
 [EVM.OCR]
 ContractConfirmations = 4

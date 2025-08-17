@@ -33,10 +33,12 @@ import (
 
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	solRouter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/cctp_token_pool"
 	solFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	solRmnRemote "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
+	solTokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
 	solanaMCMS "github.com/smartcontractkit/chainlink/deployment/common/changeset/solana/mcms"
 )
@@ -59,6 +61,7 @@ func getTypeToProgramDeployName() map[cldf.ContractType]string {
 		types.ManyChainMultisigProgram: deployment.McmProgramName,
 		types.RBACTimelockProgram:      deployment.TimelockProgramName,
 		shared.Receiver:                deployment.ReceiverProgramName,
+		shared.CCTPTokenPool:           deployment.CCTPTokenPoolProgramName,
 	}
 }
 
@@ -98,6 +101,7 @@ type UpgradeConfig struct {
 	NewRMNRemoteVersion            *semver.Version
 	NewBurnMintTokenPoolVersion    *semver.Version
 	NewLockReleaseTokenPoolVersion *semver.Version
+	NewCCTPTokenPoolVersion        *semver.Version
 	NewAccessControllerVersion     *semver.Version
 	NewMCMVersion                  *semver.Version
 	NewTimelockVersion             *semver.Version
@@ -529,17 +533,6 @@ func deployChainContractsSolana(
 		burnMintTokenPool = chainState.BurnMintTokenPools[metadata]
 	}
 
-	//	poolType := solTestTokenPool.BurnAndMint_PoolType
-	//	_, err = InitGlobalConfigTokenPoolProgram(e, TokenPoolConfigWithMCM{
-	//		ChainSelector: chain.Selector,
-	//		PoolType:      &poolType,
-	//		TokenPubKey:   burnMintTokenPool,
-	//		Metadata:      metadata,
-	//	})
-	//	if err != nil {
-	//		return batches, fmt.Errorf("failed to initialize global config token pool program: %w", err)
-	//	}
-
 	var lockReleaseTokenPool solana.PublicKey
 	metadata = shared.CLLMetadata
 	if config.LockReleaseTokenPoolMetadata != "" {
@@ -569,16 +562,42 @@ func deployChainContractsSolana(
 		lockReleaseTokenPool = chainState.LockReleaseTokenPools[metadata]
 	}
 
-	//	lockReleasePoolType := solTestTokenPool.LockAndRelease_PoolType
-	//	_, err = InitGlobalConfigTokenPoolProgram(e, TokenPoolConfigWithMCM{
-	//		ChainSelector: chain.Selector,
-	//		PoolType:      &lockReleasePoolType,
-	//		TokenPubKey:   lockReleaseTokenPool,
-	//		Metadata:      metadata,
-	//	})
-	//	if err != nil {
-	//		return batches, fmt.Errorf("failed to initialize global config token pool program: %w", err)
-	//	}
+	var cctpTokenPool solana.PublicKey
+	switch {
+	case chainState.CCTPTokenPool.IsZero():
+		cctpTokenPool, err = DeployAndMaybeSaveToAddressBook(e, chain, ab, shared.CCTPTokenPool, deployment.Version1_0_0, false, metadata)
+		if err != nil {
+			return batches, fmt.Errorf("failed to deploy program: %w", err)
+		}
+	case config.UpgradeConfig.NewCCTPTokenPoolVersion != nil:
+		cctpTokenPool = chainState.CCTPTokenPool
+		newTxns, err := generateUpgradeTxns(e, chain, ab, config, config.UpgradeConfig.NewCCTPTokenPoolVersion, cctpTokenPool, shared.CCTPTokenPool)
+		if err != nil {
+			return batches, fmt.Errorf("failed to generate upgrade txns: %w", err)
+		}
+		// create proposals for txns
+		if len(newTxns) > 0 {
+			batches = append(batches, mcmsTypes.BatchOperation{
+				ChainSelector: mcmsTypes.ChainSelector(chain.Selector),
+				Transactions:  newTxns,
+			})
+		}
+	default:
+		e.Logger.Infow("Using existing CCTP token pool", "addr", chainState.CCTPTokenPool.String())
+		cctpTokenPool = chainState.CCTPTokenPool
+	}
+
+	// CCTP token pool initialization
+	var cctpTokenPoolConfig cctp_token_pool.PoolConfig
+	configPDA, _ := solTokens.TokenPoolGlobalConfigPDA(cctpTokenPool)
+	err = chain.GetAccountDataBorshInto(e.GetContext(), configPDA, &cctpTokenPoolConfig)
+	if err != nil {
+		if err2 := initializeCCTPTokenPoolGlobalConfig(e, chain, cctpTokenPool); err2 != nil {
+			return batches, err2
+		}
+	} else {
+		e.Logger.Infow("CCTP token pool global config already initialized, skipping initialization", "chain", chain.String())
+	}
 
 	// MCMS
 	// this should selectively deploy and initialise anything if required
@@ -682,6 +701,8 @@ func deployChainContractsSolana(
 		rmnRemoteAddress,
 		rmnRemoteConfigPDA,
 		rmnRemoteCursePDA,
+		// cctp token pool
+		cctpTokenPool,
 	}
 
 	if err := extendLookupTable(e, chain, offRampAddress, lookupTableKeys); err != nil {
@@ -866,6 +887,42 @@ func initializeRMNRemote(
 		return fmt.Errorf("failed to confirm initializeRMNRemote: %w", err)
 	}
 	e.Logger.Infow("Initialized rmn remote", "chain", chain.String())
+	return nil
+}
+
+func initializeCCTPTokenPoolGlobalConfig(
+	e cldf.Environment,
+	chain cldf_solana.Chain,
+	cctpTokenPoolProgram solana.PublicKey,
+) error {
+	e.Logger.Debugw("Initializing CCTP token pool global config", "chain", chain.String(), "cctpTokenPoolProgram", cctpTokenPoolProgram.String())
+	programData, err := getSolProgramData(e, chain, cctpTokenPoolProgram)
+	if err != nil {
+		return fmt.Errorf("failed to get solana router program data: %w", err)
+	}
+	config, err := solTokens.TokenPoolGlobalConfigPDA(cctpTokenPoolProgram)
+	if err != nil {
+		return fmt.Errorf("failed to calculate the token pool global config PDA: %w", err)
+	}
+	ix, err := cctp_token_pool.NewInitGlobalConfigInstruction(
+		config,
+		chain.DeployerKey.PublicKey(),
+		solana.SystemProgramID,
+		cctpTokenPoolProgram,
+		programData.Address,
+	).ValidateAndBuild()
+	if err != nil {
+		return fmt.Errorf("failed to build instruction: %w", err)
+	}
+	ixData, err := ix.Data()
+	if err != nil {
+		return fmt.Errorf("failed to extract data payload for CCTP token pool init global config instruction: %w", err)
+	}
+	initGlobalCfgIx := solana.NewInstruction(cctpTokenPoolProgram, ix.Accounts(), ixData)
+	if err := chain.Confirm([]solana.Instruction{initGlobalCfgIx}); err != nil {
+		return fmt.Errorf("failed to confirm initializeCCTPTokenPoolGlobalConfig: %w", err)
+	}
+	e.Logger.Infow("Initialized CCTP token pool's global config", "chain", chain.String())
 	return nil
 }
 
@@ -1098,13 +1155,50 @@ func getSolProgramData(e cldf.Environment, chain cldf_solana.Chain, programID so
 type CloseBuffersConfig struct {
 	ChainSelector uint64
 	Buffers       []string
+	MCMS          *proposalutils.TimelockConfig
 }
 
 func CloseBuffersChangeset(e cldf.Environment, cfg CloseBuffersConfig) (cldf.ChangesetOutput, error) {
-	for _, buffer := range cfg.Buffers {
-		if err := e.BlockChains.SolanaChains()[cfg.ChainSelector].CloseBuffers(e.Logger, buffer); err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to close buffer: %w", err)
+	txns := make([]mcmsTypes.Transaction, 0)
+	authority := e.BlockChains.SolanaChains()[cfg.ChainSelector].DeployerKey.PublicKey()
+	if cfg.MCMS != nil {
+		timelockSignerPDA, err := FetchTimelockSigner(e, cfg.ChainSelector)
+		if err != nil {
+			return cldf.ChangesetOutput{}, err
 		}
+		authority = timelockSignerPDA
+	}
+	for _, buffer := range cfg.Buffers {
+		closeIxn, err := generateCloseBufferIxn(
+			&e,
+			solana.MustPublicKeyFromBase58(buffer),
+			e.BlockChains.SolanaChains()[cfg.ChainSelector].DeployerKey.PublicKey(), // always redeem to the deployer key
+			authority,
+		)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate close buffer instruction: %w", err)
+		}
+		if cfg.MCMS == nil {
+			if err := e.BlockChains.SolanaChains()[cfg.ChainSelector].Confirm([]solana.Instruction{closeIxn}); err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+			}
+		} else {
+			closeTx, err := BuildMCMSTxn(closeIxn, solana.BPFLoaderUpgradeableProgramID.String(), shared.BPFUpgradeable)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to create close transaction: %w", err)
+			}
+			txns = append(txns, *closeTx)
+		}
+	}
+	if len(txns) > 0 {
+		proposal, err := BuildProposalsForTxns(
+			e, cfg.ChainSelector, "proposal to close existing programs", cfg.MCMS.MinDelay, txns)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
+		}
+		return cldf.ChangesetOutput{
+			MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
+		}, nil
 	}
 	return cldf.ChangesetOutput{}, nil
 }
