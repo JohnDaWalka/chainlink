@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -183,7 +184,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	}
 
 	i.lggr.Infow("offramp address", "offrampAddrStr", config.Config.OfframpAddress, "selector", config.Config.ChainSelector)
-	contractReaders, chainWriters, err := i.createReadersAndWriters(
+	contractReaders, extendedReaders, chainWriters, err := i.createReadersAndWriters(
 		ctx,
 		pluginServices.ChainRW,
 		destChainID,
@@ -198,7 +199,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	}
 
 	// Create chain accessors
-	chainAccessors, err := i.createChainAccessors(contractReaders, chainWriters, pluginServices)
+	chainAccessors, err := i.createChainAccessors(extendedReaders, chainWriters, pluginServices)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain accessors: %w", err)
 	}
@@ -231,7 +232,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		config,
 		destRelayID,
 		chainAccessors,
-		contractReaders,
+		extendedReaders,
 		chainWriters,
 		destChainWriter,
 		destFromAccounts,
@@ -283,7 +284,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		return nil, err
 	}
 
-	closers := make([]io.Closer, 0, len(contractReaders)+len(chainWriters))
+	closers := make([]io.Closer, 0, len(extendedReaders)+len(chainWriters))
 	for _, cr := range contractReaders {
 		closers = append(closers, cr)
 	}
@@ -298,7 +299,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	config cctypes.OCR3ConfigWithMeta,
 	destRelayID types.RelayID,
 	chainAccessors map[cciptypes.ChainSelector]cciptypes.ChainAccessor,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	extendedReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChainWriter types.ContractWriter,
 	destFromAccounts []string,
@@ -341,7 +342,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				HomeChainReader:   i.homeChainReader,
 				HomeChainSelector: i.homeChainSelector,
 				ChainAccessors:    chainAccessors,
-				ContractReaders:   contractReaders,
+				ExtendedReaders:   extendedReaders,
 				ContractWriters:   chainWriters,
 				RmnPeerClient:     rmnPeerClient,
 				RmnCrypto:         pluginConfig.RMNCrypto})
@@ -402,7 +403,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				TokenDataEncoder: pluginConfig.TokenDataEncoder,
 				EstimateProvider: pluginConfig.GasEstimateProvider,
 				ChainAccessors:   chainAccessors,
-				ContractReaders:  contractReaders,
+				ExtendedReaders:  extendedReaders,
 				ContractWriters:  chainWriters,
 			})
 		factory = promwrapper.NewReportingPluginFactory(
@@ -452,7 +453,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 }
 
 func (i *pluginOracleCreator) createChainAccessors(
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	extendedReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	pluginServices ccipcommon.PluginServices,
 ) (map[cciptypes.ChainSelector]cciptypes.ChainAccessor, error) {
@@ -465,12 +466,12 @@ func (i *pluginOracleCreator) createChainAccessors(
 		chainSelector := cciptypes.ChainSelector(chainDetails.ChainSelector)
 		chainAccessor, err := pluginServices.PluginConfig.ChainAccessorFactory.NewChainAccessor(
 			ccipcommon.ChainAccessorFactoryParams{
-				Lggr:           i.lggr,
-				Relayer:        relayer,
-				ChainSelector:  chainSelector,
-				ContractReader: contractReaders[chainSelector],
-				ContractWriter: chainWriters[chainSelector],
-				AddrCodec:      pluginServices.AddrCodec,
+				Lggr:                   i.lggr,
+				Relayer:                relayer,
+				ChainSelector:          chainSelector,
+				ExtendedContractReader: extendedReaders[chainSelector],
+				ContractWriter:         chainWriters[chainSelector],
+				AddrCodec:              pluginServices.AddrCodec,
 			},
 		)
 		if err != nil {
@@ -516,12 +517,13 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 	destAddrStr string,
 ) (
 	map[cciptypes.ChainSelector]types.ContractReader,
+	map[cciptypes.ChainSelector]contractreader.Extended,
 	map[cciptypes.ChainSelector]types.ContractWriter,
 	error,
 ) {
 	ofc, err := decodeAndValidateOffchainConfig(pluginType, publicCfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var execBatchGasLimit uint64
@@ -535,11 +537,11 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 
 	homeChainID, err := chainsel.GetChainIDFromSelector(uint64(i.homeChainSelector))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get chain ID from chain selector %d: %w", i.homeChainSelector, err)
+		return nil, nil, nil, fmt.Errorf("failed to get chain ID from chain selector %d: %w", i.homeChainSelector, err)
 	}
 
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
-	i.lggr.Infow("RELAYER MAP", "keys", i.relayers)
+	extendedReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
 	chainWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	for relayID, relayer := range i.relayers {
 		chainID := relayID.ChainID
@@ -547,7 +549,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		chainDetails, err1 := chainsel.GetChainDetailsByChainIDAndFamily(chainID, relayChainFamily)
 		chainSelector := cciptypes.ChainSelector(chainDetails.ChainSelector)
 		if err1 != nil {
-			return nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID, err1)
+			return nil, nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID, err1)
 		}
 
 		i.lggr.Infow("INSIDE RELAYER LOOP", "relayID", relayID, "relayChainFam", relayChainFamily)
@@ -565,7 +567,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			Transmitters: i.transmitters,
 		})
 		if err1 != nil {
-			return nil, nil, err1
+			return nil, nil, nil, err1
 		}
 
 		i.lggr.Infow("CW CONDITION DEBUG",
@@ -584,14 +586,14 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 				},
 			})
 			if err2 != nil {
-				return nil, nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chainID, offrampAddress, err2)
+				return nil, nil, nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chainID, offrampAddress, err2)
 			}
 		}
 
 		i.lggr.Infow("START CHAIN READER")
 
 		if err2 := cr.Start(ctx); err2 != nil {
-			return nil, nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chainID, err2)
+			return nil, nil, nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chainID, err2)
 		}
 
 		i.lggr.Infow("CHAINREADER STARTED")
@@ -617,31 +619,50 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			SolanaChainWriterConfigVersion: solanaChainWriterConfigVersion,
 		})
 		if err1 != nil {
-			return nil, nil, err1
+			return nil, nil, nil, err1
 		}
 
 		i.lggr.Infow("starting CW FOR: ", cw)
 
 		if err4 := cw.Start(ctx); err4 != nil {
-			return nil, nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chainID, err4)
+			return nil, nil, nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chainID, err4)
+		}
+
+		extendedCr, err := wrapContractReaderInObservedExtended(i.lggr, cr, chainSelector)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to wrap contract reader for chain %s: %w", chainID, err)
 		}
 
 		i.lggr.Infow("started CW")
 
 		contractReaders[chainSelector] = cr
+		extendedReaders[chainSelector] = extendedCr
 		chainWriters[chainSelector] = cw
 	}
+	return contractReaders, extendedReaders, chainWriters, nil
+}
 
-	i.lggr.Info("CHAINWRITERERS CREATED: ", chainWriters)
-	for sel, cw := range chainWriters {
-		i.lggr.Infow("CHAIN WRITER TYPE",
-			"selector", sel,
-			"type", fmt.Sprintf("%T", cw),
-			"value", cw.Name(),
-		)
+func wrapContractReaderInObservedExtended(
+	lggr logger.Logger,
+	contractReader types.ContractReader,
+	chainSelector cciptypes.ChainSelector,
+) (contractreader.Extended, error) {
+	chainFamily, err1 := chainsel.GetSelectorFamily(uint64(chainSelector))
+	if err1 != nil {
+		return nil, fmt.Errorf("failed to get chain family from selector: %w", err1)
 	}
-
-	return contractReaders, chainWriters, nil
+	chainID, err1 := chainsel.GetChainIDFromSelector(uint64(chainSelector))
+	if err1 != nil {
+		return nil, fmt.Errorf("failed to get chain id from selector: %w", err1)
+	}
+	// NewExtendedContractReader() protects against double wrapping an extended reader.
+	reader := contractreader.NewExtendedContractReader(
+		contractreader.NewObserverReader(contractReader, lggr, chainFamily, chainID),
+	)
+	if reader == nil {
+		return nil, fmt.Errorf("failed to create extended contract reader for chain selector %d", chainSelector)
+	}
+	return reader, nil
 }
 
 func decodeAndValidateOffchainConfig(
