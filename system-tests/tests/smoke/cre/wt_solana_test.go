@@ -14,7 +14,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	sol_binary "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -24,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	sol "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
@@ -296,13 +296,8 @@ func (w *writer) generateSignatures(report []byte, reportCtx []byte) ([][]byte, 
 
 type decimalReport struct {
 	Timestamp uint32
-	Answer    uint128
+	Answer    *big.Int
 	DataID    [16]byte
-}
-
-type uint128 struct {
-	Lo uint64
-	Hi uint64
 }
 
 func (w *writer) getRemainings() (solana.AccountMetaSlice, error) {
@@ -353,24 +348,30 @@ func (w *writer) getRemainings() (solana.AccountMetaSlice, error) {
 }
 
 func (w *writer) createEncodedReport(m *pb.Metadata, remainings solana.AccountMetaSlice) ([]byte, error) {
+	encoder, err := w.createEncoder()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encoder: %w", err)
+	}
 	ts := uint32(time.Now().Unix()) //nolint:gosec // disable G115
 
-	var reports []decimalReport
+	reports := w.generateReports(ts)
 
-	dataID, _ := new(big.Int).SetString(w.feedID, 0)
-	var data [16]byte
-	copy(data[:], dataID.Bytes())
-
-	reports = append(reports, decimalReport{
-		DataID:    data,
-		Timestamp: ts,
-		Answer:    uint128{10, 10},
-	})
-
-	payload, err := sol_binary.MarshalBorsh(reports)
-	if err != nil {
-		return nil, err
+	var buff []byte
+	for _, acc := range remainings {
+		buff = append(buff, acc.PublicKey.Bytes()...)
 	}
+
+	accsHash := sha256.Sum256(buff)
+	fakeReport := w.createFakeReport(reports, m, ts, accsHash)
+	wrappedFakeReport, err := values.NewMap(fakeReport)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wrap fake report: %w", err)
+	}
+
+	return encoder.Encode(context.TODO(), *wrappedFakeReport)
+}
+
+func (w *writer) createFakeReport(reports []any, m *pb.Metadata, ts uint32, accHash [32]byte) map[string]any {
 	meta := ocr3types.Metadata{
 		Version:          1,
 		ExecutionID:      m.WorkflowExecutionID,
@@ -383,30 +384,64 @@ func (w *writer) createEncodedReport(m *pb.Metadata, remainings solana.AccountMe
 		ReportID:         fmt.Sprintf("%04x", w.reportID),
 	}
 
-	encMeta, err := meta.Encode()
-	if err != nil {
-		return nil, err
+	return map[string]any{
+		"account_ctx_hash":          accHash,
+		"payload":                   reports,
+		ocr3types.MetadataFieldName: meta,
 	}
 
-	var buff []byte
-	for _, acc := range remainings {
-		buff = append(buff, acc.PublicKey.Bytes()...)
-	}
+}
 
-	accsHash := sha256.Sum256(buff)
-	forwarderReport, err := sol_binary.MarshalBorsh(struct {
-		AccountHash [32]byte
-		Payload     []byte
-	}{
-		AccountHash: accsHash,
-		Payload:     payload,
+func (w *writer) generateReports(ts uint32) []any {
+	var reports []any
+
+	dataID, _ := new(big.Int).SetString(w.feedID, 0)
+	var data [16]byte
+	copy(data[:], dataID.Bytes())
+
+	reports = append(reports, map[string]any{
+		"timestamp": ts,
+		"answer":    big.NewInt(12),
+		"dataId":    data,
 	})
+
+	return reports
+}
+
+func (w *writer) createEncoder() (ocr3types.Encoder, error) {
+	encoderConfig := map[string]any{
+		"report_schema": `{
+      "kind": "struct",
+      "fields": [
+        { "name": "payload", "type": { "vec": { "defined": "DecimalReport" } } }
+      ]
+    }`,
+		"defined_types": `
+		[
+      {
+        "name":"DecimalReport",
+         "type":{
+          "kind":"struct",
+          "fields":[
+            { "name":"timestamp", "type":"u32" },
+            { "name":"answer",    "type":"u128" },
+	    { "name": "dataId",   "type": {"array": ["u8",16]}}
+          ]
+        }
+      }
+    ]`,
+	}
+	wrappedEncoderConfig, err := values.NewMap(encoderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encoder config: %w", err)
+	}
+
+	encoder, err := sol.NewEncoder(wrappedEncoderConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	// encoded raw_report is META|CTX_HASH|forwarderReport|ctx
-	return append(encMeta, forwarderReport...), nil
+	return encoder, nil
 }
 
 func (w *writer) createWorkflowMetadata() (*pb.Metadata, error) {
