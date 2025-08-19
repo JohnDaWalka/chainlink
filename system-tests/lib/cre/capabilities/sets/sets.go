@@ -2,8 +2,9 @@ package sets
 
 import (
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	customcompute "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
 	consensuscapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus"
 	croncapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/cron"
 	evmcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/evm"
@@ -27,6 +28,12 @@ func NewDefaultSet(homeChainID uint64, extraAllowedPorts []int, extraAllowedIPs 
 		return nil, errors.Wrap(cErr, "failed to create cron capability")
 	}
 	capabilities = append(capabilities, cron)
+
+	customCompute, customComputeErr := customcompute.New()
+	if customComputeErr != nil {
+		return nil, errors.Wrap(customComputeErr, "failed to create custom compute capability")
+	}
+	capabilities = append(capabilities, customCompute)
 
 	c1, c1Err := consensuscapability.NewV1(homeChainID)
 	if c1Err != nil {

@@ -499,7 +499,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 		case string:
 			trimmed := strings.TrimSpace(t)
 			if trimmed == "" {
-				return 0, fmt.Errorf("chain id cannot be empty")
+				return 0, errors.New("chain id cannot be empty")
 			}
 			chainID, err = strconv.ParseUint(trimmed, 10, 64)
 			if err != nil {
@@ -522,7 +522,7 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 		}
 
 		if chainID == 0 {
-			return 0, fmt.Errorf("chain id cannot be zero")
+			return 0, errors.New("chain id cannot be zero")
 		}
 
 		return chainID, nil
@@ -894,9 +894,6 @@ func (w *ManageWorkflowWithCRECLIInput) Validate() error {
 type InstallableCapability interface {
 	// Flag returns the unique identifier used in TOML configurations and internal references
 	Flag() CapabilityFlag
-
-	// Validate performs any precondition checks required before the capability can be installed
-	Validate() error
 
 	// JobSpecFn returns a function that generates job specifications for this capability
 	// based on the provided input configuration and topology

@@ -19,11 +19,6 @@ func (c *Capability) Flag() cre.CapabilityFlag {
 	return c.flag
 }
 
-// TODO remove from the interface, validation should be done in the builder
-func (c *Capability) Validate() error {
-	return nil
-}
-
 func (c *Capability) JobSpecFn() cre.JobSpecFn {
 	return c.jobSpecFn
 }
@@ -73,18 +68,18 @@ func WithValidateFn(validateFn func(*Capability) error) Option {
 }
 
 func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
-	cap := &Capability{
+	capability := &Capability{
 		flag: flag,
 	}
 	for _, opt := range opts {
-		opt(cap)
+		opt(capability)
 	}
 
-	if cap.validateFn != nil {
-		if err := cap.validateFn(cap); err != nil {
-			return nil, errors.Wrapf(err, "failed to validate capability %s", cap.flag)
+	if capability.validateFn != nil {
+		if err := capability.validateFn(capability); err != nil {
+			return nil, errors.Wrapf(err, "failed to validate capability %s", capability.flag)
 		}
 	}
 
-	return cap, nil
+	return capability, nil
 }
