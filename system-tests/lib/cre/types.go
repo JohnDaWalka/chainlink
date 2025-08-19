@@ -19,7 +19,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/nix"
@@ -265,6 +264,9 @@ type ConfigureKeystoneInput struct {
 	OCR3Config  keystone_changeset.OracleConfig
 	OCR3Address *common.Address
 
+	DONTimeConfig  keystone_changeset.OracleConfig
+	DONTimeAddress *common.Address
+
 	VaultOCR3Config  keystone_changeset.OracleConfig
 	VaultOCR3Address *common.Address
 
@@ -490,18 +492,40 @@ func (c *CapabilitiesAwareNodeSet) ParseChainCapabilities() error {
 	}
 
 	var parseChainID = func(v any) (uint64, error) {
+		var chainID uint64
+		var err error
+
 		switch t := v.(type) {
 		case string:
-			return strconv.ParseUint(strings.TrimSpace(t), 10, 64)
+			trimmed := strings.TrimSpace(t)
+			if trimmed == "" {
+				return 0, fmt.Errorf("chain id cannot be empty")
+			}
+			chainID, err = strconv.ParseUint(trimmed, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid chain id string '%s': %w", trimmed, err)
+			}
 		case int64:
-			return libc.MustSafeUint64(t), nil
+			if t < 0 {
+				return 0, fmt.Errorf("chain id cannot be negative: %d", t)
+			}
+			chainID = uint64(t)
 		case int:
-			return libc.MustSafeUint64FromInt(t), nil
+			if t < 0 {
+				return 0, fmt.Errorf("chain id cannot be negative: %d", t)
+			}
+			chainID = uint64(t)
 		case uint64:
-			return t, nil
+			chainID = t
 		default:
 			return 0, fmt.Errorf("invalid chain id type: %T. Supported types are string, int64, int, uint64", v)
 		}
+
+		if chainID == 0 {
+			return 0, fmt.Errorf("chain id cannot be zero")
+		}
+
+		return chainID, nil
 	}
 
 	for capName, capValue := range capMap {

@@ -45,6 +45,17 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 		return nil, errors.Wrap(err, "failed to get Vault capability address")
 	}
 
+	donTimeKey := datastore.NewAddressRefKey(
+		donTopology.HomeChainSelector,
+		datastore.ContractType(keystone_changeset.OCR3Capability.String()),
+		semver.MustParse("1.0.0"),
+		"DONTime",
+	)
+	donTimeAddress, err := ds.Addresses().Get(donTimeKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get DON Time address")
+	}
+
 	for _, donWithMetadata := range donTopology.DonsWithMetadata {
 		if !flags.HasFlag(donWithMetadata.Flags, cre.ConsensusCapability) {
 			continue
@@ -103,6 +114,7 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, ds datastore.DataStore, chai
 				return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
 			}
 			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainID))
+			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainID))
 		}
 	}
 
@@ -119,31 +131,35 @@ func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[s
 	}
 }
 
-var V2JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
-	configGen := func(_ zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
-		// Build runtime fallbacks for any missing values
-		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
+type consensusV2JobConfigGenerator struct {
+	input *cre.JobSpecInput
+}
 
-		// Apply runtime fallbacks only for keys not specified by user
-		templateData, aErr := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
-		if aErr != nil {
-			return "", errors.Wrap(aErr, "failed to apply runtime values")
-		}
+func (c *consensusV2JobConfigGenerator) Generate(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
+	// Build runtime fallbacks for any missing values
+	runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
 
-		// Parse and execute template
-		tmpl, err := template.New("consensusConfig").Parse(consensusConfigTemplate)
-		if err != nil {
-			return "", errors.Wrap(err, "failed to parse consensus config template")
-		}
-
-		var configBuffer bytes.Buffer
-		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-			return "", errors.Wrap(err, "failed to execute consensus config template")
-		}
-
-		return configBuffer.String(), nil
+	// Apply runtime fallbacks only for keys not specified by user
+	templateData, aErr := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+	if aErr != nil {
+		return "", errors.Wrap(aErr, "failed to apply runtime values")
 	}
 
+	// Parse and execute template
+	tmpl, err := template.New("consensusConfig").Parse(consensusConfigTemplate)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse consensus config template")
+	}
+
+	var configBuffer bytes.Buffer
+	if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+		return "", errors.Wrap(err, "failed to execute consensus config template")
+	}
+
+	return configBuffer.String(), nil
+}
+
+var V2JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	return ocr.GenerateJobSpecsForStandardCapabilityWithOCR(
 		input.DonTopology,
 		input.CldEnvironment.DataStore,
@@ -151,10 +167,10 @@ var V2JobSpecFn = func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		input.InfraInput,
 		"capability_consensus",
 		cre.ConsensusCapabilityV2,
-		ocr.CapabilityAppliesPerDonFn,
-		ocr.EnabledForHomeChainFn,
-		configGen,
-		ocr.ConfigMergePerDonFn,
+		&ocr.CapabilityEnablerPerDon{},
+		&ocr.RegistryChainOnlyProvider{},
+		&consensusV2JobConfigGenerator{input: input},
+		&ocr.ConfigMergerPerDon{},
 		input.CapabilityConfigs,
 	)
 }
