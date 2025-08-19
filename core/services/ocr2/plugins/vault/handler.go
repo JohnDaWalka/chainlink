@@ -65,6 +65,7 @@ type service interface {
 	Execute(ctx context.Context, request capabilities.CapabilityRequest) (capabilities.CapabilityResponse, error)
 	CreateSecrets(ctx context.Context, request *vault.CreateSecretsRequest) (*Response, error)
 	UpdateSecrets(ctx context.Context, request *vault.UpdateSecretsRequest) (*Response, error)
+	DeleteSecrets(ctx context.Context, request *vault.DeleteSecretsRequest) (*Response, error)
 	ListSecretIdentifiers(ctx context.Context, request *vault.ListSecretIdentifiersRequest) (*Response, error)
 }
 
@@ -105,6 +106,8 @@ func (h *Handler) HandleGatewayMessage(ctx context.Context, gatewayID string, re
 		response = h.handleSecretsUpdate(ctx, gatewayID, req)
 	case vault_api.MethodSecretsList:
 		response = h.handleSecretsList(ctx, gatewayID, req)
+	case vault_api.MethodSecretsDelete:
+		response = h.handleSecretsDelete(ctx, gatewayID, req)
 	default:
 		response = h.errorResponse(ctx, gatewayID, req, api.UnsupportedMethodError, errors.New("unsupported method: "+req.Method))
 	}
@@ -181,6 +184,30 @@ func (h *Handler) handleSecretsList(ctx context.Context, gatewayID string, req *
 	resp, err := h.vault.ListSecretIdentifiers(ctx, r)
 	if err != nil {
 		return h.errorResponse(ctx, gatewayID, req, api.HandlerError, fmt.Errorf("failed to list secret identifiers: %w", err))
+	}
+
+	resultBytes, err := resp.ToJSONRPCResult()
+	if err != nil {
+		return h.errorResponse(ctx, gatewayID, req, api.NodeReponseEncodingError, err)
+	}
+
+	return &jsonrpc.Response[json.RawMessage]{
+		Version: jsonrpc.JsonRpcVersion,
+		ID:      req.ID,
+		Method:  req.Method,
+		Result:  (*json.RawMessage)(&resultBytes),
+	}
+}
+
+func (h *Handler) handleSecretsDelete(ctx context.Context, gatewayID string, req *jsonrpc.Request[json.RawMessage]) *jsonrpc.Response[json.RawMessage] {
+	r := &vault.DeleteSecretsRequest{}
+	if err := json.Unmarshal(*req.Params, r); err != nil {
+		return h.errorResponse(ctx, gatewayID, req, api.UserMessageParseError, err)
+	}
+
+	resp, err := h.vault.DeleteSecrets(ctx, r)
+	if err != nil {
+		return h.errorResponse(ctx, gatewayID, req, api.HandlerError, fmt.Errorf("failed to delete secrets: %w", err))
 	}
 
 	resultBytes, err := resp.ToJSONRPCResult()

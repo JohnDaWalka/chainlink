@@ -508,6 +508,39 @@ func TestService_CRUD(t *testing.T) {
 			},
 		},
 		{
+			name: "UpdateSecrets_InvalidRequests_DuplicateIDs",
+			response: &Response{
+				ID:      "response-id",
+				Payload: []byte("hello world"),
+				Format:  "protobuf",
+			},
+			error: "duplicate secret ID found",
+			call: func(t *testing.T, service *Service) (*Response, error) {
+				req := &vault.UpdateSecretsRequest{
+					RequestId: requestID,
+					EncryptedSecrets: []*vault.EncryptedSecret{
+						{
+							Id: &vault.SecretIdentifier{
+								Key:       "Foo",
+								Namespace: "Bar",
+								Owner:     "Owner",
+							},
+							EncryptedValue: "encrypted-value",
+						},
+						{
+							Id: &vault.SecretIdentifier{
+								Key:       "Foo",
+								Namespace: "Bar",
+								Owner:     "Owner",
+							},
+							EncryptedValue: "encrypted-value",
+						},
+					},
+				}
+				return service.UpdateSecrets(t.Context(), req)
+			},
+		},
+		{
 			name:     "ListSecretIdentifiers_Invalid_OwnerMissing",
 			response: nil,
 			error:    "owner must not be empty",
@@ -544,6 +577,128 @@ func TestService_CRUD(t *testing.T) {
 					Owner:     owner,
 				}
 				return service.ListSecretIdentifiers(t.Context(), req)
+			},
+		},
+		{
+			name:     "DeleteSecrets_Invalid_BatchTooBig",
+			response: nil,
+			error:    "request batch size exceeds maximum of 10",
+			call: func(t *testing.T, service *Service) (*Response, error) {
+				req := &vault.DeleteSecretsRequest{
+					RequestId: requestID,
+					Ids: []*vault.SecretIdentifier{
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+					},
+				}
+				return service.DeleteSecrets(t.Context(), req)
+			},
+		},
+		{
+			name:     "DeleteSecrets_Invalid_RequestIDMissing",
+			response: nil,
+			error:    "request ID must not be empty",
+			call: func(t *testing.T, service *Service) (*Response, error) {
+				req := &vault.DeleteSecretsRequest{
+					RequestId: "",
+				}
+				return service.DeleteSecrets(t.Context(), req)
+			},
+		},
+		{
+			name: "DeleteSecrets",
+			response: &Response{
+				ID:      "response-id",
+				Payload: []byte("hello world"),
+				Format:  "protobuf",
+			},
+			call: func(t *testing.T, service *Service) (*Response, error) {
+				req := &vault.DeleteSecretsRequest{
+					RequestId: requestID,
+					Ids: []*vault.SecretIdentifier{
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+					},
+				}
+				return service.DeleteSecrets(t.Context(), req)
+			},
+		},
+		{
+			name:  "DeleteSecrets_Invalid_Duplicates",
+			error: "duplicate secret ID found",
+			call: func(t *testing.T, service *Service) (*Response, error) {
+				req := &vault.DeleteSecretsRequest{
+					RequestId: requestID,
+					Ids: []*vault.SecretIdentifier{
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+						{
+							Key:       "Foo",
+							Namespace: "Bar",
+							Owner:     owner,
+						},
+					},
+				}
+				return service.DeleteSecrets(t.Context(), req)
 			},
 		},
 	}

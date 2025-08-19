@@ -159,6 +159,69 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 		wg.Wait()
 	})
 
+	t.Run("happy path - delete secrets", func(t *testing.T) {
+		var wg sync.WaitGroup
+		h, callbackCh, don := setupHandler(t)
+		don.On("SendToNode", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		id := &vault.SecretIdentifier{
+			Key:       "foo",
+			Namespace: "default",
+			Owner:     "owner-id",
+		}
+		reqData := &vault.DeleteSecretsRequest{
+			RequestId: "id",
+			Ids: []*vault.SecretIdentifier{
+				id,
+			},
+		}
+		reqDatab, err := json.Marshal(reqData)
+		require.NoError(t, err)
+
+		validJSONRequest := jsonrpc.Request[json.RawMessage]{
+			ID:     "1",
+			Method: MethodSecretsDelete,
+			Params: (*json.RawMessage)(&reqDatab),
+		}
+
+		responseData := &vault.DeleteSecretsResponse{
+			Responses: []*vault.DeleteSecretResponse{
+				{
+					Id:      id,
+					Success: true,
+				},
+			},
+		}
+		resultBytes, err := json.Marshal(responseData)
+
+		require.NoError(t, err)
+		response := jsonrpc.Response[json.RawMessage]{
+			ID:     "1",
+			Result: (*json.RawMessage)(&resultBytes),
+			Method: MethodSecretsList,
+		}
+		resultBytes, err = json.Marshal(responseData)
+		require.NoError(t, err)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			callback := <-callbackCh
+			var secretsResponse jsonrpc.Response[vault.DeleteSecretsResponse]
+			err2 := json.Unmarshal(callback.RawResponse, &secretsResponse)
+			assert.NoError(t, err2)
+			assert.Equal(t, validJSONRequest.ID, secretsResponse.ID, "Request ID should match")
+			assert.True(t, proto.Equal(secretsResponse.Result, responseData), "Response data should match")
+		}()
+
+		err = h.HandleJSONRPCUserMessage(t.Context(), validJSONRequest, callbackCh)
+		require.NoError(t, err)
+
+		err = h.HandleNodeMessage(t.Context(), &response, NodeOne.Address)
+		require.NoError(t, err)
+		wg.Wait()
+	})
+
 	t.Run("unsupported method", func(t *testing.T) {
 		var wg sync.WaitGroup
 		h, callbackCh, don := setupHandler(t)

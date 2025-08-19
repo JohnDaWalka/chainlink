@@ -6,6 +6,7 @@ const (
 	MethodSecretsCreate = "vault.secrets.create"
 	MethodSecretsUpdate = "vault.secrets.update"
 	MethodSecretsList   = "vault.secrets.list"
+	MethodSecretsDelete = "vault.secrets.delete"
 )
 
 type SecretsCreateRequest struct {
