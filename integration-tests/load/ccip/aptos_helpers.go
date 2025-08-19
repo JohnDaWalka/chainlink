@@ -107,7 +107,8 @@ func fundAptosLoadAccountsWithBnM(
 		"tokenAddress", bnmTokenAddr.String(),
 		"deployerAddress", deployerAddr.String())
 
-	transferAmount := uint64(1e9)
+	// Transfer small amount since token is 8 decimals
+	transferAmount := uint64(1e7)
 
 	aptosClient, ok := client.(*aptos.Client)
 	if !ok {

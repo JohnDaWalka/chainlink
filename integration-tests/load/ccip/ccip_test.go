@@ -351,6 +351,15 @@ func TestCCIPLoad_RPS(t *testing.T) {
 			continue
 		}
 
+		hasTokenTransfer := false
+
+		for _, src := range *config.CCIP.Load.MessageDetails {
+			if src.MsgType != nil && *src.MsgType == "TokenTransfer" && *src.Ratio > 0 {
+				hasTokenTransfer = true
+				break
+			}
+		}
+
 		g := new(errgroup.Group)
 		for _, src := range srcChains {
 			src := src
@@ -360,10 +369,11 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				switch selFamily {
 				case selectors.FamilyEVM:
 					if *userOverrides.Testnet {
-						return nil
+						if !hasTokenTransfer {
+							return nil
+						}
 						err := fundLoadAccountsWithBnM(
 							lggr,
-							state,
 							*env,
 							src,
 							[]*bind.TransactOpts{evmSourceKeys[cs][src]},
@@ -388,7 +398,9 @@ func TestCCIPLoad_RPS(t *testing.T) {
 						)
 					}
 				case selectors.FamilyAptos:
-					return nil
+					if !hasTokenTransfer {
+						return nil
+					}
 					return fundAptosLoadAccountsWithBnM(
 						lggr,
 						*env,

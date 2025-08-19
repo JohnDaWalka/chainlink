@@ -254,13 +254,15 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 
 	if dstSelFamily == selectors.FamilyAptos && len(msg.TokenAmounts) > 0 {
 		for _, tokenAmount := range msg.TokenAmounts {
-			err = testhelpers.ApproveToken(m.env, src, tokenAmount.Token, r.Address(), tokenAmount.Amount)
+			// Use a sufficiently large approval amount to handle multiple transactions
+			approvalAmount := new(big.Int).Mul(big.NewInt(1_000_000), big.NewInt(1e18))
+			err = testhelpers.ApproveToken(m.env, src, tokenAmount.Token, r.Address(), approvalAmount)
 			if err != nil {
 				return fmt.Errorf("failed to approve token %s for router: %w", tokenAmount.Token.Hex(), err)
 			}
 			m.l.Infow("Approved token for router (Aptos destination)",
 				"token", tokenAmount.Token.Hex(),
-				"amount", tokenAmount.Amount,
+				"amount", approvalAmount,
 				"router", r.Address().Hex())
 		}
 	}
@@ -432,22 +434,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			return router.ClientEVM2AnyMessage{}, 0, err
 		}
 
-		for symbol, versionMap := range srcChainState.LockReleaseTokenPools {
-			for _, pool := range versionMap {
-				tokenAddr, err := pool.GetToken(&bind.CallOpts{Context: context.Background()})
-				if err != nil {
-					return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("failed to get token from LockReleaseTokenPool: %w", err)
-				}
-				token = tokenAddr
-				m.l.Infow("Using token from LockReleaseTokenPool for Aptos destination",
-					"tokenSymbol", symbol,
-					"poolAddress", pool.Address().Hex(),
-					"tokenAddress", token.Hex())
-				break
-			}
-			if token != (common.Address{}) {
-				break
-			}
+		if *m.testConfig.Testnet {
+			token = TestnetBnMTokenAddress[src]
 		}
 
 		if token == (common.Address{}) {
@@ -684,7 +672,7 @@ func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendReque
 
 		tokenAmounts = []testhelpers.AptosTokenAmount{{
 			Token:  bnmToken,
-			Amount: 1e8,
+			Amount: 1e2,
 		}}
 	}
 

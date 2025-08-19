@@ -48,7 +48,7 @@ const (
 
 var (
 	// TMP for testnet
-	fundingAmount = deployment.UBigInt(200000000000000000) // 0.5 ETH
+	fundingAmount = deployment.UBigInt(900000000000000000) // 0.5 ETH
 	// fundingAmount = new(big.Int).Mul(deployment.UBigInt(1), deployment.UBigInt(1e18)) // 100 eth
 )
 
@@ -653,23 +653,8 @@ func approveBnmForLoadTestAccount(
 	if !exists {
 		return fmt.Errorf("no state available for source chain %d", src)
 	}
-	var bnmTokenAddr common.Address
-	for _, versionMap := range srcChainState.LockReleaseTokenPools {
-		for _, pool := range versionMap {
-			tokenAddr, err := pool.GetToken(&bind.CallOpts{Context: context.Background()})
-			if err != nil {
-				return fmt.Errorf("failed to get token from LockReleaseTokenPool: %w", err)
-			}
-			bnmTokenAddr = tokenAddr
-			break
-		}
-		if bnmTokenAddr != (common.Address{}) {
-			break
-		}
-	}
-	if bnmTokenAddr == (common.Address{}) {
-		return fmt.Errorf("no BnM token found in LockReleaseTokenPools for chain %d", src)
-	}
+
+	bnmTokenAddr := TestnetBnMTokenAddress[src]
 
 	bnmToken, err := burn_mint_erc677.NewBurnMintERC677(bnmTokenAddr, e.BlockChains.EVMChains()[src].Client)
 	if err != nil {
@@ -694,7 +679,6 @@ func approveBnmForLoadTestAccount(
 
 func fundLoadAccountsWithBnM(
 	lggr logger.Logger,
-	state stateview.CCIPOnChainState,
 	e cldf.Environment,
 	src uint64,
 	loadAccounts []*bind.TransactOpts,
@@ -702,29 +686,11 @@ func fundLoadAccountsWithBnM(
 	srcDeployer := e.BlockChains.EVMChains()[src].DeployerKey
 	lggr.Infow("Funding load test accounts with BnM tokens", "src", src, "numAccounts", len(loadAccounts))
 
-	// Find BnM token from LockReleaseTokenPool (same logic as in destination_gun)
-	srcChainState, exists := state.Chains[src]
-	if !exists {
-		return fmt.Errorf("no state available for source chain %d", src)
-	}
-
-	var bnmTokenAddr common.Address
-	for _, versionMap := range srcChainState.LockReleaseTokenPools {
-		for _, pool := range versionMap {
-			tokenAddr, err := pool.GetToken(&bind.CallOpts{Context: context.Background()})
-			if err != nil {
-				return fmt.Errorf("failed to get token from LockReleaseTokenPool: %w", err)
-			}
-			bnmTokenAddr = tokenAddr
-			break
-		}
-		if bnmTokenAddr != (common.Address{}) {
-			break
-		}
-	}
+	// Check for lock release token pools
+	bnmTokenAddr := TestnetBnMTokenAddress[src]
 
 	if bnmTokenAddr == (common.Address{}) {
-		return fmt.Errorf("no LockReleaseTokenPool found for chain %d", src)
+		return fmt.Errorf("no BnM token found for chain %d", src)
 	}
 
 	// Create BurnMintERC677 contract instance
