@@ -37,10 +37,10 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 	infraInput *infra.Input,
 	contractName string,
 	flag cre.CapabilityFlag,
-	capabilityAppliesFn HowCapabilityAppliesFn,
-	enabledChainsFn EnabledChainsFn,
-	jobConfigGenFn JobConfigGenFn,
-	mergeConfigFn ConfigMergeFn,
+	capabilityEnabler CapabilityEnabler,
+	enabledChainsProvider EnabledChainsProvider,
+	jobConfigGenerator JobConfigGenerator,
+	configMerger ConfigMerger,
 	capabilitiesConfig map[string]cre.CapabilityConfig,
 ) (cre.DonsToJobSpecs, error) {
 	if donTopology == nil {
@@ -51,12 +51,16 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 		return nil, errors.New("infra input is nil")
 	}
 
+	if configMerger == nil {
+		return nil, errors.New("config merger is nil")
+	}
+
 	donToJobSpecs := make(cre.DonsToJobSpecs)
 
 	logger := framework.L
 
 	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
-		if !capabilityAppliesFn(nodeSetInput[donIdx], flag) {
+		if !capabilityEnabler.IsEnabled(nodeSetInput[donIdx], flag) {
 			continue
 		}
 
@@ -123,7 +127,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 		}
 
-		chainIDs := enabledChainsFn(donTopology, nodeSetInput[donIdx], flag)
+		chainIDs := enabledChainsProvider.EnabledChains(donTopology, nodeSetInput[donIdx], flag)
 
 		for _, chainIDUint64 := range chainIDs {
 			chainIDStr := strconv.FormatUint(chainIDUint64, 10)
@@ -136,7 +140,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, contractName, ocr3ConfigContractAddress.Address, chainIDUint64))
 			logger.Debug().Msgf("Found deployed '%s' OCR3 contract on chain %d at %s", contractName, chainIDUint64, ocr3ConfigContractAddress.Address)
 
-			mergedConfig, enabled, rErr := mergeConfigFn(flag, nodeSetInput[donIdx], chainIDUint64, capabilityConfig)
+			mergedConfig, enabled, rErr := configMerger.Merge(flag, nodeSetInput[donIdx], chainIDUint64, capabilityConfig)
 			if rErr != nil {
 				return nil, errors.Wrap(rErr, "failed to merge capability config")
 			}
@@ -207,7 +211,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 
 				logger.Debug().Msgf("Creating %s Capability job spec for chainID: %d, selector: %d, DON:%q, node:%q", flag, chainIDUint64, chain.Selector, donWithMetadata.Name, nodeID)
 
-				jobConfig, cErr := jobConfigGenFn(logger, chainIDUint64, nodeAddress, mergedConfig)
+				jobConfig, cErr := jobConfigGenerator.Generate(logger, chainIDUint64, nodeAddress, mergedConfig)
 				if cErr != nil {
 					return nil, errors.Wrap(cErr, "failed to generate job config")
 				}
@@ -242,10 +246,13 @@ func getBoostrapWorkflowNames(donWithMetadata *cre.DonWithMetadata, nodeSetInput
 	return internalHostsBS
 }
 
-type ConfigMergeFn func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error)
-type JobConfigGenFn func(zerolog.Logger, uint64, string, map[string]any) (string, error)
+type ConfigMerger interface {
+	Merge(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error)
+}
 
-var ConfigMergePerChainFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
+type ConfigMergerPerChain struct{}
+
+func (c *ConfigMergerPerChain) Merge(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
 	// Build user configuration from defaults + chain overrides
 	enabled, mergedConfig, rErr := envconfig.ResolveCapabilityForChain(flag, nodeSetInput.ChainCapabilities, capabilityConfig.Config, chainIDUint64)
 	if rErr != nil {
@@ -258,7 +265,9 @@ var ConfigMergePerChainFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.Capa
 	return mergedConfig, true, nil
 }
 
-var ConfigMergePerDonFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
+type ConfigMergerPerDon struct{}
+
+func (c *ConfigMergerPerDon) Merge(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
 	// Merge global defaults with DON-specific overrides
 	if nodeSetInput == nil {
 		return nil, false, nil
@@ -267,9 +276,18 @@ var ConfigMergePerDonFn = func(flag cre.CapabilityFlag, nodeSetInput *cre.Capabi
 	return envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSetInput.CapabilityOverrides), true, nil
 }
 
-type HowCapabilityAppliesFn func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
+type JobConfigGenFn func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error)
 
-var CapabilityAppliesPerChainsFn = func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool {
+type JobConfigGenerator interface {
+	Generate(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error)
+}
+type CapabilityEnabler interface {
+	IsEnabled(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
+}
+
+type CapabilityEnablerPerChain struct{}
+
+func (c *CapabilityEnablerPerChain) IsEnabled(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool {
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
 		return false
 	}
@@ -280,7 +298,9 @@ var CapabilityAppliesPerChainsFn = func(nodeSetInput *cre.CapabilitiesAwareNodeS
 	return true
 }
 
-var CapabilityAppliesPerDonFn = func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool {
+type CapabilityEnablerPerDon struct{}
+
+func (c *CapabilityEnablerPerDon) IsEnabled(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool {
 	if nodeSetInput == nil {
 		return false
 	}
@@ -288,9 +308,13 @@ var CapabilityAppliesPerDonFn = func(nodeSetInput *cre.CapabilitiesAwareNodeSet,
 	return flags.HasFlag(nodeSetInput.ComputedCapabilities, flag)
 }
 
-type EnabledChainsFn func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64
+type EnabledChainsProvider interface {
+	EnabledChains(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64
+}
 
-var EnabledPerChainFn = func(_ *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
+type PerEnabledChainsProvider struct{}
+
+func (c *PerEnabledChainsProvider) EnabledChains(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
 		return []uint64{}
 	}
@@ -298,6 +322,8 @@ var EnabledPerChainFn = func(_ *cre.DonTopology, nodeSetInput *cre.CapabilitiesA
 	return nodeSetInput.ChainCapabilities[flag].EnabledChains
 }
 
-var EnabledForHomeChainFn = func(donTopology *cre.DonTopology, _ *cre.CapabilitiesAwareNodeSet, _ cre.CapabilityFlag) []uint64 {
+type RegistryChainOnlyProvider struct{}
+
+func (c *RegistryChainOnlyProvider) EnabledChains(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
 	return []uint64{donTopology.HomeChainSelector}
 }

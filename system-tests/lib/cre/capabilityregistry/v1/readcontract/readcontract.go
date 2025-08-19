@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 
@@ -13,7 +12,7 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
+var CapabilityRegistryConfigFn = func(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
@@ -25,16 +24,14 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 	}
 
 	for _, chainID := range nodeSetInput.ChainCapabilities[cre.ReadContractCapability].EnabledChains {
-		if flags.HasFlag(donFlags, cre.ReadContractCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   fmt.Sprintf("read-contract-evm-%d", chainID),
-					Version:        "1.0.0",
-					CapabilityType: 1, // ACTION
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   fmt.Sprintf("read-contract-evm-%d", chainID),
+				Version:        "1.0.0",
+				CapabilityType: 1, // ACTION
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
 	}
 
 	return capabilities, nil

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 
@@ -15,7 +14,7 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
-var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
+var CapabilityRegistryConfigFn = func(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
@@ -30,17 +29,15 @@ var CapabilityRegistryConfigFn = func(donFlags []string, nodeSetInput *cre.Capab
 		fullName := corevm.GenerateWriteTargetName(chainID)
 		splitName := strings.Split(fullName, "@")
 
-		if flags.HasFlag(donFlags, cre.WriteEVMCapability) {
-			capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
-				Capability: kcr.CapabilitiesRegistryCapability{
-					LabelledName:   splitName[0],
-					Version:        splitName[1],
-					CapabilityType: 3, // TARGET
-					ResponseType:   1, // OBSERVATION_IDENTICAL
-				},
-				Config: &capabilitiespb.CapabilityConfig{},
-			})
-		}
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   splitName[0],
+				Version:        splitName[1],
+				CapabilityType: 3, // TARGET
+				ResponseType:   1, // OBSERVATION_IDENTICAL
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
 	}
 
 	return capabilities, nil
