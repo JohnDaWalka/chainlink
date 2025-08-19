@@ -23,6 +23,9 @@ cre.yaml
 *.state.yaml
 examples/**/*.yaml
 
+# CRE CLI secrets
+encrypted.secrets.json
+
 # dumped data
 env_artifact/
 bin/

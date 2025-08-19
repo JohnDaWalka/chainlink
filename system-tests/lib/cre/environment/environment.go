@@ -76,6 +76,7 @@ type SetupInput struct {
 	JdInput                   jd.Input
 	InfraInput                infra.Input
 	OCR3Config                *keystone_changeset.OracleConfig
+	DONTimeConfig             *keystone_changeset.OracleConfig
 	VaultOCR3Config           *keystone_changeset.OracleConfig
 	S3ProviderInput           *s3provider.Input
 	CapabilityConfigs         cre.CapabilityConfigs
@@ -244,6 +245,7 @@ func SetupTestEnvironment(
 			DeployConsensusOCR3:   consensusAddrFlag,
 		},
 	)
+
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
 	}
@@ -251,13 +253,20 @@ func SetupTestEnvironment(
 	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(deployKeystoneReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
 		return nil, pkgerrors.Wrap(err, "failed to merge address book with Keystone contracts addresses")
 	}
+
 	if err = memoryDatastore.Merge(deployKeystoneReport.Output.Datastore); err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
 	}
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 
+	balanceReaderAddr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.BalanceReader.String(), "1.0.0", "")
+	testLogger.Info().Msgf("Deployed BalanceReader contract on chain %d at %s", homeChainOutput.ChainSelector, balanceReaderAddr)
+
 	ocr3Addr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String(), "1.0.0", "capability_ocr3")
 	testLogger.Info().Msgf("Deployed OCR3 contract on chain %d at %s", homeChainOutput.ChainSelector, ocr3Addr)
+
+	donTimeAddr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.OCR3Capability.String(), "1.0.0", "DONTime")
+	testLogger.Info().Msgf("Deployed DON Time contract on chain %d at %s", homeChainOutput.ChainSelector, donTimeAddr)
 
 	wfRegAddr := mustGetAddress(memoryDatastore, homeChainOutput.ChainSelector, keystone_changeset.WorkflowRegistry.String(), "1.0.0", "")
 	testLogger.Info().Msgf("Deployed Workflow Registry contract on chain %d at %s", homeChainOutput.ChainSelector, wfRegAddr)
@@ -543,6 +552,7 @@ func SetupTestEnvironment(
 
 	// Configure the Forwarder, OCR3 and Capabilities contracts
 	ocr3CommonAddr := common.HexToAddress(ocr3Addr)
+	donTimeCommonAddr := common.HexToAddress(donTimeAddr)
 
 	var vaultOCR3CommonAddr common.Address
 	if vaultOCR3AddrFlag {
@@ -570,6 +580,7 @@ func SetupTestEnvironment(
 		Topology:                    topology,
 		CapabilitiesRegistryAddress: &capRegCommonAddr,
 		OCR3Address:                 &ocr3CommonAddr,
+		DONTimeAddress:              &donTimeCommonAddr,
 		VaultOCR3Address:            &vaultOCR3CommonAddr,
 		EVMOCR3Address:              &evmOCR3CommonAddr,
 		ConsensusV2OCR3Address:      &consensusV2OCR3CommonAddr,
@@ -584,6 +595,17 @@ func SetupTestEnvironment(
 			return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
 		}
 		configureKeystoneInput.OCR3Config = *ocr3Config
+	}
+
+	if input.DONTimeConfig != nil {
+		configureKeystoneInput.DONTimeConfig = *input.DONTimeConfig
+	} else {
+		donTimeConfig, donTimeConfigErr := libcontracts.DefaultOCR3Config(topology)
+		donTimeConfig.DeltaRoundMillis = 0 // Fastest rounds possible
+		if donTimeConfigErr != nil {
+			return nil, pkgerrors.Wrap(donTimeConfigErr, "failed to generate default DON Time config")
+		}
+		configureKeystoneInput.DONTimeConfig = *donTimeConfig
 	}
 
 	ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
