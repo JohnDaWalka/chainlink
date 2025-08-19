@@ -101,6 +101,7 @@ user_config_overrides = """
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
       ChipIngressEndpoint = 'chip-ingress:50051'
+      ChipIngressInsecureConnection = true
       InsecureConnection = true
       TraceSampleRatio = 1
       """

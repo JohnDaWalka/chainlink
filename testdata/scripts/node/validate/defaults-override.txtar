@@ -407,6 +407,8 @@ TraceSampleRatio = 0.01
 EmitterBatchProcessor = true
 EmitterExportTimeout = '1s'
 ChipIngressEndpoint = ''
+ChipIngressInsecureConnection = false
+ChipIngressForceIPV4 = false
 HeartbeatInterval = '1s'
 
 [Workflows]

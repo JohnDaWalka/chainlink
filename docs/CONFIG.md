@@ -2221,6 +2221,8 @@ TraceSampleRatio = 0.01 # Default
 EmitterBatchProcessor = true # Default
 EmitterExportTimeout = '1s' # Default
 ChipIngressEndpoint = '' # Default
+ChipIngressInsecureConnection = false # Default
+ChipIngressForceIPV4 = false # Default
 HeartbeatInterval = '1s' # Default
 ```
 Telemetry holds OTEL settings.
@@ -2276,6 +2278,18 @@ EmitterExportTimeout sets timeout for exporting telemetry events
 ChipIngressEndpoint = '' # Default
 ```
 ChipIngressEndpoint enables sending custom messages to CHIP Ingress.
+
+### ChipIngressInsecureConnection
+```toml
+ChipIngressInsecureConnection = false # Default
+```
+ChipIngressInsecureConnection disables TLS when connecting to CHIP Ingress.
+
+### ChipIngressForceIPV4
+```toml
+ChipIngressForceIPV4 = false # Default
+```
+ChipIngressForceIPV4 forces IPv4 when connecting to CHIP Ingress.
 
 ### HeartbeatInterval
 ```toml

@@ -89,6 +89,20 @@ func (b *telemetryConfig) ChipIngressEndpoint() string {
 	return *b.s.ChipIngressEndpoint
 }
 
+func (b *telemetryConfig) ChipIngressInsecureConnection() bool {
+	if b.s.ChipIngressInsecureConnection == nil {
+		return false
+	}
+	return *b.s.ChipIngressInsecureConnection
+}
+
+func (b *telemetryConfig) ChipIngressForceIPV4() bool {
+	if b.s.ChipIngressForceIPV4 == nil {
+		return false
+	}
+	return *b.s.ChipIngressForceIPV4
+}
+
 func (b *telemetryConfig) HeartbeatInterval() time.Duration {
 	if b.s.HeartbeatInterval == nil || b.s.HeartbeatInterval.Duration() <= 0 {
 		return defaultHeartbeatInterval
