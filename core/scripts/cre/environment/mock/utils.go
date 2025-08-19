@@ -226,6 +226,112 @@ func runSendTrigger(cmd *cobra.Command, args []string) error {
 	return SendTrigger(cmd.Context(), id, dataType, frequency, duration)
 }
 
+func runList(cmd *cobra.Command, args []string) error {
+	return List(cmd.Context())
+}
+
+// List retrieves and displays all capabilities from all connected nodes
+func List(ctx context.Context) error {
+	mocks, err := newMockCapabilityController()
+	if err != nil {
+		return err
+	}
+
+	capInfos, err := mocks.List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get capabilities: %w", err)
+	}
+
+	if len(capInfos) == 0 {
+		fmt.Println("No capabilities found on any nodes")
+		return nil
+	}
+
+	// Group capabilities by node for better readability
+	fmt.Printf("📋 Capabilities Summary\n")
+	fmt.Printf("═══════════════════════\n\n")
+
+	for _, nodeInfo := range capInfos {
+		fmt.Printf("🖥️  Node: %s\n", nodeInfo.Node)
+		fmt.Printf("   └─ Address: %s\n", nodeInfo.Node)
+
+		if len(nodeInfo.Capabilities) == 0 {
+			fmt.Printf("   └─ No capabilities registered\n\n")
+			continue
+		}
+
+		fmt.Printf("   └─ Capabilities (%d):\n", len(nodeInfo.Capabilities))
+
+		for i, c := range nodeInfo.Capabilities {
+			isLast := i == len(nodeInfo.Capabilities)-1
+			prefix := "├─"
+			if isLast {
+				prefix = "└─"
+			}
+
+			fmt.Printf("      %s 📦 %s\n", prefix, c.ID)
+
+			if c.Description != "" {
+				if isLast {
+					fmt.Printf("         └─ Description: %s\n", c.Description)
+				} else {
+					fmt.Printf("      │  └─ Description: %s\n", c.Description)
+				}
+			}
+
+			if isLast {
+				fmt.Printf("         └─ Type: %s\n", c.CapabilityType)
+			} else {
+				fmt.Printf("      │  └─ Type: %s\n", c.CapabilityType)
+			}
+
+			if isLast {
+				fmt.Printf("         └─ isLocal: %t\n", c.IsLocal)
+			} else {
+				fmt.Printf("      │  └─ isLocal: %t\n", c.IsLocal)
+			}
+		}
+		fmt.Println()
+	}
+
+	// Summary statistics
+	totalCapabilities := 0
+	capabilityTypes := make(map[string]int)
+
+	for _, nodeInfo := range capInfos {
+		for _, c := range nodeInfo.Capabilities {
+			totalCapabilities++
+			capabilityTypes[string(c.CapabilityType)]++
+		}
+	}
+
+	fmt.Printf("📊 Summary:\n")
+	fmt.Printf("   • Total Nodes: %d\n", len(capInfos))
+	fmt.Printf("   • Total Capabilities: %d\n", totalCapabilities)
+
+	if len(capabilityTypes) > 0 {
+		fmt.Printf("   • Capability Types:\n")
+		for capType, count := range capabilityTypes {
+			fmt.Printf("     - %s: %d\n", capType, count)
+		}
+	}
+
+	return nil
+}
+
+func runRegisterTrigger(cmd *cobra.Command, args []string) error {
+	return RegisterTrigger(cmd.Context())
+}
+
+func RegisterTrigger(ctx context.Context) error {
+	mocks, err := newMockCapabilityController()
+	if err != nil {
+		return err
+	}
+
+	mocks.
+}
+
 func init() {
 	MockCommand.PersistentFlags().StringSliceVar(&containerAddresses, "addresses", nil,
 		"Container addresses (format: addr1:port,addr2:port,addr3:port)")
@@ -282,5 +388,19 @@ func init() {
 		RunE:  runWatchExecutables,
 	}
 
-	MockCommand.AddCommand(createCmd, deleteCmd, triggerCmd, watchCmd)
+	// Link command
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List capabilities",
+		RunE:  runList,
+	}
+
+	// Register trigger command
+	registerTriggerCmd := &cobra.Command{
+		Use:   "register-trigger",
+		Short: "Register to a trigger",
+		RunE:  runRegisterTrigger,
+	}
+
+	MockCommand.AddCommand(createCmd, deleteCmd, triggerCmd, watchCmd, listCmd, registerTriggerCmd)
 }

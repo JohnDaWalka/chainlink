@@ -81,7 +81,8 @@ const (
 	TopologyWorkflow                    = "workflow"
 	TopologyWorkflowGateway             = "workflow-gateway"
 	TopologyWorkflowGatewayCapabilities = "workflow-gateway-capabilities"
-	TopologyMock                        = "mock"
+	TopologyMock                        = "mock"        // TODO: @george-dorin: rename to clarify that this is a multy-node mock environment
+	TopologySingleMock                  = "single-mock" // TODO: @george-dorin: rename to clarify that this is a single-node mock environment
 
 	WorkflowTriggerWebTrigger = "web-trigger"
 	WorkflowTriggerCron       = "cron"
@@ -252,8 +253,8 @@ func startCmd() *cobra.Command {
 				}
 			}
 
-			if topology != TopologyWorkflow && topology != TopologyWorkflowGatewayCapabilities && topology != TopologyWorkflowGateway && topology != TopologyMock {
-				return fmt.Errorf("invalid topology: %s. Valid topologies are: %s, %s, %s, %s", topology, TopologyWorkflow, TopologyWorkflowGatewayCapabilities, TopologyWorkflowGateway, TopologyMock)
+			if topology != TopologyWorkflow && topology != TopologyWorkflowGatewayCapabilities && topology != TopologyWorkflowGateway && topology != TopologyMock && topology != TopologySingleMock {
+				return fmt.Errorf("invalid topology: %s. Valid topologies are: %s, %s, %s, %s, %s", topology, TopologyWorkflow, TopologyWorkflowGatewayCapabilities, TopologyWorkflowGateway, TopologyMock, TopologySingleMock)
 			}
 
 			PrintCRELogo()
@@ -727,6 +728,34 @@ func StartCLIEnvironment(
 				GatewayNodeIndex:   0,
 			},
 		}
+	case TopologySingleMock:
+		if len(in.NodeSets) != 2 {
+			return nil, fmt.Errorf("expected 2 nodesets for topology %s, got %d", topologyFlag, len(in.NodeSets))
+		}
+
+		workflowDONCapabilities := []string{cre.OCR3Capability, cre.CustomComputeCapability, cre.WebAPITriggerCapability, cre.MockCapability, cre.CronCapability}
+
+		for capabilityName, binaryPath := range extraBinaries {
+			if binaryPath != "" || withPluginsDockerImageFlag != "" {
+				workflowDONCapabilities = append(workflowDONCapabilities, capabilityName)
+				capabilitiesBinaryPaths[capabilityName] = binaryPath
+			}
+		}
+		capabilitiesAwareNodeSets = []*cre.CapabilitiesAwareNodeSet{
+			{
+				Input:              in.NodeSets[0],
+				Capabilities:       workflowDONCapabilities,
+				DONTypes:           []string{cre.WorkflowDON},
+				BootstrapNodeIndex: 0,
+			},
+			{
+				Input:              in.NodeSets[1],
+				Capabilities:       []string{},
+				DONTypes:           []string{cre.GatewayDON}, // <----- it's crucial to set the correct DON type
+				BootstrapNodeIndex: -1,                       // <----- it's crucial to indicate there's no bootstrap node
+				GatewayNodeIndex:   0,
+			},
+		}
 	default:
 		return nil, fmt.Errorf("invalid topology flag: %s", topologyFlag)
 	}
@@ -998,6 +1027,11 @@ func defaultCtfConfigs(topologyFlag string) error {
 				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
 			}
 		case TopologyMock:
+			setErr := os.Setenv("CTF_CONFIGS", "configs/workflow-load.toml")
+			if setErr != nil {
+				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
+			}
+		case TopologySingleMock:
 			setErr := os.Setenv("CTF_CONFIGS", "configs/workflow-load.toml")
 			if setErr != nil {
 				return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)

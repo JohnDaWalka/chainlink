@@ -132,6 +132,19 @@ func (c *Controller) SendTrigger(ctx context.Context, message *pb2.SendTriggerEv
 	return nil
 }
 
+func (c *Controller) RegisterTrigger(ctx context.Context) error {
+	for _, clinet := range c.Nodes {
+		framework.L.Info().Msg("Registering trigger")
+		s, err := clinet.API.RegisterTrigger(ctx, &pb2.TriggerRegistrationRequest{
+			TriggerID: "",
+			Metadata:  nil,
+			Config:    nil,
+			Payload:   nil,
+			Method:    "",
+		})
+	}
+}
+
 type CapInfos struct {
 	Node         string
 	Capabilities []capabilities.CapabilityInfo
