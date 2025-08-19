@@ -1,14 +1,21 @@
 package readcontract
 
 import (
+	"errors"
+	"fmt"
+
+	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
-	readcontractregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/readcontract"
 	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 	chainlevel "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability/chainlevel"
 )
 
-const readContractConfigTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}"}'`
+const flag = cre.ReadContractCapability
+const configTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}"}'`
 
 func New() (*capabilities.Capability, error) {
 	perChainJobSpecFactory := factory.NewCapabilityJobSpecFactory(
@@ -19,10 +26,10 @@ func New() (*capabilities.Capability, error) {
 	)
 
 	return capabilities.New(
-		cre.ReadContractCapability,
+		flag,
 		capabilities.WithJobSpecFn(perChainJobSpecFactory.BuildJobSpecFn(
-			cre.ReadContractCapability,
-			readContractConfigTemplate,
+			flag,
+			configTemplate,
 			func(chainID uint64, _ *cre.NodeMetadata) map[string]any {
 				return map[string]any{
 					"ChainID":       chainID,
@@ -31,6 +38,31 @@ func New() (*capabilities.Capability, error) {
 			},
 			factory.BinaryPathBuilder,
 		)),
-		capabilities.WithCapabilityRegistryV1ConfigFn(readcontractregistry.CapabilityRegistryConfigFn),
+		capabilities.WithCapabilityRegistryV1ConfigFn(registerWithV1),
 	)
+}
+
+func registerWithV1(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
+	var capabilities []keystone_changeset.DONCapabilityWithConfig
+
+	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
+		return nil, errors.New("node set input is nil or chain capabilities is nil")
+	}
+
+	if _, ok := nodeSetInput.ChainCapabilities[flag]; !ok {
+		return nil, nil
+	}
+
+	for _, chainID := range nodeSetInput.ChainCapabilities[cre.ReadContractCapability].EnabledChains {
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   fmt.Sprintf("read-contract-evm-%d", chainID),
+				Version:        "1.0.0",
+				CapabilityType: 1, // ACTION
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
+	}
+
+	return capabilities, nil
 }

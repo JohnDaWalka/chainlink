@@ -1,14 +1,19 @@
 package mock
 
 import (
+	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
-	mockregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry/v1/mock"
 	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 	donlevel "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability/donlevel"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-const mockConfigTemplate = `"""port={{.Port}}"""`
+const flag = cre.MockCapability
+const configTemplate = `"""port={{.Port}}"""`
 
 func New() (*capabilities.Capability, error) {
 	perDonJobSpecFactory := factory.NewCapabilityJobSpecFactory(
@@ -19,13 +24,31 @@ func New() (*capabilities.Capability, error) {
 	)
 
 	return capabilities.New(
-		cre.MockCapability,
+		flag,
 		capabilities.WithJobSpecFn(perDonJobSpecFactory.BuildJobSpecFn(
-			cre.MockCapability,
-			mockConfigTemplate,
+			flag,
+			configTemplate,
 			factory.NoOpExtractor, // No runtime values extraction needed
 			factory.BinaryPathBuilder,
 		)),
-		capabilities.WithCapabilityRegistryV1ConfigFn(mockregistry.CapabilityRegistryConfigFn),
+		capabilities.WithCapabilityRegistryV1ConfigFn(registerWithV1),
 	)
+}
+
+func registerWithV1(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
+	var capabilities []keystone_changeset.DONCapabilityWithConfig
+
+	// Configuration details are irrelevant here; this is only included to satisfy validation requirements
+	if flags.HasFlag(donFlags, flag) {
+		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
+			Capability: kcr.CapabilitiesRegistryCapability{
+				LabelledName:   "mock",
+				Version:        "1.0.0",
+				CapabilityType: 0, // TRIGGER
+			},
+			Config: &capabilitiespb.CapabilityConfig{},
+		})
+	}
+
+	return capabilities, nil
 }
