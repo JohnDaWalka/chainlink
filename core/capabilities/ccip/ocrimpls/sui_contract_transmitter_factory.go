@@ -23,9 +23,10 @@ type SuiCommitCallArgs struct {
 
 // SuiExecCallArgs defines the calldata structure for an Sui execute transaction.
 type SuiExecCallArgs struct {
-	ReportContext [2][32]byte                `mapstructure:"ReportContext"`
-	Report        []byte                     `mapstructure:"Report"`
-	Info          ccipocr3.ExecuteReportInfo `mapstructure:"Info"`
+	ReportContext [2][32]byte                 `mapstructure:"ReportContext"`
+	Report        []byte                      `mapstructure:"Report"`
+	Info          ccipocr3.ExecuteReportInfo  `mapstructure:"Info"`
+	ExtraData     ccipcommon.ExtraDataDecoded `mapstructure:"ExtraData"`
 }
 
 // SuiContractTransmitterFactory implements the transmitter factory for Sui chains.
@@ -81,13 +82,20 @@ var SuiExecCallDataFunc = func(
 	rawReportCtx [2][32]byte,
 	report ocr3types.ReportWithInfo[[]byte],
 	signatures [][96]byte,
-	_ ccipcommon.ExtraDataCodec,
+	extraDataCodec ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
 	var info ccipocr3.ExecuteReportInfo
+	var extraDataDecoded ccipcommon.ExtraDataDecoded
 	if len(report.Info) != 0 {
 		info, err = ccipocr3.DecodeExecuteReportInfo(report.Info)
 		if err != nil {
 			return "", "", nil, fmt.Errorf("failed to decode execute report info: %w", err)
+		}
+		if extraDataCodec != nil {
+			extraDataDecoded, err = decodeExecDataSui(info, extraDataCodec)
+			if err != nil {
+				return "", "", nil, fmt.Errorf("failed to decode extra data: %w", err)
+			}
 		}
 	}
 	return consts.ContractNameOffRamp,
@@ -96,6 +104,7 @@ var SuiExecCallDataFunc = func(
 			ReportContext: rawReportCtx,
 			Report:        report.Report,
 			Info:          info,
+			ExtraData:     extraDataDecoded,
 		}, nil
 }
 
@@ -114,4 +123,34 @@ func (f *SuiContractTransmitterFactory) NewExecTransmitter(
 		toEd25519CalldataFn: SuiExecCallDataFunc,
 		extraDataCodec:      f.extraDataCodec,
 	}
+}
+
+// decodeExecData decodes the extra data from an execute report.
+func decodeExecDataSui(report ccipocr3.ExecuteReportInfo, codec ccipcommon.ExtraDataCodec) (ccipcommon.ExtraDataDecoded, error) {
+	// only one report one message, since this is a stop-gap solution for solana
+	if len(report.AbstractReports) != 1 {
+		return ccipcommon.ExtraDataDecoded{}, fmt.Errorf("unexpected report length, expected 1, got %d", len(report.AbstractReports))
+	}
+	if len(report.AbstractReports[0].Messages) != 1 {
+		return ccipcommon.ExtraDataDecoded{}, fmt.Errorf("unexpected message length, expected 1, got %d", len(report.AbstractReports[0].Messages))
+	}
+	message := report.AbstractReports[0].Messages[0]
+	extraDataDecoded := ccipcommon.ExtraDataDecoded{}
+
+	var err error
+	extraDataDecoded.ExtraArgsDecoded, err = codec.DecodeExtraArgs(message.ExtraArgs, report.AbstractReports[0].SourceChainSelector)
+	if err != nil {
+		return ccipcommon.ExtraDataDecoded{}, fmt.Errorf("failed to decode extra args: %w", err)
+	}
+	// stopgap solution for missing extra args for Solana. To be replaced in the future.
+	destExecDataDecoded := make([]map[string]any, len(message.TokenAmounts))
+	for i, tokenAmount := range message.TokenAmounts {
+		destExecDataDecoded[i], err = codec.DecodeTokenAmountDestExecData(tokenAmount.DestExecData, report.AbstractReports[0].SourceChainSelector)
+		if err != nil {
+			return ccipcommon.ExtraDataDecoded{}, fmt.Errorf("failed to decode token amount dest exec data: %w", err)
+		}
+	}
+	extraDataDecoded.DestExecDataDecoded = destExecDataDecoded
+
+	return extraDataDecoded, nil
 }

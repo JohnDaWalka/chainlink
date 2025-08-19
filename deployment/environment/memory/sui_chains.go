@@ -1,26 +1,14 @@
 package memory
 
 import (
-	"context"
-	"crypto/ed25519"
-	"errors"
 	"testing"
-	"time"
-
-	suisigner "github.com/block-vision/sui-go-sdk/signer"
-	"github.com/block-vision/sui-go-sdk/sui"
-
-	"github.com/smartcontractkit/freeport"
 
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
+	cldf_sui_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui/provider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
@@ -37,95 +25,18 @@ func GenerateChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	chains := make([]cldf_chain.BlockChain, 0, numChains)
 	for i := range numChains {
 		selector := testSuiChainSelectors[i]
-		chainID, err := chainsel.GetChainIDFromSelector(selector)
+
+		c, err := cldf_sui_provider.NewCTFChainProvider(t, selector,
+			cldf_sui_provider.CTFChainProviderConfig{
+				Once: once,
+			},
+		).Initialize(t.Context())
 		require.NoError(t, err)
 
-		url, _, privateKey, client := suiChain(t, chainID)
-		sui := suichain.Chain{
-			ChainMetadata: suichain.ChainMetadata{
-				Selector: selector,
-			},
-			Client:      client,
-			DeployerKey: privateKey,
-			URL:         url,
-			Confirm: func(txHash string, opts ...any) error {
-				return errors.New("TODO: sui Confirm")
-			},
-		}
-		chains = append(chains, sui)
+		chains = append(chains, c)
 	}
 	t.Logf("Created %d Sui chains: %+v", len(chains), chains)
 	return chains
-}
-
-func suiChain(t *testing.T, chainID string) (string, string, ed25519.PrivateKey, sui.ISuiAPI) {
-	t.Helper()
-
-	// initialize the docker network used by CTF
-	err := framework.DefaultNetwork(once)
-	require.NoError(t, err)
-
-	maxRetries := 10
-	var url string
-	var suiAddress string
-	var mnemonic string
-	for i := 0; i < maxRetries; i++ {
-		// reserve all the ports we need explicitly to avoid port conflicts in other tests
-		ports := freeport.GetN(t, 2)
-
-		imagePlatform := "linux/arm64"
-		bcInput := &blockchain.Input{
-			Image: "mysten/sui-tools:ci-arm64", // filled out by defaultSui function
-			Type:  "sui",
-			ImagePlatform: &imagePlatform,
-			// TODO: this is unused, can it be applied?
-			ChainID:       chainID, 
-		}
-
-		output, err := blockchain.NewBlockchainNetwork(bcInput)
-		if err != nil {
-			t.Logf("Error creating Sui network: %v", err)
-			freeport.Return(ports)
-			time.Sleep(time.Second)
-			maxRetries -= 1
-			continue
-		}
-		require.NoError(t, err)
-		testcontainers.CleanupContainer(t, output.Container)
-		url = output.Nodes[0].ExternalHTTPUrl
-
-		suiWalletInfo := output.NetworkSpecificData.SuiAccount
-		mnemonic = suiWalletInfo.Mnemonic
-		suiAddress = suiWalletInfo.SuiAddress
-		break
-	}
-
-	suiSigner, err := suisigner.NewSignertWithMnemonic(mnemonic)
-	require.NoError(t, err)
-
-	suiPrivateKey := suiSigner.PriKey
-
-	client := sui.NewSuiClient(url)
-
-	var ready bool
-	for i := 0; i < 30; i++ {
-		time.Sleep(time.Second)
-		receivedChainID, err := client.SuiGetChainIdentifier(context.Background())
-		if err != nil {
-			t.Logf("API server not ready yet (attempt %d): %+v\n", i+1, err)
-			continue
-		}
-		// we can't compare receivedChainID to chainID because it's generated from a new genesis block
-		// checkpoint each time
-		// TODO: could we keep the same genesis config each time when starting the container?
-		t.Logf("Successfully fetched chain id: %s", receivedChainID)
-		ready = true
-		break
-	}
-	require.True(t, ready, "Sui network not ready")
-	time.Sleep(15 * time.Second) // we have slot errors that force retries if the chain is not given enough time to boot
-
-	return url, suiAddress, suiPrivateKey, client
 }
 
 func createSuiChainConfig(chainID string, chain suichain.Chain) chainlink.RawConfig {

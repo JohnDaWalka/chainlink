@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 
@@ -30,7 +29,7 @@ func (d ApplyFeeToken) Apply(e cldf.Environment, config ApplyFeeTokenUpdateConfi
 	suiChains := e.BlockChains.SuiChains()
 
 	suiChain := suiChains[config.ChainSelector]
-	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+	suiSigner := suiChain.Signer
 
 	deps := SuiDeps{
 		AB: ab,

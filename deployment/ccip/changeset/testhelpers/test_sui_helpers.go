@@ -1,17 +1,10 @@
 package testhelpers
 
 import (
-	"crypto/ed25519"
-
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	sui_bind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
-	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	suicodec "github.com/smartcontractkit/chainlink-sui/relayer/codec"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 
 type suiCtx struct {
@@ -50,47 +43,6 @@ type CCIPMessageSent struct {
 	DestChainSelector uint64
 	SequenceNumber    uint64
 	Message           Sui2AnyRampMessage
-}
-
-func NewSuiCtx(e cldf.Environment, src uint64) (*suiCtx, error) {
-	st, err := stateview.LoadOnchainState(e)
-	if err != nil {
-		return nil, err
-	}
-	sc := e.BlockChains.SuiChains()[src]
-	signer := rel.NewPrivateKeySigner(sc.DeployerKey)
-	addr, err := signer.GetAddress()
-	if err != nil {
-		return nil, err
-	}
-	pub := sc.DeployerKey.Public().(ed25519.PublicKey)
-
-	deps := suideps.SuiDeps{
-		SuiChain: sui_ops.OpTxDeps{
-			Client: sc.Client,
-			Signer: signer,
-			GetCallOpts: func() *sui_bind.CallOpts {
-				b := uint64(400_000_000)
-				return &sui_bind.CallOpts{
-					WaitForExecution: true,
-					GasBudget:        &b,
-				}
-			},
-		},
-	}
-
-	return &suiCtx{
-		Deps:                deps,
-		CCIPObjectRefID:     st.SuiChains[src].CCIPObjectRef,
-		CCIPPackageID:       st.SuiChains[src].CCIPAddress,
-		OnRampPackageID:     st.SuiChains[src].OnRampAddress,
-		OnRampStateObjectID: st.SuiChains[src].OnRampStateObjectId,
-		LinkTokenPkgID:      st.SuiChains[src].LinkTokenAddress,
-		LinkTokenMetaID:     st.SuiChains[src].LinkTokenCoinMetadataId,
-		LinkTokenCapID:      st.SuiChains[src].LinkTokenTreasuryCapId,
-		SignerAddr:          addr,
-		PubKeyBytes:         []byte(pub),
-	}, nil
 }
 
 func baseCCIPConfig(

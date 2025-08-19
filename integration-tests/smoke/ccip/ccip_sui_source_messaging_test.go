@@ -11,7 +11,6 @@ import (
 	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
@@ -46,7 +45,7 @@ func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
 
 	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
-	suiSenderAddr, err := rel.NewPrivateKeySigner(e.Env.BlockChains.SuiChains()[sourceChain].DeployerKey).GetAddress()
+	suiSenderAddr, err := e.Env.BlockChains.SuiChains()[sourceChain].Signer.GetAddress()
 	require.NoError(t, err)
 
 	normalizedAddr, err := suiutil.ConvertStringToAddressBytes(suiSenderAddr)

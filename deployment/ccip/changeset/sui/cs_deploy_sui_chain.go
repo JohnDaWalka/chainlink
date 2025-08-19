@@ -14,7 +14,6 @@ import (
 	routerops "github.com/smartcontractkit/chainlink-sui/ops/ccip_router"
 	tokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_token_pool"
 	mcmsops "github.com/smartcontractkit/chainlink-sui/ops/mcms"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -39,7 +38,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		suiChains := e.BlockChains.SuiChains()
 
 		suiChain := suiChains[chainSel]
-		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+		suiSigner := suiChain.Signer
 
 		signerAddr, err := suiSigner.GetAddress()
 		if err != nil {

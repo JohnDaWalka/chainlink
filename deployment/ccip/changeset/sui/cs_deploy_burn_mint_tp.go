@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_burn_mint_token_pool"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -32,7 +31,7 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 	suiChains := e.BlockChains.SuiChains()
 
 	suiChain := suiChains[config.ChainSelector]
-	suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+	suiSigner := suiChain.Signer
 
 	signerAddr, err := suiSigner.GetAddress()
 	if err != nil {
@@ -114,9 +113,9 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 
 	// save BnM TokenPool to addressbook
 	typeAndVersionBurnMintTokenPool := cldf.NewTypeAndVersion(shared.SuiBnMTokenPoolType, deployment.Version1_5_1)
-	err = deps.AB.Save(config.ChainSelector, deployBurnMintTp.Output.BurnMintTPPackageId, typeAndVersionBurnMintTokenPool)
+	err = deps.AB.Save(config.ChainSelector, deployBurnMintTp.Output.CCIPPackageId, typeAndVersionBurnMintTokenPool)
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save BurnMintTokenPool address %s for Sui chain %d: %w", deployBurnMintTp.Output.BurnMintTPPackageId, config.ChainSelector, err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save BurnMintTokenPool address %s for Sui chain %d: %w", deployBurnMintTp.Output.CCIPPackageId, config.ChainSelector, err)
 	}
 
 	// save BnM TokenPool State to addressbook

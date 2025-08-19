@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
-	rel "github.com/smartcontractkit/chainlink-sui/relayer/signer"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -39,7 +38,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 	for _, remoteSelector := range config.RemoteChainSels {
 		suiChains := e.BlockChains.SuiChains()
 		suiChain := suiChains[remoteSelector]
-		suiSigner := rel.NewPrivateKeySigner(suiChain.DeployerKey)
+		suiSigner := suiChain.Signer
 
 		deps := SuiDeps{
 			AB: ab,
