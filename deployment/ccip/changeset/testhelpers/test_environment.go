@@ -756,20 +756,17 @@ func NewEnvironment(t *testing.T, tEnv TestEnvironment) DeployedEnv {
 func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) DeployedEnv {
 	var err error
 	e := NewEnvironmentWithPrerequisitesContracts(t, tEnv)
-	suiChains := e.Env.BlockChains.SuiChains()
 
 	evmChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))
 	solChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySolana))
 	aptosChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyAptos))
 	tonChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyTon))
+	suiChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySui))
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
 	allChains = append(allChains, tonChains...)
-
-	for sel, _ := range suiChains {
-		allChains = append(allChains, sel)
-	}
+	allChains = append(allChains, suiChains...)
 
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
@@ -956,7 +953,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	evmContractParams := make(map[uint64]ccipseq.ChainContractParams)
 
 	var (
-		evmChains, solChains, aptosChains []uint64
+		evmChains, solChains, aptosChains, suiChains []uint64
 	)
 	for _, chain := range allChains {
 		if _, ok := e.Env.BlockChains.EVMChains()[chain]; ok {
@@ -967,6 +964,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		}
 		if _, ok := e.Env.BlockChains.AptosChains()[chain]; ok {
 			aptosChains = append(aptosChains, chain)
+		}
+		if _, ok := e.Env.BlockChains.SuiChains()[chain]; ok {
+			suiChains = append(suiChains, chain)
 		}
 	}
 
@@ -982,13 +982,6 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 			FeeQuoterParams: ccipops.DefaultFeeQuoterParams(),
 			OffRampParams:   ccipops.DefaultOffRampParams(),
 		}
-	}
-
-	suiChains := []uint64{}
-	rawChains := e.Env.BlockChains.SuiChains()
-
-	for sel := range rawChains {
-		suiChains = append(suiChains, sel)
 	}
 
 	apps = append(apps, []commonchangeset.ConfiguredChangeSet{
@@ -1029,6 +1022,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 			apps = append(apps, solCs...)
 		}
 	}
+
 	e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, apps)
 	require.NoError(t, err)
 

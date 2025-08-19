@@ -103,6 +103,16 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				McmsPackageId: mcmsSeqReport.Output.PackageId,
 				McmsOwner:     signerAddr,
 			},
+			// Fee Quoter configuration
+			AddMinFeeUsdCents:    []uint32{3000},
+			AddMaxFeeUsdCents:    []uint32{30000},
+			AddDeciBps:           []uint16{1000},
+			AddDestGasOverhead:   []uint32{1000000},
+			AddDestBytesOverhead: []uint32{1000},
+			AddIsEnabled:         []bool{true},
+			RemoveTokens:         []string{},
+
+			// TODO: retrieve thesevalues from config
 			// Fee Quoter destination chain configuration
 			// values retried from here: https://github.com/smartcontractkit/chainlink-sui/pull/277/files#diff-5088e21cdbdb4efead9c1142c365a8717bcfe1a912cb0f2b54d0c0b7aad7e3c1R496
 			IsEnabled:                         true,
@@ -270,9 +280,9 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save offRamp StateObjectId %s for Sui chain %d: %w", ccipOffRampSeqReport.Output.Objects.StateObjectId, chainSel, err)
 		}
 
-		// NOT NEEDED FOR ARBITRARY MSG PASSING
-		// TODO abstract this into a different function
-		// Deploy CCIP TokenPool
+		// // NOT NEEDED FOR ARBITRARY MSG PASSING
+		// // TODO abstract this into a different function
+		// // Deploy CCIP TokenPool
 		deployTp, err := operations.ExecuteOperation(e.OperationsBundle, tokenpoolops.DeployCCIPTokenPoolOp, deps.SuiChain,
 			tokenpoolops.TokenPoolDeployInput{
 				CCIPPackageId:    ccipSeqReport.Output.CCIPPackageId,

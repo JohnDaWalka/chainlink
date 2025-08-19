@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	lggr "github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 // ChainReaderProviderOpts is a struct that contains the parameters for GetChainReader.
@@ -66,8 +65,6 @@ func (c *MultiChainRW) GetChainReader(ctx context.Context, params ChainReaderPro
 
 // GetChainWriter returns a new ContractWriter based on relay chain family.
 func (c *MultiChainRW) GetChainWriter(ctx context.Context, params ChainWriterProviderOpts) (types.ContractWriter, error) {
-	loggerInst, _ := lggr.NewLogger()
-	loggerInst.Infow("CW PROVIDERMAP: ", "CWPROVIDERMAP: ", c.cwProviderMap)
 	provider, exist := c.cwProviderMap[params.ChainFamily]
 	if !exist {
 		return nil, fmt.Errorf("unsupported chain family %s", params.ChainFamily)

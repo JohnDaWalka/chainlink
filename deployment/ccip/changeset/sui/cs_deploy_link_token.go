@@ -29,16 +29,13 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 	ab := cldf.NewMemoryAddressBook()
 	seqReports := make([]operations.Report[any, any], 0)
 
-	suiChains := e.BlockChains.SuiChains()
-
-	suiChain := suiChains[config.ChainSelector]
-	suiSigner := suiChain.Signer
+	suiChain := e.BlockChains.SuiChains()[config.ChainSelector]
 
 	deps := SuiDeps{
 		AB: ab,
 		SuiChain: sui_ops.OpTxDeps{
 			Client: suiChain.Client,
-			Signer: suiSigner,
+			Signer: suiChain.Signer,
 			GetCallOpts: func() *bind.CallOpts {
 				b := uint64(400_000_000)
 				return &bind.CallOpts{

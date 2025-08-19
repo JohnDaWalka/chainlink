@@ -91,7 +91,6 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		var commitTransmitters []string
 
 		for _, transmitter := range commitArgs.Transmitters {
-			fmt.Println("COMMIT TRANSMITTER: ", transmitter)
 			// 1) Strip any “0x” prefix
 			clean := strings.TrimPrefix(transmitter, "0x")
 
@@ -106,8 +105,6 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			addr := "0x" + hex.EncodeToString(hash[:])
 			commitTransmitters = append(commitTransmitters, addr)
 		}
-
-		fmt.Println("COMIT TRANSMITTERS: ", commitTransmitters)
 
 		setOCR3ConfigCommitInput := offrampops.SetOCR3ConfigInput{
 			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
@@ -126,7 +123,6 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		var execTransmitters []string
 
 		for _, transmitter := range execArgs.Transmitters {
-			fmt.Println("EXEC TRANSMITTER: ", transmitter)
 			// 1) Strip any “0x” prefix
 			clean := strings.TrimPrefix(transmitter, "0x")
 
@@ -142,8 +138,6 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			addr := "0x" + hex.EncodeToString(hash[:])
 			execTransmitters = append(execTransmitters, addr)
 		}
-
-		fmt.Println("EXEC TRANSMITTERS: ", execTransmitters)
 		_, err = operations.ExecuteOperation(e.OperationsBundle, offrampops.SetOCR3ConfigOp, deps.SuiChain, setOCR3ConfigCommitInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err

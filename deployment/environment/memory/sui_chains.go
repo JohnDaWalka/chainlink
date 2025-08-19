@@ -1,6 +1,10 @@
 package memory
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,6 +21,16 @@ func getTestSuiChainSelectors() []uint64 {
 	return []uint64{chainsel.SUI_LOCALNET.Selector}
 }
 
+func randomSeed() []byte {
+	seed := make([]byte, ed25519.SeedSize)
+	_, err := rand.Read(seed)
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate random seed: %+v", err))
+	}
+
+	return seed
+}
+
 func GenerateChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	testSuiChainSelectors := getTestSuiChainSelectors()
 	if len(testSuiChainSelectors) < numChains {
@@ -26,15 +40,22 @@ func GenerateChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	for i := range numChains {
 		selector := testSuiChainSelectors[i]
 
+		seeded := ed25519.NewKeyFromSeed(randomSeed()) // 64 bytes: seed||pub
+		seed := seeded[:32]                            // or: seeded.Seed() if available
+		hexKey := hex.EncodeToString(seed)             // 64 hex chars
+
+		// generate adhoc sui privKey
 		c, err := cldf_sui_provider.NewCTFChainProvider(t, selector,
 			cldf_sui_provider.CTFChainProviderConfig{
-				Once: once,
+				Once:              once,
+				DeployerSignerGen: cldf_sui_provider.AccountGenPrivateKey(hexKey),
 			},
 		).Initialize(t.Context())
 		require.NoError(t, err)
 
 		chains = append(chains, c)
 	}
+
 	t.Logf("Created %d Sui chains: %+v", len(chains), chains)
 	return chains
 }

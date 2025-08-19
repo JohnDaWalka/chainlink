@@ -9,7 +9,6 @@ import (
 	suiloop "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/loop"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	suiconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/sui"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 // ChainCWProvider is a struct that implements the ChainRWProvider interface for EVM chains.
@@ -34,9 +33,6 @@ func (g ChainCWProvider) GetChainReader(ctx context.Context, params ccipcommon.C
 		return nil, err
 	}
 
-	loggerInst, _ := logger.NewLogger()
-	loggerInst.Infow("GETCHAINREADER: ", "cw: ", cr.Name(), "transmitters: ", transmitter) // SUI CHAINREADER NOT COMMON
-
 	cr = suiloop.NewLoopChainReader(params.Lggr, cr)
 
 	return cr, nil
@@ -58,9 +54,5 @@ func (g ChainCWProvider) GetChainWriter(ctx context.Context, params ccipcommon.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", params.ChainID, err)
 	}
-
-	loggerInst, _ := logger.NewLogger()
-	loggerInst.Infow("GETCHAINWRITER: ", "cw: ", cw.Name(), "Transmitter: ", transmitter) // SUI CHAINWRITER NOT COMMON
-
 	return cw, nil
 }
