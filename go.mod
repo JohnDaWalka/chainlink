@@ -83,7 +83,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.7.1-0.20250807174108-141496ece254
 	github.com/smartcontractkit/chainlink-common/pkg/values v0.0.0-20250626141212-e50b2e7ffe2d
 	github.com/smartcontractkit/chainlink-data-streams v0.1.1-0.20250604171706-a98fa6515eae
-	github.com/smartcontractkit/chainlink-evm v0.0.0-20250704141053-c351643e0b06
+	github.com/smartcontractkit/chainlink-evm v0.0.0-20250820082914-37a441e4e4f4
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250618164021-9b34289a9502
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20250627121608-e7b52913fae2
