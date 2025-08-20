@@ -25,3 +25,12 @@ pre_run = "pushd chip-ingress && go mod vendor && popd"
 [chip_ingress.pull_config]
 local_image = "chip-ingress:local-cre"
 ecr_image = "{{.ECR}}/atlas-chip-ingress:qa-latest"
+
+[capabilities]
+target_path = "./binaries"
+
+[[capabilities.repositories]]
+repository = "https://github.com/smartcontractkit/capabilities"
+branch = "main"
+build_command = "pnpm install && ./nx run-many -t build"
+artifacts_dir = "./bin/amd64"

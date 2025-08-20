@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/tidwall/gjson"
 
@@ -50,12 +51,26 @@ func init() {
 	SetupCmd.Flags().BoolVarP(&purge, "purge", "p", false, "Purge all existing images and re-download/re-build them")
 
 	EnvironmentCmd.AddCommand(SetupCmd)
+
+	BuildCapabilitiesCmd := &cobra.Command{
+		Use:   "build-caps",
+		Short: "Build capabilities binaries",
+		Long:  `Builds the capabilities binaries for the CRE environment`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return BuildCapabilities(cmd.Context(), config, noPrompt)
+		},
+	}
+
+	BuildCapabilitiesCmd.Flags().StringVarP(&config.ConfigPath, "config", "c", "configs/setup.toml", "Path to the TOML configuration file")
+	BuildCapabilitiesCmd.Flags().BoolVarP(&noPrompt, "no-prompt", "y", false, "Automatically accept defaults and do not prompt for user input")
+	EnvironmentCmd.AddCommand(BuildCapabilitiesCmd)
 }
 
 type config struct {
 	General        generalConfig        `toml:"general"`
 	JobDistributor jobDistributorConfig `toml:"job_distributor"`
 	ChipIngress    chipIngressConfig    `toml:"chip_ingress"`
+	Capabilities   capabilitiesConfig   `toml:"capabilities"`
 }
 
 type generalConfig struct {
@@ -72,6 +87,18 @@ type jobDistributorConfig struct {
 type chipIngressConfig struct {
 	BuildConfig BuildConfig `toml:"build_config"`
 	PullConfig  PullConfig  `toml:"pull_config"`
+}
+
+type capabilitiesConfig struct {
+	TargetPath   string                 `toml:"target_path"`
+	Repositories []capabilityRepository `toml:"repositories"`
+}
+
+type capabilityRepository struct {
+	RepoURL      string `toml:"repository"`
+	Branch       string `toml:"branch"`
+	BuildCommand string `toml:"build_command"`
+	ArtifactsDir string `toml:"artifacts_dir"`
 }
 
 var (
@@ -93,16 +120,7 @@ type BuildConfig struct {
 	PreRun     string `toml:"pre_run"` // Optional function to run before building
 }
 
-func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
-	var (
-		repo = c.RepoURL
-		tag  = c.Branch
-	)
-	logger := framework.L
-	name := strings.ReplaceAll(strings.Split(c.LocalImage, ":")[0], "-", " ")
-	name = cases.Title(language.English).String(name)
-	logger.Info().Msgf("Building %s image...", name)
-
+func checkoutAndBuildRepo(ctx context.Context, logger zerolog.Logger, repo, reference string) (string, bool, error) {
 	// Check if repo is a local directory
 	isLocalRepo := false
 	if _, err2 := os.Stat(repo); err2 == nil {
@@ -122,19 +140,42 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 		// Create a temporary directory for cloning the remote repo
 		tempDir, err2 := os.MkdirTemp("", filepath.Base(repo)+"-*")
 		if err2 != nil {
-			return "", fmt.Errorf("failed to create temporary directory: %w", err2)
+			return "", false, fmt.Errorf("failed to create temporary directory: %w", err2)
 		}
-		defer os.RemoveAll(tempDir)
 		workingDir = tempDir
 
 		// Clone the repository
 		logger.Info().Msgf("Cloning repository from %s", repo)
-		cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", tag, "--single-branch", repo, tempDir)
+		cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--branch", reference, "--single-branch", repo, tempDir)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err2 := cmd.Run(); err2 != nil {
-			return "", fmt.Errorf("failed to clone repository: %w", err2)
+			return "", false, fmt.Errorf("failed to clone repository: %w", err2)
 		}
+	}
+
+	return workingDir, isLocalRepo, nil
+}
+
+func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
+	var (
+		repo = c.RepoURL
+		tag  = c.Branch
+	)
+	logger := framework.L
+	name := strings.ReplaceAll(strings.Split(c.LocalImage, ":")[0], "-", " ")
+	name = cases.Title(language.English).String(name)
+	logger.Info().Msgf("Building %s image...", name)
+
+	workingDir, isLocalRepo, err := checkoutAndBuildRepo(ctx, logger, repo, tag)
+	if err != nil {
+		return "", fmt.Errorf("failed to checkout and build repository: %w", err)
+	}
+
+	if !isLocalRepo {
+		defer func() {
+			_ = os.RemoveAll(workingDir)
+		}()
 	}
 
 	// Save current directory and change to working directory
@@ -160,6 +201,7 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 			return "", fmt.Errorf("failed to checkout version %s: %w", tag, err)
 		}
 	}
+
 	// If pre-run function is specified, run it
 	if c.PreRun != "" {
 		logger.Info().Msgf("Running pre-run step: %s", c.PreRun)
@@ -351,6 +393,7 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt bool, purge bool
 			fmt.Fprintf(os.Stderr, "failed to create DX tracker: %s\n", trackerErr)
 		}
 	}
+
 	jdConfig := ImageConfig{
 		BuildConfig: cfg.JobDistributor.BuildConfig,
 		PullConfig:  cfg.JobDistributor.PullConfig,
@@ -379,6 +422,12 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt bool, purge bool
 		return
 	}
 
+	buildErr := buildCapabilityBinaries(ctx, cfg.Capabilities)
+	if buildErr != nil {
+		setupErr = errors.Wrap(buildErr, "failed to build capabilities")
+		return
+	}
+
 	// Print summary
 	fmt.Println()
 	logger.Info().Msg("✅ Setup Summary:")
@@ -395,6 +444,11 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt bool, purge bool
 	} else {
 		logger.Warn().Msg("   ✗ CTF CLI is not installed")
 	}
+	if len(cfg.Capabilities.Repositories) > 0 {
+		logger.Info().Msg("   ✓ Capabilities binaries built")
+	} else {
+		logger.Warn().Msg("   ✗ Capabilities binaries not built")
+	}
 
 	fmt.Println()
 	logger.Info().Msg("🚀 Next Steps:")
@@ -404,6 +458,32 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt bool, purge bool
 	logger.Info().Msg("   Optional: Add --with-plugins-docker-image to use a pre-built image with capabilities")
 	logger.Info().Msg("   Optional: Add --with-beholder to start the Beholder")
 	logger.Info().Msg("\nFor more information, see the documentation in core/scripts/cre/environment/README.md")
+
+	return nil
+}
+
+func BuildCapabilities(ctx context.Context, config SetupConfig, noPrompt bool) error {
+	cfg, cfgErr := readConfig(config.ConfigPath)
+	if cfgErr != nil {
+		return errors.Wrap(cfgErr, "failed to read config")
+	}
+
+	_, ghCliErr := checkGHCli(ctx, cfg.General.MinGHCLIVersion, noPrompt)
+	if ghCliErr != nil {
+		return errors.Wrap(ghCliErr, "failed to ensure GitHub CLI")
+	}
+
+	buildErr := buildCapabilityBinaries(ctx, cfg.Capabilities)
+	if buildErr != nil {
+		return errors.Wrap(buildErr, "failed to build capabilities")
+	}
+
+	fmt.Println()
+	logger := framework.L
+	logger.Info().Msg("✅ Build Capabilities Summary:")
+	for _, repo := range cfg.Capabilities.Repositories {
+		logger.Info().Msgf("   ✓ %s", repo.RepoURL)
+	}
 
 	return nil
 }
@@ -421,6 +501,76 @@ func readConfig(configPath string) (*config, error) {
 	}
 
 	return cfg, nil
+}
+
+func buildCapabilityBinaries(ctx context.Context, capabilitiesConfig capabilitiesConfig) error {
+	logger := framework.L
+	logger.Info().Msg("🔍 Building capabilities binaries...")
+
+	for _, repo := range capabilitiesConfig.Repositories {
+		logger.Info().Msgf("🔍 Building %s...", repo.RepoURL)
+
+		workingDir, isLocalRepo, err := checkoutAndBuildRepo(ctx, logger, repo.RepoURL, repo.Branch)
+		if err != nil {
+			return fmt.Errorf("failed to checkout and build repository: %w", err)
+		}
+
+		if !isLocalRepo {
+			defer func() {
+				_ = os.RemoveAll(workingDir)
+			}()
+		}
+
+		// Save current directory and change to working directory
+		currentDir, cErr := os.Getwd()
+		if cErr != nil {
+			return fmt.Errorf("failed to get current directory: %w", cErr)
+		}
+
+		if err := os.Chdir(workingDir); err != nil {
+			return fmt.Errorf("failed to change to working directory: %w", err)
+		}
+		defer func() {
+			_ = os.Chdir(currentDir)
+		}()
+
+		// Only checkout specific version if using a git repo and version is specified
+		if !isLocalRepo && repo.Branch != "" {
+			logger.Info().Msgf("Checking out version %s", repo.Branch)
+			cmd := exec.CommandContext(ctx, "git", "checkout", repo.Branch)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to checkout version %s: %w", repo.Branch, err)
+			}
+		}
+
+		// Run build command
+		logger.Info().Msgf("Running build command: %s", repo.BuildCommand)
+		cmd := exec.CommandContext(ctx, "bash", "-c", repo.BuildCommand)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to run build command: %w", err)
+		}
+
+		// Copy artifacts to target path
+		targetPath := filepath.Join(currentDir, capabilitiesConfig.TargetPath)
+		if err := os.MkdirAll(targetPath, 0755); err != nil {
+			return fmt.Errorf("failed to create target directory: %w", err)
+		}
+
+		logger.Info().Msgf("Copying build artifacts from %s to %s", repo.ArtifactsDir, targetPath)
+		artifactsDir := filepath.Join(workingDir, repo.ArtifactsDir)
+		copyCmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("cp -r %s/* %s/", artifactsDir, targetPath))
+		if err := copyCmd.Run(); err != nil {
+			return fmt.Errorf("failed to copy directory: %w", err)
+		}
+
+		logger.Info().Msgf("✓ Build artifacts copied to %s", targetPath)
+	}
+
+	return nil
 }
 
 // isCommandAvailable checks if a command is available in the PATH
