@@ -12,8 +12,8 @@ const (
 	RMNRemoteProgramName            = "rmn_remote"
 	ReceiverProgramName             = "test_ccip_receiver"
 	KeystoneForwarderProgramName    = "keystone_forwarder"
-	DataFeedsCacheProgramName       = "data_feeds_cache"
 	CCTPTokenPoolProgramName        = "cctp_token_pool"
+	DataFeedsCacheProgramName       = "data_feeds_cache"
 )
 
 // https://docs.google.com/document/d/1Fk76lOeyS2z2X6MokaNX_QTMFAn5wvSZvNXJluuNV1E/edit?tab=t.0#heading=h.uij286zaarkz
