@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -93,6 +94,10 @@ func Test_CRE_Workflow_Don(t *testing.T) {
 	t.Run("vault DON test", func(t *testing.T) {
 		executeVaultTest(t, in, envArtifact)
 	})
+
+	t.Run("Read Capability", func(t *testing.T) {
+		executeEVMReadTest(t, in, envArtifact, 5*time.Minute)
+	})
 }
 
 func executePoRTest(t *testing.T, in *environment.Config, envArtifact environment.EnvArtifact, verificationTimeout time.Duration) {
@@ -111,7 +116,6 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 	fullCldEnvOutput, wrappedBlockchainOutputs, loadErr := environment.BuildFromSavedState(t.Context(), cldLogger, in, envArtifact)
 	require.NoError(t, loadErr, "failed to load environment")
 
-	homeChainSelector := wrappedBlockchainOutputs[0].ChainSelector
 	numberOfWriteableChains := 0
 	for _, bcOutput := range wrappedBlockchainOutputs {
 		if !bcOutput.ReadOnly {
@@ -158,13 +162,6 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 
 		testLogger.Info().Msg("Proceeding to register PoR workflow...")
 
-		workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(
-			fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-			homeChainSelector,
-			keystone_changeset.WorkflowRegistry.String(),
-		)
-		require.NoError(t, workflowRegistryErr, "failed to find workflow registry address for chain %d", bcOutput.ChainID)
-
 		dataFeedsCacheAddress, dataFeedsCacheErr := crecontracts.FindAddressesForChain(
 			fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 			bcOutput.ChainSelector,
@@ -172,47 +169,14 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 		)
 		require.NoError(t, dataFeedsCacheErr, "failed to find data feeds cache address for chain %d", bcOutput.ChainID)
 
-		workflowConfigFilePath, configErr := createConfigFile(dataFeedsCacheAddress, workflowName, feedIDs[idx], priceProvider.URL(), corevm.GenerateWriteTargetName(bcOutput.ChainID))
+		workflowConfigFilePath, configErr := createPoRConfigFile(t, dataFeedsCacheAddress, workflowName, feedIDs[idx], priceProvider.URL(), corevm.GenerateWriteTargetName(bcOutput.ChainID))
 		require.NoError(t, configErr, "failed to create workflow config file")
 
-		compressedWorkflowWasmPath, compileErr := creworkflow.CompileWorkflow(workflowFileLocation, workflowName)
-		require.NoError(t, compileErr, "failed to compile workflow '%s'", workflowFileLocation)
-
 		t.Cleanup(func() {
-			wasmErr := os.Remove(compressedWorkflowWasmPath)
-			if wasmErr != nil {
-				framework.L.Warn().Msgf("failed to remove workflow wasm file %s: %s", compressedWorkflowWasmPath, wasmErr.Error())
-			}
-			configErr := os.Remove(workflowConfigFilePath)
-			if configErr != nil {
-				framework.L.Warn().Msgf("failed to remove workflow config file %s: %s", workflowConfigFilePath, configErr.Error())
-			}
-			deleteErr := creworkflow.DeleteWithContract(t.Context(), wrappedBlockchainOutputs[0].SethClient, workflowRegistryAddress, workflowName)
-			if deleteErr != nil {
-				framework.L.Warn().Msgf("failed to delete workflow %s: %s. Please delete it manually.", workflowName, deleteErr.Error())
-			}
 			debugPoRTest(t, testLogger, in, fullCldEnvOutput, wrappedBlockchainOutputs, feedIDs)
 		})
 
-		containerTargetDir := "/home/chainlink/workflows"
-		workflowCopyErr := creworkflow.CopyWorkflowToDockerContainers(compressedWorkflowWasmPath, "workflow-node", containerTargetDir)
-		require.NoError(t, workflowCopyErr, "failed to copy workflow to docker containers")
-
-		configCopyErr := creworkflow.CopyWorkflowToDockerContainers(workflowConfigFilePath, "workflow-node", containerTargetDir)
-		require.NoError(t, configCopyErr, "failed to copy workflow config to docker containers")
-
-		registerErr := creworkflow.RegisterWithContract(
-			t.Context(),
-			wrappedBlockchainOutputs[0].SethClient, // crucial to use Seth Client connected to home chain (first chain in the set)
-			workflowRegistryAddress,
-			fullCldEnvOutput.DonTopology.DonsWithMetadata[0].ID,
-			workflowName,
-			"file://"+compressedWorkflowWasmPath,
-			ptr.Ptr("file://"+workflowConfigFilePath),
-			nil,
-			&containerTargetDir,
-		)
-		require.NoError(t, registerErr, "failed to register PoR workflow")
+		deployWorkflow(t, wrappedBlockchainOutputs[0], fullCldEnvOutput, workflowConfigFilePath, workflowFileLocation, workflowName)
 	}
 
 	/*
@@ -269,6 +233,59 @@ func executePoRTest(t *testing.T, in *environment.Config, envArtifact environmen
 	}
 
 	testLogger.Info().Msgf("All prices were found for all feeds")
+}
+
+func deployWorkflow(t *testing.T,
+	workflowRegistryChain *cre.WrappedBlockchainOutput,
+	cld *cre.FullCLDEnvironmentOutput, configPath, workflowFileLocation, workflowName string) {
+
+	compressedWorkflowWasmPath := compileWorkflow(t, workflowFileLocation, workflowName)
+
+	containerTargetDir := "/home/chainlink/workflows"
+	workflowCopyErr := creworkflow.CopyWorkflowToDockerContainers(compressedWorkflowWasmPath, "workflow-node", containerTargetDir)
+	require.NoError(t, workflowCopyErr, "failed to copy workflow to docker containers")
+
+	configCopyErr := creworkflow.CopyWorkflowToDockerContainers(configPath, "workflow-node", containerTargetDir)
+	require.NoError(t, configCopyErr, "failed to copy workflow config to docker containers")
+
+	workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(
+		cld.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		workflowRegistryChain.ChainSelector,
+		keystone_changeset.WorkflowRegistry.String(),
+	)
+	require.NoError(t, workflowRegistryErr, "failed to find workflow registry address for chain %d", workflowRegistryChain.ChainID)
+
+	t.Cleanup(func() {
+		deleteErr := creworkflow.DeleteWithContract(t.Context(), workflowRegistryChain.SethClient, workflowRegistryAddress, workflowName)
+		if deleteErr != nil {
+			framework.L.Warn().Msgf("failed to delete workflow %s: %s. Please delete it manually.", workflowName, deleteErr.Error())
+		}
+	})
+
+	registerErr := creworkflow.RegisterWithContract(
+		t.Context(),
+		workflowRegistryChain.SethClient, // crucial to use Seth Client connected to home chain (first chain in the set)
+		workflowRegistryAddress,
+		cld.DonTopology.DonsWithMetadata[0].ID,
+		workflowName,
+		"file://"+compressedWorkflowWasmPath,
+		ptr.Ptr("file://"+configPath),
+		nil,
+		&containerTargetDir,
+	)
+	require.NoError(t, registerErr, "failed to register PoR workflow")
+}
+
+func compileWorkflow(t *testing.T, workflowPath, name string) string {
+	compressedWorkflowWasmPath, err := creworkflow.CompileWorkflow(workflowPath, name)
+	require.NoError(t, err, "failed to compile workflow '%s'", workflowPath)
+	t.Cleanup(func() {
+		wasmErr := os.Remove(compressedWorkflowWasmPath)
+		if wasmErr != nil {
+			framework.L.Warn().Msgf("failed to remove workflow wasm file %s: %s", compressedWorkflowWasmPath, wasmErr.Error())
+		}
+	})
+	return compressedWorkflowWasmPath
 }
 
 func executeVaultTest(t *testing.T, in *environment.Config, envArtifact environment.EnvArtifact) {
@@ -415,7 +432,7 @@ func logTestInfo(l zerolog.Logger, feedID, dataFeedsCacheAddr, forwarderAddr str
 	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
 }
 
-func createConfigFile(feedsConsumerAddress common.Address, workflowName, feedID, dataURL, writeTargetName string) (string, error) {
+func createPoRConfigFile(t *testing.T, feedsConsumerAddress common.Address, workflowName, feedID, dataURL, writeTargetName string) (string, error) {
 	cleanFeedID := strings.TrimPrefix(feedID, "0x")
 	feedLength := len(cleanFeedID)
 
@@ -437,29 +454,40 @@ func createConfigFile(feedsConsumerAddress common.Address, workflowName, feedID,
 			WriteTargetName:       writeTargetName,
 		},
 	}
-
-	configMarshalled, err := yaml.Marshal(workflowConfig)
+	marshalled, err := yaml.Marshal(workflowConfig)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal workflow config")
+		return "", fmt.Errorf("failed to marshal workflow config: %w", err)
 	}
+
+	return createConfigFile(t, workflowName, marshalled)
+}
+
+func createConfigFile(t *testing.T, workflowName string, marshaled []byte) (string, error) {
 	outputFile := workflowName + "_config.yaml"
 
 	// remove the file if it already exists
 	_, statErr := os.Stat(outputFile)
 	if statErr == nil {
 		if err := os.Remove(outputFile); err != nil {
-			return "", errors.Wrap(err, "failed to remove existing output file")
+			return "", fmt.Errorf("failed to remove old workflow config file %s: %w", outputFile, err)
 		}
 	}
 
-	if err := os.WriteFile(outputFile, configMarshalled, 0644); err != nil { //nolint:gosec // G306: we want it to be readable by everyone
-		return "", errors.Wrap(err, "failed to write output file")
+	if err := os.WriteFile(outputFile, marshaled, 0644); err != nil { //nolint:gosec // G306: we want it to be readable by everyone
+		return "", fmt.Errorf("failed to write workflow config file %s: %w", outputFile, err)
 	}
 
 	outputFileAbsPath, outputFileAbsPathErr := filepath.Abs(outputFile)
 	if outputFileAbsPathErr != nil {
-		return "", errors.Wrap(outputFileAbsPathErr, "failed to get absolute path of the config file")
+		return "", fmt.Errorf("failed to resolve absolute path for output file %s: %w", outputFile, outputFileAbsPathErr)
 	}
+
+	t.Cleanup(func() {
+		configErr := os.Remove(outputFileAbsPath)
+		if configErr != nil {
+			framework.L.Warn().Msgf("failed to remove workflow config file %s: %s", outputFileAbsPath, configErr.Error())
+		}
+	})
 
 	return outputFileAbsPath, nil
 }
