@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr/donlevel"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
@@ -56,35 +57,28 @@ func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[s
 	}
 }
 
-type jobConfigGenerator struct {
-	input *cre.JobSpecInput
-}
-
-func (c *jobConfigGenerator) Generate(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
-	// Build runtime fallbacks for any missing values
-	runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
-
-	// Apply runtime fallbacks only for keys not specified by user
-	templateData, aErr := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
-	if aErr != nil {
-		return "", errors.Wrap(aErr, "failed to apply runtime values")
-	}
-
-	// Parse and execute template
-	tmpl, err := template.New("consensusConfig").Parse(configTemplate)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to parse consensus config template")
-	}
-
-	var configBuffer bytes.Buffer
-	if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-		return "", errors.Wrap(err, "failed to execute consensus config template")
-	}
-
-	return configBuffer.String(), nil
-}
-
 func jobSpec(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+	var generateJobSpec = func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
+		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
+
+		templateData, aErr := don.ApplyRuntimeValues(mergedConfig, runtimeFallbacks)
+		if aErr != nil {
+			return "", errors.Wrap(aErr, "failed to apply runtime values")
+		}
+
+		tmpl, err := template.New("consensusConfig").Parse(configTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to parse consensus config template")
+		}
+
+		var configBuffer bytes.Buffer
+		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+			return "", errors.Wrap(err, "failed to execute consensus config template")
+		}
+
+		return configBuffer.String(), nil
+	}
+
 	return ocr.GenerateJobSpecsForStandardCapabilityWithOCR(
 		input.DonTopology,
 		input.CldEnvironment.DataStore,
@@ -92,10 +86,10 @@ func jobSpec(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		input.InfraInput,
 		"capability_consensus",
 		flag,
-		&ocr.CapabilityEnablerPerDon{},
-		&ocr.RegistryChainOnlyProvider{},
-		&jobConfigGenerator{input: input},
-		&ocr.ConfigMergerPerDon{},
+		donlevel.CapabilityEnabler,
+		donlevel.EnabledChainsProvider,
+		generateJobSpec,
+		donlevel.ConfigMerger,
 		input.CapabilityConfigs,
 	)
 }

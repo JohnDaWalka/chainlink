@@ -51,7 +51,7 @@ func New() (*capabilities.Capability, error) {
 }
 
 func registerWithV1(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
-	var capabilities []keystone_changeset.DONCapabilityWithConfig
+	capabilities := make([]keystone_changeset.DONCapabilityWithConfig, 0)
 
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
 		return nil, errors.New("node set input is nil or chain capabilities is nil")
