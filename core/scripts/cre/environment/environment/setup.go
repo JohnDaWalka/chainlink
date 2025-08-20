@@ -205,7 +205,7 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 	// If pre-run function is specified, run it
 	if c.PreRun != "" {
 		logger.Info().Msgf("Running pre-run step: %s", c.PreRun)
-		if err := exec.CommandContext(ctx, "bash", "-c", c.PreRun).Run(); err != nil {
+		if err := exec.CommandContext(ctx, "bash", "-c", c.PreRun).Run(); err != nil { //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
 			return "", fmt.Errorf("pre-run step failed: %w", err)
 		}
 	}
@@ -507,6 +507,14 @@ func buildCapabilityBinaries(ctx context.Context, capabilitiesConfig capabilitie
 	logger := framework.L
 	logger.Info().Msg("🔍 Building capabilities binaries...")
 
+	// Save current directory and change to working directory
+	currentDir, cErr := os.Getwd()
+	if cErr != nil {
+		return fmt.Errorf("failed to get current directory: %w", cErr)
+	}
+
+	dirsToDelete := []string{}
+
 	for _, repo := range capabilitiesConfig.Repositories {
 		logger.Info().Msgf("🔍 Building %s...", repo.RepoURL)
 
@@ -516,28 +524,17 @@ func buildCapabilityBinaries(ctx context.Context, capabilitiesConfig capabilitie
 		}
 
 		if !isLocalRepo {
-			defer func() {
-				_ = os.RemoveAll(workingDir)
-			}()
-		}
-
-		// Save current directory and change to working directory
-		currentDir, cErr := os.Getwd()
-		if cErr != nil {
-			return fmt.Errorf("failed to get current directory: %w", cErr)
+			dirsToDelete = append(dirsToDelete, workingDir)
 		}
 
 		if err := os.Chdir(workingDir); err != nil {
 			return fmt.Errorf("failed to change to working directory: %w", err)
 		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
 
 		// Only checkout specific version if using a git repo and version is specified
 		if !isLocalRepo && repo.Branch != "" {
 			logger.Info().Msgf("Checking out version %s", repo.Branch)
-			cmd := exec.CommandContext(ctx, "git", "checkout", repo.Branch)
+			cmd := exec.CommandContext(ctx, "git", "checkout", repo.Branch) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
@@ -547,7 +544,7 @@ func buildCapabilityBinaries(ctx context.Context, capabilitiesConfig capabilitie
 
 		// Run build command
 		logger.Info().Msgf("Running build command: %s", repo.BuildCommand)
-		cmd := exec.CommandContext(ctx, "bash", "-c", repo.BuildCommand)
+		cmd := exec.CommandContext(ctx, "bash", "-c", repo.BuildCommand) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -562,13 +559,20 @@ func buildCapabilityBinaries(ctx context.Context, capabilitiesConfig capabilitie
 
 		logger.Info().Msgf("Copying build artifacts from %s to %s", repo.ArtifactsDir, targetPath)
 		artifactsDir := filepath.Join(workingDir, repo.ArtifactsDir)
-		copyCmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("cp -r %s/* %s/", artifactsDir, targetPath))
+		copyCmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("cp -r %s/* %s/", artifactsDir, targetPath)) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
 		if err := copyCmd.Run(); err != nil {
 			return fmt.Errorf("failed to copy directory: %w", err)
 		}
 
 		logger.Info().Msgf("✓ Build artifacts copied to %s", targetPath)
 	}
+
+	defer func() {
+		_ = os.Chdir(currentDir)
+		for _, dir := range dirsToDelete {
+			_ = os.RemoveAll(dir)
+		}
+	}()
 
 	return nil
 }
@@ -923,44 +927,6 @@ func logInToGithubWithGHCLI(ctx context.Context) error {
 	}
 
 	logger.Info().Msg("  ✓ GitHub CLI logged in successfully")
-	return nil
-}
-
-// chipVendor changes to the directory specified in the config
-// and executes go mod vendor command
-func chipVendor(ctx context.Context, config BuildConfig) error {
-	logger := framework.L
-
-	// Save current directory
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	// Change to the target directory
-	logger.Info().Msgf("Changing directory to %s", config.DockerCtx)
-	if err := os.Chdir(config.DockerCtx); err != nil {
-		return fmt.Errorf("failed to change to directory %s: %w", config.DockerCtx, err)
-	}
-
-	// Restore original directory when function completes
-	defer func() {
-		if err := os.Chdir(currentDir); err != nil {
-			logger.Error().Err(err).Msg("Failed to restore original directory")
-		}
-	}()
-
-	// Execute go mod vendor
-	logger.Info().Msg("Running go mod vendor...")
-	cmd := exec.CommandContext(ctx, "go", "mod", "vendor")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("go mod vendor failed: %w", err)
-	}
-
-	logger.Info().Msg("Vendor directory successfully created")
 	return nil
 }
 
