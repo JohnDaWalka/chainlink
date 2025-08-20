@@ -16,16 +16,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	evmreadcontracts "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/contracts"
 	workflowTypes "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/types"
 
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	keystonechangeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 )
 
-func executeEVMReadTest(t *testing.T, in *environment.Config, envArtifact environment.EnvArtifact, verificationTimeout time.Duration) {
+func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environment.EnvArtifact) {
 	lggr := framework.L
 	cldLogger := cldlogger.NewSingleFileLogger(t)
 
@@ -60,7 +61,7 @@ func executeEVMReadTest(t *testing.T, in *environment.Config, envArtifact enviro
 		forwarderAddr, err := crecontracts.FindAddressesForChain(
 			fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 			bcOutput.ChainSelector,
-			keystone_changeset.KeystoneForwarder.String(),
+			keystonechangeset.KeystoneForwarder.String(),
 		)
 		require.NoError(t, err)
 		// validate workflow execution
