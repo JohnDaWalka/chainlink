@@ -29,6 +29,7 @@ import (
 	suitestutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 	"github.com/smartcontractkit/chainlink-sui/relayer/txm"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
+	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 
 	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 
@@ -88,17 +89,12 @@ func baseCCIPConfig(
 	cmds := []config.ChainWriterPTBCommand{{
 		Type:      suicodec.SuiPTBCommandMoveCall,
 		PackageId: strPtr(ccipPkg),
-		ModuleId:  strPtr("dynamic_dispatcher"),
-		Function:  strPtr("create_token_params"),
+		ModuleId:  strPtr("onramp_state_helper"),
+		Function:  strPtr("create_token_transfer_params"),
 		Params: []suicodec.SuiFunctionParam{
 			{
-				Name:     "destination_chain_selector",
-				Type:     "u64",
-				Required: true,
-			},
-			{
-				Name:     "receiver",
-				Type:     "vector<u8>",
+				Name:     "token_receiver",
+				Type:     "address",
 				Required: true,
 			},
 		},
@@ -138,6 +134,8 @@ func configureChainWriterForMsg(
 			{Name: "ref", Type: "object_id", Required: true},
 			{Name: "state", Type: "object_id", Required: true},
 			{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
+			{Name: "dest_chain_selector", Type: "u64", Required: true},
+			{Name: "receiver", Type: "vector<u8>", Required: true},
 			{Name: "data", Type: "vector<u8>", Required: true},
 			{Name: "token_params", Type: "ptb_dependency", Required: true,
 				PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 0}},
@@ -181,6 +179,8 @@ func configureChainWriterForMultipleTokens(
 				{Name: "ref", Type: "object_id", Required: true},
 				{Name: "state", Type: "object_id", Required: true},
 				{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
+				{Name: "dest_chain_selector", Type: "u64", Required: true},
+				{Name: "receiver", Type: "vector<u8>", Required: true},
 				{Name: "data", Type: "vector<u8>", Required: true},
 				{Name: "token_params", Type: "ptb_dependency", Required: true,
 					PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 1}},
@@ -215,10 +215,10 @@ func BuildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string
 	}
 }
 
-func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*AnyMsgSentEvent, error) {
+func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (*ccipclient.AnyMsgSentEvent, error) {
 	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	suiChains := e.BlockChains.SuiChains()
@@ -231,7 +231,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	// keyString, err := suiChain.Signer.GetAddress()
 	// if err != nil {
-	// 	return &AnyMsgSentEvent{}, err
+	// 	return &ccipclient.AnyMsgSentEvent{}, err
 	// }
 
 	deps := suideps.SuiDeps{
@@ -257,12 +257,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	bigIntSourceUsdPerToken, ok := new(big.Int).SetString("150000000000000000000000000000", 10)
 	if !ok {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed converting SourceUSDPerToken to bigInt")
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed converting SourceUSDPerToken to bigInt")
 	}
 
 	bigIntGasUsdPerUnitGas, ok := new(big.Int).SetString("7500000000000", 10)
 	if !ok {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed converting GasUsdPerUnitGas to bigInt")
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed converting GasUsdPerUnitGas to bigInt")
 	}
 
 	// Update Prices on FeeQuoter with minted LinkToken
@@ -277,15 +277,16 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 			GasUsdPerUnitGas:      []*big.Int{bigIntGasUsdPerUnitGas},
 		})
 	if err != nil {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed to updatePrice for Sui chain %d: %w", cfg.SourceChain, err)
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to updatePrice for Sui chain %d: %w", cfg.SourceChain, err)
 	}
 
 	msg := cfg.Message.(SuiSendRequest)
 	baseArgs := map[string]any{
-		"ref":                        ccipObjectRefId,
-		"clock":                      "0x6",
-		"destination_chain_selector": cfg.DestChain,
-		"state":                      onRampStateObjectId,
+		"ref":                 ccipObjectRefId,
+		"state":               onRampStateObjectId,
+		"clock":               "0x6",
+		"dest_chain_selector": cfg.DestChain,
+		"token_receiver":      "0xf05ebbc239612bdcfc6eff5f6f4728e87bc56d25e6f9dfcce9cffd6cc3eeb3ca", // random sui address
 		"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
 			0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
@@ -308,7 +309,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		// TOKEN POOL SETUP
 		BurnMintTP, BurnMintTPState, err = handleTokenAndPoolDeploymentForSUI(e, cfg, deps)
 		if err != nil {
-			return &AnyMsgSentEvent{}, fmt.Errorf("failed to setup tokenPool on SUI %d: %w", cfg.SourceChain, err)
+			return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to setup tokenPool on SUI %d: %w", cfg.SourceChain, err)
 		}
 		fmt.Println("TOKEN AMOUNTS: ", msg.TokenAmounts)
 		extra := map[string]any{
@@ -331,7 +332,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	relayerClient, err := client.NewPTBClient(e.Logger, "http://127.0.0.1:9000", nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	e.Logger.Info("relayerClient", relayerClient)
@@ -345,7 +346,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	txManager, err := txm.NewSuiTxm(e.Logger, relayerClient, keystoreInstance, conf, store, retryManager, gasManager)
 	if err != nil {
-		return &AnyMsgSentEvent{}, fmt.Errorf("Failed to create SuiTxm: %v", err)
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("Failed to create SuiTxm: %v", err)
 	}
 
 	var chainWriterConfig suicrcwconfig.ChainWriterConfig
@@ -357,7 +358,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	chainWriter, err := chainwriter.NewSuiChainWriter(e.Logger, txManager, chainWriterConfig, false)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	c := context.Background()
@@ -366,15 +367,15 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	err = chainWriter.Start(ctx)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	err = txManager.Start(ctx)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
-	txId := "ccip_send_token_transfer"
+	txId := "ccip_send_msg_transfer"
 	err = chainWriter.SubmitTransaction(ctx,
 		suicrcwconfig.PTBChainWriterModuleName,
 		"ccip_send",
@@ -385,7 +386,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		nil,
 	)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	// TODO: find a better way of handling waitForTransaction
@@ -393,7 +394,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	status, err := chainWriter.GetTransactionStatus(ctx, txId)
 
 	if status != commonTypes.Finalized {
-		return &AnyMsgSentEvent{}, fmt.Errorf("tx failed to get finalized")
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("tx failed to get finalized")
 	}
 
 	e.Logger.Infof("(Sui) CCIP message sent (tx %s) from chain selector %d to chain selector %d", txId, cfg.SourceChain, cfg.DestChain)
@@ -434,12 +435,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	err = sqltest.RegisterTxDB(dbURL)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	db, err := sqlx.Open(pg.DriverTxWrappedPostgres, uuid.New().String())
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	db.MapperFunc(reflectx.CamelToSnakeASCII)
@@ -447,7 +448,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	// attempt to connect
 	_, err = db.Connx(ctx)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	// Create the indexers
@@ -478,17 +479,17 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 
 	chainReader, err := chainreader.NewChainReader(ctx, e.Logger, relayerClient, chainReaderConfig, db, indexerInstance)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	err = chainReader.Start(ctx)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	err = indexerInstance.Start(ctx)
 	if err != nil {
-		return &AnyMsgSentEvent{}, err
+		return &ccipclient.AnyMsgSentEvent{}, err
 	}
 
 	err = chainReader.Bind(context.Background(), []chain_reader_types.BoundContract{{
@@ -496,7 +497,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		Address: onRampPackageId, // Package ID of the deployed counter contract
 	}})
 	if err != nil {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed to bind onramp contract with chainReader")
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to bind onramp contract with chainReader")
 	}
 
 	// TODO handle this better, maybe retrieve it from the bindings when we do binding ccip_send
@@ -526,11 +527,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 		&ccipSendEvent,
 	)
 	if err != nil {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed to query events", "error", err)
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to query events", "error", err)
 	}
 
 	if len(sequences) < 1 {
-		return &AnyMsgSentEvent{}, fmt.Errorf("failed to fetch event sequence")
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to fetch event sequence")
 	}
 	e.Logger.Debugw("Query results", "sequences", sequences)
 	rawevent := sequences[0].Data.(*CCIPMessageSent)
@@ -538,7 +539,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *CCIPSendReqConfig) (*
 	chainReader.Close()
 	indexerInstance.Close()
 
-	return &AnyMsgSentEvent{
+	return &ccipclient.AnyMsgSentEvent{
 		SequenceNumber: rawevent.SequenceNumber,
 		RawEvent:       rawevent,
 	}, nil

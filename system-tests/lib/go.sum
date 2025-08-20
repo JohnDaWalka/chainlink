@@ -442,8 +442,6 @@ github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f h1:Wl78ApPPB2
 github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f/go.mod h1:OSYXu++VVOHnXeitef/D8n/6y4QV8uLHSFXX4NeXMGc=
 github.com/expr-lang/expr v1.17.5 h1:i1WrMvcdLF249nSNlpQZN1S6NXuW9WaOfF5tPi3aw3k=
 github.com/expr-lang/expr v1.17.5/go.mod h1:8/vRC7+7HBzESEqt5kKpYXxrxkr31SaO8r40VO/1IT4=
-github.com/fardream/go-bcs v0.8.7 h1:Wi6Kd54zTXl+eNf08RNui+7/qy6tP7S4fq4vUtUchXk=
-github.com/fardream/go-bcs v0.8.7/go.mod h1:8xND2wUkBFUpfbxOe9iiso7jQEYeZPkn0crLfR7IRw4=
 github.com/fatih/camelcase v1.0.0 h1:hxNvNX/xYBp0ovncs8WyWZrOrpBNub/JfaMvbURyft8=
 github.com/fatih/camelcase v1.0.0/go.mod h1:yN2Sb0lFhZJUdVvtELVWefmrXpuZESvPmqwoZc+/fpc=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
@@ -1300,8 +1298,8 @@ github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-2025
 github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk/v2/pb v0.0.0-20250806155403-1d805e639a0f/go.mod h1:yMGYq2fDYWPXZjkVuzgRiZVv/NaifvQUqK7CY6kNgW0=
 github.com/smartcontractkit/chainlink-data-streams v0.1.2 h1:g/UmFJa/E1Zmc7NO20ob5SijxQen51DhnqTLr2f7BEc=
 github.com/smartcontractkit/chainlink-data-streams v0.1.2/go.mod h1:lxY97sDlDorQAmLGFo6x1tl8SQ2E7adsS0/wU8+mmTc=
-github.com/smartcontractkit/chainlink-deployments-framework v0.25.0 h1:4RKGSyo+nErBSfmi9zsSnDr1jMGyWEvOLM91r9E0bAI=
-github.com/smartcontractkit/chainlink-deployments-framework v0.25.0/go.mod h1:gnpB4ag+JcerUbkVRTSa0WVjuJfOIqObkEs5hNcjv54=
+github.com/smartcontractkit/chainlink-deployments-framework v0.28.1-0.20250820001832-52b4624e398f h1:0BIXpBqLrL2ob1AemH/dSQzm7jm7+C0aoddZ9lu9yYQ=
+github.com/smartcontractkit/chainlink-deployments-framework v0.28.1-0.20250820001832-52b4624e398f/go.mod h1:Mj60Zz7q4l1rkf369u40bO4Wi80KHHWoEc1coI8maLA=
 github.com/smartcontractkit/chainlink-evm v0.3.1 h1:o4DSoeHGxNCW2c9Xd0Qmu7rYQ8+Zf9Stv8Md+dHtqgg=
 github.com/smartcontractkit/chainlink-evm v0.3.1/go.mod h1:6y5OTe7zEVXKyVWzXWR/VlIrO/UDqcCrQJPmb5ms6RM=
 github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3 h1:SRMNzCdQnF2x6+QlL5YSzVeWyJb/BXqMrg+zSGaBPVg=
@@ -1332,6 +1330,8 @@ github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-
 github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-d98d7674da89/go.mod h1:HIpGvF6nKCdtZ30xhdkKWGM9+4Z4CVqJH8ZBL1FTEiY=
 github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250819153845-5175eab4f442 h1:uLDgvhetim6c3HrqpCE/atJOQtbzqDAhZs9qVFi0Opg=
 github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250819153845-5175eab4f442/go.mod h1:v6SXJpswr6T8gUDib/KK1XpkIgiUtmFO7fO2XI5fr7A=
+github.com/smartcontractkit/chainlink-sui v0.0.0-20250820014354-a2216fe86ec2 h1:jBP3FlmNwsX/elSzOIQDoXUZ2v1xv2l62uoXG8IwXYI=
+github.com/smartcontractkit/chainlink-sui v0.0.0-20250820014354-a2216fe86ec2/go.mod h1:e+vxCKO+bRpjrkCjle8Md1WZOT6jpeXb1h33no+YKRY=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.12 h1:vITyX8uIoUjMGwJXbgE8Cl01oO+5QpbOAVut69Wi9Sc=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.12/go.mod h1:gdW2dlrvHcTawMCtAIXQYZcZ9Ggx16L55kA7wONvzJ4=
 github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0 h1:PWAMYu0WaAMBfbpxCpFJGRIDHmcgmYin6a+UQC0OdtY=
@@ -1588,8 +1588,6 @@ go.uber.org/atomic v1.11.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0
 go.uber.org/goleak v1.1.11/go.mod h1:cwTWslyiVhfpKIDGSZEM2HlOvcqm+tG4zioyIeLoqMQ=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
-go.uber.org/mock v0.5.2 h1:LbtPTcP8A5k9WPXj54PPPbjcI4Y6lhyOZXn+VS7wNko=
-go.uber.org/mock v0.5.2/go.mod h1:wLlUxC2vVTPTaE3UD51E0BGOAElKrILxhVSDYQLld5o=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/multierr v1.3.0/go.mod h1:VgVr7evmIr6uPjLBxg28wmKNXyqE9akIJ5XnfpiKl+4=
 go.uber.org/multierr v1.5.0/go.mod h1:FeouvMocqHpRaaGuG9EjoKcStLC43Zu/fmqdUMPcKYU=

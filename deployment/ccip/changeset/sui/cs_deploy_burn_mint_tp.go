@@ -113,9 +113,9 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 
 	// save BnM TokenPool to addressbook
 	typeAndVersionBurnMintTokenPool := cldf.NewTypeAndVersion(shared.SuiBnMTokenPoolType, deployment.Version1_5_1)
-	err = deps.AB.Save(config.ChainSelector, deployBurnMintTp.Output.CCIPPackageId, typeAndVersionBurnMintTokenPool)
+	err = deps.AB.Save(config.ChainSelector, deployBurnMintTp.Output.BurnMintTPPackageID, typeAndVersionBurnMintTokenPool)
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save BurnMintTokenPool address %s for Sui chain %d: %w", deployBurnMintTp.Output.CCIPPackageId, config.ChainSelector, err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save BurnMintTokenPool address %s for Sui chain %d: %w", deployBurnMintTp.Output.BurnMintTPPackageID, config.ChainSelector, err)
 	}
 
 	// save BnM TokenPool State to addressbook
