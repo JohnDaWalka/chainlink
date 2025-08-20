@@ -20,7 +20,7 @@ import (
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	creregistry "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilityregistry"
+	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -69,7 +69,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			return nil, errors.New("evm config not found in capabilities config")
 		}
 
-		containerPath, pathErr := creregistry.DefaultContainerDirectory(infraInput.Type)
+		containerPath, pathErr := crecapabilities.DefaultContainerDirectory(infraInput.Type)
 		if pathErr != nil {
 			return nil, errors.Wrapf(pathErr, "failed to get default container directory for infra type %s", infraInput.Type)
 		}

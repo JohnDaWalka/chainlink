@@ -17,18 +17,18 @@ const configTemplate = `"""port={{.Port}}"""`
 
 func New() (*capabilities.Capability, error) {
 	perDonJobSpecFactory := factory.NewCapabilityJobSpecFactory(
-		donlevel.IsEnabled,
-		donlevel.EnabledChains,
+		donlevel.CapabilityEnabler,
+		donlevel.EnabledChainsProvider,
 		donlevel.ConfigResolver,
-		donlevel.JobName,
+		donlevel.JobNamer,
 	)
 
 	return capabilities.New(
 		flag,
-		capabilities.WithJobSpecFn(perDonJobSpecFactory.BuildJobSpecFn(
+		capabilities.WithJobSpecFn(perDonJobSpecFactory.BuildJobSpec(
 			flag,
 			configTemplate,
-			factory.NoOpExtractor, // No runtime values extraction needed
+			factory.NoOpExtractor,
 			factory.BinaryPathBuilder,
 		)),
 		capabilities.WithCapabilityRegistryV1ConfigFn(registerWithV1),

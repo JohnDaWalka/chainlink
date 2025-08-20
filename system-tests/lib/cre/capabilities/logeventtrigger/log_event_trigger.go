@@ -27,15 +27,15 @@ const configTemplate = `"""
 
 func New() (*capabilities.Capability, error) {
 	perChainJobSpecFactory := factory.NewCapabilityJobSpecFactory(
-		chainlevel.IsEnabled,
-		chainlevel.EnabledChains,
+		chainlevel.CapabilityEnabler,
+		chainlevel.EnabledChainsProvider,
 		chainlevel.ConfigResolver,
-		chainlevel.JobName,
+		chainlevel.JobNamer,
 	)
 
 	return capabilities.New(
 		flag,
-		capabilities.WithJobSpecFn(perChainJobSpecFactory.BuildJobSpecFn(
+		capabilities.WithJobSpecFn(perChainJobSpecFactory.BuildJobSpec(
 			flag,
 			configTemplate,
 			func(chainID uint64, _ *cre.NodeMetadata) map[string]any {
