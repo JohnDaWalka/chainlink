@@ -17,9 +17,11 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
@@ -272,8 +274,8 @@ func startCmd() *cobra.Command {
 				}
 			}
 
-			// This will not work with remote images, but it will catch early most of the issues with missing env setup
-			if err := ensureDockerImagesExist(cmdContext, in, withPluginsDockerImage); err != nil {
+			// This will not work with remote images that require authentication, but it will catch early most of the issues with missing env setup
+			if err := ensureDockerImagesExist(cmdContext, framework.L, in, withPluginsDockerImage); err != nil {
 				return err
 			}
 
@@ -734,15 +736,15 @@ func validateWorkflowTriggerAndCapabilities(in *envconfig.Config, withExampleFla
 	return nil
 }
 
-func ensureDockerImagesExist(ctx context.Context, in *envconfig.Config, withPluginsDockerImageFlag string) error {
+func ensureDockerImagesExist(ctx context.Context, logger zerolog.Logger, in *envconfig.Config, withPluginsDockerImageFlag string) error {
 	if withPluginsDockerImageFlag != "" {
-		if err := ensureDockerImageExists(ctx, withPluginsDockerImageFlag); err != nil {
+		if err := ensureDockerImageExists(ctx, logger, withPluginsDockerImageFlag); err != nil {
 			return errors.Wrapf(err, "Plugins image '%s' not found. Make sure it exists locally", withPluginsDockerImageFlag)
 		}
 	}
 
 	if in.JD != nil {
-		if err := ensureDockerImageExists(ctx, in.JD.Image); err != nil {
+		if err := ensureDockerImageExists(ctx, logger, in.JD.Image); err != nil {
 			return errors.Wrapf(err, "Job Distributor image '%s' not found. Make sure it exists locally or run 'go run . env setup' to pull it and other dependencies that also might be missing", in.JD.Image)
 		}
 	}
@@ -750,7 +752,7 @@ func ensureDockerImagesExist(ctx context.Context, in *envconfig.Config, withPlug
 	for _, nodeSet := range in.NodeSets {
 		for _, nodeSpec := range nodeSet.NodeSpecs {
 			if nodeSpec.Node != nil && nodeSpec.Node.Image != "" {
-				if err := ensureDockerImageExists(ctx, nodeSpec.Node.Image); err != nil {
+				if err := ensureDockerImageExists(ctx, logger, nodeSpec.Node.Image); err != nil {
 					return errors.Wrapf(err, "Node image '%s' not found. Make sure it exists locally", nodeSpec.Node.Image)
 				}
 			}
@@ -760,15 +762,31 @@ func ensureDockerImagesExist(ctx context.Context, in *envconfig.Config, withPlug
 	return nil
 }
 
-func ensureDockerImageExists(ctx context.Context, imageName string) error {
+// ensureDockerImageExists checks if the image exists locally, if not, it pulls it
+// it returns nil if the image exists locally or was pulled successfully
+// it returns an error if the image does not exist locally and pulling fails
+// it doesn't handle registries that require authentication
+func ensureDockerImageExists(ctx context.Context, logger zerolog.Logger, imageName string) error {
 	dockerClient, dErr := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
 	if dErr != nil {
 		return errors.Wrap(dErr, "failed to create Docker client")
 	}
 
+	logger.Debug().Msgf("Checking if image '%s' exists locally", imageName)
+
 	_, err := dockerClient.ImageInspect(ctx, imageName)
 	if err != nil {
-		return errors.Wrap(err, "Docker image not found")
+		logger.Debug().Msgf("Image '%s' not found locally, trying to pull it", imageName)
+
+		ioRead, pullErr := dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
+		if pullErr != nil {
+			return fmt.Errorf("image '%s' not found locally and pulling failed", imageName)
+		}
+		defer ioRead.Close()
+
+		logger.Debug().Msgf("Image '%s' pulled successfully", imageName)
+
+		return nil
 	}
 
 	return nil
