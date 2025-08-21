@@ -101,3 +101,6 @@
 
 [capability_configs.mock.config]
   Port = 7777  # Default port for mock service
+
+[capability_configs.consensus]
+  binary_path = "./binaries/consensus"
