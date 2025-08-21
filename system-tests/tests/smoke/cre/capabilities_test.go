@@ -257,9 +257,7 @@ func executePoRTest(t *testing.T, in *envconfig.Config, envArtifact environment.
 }
 
 func deployWorkflow(t *testing.T, workflowRegistryChain *cre.WrappedBlockchainOutput, cld *cre.FullCLDEnvironmentOutput, configPath, workflowFileLocation, workflowName string) {
-
 	compressedWorkflowWasmPath := compileWorkflow(t, workflowFileLocation, workflowName)
-
 	containerTargetDir := "/home/chainlink/workflows"
 	workflowCopyErr := creworkflow.CopyWorkflowToDockerContainers(compressedWorkflowWasmPath, "workflow-node", containerTargetDir)
 	require.NoError(t, workflowCopyErr, "failed to copy workflow to docker containers")

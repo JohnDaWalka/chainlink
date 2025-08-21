@@ -25,8 +25,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/config"
 	evmreadcontracts "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/contracts"
-	workflowTypes "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/types"
 
 	keystonechangeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
@@ -90,10 +90,10 @@ func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environm
 	}
 
 	wg.Wait()
-	require.Equal(t, successfulWorkflowRuns.Load(), len(wrappedBlockchainOutputs), "Not all workflows executed successfully")
+	require.Len(t, len(wrappedBlockchainOutputs), int(successfulWorkflowRuns.Load()), "Not all workflows executed successfully")
 }
 
-func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.WrappedBlockchainOutput, workflowName string, forwarderAddr common.Address, cfg workflowTypes.Config) error {
+func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.WrappedBlockchainOutput, workflowName string, forwarderAddr common.Address, cfg config.Config) error {
 	forwarderContract, err := forwarder.NewKeystoneForwarder(forwarderAddr, bcOutput.SethClient.Client)
 	if err != nil {
 		return fmt.Errorf("failed to create forwarder contract instance: %w", err)
@@ -139,7 +139,7 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 	}
 }
 
-func configureEVMReadWorkflow(t *testing.T, lggr zerolog.Logger, chain *cre.WrappedBlockchainOutput) workflowTypes.Config {
+func configureEVMReadWorkflow(t *testing.T, lggr zerolog.Logger, chain *cre.WrappedBlockchainOutput) config.Config {
 	lggr.Info().Msgf("Deploying message emitter for chain %s", chain.BlockchainOutput.ChainID)
 	msgEmitterContractAddr, tx, msgEmitter, err := evmreadcontracts.DeployMessageEmitter(chain.SethClient.NewTXOpts(), chain.SethClient.Client)
 	require.NoError(t, err)
@@ -162,7 +162,7 @@ func configureEVMReadWorkflow(t *testing.T, lggr zerolog.Logger, chain *cre.Wrap
 	err = chain.SethClient.TransferETHFromKey(t.Context(), 0, accountAddr.Hex(), big.NewInt(expectedBalance), nil)
 	require.NoError(t, err, "failed to transfer ETH to contract %s", msgEmitterContractAddr.String())
 
-	return workflowTypes.Config{
+	return config.Config{
 		ContractAddress: msgEmitterContractAddr.Bytes(),
 		ChainSelector:   chain.ChainSelector,
 		AccountAddress:  accountAddr.Bytes(),

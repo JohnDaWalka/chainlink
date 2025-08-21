@@ -23,22 +23,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 
+	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/config"
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/contracts"
-	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/types"
 )
 
 func main() {
-	wasm.NewRunner(func(b []byte) (types.Config, error) {
-		cfg := types.Config{}
+	wasm.NewRunner(func(b []byte) (config.Config, error) {
+		cfg := config.Config{}
 		if err := json.Unmarshal(b, &cfg); err != nil {
-			return types.Config{}, fmt.Errorf("error unmarshalling config: %w", err)
+			return config.Config{}, fmt.Errorf("error unmarshalling config: %w", err)
 		}
 		return cfg, nil
 	}).Run(RunReadWorkflow)
 }
 
-func RunReadWorkflow(cfg types.Config, logger *slog.Logger, secretsProvider sdk.SecretsProvider) (sdk.Workflow[types.Config], error) {
-	return sdk.Workflow[types.Config]{
+func RunReadWorkflow(cfg config.Config, logger *slog.Logger, secretsProvider sdk.SecretsProvider) (sdk.Workflow[config.Config], error) {
+	return sdk.Workflow[config.Config]{
 		sdk.Handler(
 			cron.Trigger(&cron.Config{Schedule: "*/30 * * * * *"}),
 			onReadTrigger,
@@ -46,7 +46,7 @@ func RunReadWorkflow(cfg types.Config, logger *slog.Logger, secretsProvider sdk.
 	}, nil
 }
 
-func onReadTrigger(cfg types.Config, runtime sdk.Runtime, payload *cron.Payload) (_ any, _ error) {
+func onReadTrigger(cfg config.Config, runtime sdk.Runtime, payload *cron.Payload) (_ any, _ error) {
 	runtime.Logger().Info("onReadTrigger called", "payload", payload)
 	defer func() {
 		if r := recover(); r != nil {
@@ -78,7 +78,7 @@ func onReadTrigger(cfg types.Config, runtime sdk.Runtime, payload *cron.Payload)
 	return
 }
 
-func requireBalance(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
+func requireBalance(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
 	balanceReply, err := client.BalanceAt(runtime, &evm.BalanceAtRequest{
 		Account:     cfg.AccountAddress,
 		BlockNumber: nil,
@@ -89,7 +89,7 @@ func requireBalance(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Clie
 	require.Equal(t, cfg.ExpectedBalance.String(), pb.NewIntFromBigInt(balanceReply.Balance).String(), "Balance should match expected value")
 }
 
-func requireError(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
+func requireError(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
 	txReply, err := client.GetTransactionByHash(runtime, &evm.GetTransactionByHashRequest{Hash: make([]byte, len(cfg.TxHash))}).Await()
 	require.NotNil(t, err, "expected error when getting non existing transaction by hash")
 	require.Nil(t, txReply, "txReply expected to be nil")
@@ -97,7 +97,7 @@ func requireError(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client
 	runtime.Logger().Info("Successfully got error for non-existing transaction", "error", err)
 }
 
-func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
+func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
 	estimatedGasReply, err := client.EstimateGas(runtime, &evm.EstimateGasRequest{
 		Msg: &evm.CallMsg{
 			To:   cfg.ContractAddress,
@@ -109,7 +109,7 @@ func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg types.Config, client evm
 	require.Greater(t, estimatedGasReply.Gas, uint64(0), "Estimated gas should greater than 0")
 }
 
-func requireTx(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
+func requireTx(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
 	txReply, err := client.GetTransactionByHash(runtime, &evm.GetTransactionByHashRequest{Hash: cfg.TxHash}).Await()
 	require.NoError(t, err, "failed to get transaction by hash")
 	require.NotNil(t, txReply, "GetTransactionByHashReply should not be nil")
@@ -117,7 +117,7 @@ func requireTx(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
 	require.Empty(t, cmp.Diff(txReply.Transaction, cfg.ExpectedTx, protocmp.Transform()))
 }
 
-func requireReceipt(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
+func requireReceipt(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
 	receiptReply, err := client.GetTransactionReceipt(runtime, &evm.GetTransactionReceiptRequest{Hash: cfg.TxHash}).Await()
 	require.NoError(t, err, "failed to get transaction receipt")
 	require.NotNil(t, receiptReply, "TransactionReceiptReply should not be nil")
@@ -128,7 +128,7 @@ func requireReceipt(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Clie
 	require.Empty(t, cmp.Diff(receiptReply.Receipt, cfg.ExpectedReceipt, protocmp.Transform()))
 }
 
-func requireContractCall(t *T, cfg types.Config, runtime sdk.Runtime, client evm.Client) {
+func requireContractCall(t *T, cfg config.Config, runtime sdk.Runtime, client evm.Client) {
 	parsed, err := abi.JSON(strings.NewReader(contracts.MessageEmitterMetaData.ABI))
 	require.NoError(t, err, "failed to parse api")
 	const callArg = "Hey CRE"
@@ -170,7 +170,7 @@ func requireLatestBlockNumber(t *T, runtime sdk.Runtime, client evm.Client) int6
 	return prevHeaderNumber.Int64()
 }
 
-func sendTx(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client, msg string) []byte {
+func sendTx(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client, msg string) []byte {
 	// NOTE: This is not a right way to send a transaction. Msg must be properly encoded to trigger a proper receiver contract call.
 	// In this case we just need to see transaction on chain, so it's sufficient.
 	report, err := runtime.GenerateReport(&sdkpb.ReportRequest{
@@ -190,7 +190,7 @@ func sendTx(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client, msg 
 	return reportReply.TxHash
 }
 
-func requireEvent(t *T, cfg types.Config, runtime sdk.Runtime, latestHeadNumber int64, client evm.Client) {
+func requireEvent(t *T, cfg config.Config, runtime sdk.Runtime, latestHeadNumber int64, client evm.Client) {
 	const blocksStep = 100
 	foundEvent := false
 	for ; latestHeadNumber > 0; latestHeadNumber -= blocksStep {
