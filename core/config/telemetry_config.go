@@ -13,6 +13,5 @@ type Telemetry interface {
 	EmitterExportTimeout() time.Duration
 	ChipIngressEndpoint() string
 	ChipIngressInsecureConnection() bool
-	ChipIngressForceIPV4() bool
 	HeartbeatInterval() time.Duration
 }

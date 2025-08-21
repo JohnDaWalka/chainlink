@@ -815,8 +815,6 @@ EmitterExportTimeout = '1s' # Default
 ChipIngressEndpoint = '' # Default
 # ChipIngressInsecureConnection disables TLS when connecting to CHIP Ingress.
 ChipIngressInsecureConnection = false # Default
-# ChipIngressForceIPV4 forces IPv4 when connecting to CHIP Ingress.
-ChipIngressForceIPV4 = false # Default
 
 # HeartbeatInterval is the interval at which a the application heartbeat is sent to telemetry backends.
 HeartbeatInterval = '1s' # Default

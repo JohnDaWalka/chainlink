@@ -2275,7 +2275,6 @@ type Telemetry struct {
 	EmitterExportTimeout          *commonconfig.Duration
 	ChipIngressEndpoint           *string
 	ChipIngressInsecureConnection *bool
-	ChipIngressForceIPV4          *bool
 	HeartbeatInterval             *commonconfig.Duration
 }
 
@@ -2309,9 +2308,6 @@ func (b *Telemetry) setFrom(f *Telemetry) {
 	}
 	if v := f.ChipIngressInsecureConnection; v != nil {
 		b.ChipIngressInsecureConnection = v
-	}
-	if v := f.ChipIngressForceIPV4; v != nil {
-		b.ChipIngressForceIPV4 = v
 	}
 	if v := f.HeartbeatInterval; v != nil {
 		b.HeartbeatInterval = v

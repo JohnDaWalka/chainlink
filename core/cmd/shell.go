@@ -114,7 +114,6 @@ func initGlobals(cfgProm config.Prometheus, cfgTracing config.Tracing, cfgTeleme
 				ChipIngressEmitterEnabled:      cfgTelemetry.ChipIngressEndpoint() != "",
 				ChipIngressEmitterGRPCEndpoint: cfgTelemetry.ChipIngressEndpoint(),
 				ChipIngressInsecureConnection:  cfgTelemetry.ChipIngressInsecureConnection(),
-				ChipIngressForceIPV4:           cfgTelemetry.ChipIngressForceIPV4(),
 			}
 			// note: due to the OTEL specification, all histogram buckets
 			// must be defined when the beholder client is created

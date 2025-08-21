@@ -68,8 +68,6 @@ func (m mockCfgTelemetry) ChipIngressEndpoint() string { return "example.com/chi
 
 func (m mockCfgTelemetry) ChipIngressInsecureConnection() bool { return false }
 
-func (m mockCfgTelemetry) ChipIngressForceIPV4() bool { return false }
-
 func (m mockCfgTelemetry) HeartbeatInterval() time.Duration {
 	return 5 * time.Second
 }
