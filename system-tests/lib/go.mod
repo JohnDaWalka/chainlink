@@ -33,8 +33,13 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/smartcontractkit/chain-selectors v1.0.67
 	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
+<<<<<<< HEAD
 	github.com/smartcontractkit/chainlink-deployments-framework v0.28.1-0.20250820001832-52b4624e398f
 	github.com/smartcontractkit/chainlink-evm v0.3.1
+=======
+	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0
+	github.com/smartcontractkit/chainlink-evm v0.3.2
+>>>>>>> develop
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250808121824-2c3544aab8f3
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
