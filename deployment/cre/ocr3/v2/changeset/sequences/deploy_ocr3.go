@@ -4,14 +4,16 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
 
-	"github.com/smartcontractkit/chainlink/deployment/cre/ocr3/changeset/operations/contracts"
+	"github.com/smartcontractkit/chainlink/deployment/cre/ocr3/v2/changeset/operations/contracts"
 	kchangeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+	kinternal "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 )
 
 type DeployOCR3Deps struct {
@@ -21,6 +23,12 @@ type DeployOCR3Deps struct {
 type DeployOCR3Input struct {
 	RegistryChainSel uint64
 	Qualifier        string
+
+	DONs         []contracts.ConfigureKeystoneDON
+	OracleConfig *kinternal.OracleConfig
+	DryRun       bool
+
+	MCMSConfig *kchangeset.MCMSConfig
 }
 
 func (c DeployOCR3Input) Validate() error {
@@ -55,6 +63,8 @@ var DeployOCR3 = operations.NewSequence(
 			return DeployOCR3Output{}, err
 		}
 
+		ocr3ContractAddress := common.HexToAddress(ocr3DeploymentReport.Output.Address)
+
 		// Step 2: Get all the dependencies needed for the OCR3 configuration
 		// 2.1 get capabilities registry
 		capabilitiesRegistryKey := datastore.NewAddressRefKey(input.RegistryChainSel, datastore.ContractType("CapabilitiesRegistry"), semver.MustParse("1.0.0"), "")
@@ -80,9 +90,9 @@ var DeployOCR3 = operations.NewSequence(
 		_, err = operations.ExecuteOperation(b, contracts.ConfigureOCR3, contracts.ConfigureOCR3Deps{
 			Env: deps.Env,
 			// WriteGeneratedConfig: deps.WriteGeneratedConfig,
-			Registry: capabilitiesRegistry,
+			Registry: capabilitiesRegistry.Contract,
 		}, contracts.ConfigureOCR3Input{
-			ContractAddress:  &ocr3DeploymentReport.Output.Address,
+			ContractAddress:  &ocr3ContractAddress,
 			RegistryChainSel: input.RegistryChainSel,
 			DONs:             input.DONs,
 			Config:           input.OracleConfig,

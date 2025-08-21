@@ -39,6 +39,11 @@ func (l DeployOCR3) Apply(e cldf.Environment, config DeployOCR3Input) (cldf.Chan
 		sequences.DeployOCR3Input{
 			RegistryChainSel: config.ChainSelector,
 			Qualifier:        config.Qualifier,
+
+			DONs:         config.DONs,
+			OracleConfig: config.OracleConfig,
+			DryRun:       config.DryRun,
+			MCMSConfig:   config.MCMSConfig,
 		},
 	)
 	if err != nil {
