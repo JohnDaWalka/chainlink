@@ -14,7 +14,7 @@ import (
 var OCR3CapabilityFactoryFn = func(donFlags []string) []keystone_changeset.DONCapabilityWithConfig {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
 
-	if flags.HasFlag(donFlags, cre.OCR3Capability) {
+	if flags.HasFlag(donFlags, cre.ConsensusCapability) {
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
 				LabelledName:   "offchain_reporting",
