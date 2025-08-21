@@ -14,9 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values/pb"
@@ -81,10 +82,10 @@ func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environm
 			if err != nil {
 				lggr.Error().Msgf("Workflow %s execution failed on chain %s: %v", workflowName, bcOutput.BlockchainOutput.ChainID, err)
 				return
-			} else {
-				lggr.Info().Msgf("Workflow %s executed successfully on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
-				successfulWorkflowRuns.Add(1)
 			}
+
+			lggr.Info().Msgf("Workflow %s executed successfully on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
+			successfulWorkflowRuns.Add(1)
 		}(bcOutput)
 	}
 
@@ -94,7 +95,9 @@ func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environm
 
 func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.WrappedBlockchainOutput, workflowName string, forwarderAddr common.Address, cfg workflowTypes.Config) error {
 	forwarderContract, err := forwarder.NewKeystoneForwarder(forwarderAddr, bcOutput.SethClient.Client)
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("failed to create forwarder contract instance: %w", err)
+	}
 	msgEmitterAddr := common.BytesToAddress(cfg.ContractAddress)
 	isWorkflowFinished := func(ctx context.Context) (bool, error) {
 		iter, err := forwarderContract.FilterReportProcessed(&bind.FilterOpts{
