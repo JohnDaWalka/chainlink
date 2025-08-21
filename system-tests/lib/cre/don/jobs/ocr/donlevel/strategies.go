@@ -1,6 +1,10 @@
 package donlevel
 
 import (
+	"fmt"
+
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -23,5 +27,10 @@ var CapabilityEnabler = func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cr
 }
 
 var EnabledChainsProvider = func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
-	return []uint64{donTopology.HomeChainSelector}
+	// return chainIDs to be consistent with chainlevel.EnabledChainsProvider
+	chain, ok := chainselectors.ChainBySelector(donTopology.HomeChainSelector)
+	if !ok {
+		panic(fmt.Errorf("failed getting chain for selector %d", donTopology.HomeChainSelector))
+	}
+	return []uint64{chain.EvmChainID}
 }
