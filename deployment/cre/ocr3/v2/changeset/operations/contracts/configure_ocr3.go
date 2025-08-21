@@ -15,7 +15,7 @@ import (
 	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
 
 	kchangeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	kinternal "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	kinternal "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
 type ConfigureOCR3Deps struct {

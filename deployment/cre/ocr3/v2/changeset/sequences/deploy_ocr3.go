@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/deployment/cre/ocr3/v2/changeset/operations/contracts"
 	kchangeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	kinternal "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
+	kinternal "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 )
 
 type DeployOCR3Deps struct {

@@ -39,7 +39,7 @@ type ConfigureOCR3Config struct {
 	ChainSel             uint64
 	NodeIDs              []string
 	Address              *common.Address // address of the OCR3 contract to configure
-	OCR3Config           *internal.OracleConfig
+	OCR3Config           *OracleConfig
 	DryRun               bool
 	WriteGeneratedConfig io.Writer // if not nil, write the generated config to this writer as JSON [OCR2OracleConfig]
 

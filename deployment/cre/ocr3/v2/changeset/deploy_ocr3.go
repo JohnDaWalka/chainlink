@@ -8,8 +8,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
-	"github.com/smartcontractkit/chainlink/deployment/cre/ocr3/changeset/sequences"
+	"github.com/smartcontractkit/chainlink/deployment/cre/ocr3/v2/changeset/sequences"
+	//"github.com/smartcontractkit/chainlink/deployment/cre/ocr3/changeset/sequences"
 )
 
 var _ cldf.ChangeSetV2[DeployOCR3Input] = DeployOCR3{}
@@ -39,11 +39,6 @@ func (l DeployOCR3) Apply(e cldf.Environment, config DeployOCR3Input) (cldf.Chan
 		sequences.DeployOCR3Input{
 			RegistryChainSel: config.ChainSelector,
 			Qualifier:        config.Qualifier,
-
-			DONs:         config.DONs,
-			OracleConfig: config.OracleConfig,
-			DryRun:       config.DryRun,
-			MCMSConfig:   config.MCMSConfig,
 		},
 	)
 	if err != nil {
