@@ -339,6 +339,7 @@ flowchart LR
 	chainlink/system-tests/tests --> chainlink-testing-framework/wasp
 	chainlink/system-tests/tests --> chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based
 	chainlink/system-tests/tests --> chainlink/system-tests/lib
+	chainlink/system-tests/tests --> cre-sdk-go/capabilities/blockchain/evm
 	click chainlink/system-tests/tests href "https://github.com/smartcontractkit/chainlink"
 	chainlink/v2 --> chainlink-aptos
 	chainlink/v2 --> chainlink-automation
@@ -354,6 +355,8 @@ flowchart LR
 	cre-sdk-go --> chainlink-common/pkg/workflows/sdk/v2/pb
 	cre-sdk-go --> chainlink-protos/cre/go
 	click cre-sdk-go href "https://github.com/smartcontractkit/cre-sdk-go"
+	cre-sdk-go/capabilities/blockchain/evm --> cre-sdk-go
+	click cre-sdk-go/capabilities/blockchain/evm href "https://github.com/smartcontractkit/cre-sdk-go"
 	cre-sdk-go/capabilities/networking/http --> cre-sdk-go
 	click cre-sdk-go/capabilities/networking/http href "https://github.com/smartcontractkit/cre-sdk-go"
 	cre-sdk-go/capabilities/scheduler/cron --> cre-sdk-go
@@ -450,6 +453,7 @@ flowchart LR
 
 	subgraph cre-sdk-go-repo[cre-sdk-go]
 		 cre-sdk-go
+		 cre-sdk-go/capabilities/blockchain/evm
 		 cre-sdk-go/capabilities/networking/http
 		 cre-sdk-go/capabilities/scheduler/cron
 	end
