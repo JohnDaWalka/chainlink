@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -131,18 +133,146 @@ func (c *Controller) SendTrigger(ctx context.Context, message *pb2.SendTriggerEv
 	}
 	return nil
 }
-
-func (c *Controller) RegisterTrigger(ctx context.Context) error {
-	for _, clinet := range c.Nodes {
-		framework.L.Info().Msg("Registering trigger")
-		s, err := clinet.API.RegisterTrigger(ctx, &pb2.TriggerRegistrationRequest{
-			TriggerID: "",
-			Metadata:  nil,
-			Config:    nil,
-			Payload:   nil,
-			Method:    "",
-		})
+func (c *Controller) RegisterTrigger(ctx context.Context, triggerID string, metadata *pb2.Metadata, config []byte, payload *anypb.Any, method string) ([]chan *capabilities.TriggerResponse, error) {
+	if len(c.Nodes) == 0 {
+		return nil, fmt.Errorf("no nodes available for trigger registration")
 	}
+
+	responses := make([]chan *capabilities.TriggerResponse, len(c.Nodes))
+	var registrationErrors []error
+
+	for i, client := range c.Nodes {
+		// Create unbuffered channel
+		responses[i] = make(chan *capabilities.TriggerResponse, 0)
+
+		c.lggr.Info().Str("client_url", client.URL).Str("trigger_id", triggerID).Msg("Registering trigger")
+
+		stream, err := client.API.RegisterTrigger(ctx, &pb2.TriggerRegistrationRequest{
+			TriggerID:             triggerID,
+			Metadata:              metadata,
+			Config:                config,
+			Payload:               payload,
+			Method:                method,
+			RegistrationTriggerID: uuid.New().String(),
+		})
+		if err != nil {
+			registrationErrors = append(registrationErrors, fmt.Errorf("failed to register trigger for client %s: %w", client.URL, err))
+			close(responses[i])
+			continue
+		}
+
+		// Start goroutine to handle stream
+		go c.handleTriggerStream(ctx, client, stream, responses[i])
+	}
+
+	// If all registrations failed, return error
+	if len(registrationErrors) == len(c.Nodes) {
+		return nil, fmt.Errorf("all trigger registrations failed: %v", registrationErrors)
+	}
+
+	// Log partial failures but continue
+	if len(registrationErrors) > 0 {
+		c.lggr.Warn().Int("failed_count", len(registrationErrors)).Errs("errors", registrationErrors).Msg("Some trigger registrations failed")
+	}
+
+	return responses, nil
+}
+
+// handleTriggerStream handles the streaming response from a single client
+func (c *Controller) handleTriggerStream(ctx context.Context, client MockClient, stream pb2.MockCapability_RegisterTriggerClient, responseCh chan *capabilities.TriggerResponse) {
+	defer func() {
+		c.lggr.Debug().Str("client_url", client.URL).Msg("Closing trigger stream handler")
+		close(responseCh)
+	}()
+
+	c.lggr.Debug().Str("client_url", client.URL).Msg("Starting trigger stream handler")
+
+	for {
+		select {
+		case <-ctx.Done():
+			c.lggr.Debug().Str("client_url", client.URL).Err(ctx.Err()).Msg("Context cancelled, stopping trigger stream")
+			return
+
+		default:
+			// Set a reasonable timeout for receiving messages
+			response, err := stream.Recv()
+			c.lggr.Info().Str("client_url", client.URL).Msg("Stream received trigger event")
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					c.lggr.Info().Str("client_url", client.URL).Msg("Trigger stream ended normally")
+					return
+				}
+				c.lggr.Error().Str("client_url", client.URL).Err(err).Msg("Error receiving trigger event")
+
+				// Send error response to channel before returning
+				select {
+				case responseCh <- &capabilities.TriggerResponse{
+					Err: fmt.Errorf("stream error from %s: %w", client.URL, err),
+				}:
+				case <-ctx.Done():
+					return
+				}
+				return
+			}
+
+			// Process the received trigger event
+			triggerResponse, processErr := c.processTriggerResponse(response, client.URL)
+			if processErr != nil {
+				c.lggr.Error().Str("client_url", client.URL).Err(processErr).Msg("Error processing trigger response")
+
+				// Send processing error to channel
+				select {
+				case responseCh <- &capabilities.TriggerResponse{
+					Err: fmt.Errorf("processing error from %s: %w", client.URL, processErr),
+				}:
+				case <-ctx.Done():
+					return
+				}
+				continue
+			}
+
+			// Send successful response to channel
+			select {
+			case responseCh <- triggerResponse:
+				c.lggr.Debug().Str("client_url", client.URL).Str("event_id", triggerResponse.Event.ID).Msg("Sent trigger response to channel")
+			case <-ctx.Done():
+				c.lggr.Debug().Str("client_url", client.URL).Msg("Context cancelled while sending response")
+				return
+			}
+		}
+	}
+}
+
+// processTriggerResponse converts the protobuf response to capabilities.TriggerResponse
+func (c *Controller) processTriggerResponse(response *pb2.TriggerResponse, clientURL string) (*capabilities.TriggerResponse, error) {
+	if response == nil {
+		return nil, fmt.Errorf("received nil response from %s", clientURL)
+	}
+
+	triggerEvent := response.GetTriggerEvent()
+	if triggerEvent == nil {
+		return nil, fmt.Errorf("received response with nil trigger event from %s", clientURL)
+	}
+
+	outputs, err := BytesToMap(triggerEvent.GetOutputs())
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode outputs from %s: %w", clientURL, err)
+	}
+
+	triggerResponse := &capabilities.TriggerResponse{
+		Event: capabilities.TriggerEvent{
+			TriggerType: triggerEvent.TriggerType,
+			ID:          triggerEvent.ID,
+			Outputs:     outputs,
+		},
+	}
+
+	// Check for error in response
+	if response.Error != "" {
+		triggerResponse.Err = fmt.Errorf("trigger error from %s: %s", clientURL, response.Error)
+	}
+
+	return triggerResponse, nil
 }
 
 type CapInfos struct {

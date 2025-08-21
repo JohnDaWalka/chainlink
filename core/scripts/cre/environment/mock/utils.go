@@ -9,7 +9,9 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
@@ -329,7 +331,22 @@ func RegisterTrigger(ctx context.Context) error {
 		return err
 	}
 
-	mocks.
+	metadata := &pb2.Metadata{
+		WorkflowID: "some-workflow-id2",
+	}
+
+	payload, err := anypb.New(&cron.Config{Schedule: "*/30 * * * * *"})
+	if err != nil {
+		return err
+	}
+
+	_, err = mocks.RegisterTrigger(ctx, "cron-trigger@1.0.0", metadata, nil, payload, "")
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(time.Hour)
+	return nil
 }
 
 func init() {

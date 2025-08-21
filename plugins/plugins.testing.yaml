@@ -12,6 +12,6 @@ plugins:
   mock:
     - enabled: true
       moduleURI: "github.com/smartcontractkit/capabilities/mock"
-      gitRef: "02cb745cabad2979034e6f96ebb47c9322df24ba"
+      gitRef: "f6ada200512f033d539a5bbdd6963210c48c10e6"
       installPath: "github.com/smartcontractkit/capabilities/mock"
 
