@@ -30,6 +30,8 @@ func (l DeployOCR3) VerifyPreconditions(e cldf.Environment, config DeployOCR3Inp
 }
 
 func (l DeployOCR3) Apply(e cldf.Environment, config DeployOCR3Input) (cldf.ChangesetOutput, error) {
+	ds := datastore.NewMemoryDataStore()
+
 	ocr3DeploymentReport, err := operations.ExecuteSequence(
 		e.OperationsBundle,
 		sequences.DeployOCR3,
@@ -45,9 +47,6 @@ func (l DeployOCR3) Apply(e cldf.Environment, config DeployOCR3Input) (cldf.Chan
 
 	reports := make([]operations.Report[any, any], 0)
 	reports = append(reports, ocr3DeploymentReport.ToGenericReport())
-
-	// Create datastore and populate it with the deployed contract information
-	ds := datastore.NewMemoryDataStore()
 
 	// Parse the version string back to semver.Version
 	version, err := semver.NewVersion(ocr3DeploymentReport.Output.Version)
