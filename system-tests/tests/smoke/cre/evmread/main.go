@@ -13,13 +13,15 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/smartcontractkit/chainlink-common/pkg/values/pb"
+	"github.com/google/go-cmp/cmp"
 	sdkpb "github.com/smartcontractkit/chainlink-protos/cre/go/sdk"
+	"github.com/smartcontractkit/chainlink-protos/cre/go/values/pb"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	sdk "github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/types"
@@ -99,7 +101,7 @@ func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg types.Config, client evm
 	estimatedGasReply, err := client.EstimateGas(runtime, &evm.EstimateGasRequest{
 		Msg: &evm.CallMsg{
 			To:   cfg.ContractAddress,
-			Data: cfg.ExpectedTx.Data(),
+			Data: cfg.ExpectedTx.Data,
 		},
 	}).Await()
 	require.NoError(t, err, "failed to estimate gas")
@@ -112,13 +114,7 @@ func requireTx(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
 	require.NoError(t, err, "failed to get transaction by hash")
 	require.NotNil(t, txReply, "GetTransactionByHashReply should not be nil")
 	require.NotNil(t, txReply.Transaction, "Transaction should not be nil")
-	require.Equal(t, cfg.ExpectedTx.Nonce(), txReply.Transaction.Nonce, "nonce should match")
-	require.Equal(t, cfg.ExpectedTx.Gas(), txReply.Transaction.Gas, "gas should match")
-	require.Equal(t, cfg.ExpectedTx.To().Bytes(), txReply.Transaction.To, "to address should match")
-	require.Equal(t, cfg.ExpectedTx.Data(), txReply.Transaction.Data, "data should match")
-	require.Equal(t, cfg.ExpectedTx.Hash().Bytes(), txReply.Transaction.Hash, "hash should match")
-	require.Equal(t, cfg.ExpectedTx.Value().String(), pb.NewIntFromBigInt(txReply.Transaction.Value).String(), "value should match")
-	require.Equal(t, cfg.ExpectedTx.GasPrice().String(), pb.NewIntFromBigInt(txReply.Transaction.GasPrice).String(), "gas price should match")
+	require.Empty(t, cmp.Diff(txReply.Transaction, cfg.ExpectedTx, protocmp.Transform()))
 }
 
 func requireReceipt(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Client) {
@@ -126,18 +122,10 @@ func requireReceipt(t *T, runtime sdk.Runtime, cfg types.Config, client evm.Clie
 	require.NoError(t, err, "failed to get transaction receipt")
 	require.NotNil(t, receiptReply, "TransactionReceiptReply should not be nil")
 	require.NotNil(t, receiptReply.Receipt, "TransactionReceipt should not be nil")
-	require.Equal(t, cfg.ExpectedReceipt.ContractAddress.Bytes(), receiptReply.Receipt.ContractAddress,
-		"Contract address in receipt should match expected contract address")
-	require.Equal(t, cfg.ExpectedReceipt.TxHash.Bytes(), receiptReply.Receipt.TxHash, "Tx hash should match")
-	require.Equal(t, cfg.ExpectedReceipt.Status, receiptReply.Receipt.Status, "Status should match expected value")
-	require.Equal(t, cfg.ExpectedReceipt.GasUsed, receiptReply.Receipt.GasUsed, "GasUsed should match expected value")
-	require.Equal(t, uint64(cfg.ExpectedReceipt.TransactionIndex), receiptReply.Receipt.TxIndex, "TxIndex should match expected value")
-	require.Equal(t, cfg.ExpectedReceipt.BlockHash.Bytes(), receiptReply.Receipt.BlockHash, "BlockHash should match expected value")
 	require.Equal(t, len(cfg.ExpectedReceipt.Logs), len(receiptReply.Receipt.Logs), "Logs length should match expected value")
-	require.Equal(t, cfg.ExpectedReceipt.TxHash.Bytes(), receiptReply.Receipt.TxHash, "TxHash should match expected value")
-	require.Equal(t, cfg.ExpectedReceipt.EffectiveGasPrice.String(), pb.NewIntFromBigInt(receiptReply.Receipt.EffectiveGasPrice).String(), "EffectiveGasPrice should match expected value")
-	require.Equal(t, cfg.ExpectedReceipt.BlockNumber.String(), pb.NewIntFromBigInt(receiptReply.Receipt.BlockNumber).String(), "BlockNumber should match expected value")
-	require.Equal(t, cfg.ExpectedReceipt.ContractAddress.Bytes(), receiptReply.Receipt.ContractAddress, "ContractAddress should match expected value")
+	cfg.ExpectedReceipt.Logs = nil
+	receiptReply.Receipt.Logs = nil
+	require.Empty(t, cmp.Diff(receiptReply.Receipt, cfg.ExpectedReceipt, protocmp.Transform()))
 }
 
 func requireContractCall(t *T, cfg types.Config, runtime sdk.Runtime, client evm.Client) {

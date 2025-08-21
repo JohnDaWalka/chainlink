@@ -12,7 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
+	"github.com/smartcontractkit/chainlink-protos/cre/go/values/pb"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -72,7 +74,7 @@ func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environm
 			require.Eventually(t, func() bool {
 				msgEmitterAddr := common.BytesToAddress(cfg.ContractAddress)
 				msgs, err := forwarderContract.FilterReportProcessed(&bind.FilterOpts{
-					Start:   cfg.ExpectedReceipt.BlockNumber.Uint64(),
+					Start:   pb.NewIntFromBigInt(cfg.ExpectedReceipt.BlockNumber).Uint64(),
 					End:     nil,
 					Context: t.Context(),
 				}, []common.Address{msgEmitterAddr}, nil, nil)
@@ -127,8 +129,26 @@ func configureEVMReadWorkflow(t *testing.T, lggr zerolog.Logger, chain *cre.Wrap
 		ChainSelector:   chain.ChainSelector,
 		AccountAddress:  accountAddr.Bytes(),
 		ExpectedBalance: big.NewInt(expectedBalance),
-		ExpectedReceipt: emittingReceipt,
-		TxHash:          emittingReceipt.TxHash.Bytes(),
-		ExpectedTx:      emittingTx,
+		ExpectedReceipt: &evm.Receipt{
+			Status:            emittingReceipt.Status,
+			Logs:              make([]*evm.Log, len(emittingReceipt.Logs)), // workflow compares only number of logs, not their content
+			TxHash:            emittingReceipt.TxHash.Bytes(),
+			ContractAddress:   emittingReceipt.ContractAddress.Bytes(),
+			GasUsed:           emittingReceipt.GasUsed,
+			BlockHash:         emittingReceipt.BlockHash.Bytes(),
+			BlockNumber:       pb.NewBigIntFromInt(emittingReceipt.BlockNumber),
+			TxIndex:           uint64(emittingReceipt.TransactionIndex),
+			EffectiveGasPrice: pb.NewBigIntFromInt(emittingReceipt.EffectiveGasPrice),
+		},
+		TxHash: emittingReceipt.TxHash.Bytes(),
+		ExpectedTx: &evm.Transaction{
+			Nonce:    emittingTx.Nonce(),
+			Gas:      emittingTx.Gas(),
+			To:       emittingTx.To().Bytes(),
+			Data:     emittingTx.Data(),
+			Hash:     emittingTx.Hash().Bytes(),
+			Value:    pb.NewBigIntFromInt(emittingTx.Value()),
+			GasPrice: pb.NewBigIntFromInt(emittingTx.GasPrice()),
+		},
 	}
 }

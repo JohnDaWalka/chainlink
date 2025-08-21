@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
 type Config struct {
@@ -12,6 +12,6 @@ type Config struct {
 	AccountAddress  []byte
 	ExpectedBalance *big.Int
 	TxHash          []byte
-	ExpectedReceipt *types.Receipt
-	ExpectedTx      *types.Transaction
+	ExpectedReceipt *evm.Receipt
+	ExpectedTx      *evm.Transaction
 }
