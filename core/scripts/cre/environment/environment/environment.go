@@ -272,6 +272,11 @@ func startCmd() *cobra.Command {
 				}
 			}
 
+			// This will not work with remote images, but it will catch early most of the issues with missing env setup
+			if err := ensureDockerImagesExist(cmdContext, in, withPluginsDockerImage); err != nil {
+				return err
+			}
+
 			capabilityFlagsProvider := flags.NewDefaultCapabilityFlagsProvider()
 
 			if err := in.Validate(capabilityFlagsProvider); err != nil {
@@ -724,6 +729,46 @@ func validateWorkflowTriggerAndCapabilities(in *envconfig.Config, withExampleFla
 		}
 
 		return nil
+	}
+
+	return nil
+}
+
+func ensureDockerImagesExist(ctx context.Context, in *envconfig.Config, withPluginsDockerImageFlag string) error {
+	if withPluginsDockerImageFlag != "" {
+		if err := ensureDockerImageExists(ctx, withPluginsDockerImageFlag); err != nil {
+			return errors.Wrapf(err, "Plugins image '%s' not found. Make sure it exists locally", withPluginsDockerImageFlag)
+		}
+	}
+
+	if in.JD != nil {
+		if err := ensureDockerImageExists(ctx, in.JD.Image); err != nil {
+			return errors.Wrapf(err, "Job Distributor image '%s' not found. Make sure it exists locally or run 'go run . env setup' to pull it and other dependencies that also might be missing", in.JD.Image)
+		}
+	}
+
+	for _, nodeSet := range in.NodeSets {
+		for _, nodeSpec := range nodeSet.NodeSpecs {
+			if nodeSpec.Node != nil && nodeSpec.Node.Image != "" {
+				if err := ensureDockerImageExists(ctx, nodeSpec.Node.Image); err != nil {
+					return errors.Wrapf(err, "Node image '%s' not found. Make sure it exists locally", nodeSpec.Node.Image)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func ensureDockerImageExists(ctx context.Context, imageName string) error {
+	dockerClient, dErr := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+	if dErr != nil {
+		return errors.Wrap(dErr, "failed to create Docker client")
+	}
+
+	_, err := dockerClient.ImageInspect(ctx, imageName)
+	if err != nil {
+		return errors.Wrap(err, "Docker image not found")
 	}
 
 	return nil
