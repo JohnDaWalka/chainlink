@@ -256,9 +256,7 @@ func executePoRTest(t *testing.T, in *envconfig.Config, envArtifact environment.
 	testLogger.Info().Msgf("All prices were found for all feeds")
 }
 
-func deployWorkflow(t *testing.T,
-	workflowRegistryChain *cre.WrappedBlockchainOutput,
-	cld *cre.FullCLDEnvironmentOutput, configPath, workflowFileLocation, workflowName string) {
+func deployWorkflow(t *testing.T, workflowRegistryChain *cre.WrappedBlockchainOutput, cld *cre.FullCLDEnvironmentOutput, configPath, workflowFileLocation, workflowName string) {
 
 	compressedWorkflowWasmPath := compileWorkflow(t, workflowFileLocation, workflowName)
 

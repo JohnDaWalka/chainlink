@@ -1,9 +1,12 @@
 package cre
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,11 +14,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
+	"github.com/stretchr/testify/require"
+
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values/pb"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
@@ -42,6 +47,7 @@ func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environm
 
 	homeChain := wrappedBlockchainOutputs[0]
 	var wg sync.WaitGroup
+	var successfulWorkflowRuns atomic.Int32
 	for _, bcOutput := range wrappedBlockchainOutputs {
 		/*
 			REGISTER WORKFLOW FOR EACH CHAIN
@@ -66,39 +72,68 @@ func executeEVMReadTest(t *testing.T, in *envconfig.Config, envArtifact environm
 			keystonechangeset.KeystoneForwarder.String(),
 		)
 		require.NoError(t, err)
-		// validate workflow execution
-		go func(forwarderAddr common.Address, cfg workflowTypes.Config) {
-			defer wg.Done()
-			forwarderContract, err := forwarder.NewKeystoneForwarder(forwarderAddr, bcOutput.SethClient.Client)
-			require.NoError(t, err)
-			require.Eventually(t, func() bool {
-				msgEmitterAddr := common.BytesToAddress(cfg.ContractAddress)
-				msgs, err := forwarderContract.FilterReportProcessed(&bind.FilterOpts{
-					Start:   pb.NewIntFromBigInt(cfg.ExpectedReceipt.BlockNumber).Uint64(),
-					End:     nil,
-					Context: t.Context(),
-				}, []common.Address{msgEmitterAddr}, nil, nil)
-				if err != nil {
-					lggr.Error().Err(err).Msg("failed to filter messages emitted by contract")
-					return false
-				}
 
-				for {
-					if msgs.Error() != nil {
-						lggr.Error().Err(msgs.Error()).Msg("error while reading messages emitted by contract")
-						return false
-					}
-					if !msgs.Next() {
-						return false
-					}
-					lggr.Info().Msgf("Workflow sucesfully executed on chain %s", bcOutput.BlockchainOutput.ChainID)
-					return true
-				}
-			}, time.Minute*6, time.Second)
-		}(forwarderAddr, workflowConfig)
+		// validate workflow execution
+		wg.Add(1)
+		go func(bcOutput *cre.WrappedBlockchainOutput) {
+			defer wg.Done()
+			err = validateWorkflowExecution(t, lggr, bcOutput, workflowName, forwarderAddr, workflowConfig)
+			if err != nil {
+				lggr.Error().Msgf("Workflow %s execution failed on chain %s: %v", workflowName, bcOutput.BlockchainOutput.ChainID, err)
+				return
+			} else {
+				lggr.Info().Msgf("Workflow %s executed successfully on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
+				successfulWorkflowRuns.Add(1)
+			}
+		}(bcOutput)
 	}
 
 	wg.Wait()
+	require.Equal(t, successfulWorkflowRuns.Load(), len(wrappedBlockchainOutputs), "Not all workflows executed successfully")
+}
+
+func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.WrappedBlockchainOutput, workflowName string, forwarderAddr common.Address, cfg workflowTypes.Config) error {
+	forwarderContract, err := forwarder.NewKeystoneForwarder(forwarderAddr, bcOutput.SethClient.Client)
+	require.NoError(t, err)
+	msgEmitterAddr := common.BytesToAddress(cfg.ContractAddress)
+	isWorkflowFinished := func(ctx context.Context) (bool, error) {
+		iter, err := forwarderContract.FilterReportProcessed(&bind.FilterOpts{
+			Start:   pb.NewIntFromBigInt(cfg.ExpectedReceipt.BlockNumber).Uint64(),
+			End:     nil,
+			Context: ctx,
+		}, []common.Address{msgEmitterAddr}, nil, nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to filter forwarder: %w", err)
+		}
+
+		if iter.Error() != nil {
+			return false, fmt.Errorf("error while filtering forwarder: %w", iter.Error())
+		}
+
+		return iter.Next(), nil
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), testutils.WaitTimeout(t))
+	defer cancel()
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			lggr.Info().Msgf("Checking if workflow %s executed on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
+			ok, err := isWorkflowFinished(t.Context())
+			if err != nil {
+				lggr.Error().Msgf("Error checking workflow execution: %v", err)
+				continue
+			}
+
+			if ok {
+				lggr.Info().Msgf("Workflow %s executed successfully on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
+				return nil
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("workflow %s did not execute on chain %s within the timeout", workflowName, bcOutput.BlockchainOutput.ChainID)
+		}
+	}
 }
 
 func configureEVMReadWorkflow(t *testing.T, lggr zerolog.Logger, chain *cre.WrappedBlockchainOutput) workflowTypes.Config {
