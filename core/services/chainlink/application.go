@@ -30,7 +30,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/billing"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
-	commonservices "github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/services/otelhealth"
+	"github.com/smartcontractkit/chainlink-common/pkg/services/promhealth"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	"github.com/smartcontractkit/chainlink-common/pkg/storage"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -114,6 +115,7 @@ type Application interface {
 	GetLogger() logger.SugaredLogger
 	GetAuditLogger() audit.AuditLogger
 	GetHealthChecker() services.Checker
+	GetBeholderHealthChecker() services.Checker
 	GetDB() sqlutil.DataSource
 	GetConfig() GeneralConfig
 	SetLogLevel(lvl zapcore.Level) error
@@ -181,6 +183,7 @@ type ChainlinkApplication struct {
 	shutdownOnce             sync.Once
 	srvcs                    []services.ServiceCtx
 	HealthChecker            services.Checker
+	BeholderHealthChecker    services.Checker
 	logger                   logger.SugaredLogger
 	AuditLogger              audit.AuditLogger
 	closeLogger              func() error
@@ -696,7 +699,13 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	)
 	srvcs = append(srvcs, bridgeStatusReporter)
 
-	healthChecker := commonservices.NewChecker(static.Version, static.Sha)
+	// healthChecker := commonservices.NewChecker(static.Version, static.Sha)
+	healthChecker := promhealth.NewChecker(static.Version, static.Sha)
+	beholderHealthChecker, err := otelhealth.NewChecker(static.Version, static.Sha, beholder.GetMeter())
+
+	if err != nil {
+		return nil, err
+	}
 
 	var lbs []utils.DependentAwaiter
 	for _, c := range legacyEVMChains.Slice() {
@@ -706,6 +715,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		}
 		lbs = append(lbs, legacyChain.LogBroadcaster())
 	}
+	// TODO: add beholder health checker to job spawner ??
 	jobSpawner := job.NewSpawner(jobORM, cfg.Database(), healthChecker, delegates, globalLogger, lbs)
 	srvcs = append(srvcs, jobSpawner, pipelineRunner)
 
@@ -751,6 +761,9 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 			panic("service unexpectedly nil")
 		}
 		if err := healthChecker.Register(s); err != nil {
+			return nil, err
+		}
+		if err := beholderHealthChecker.Register(s); err != nil {
 			return nil, err
 		}
 	}
@@ -1207,6 +1220,9 @@ func (app *ChainlinkApplication) Start(ctx context.Context) error {
 	if err := app.HealthChecker.Start(); err != nil {
 		return err
 	}
+	if err := app.BeholderHealthChecker.Start(); err != nil {
+		return err
+	}
 
 	app.started = true
 
@@ -1264,6 +1280,8 @@ func (app *ChainlinkApplication) stop() (err error) {
 		err = stderrors.Join(err, app.SessionReaper.Stop())
 		app.logger.Debug("Closing HealthChecker...")
 		err = stderrors.Join(err, app.HealthChecker.Close())
+		app.logger.Debug("Closing BeholderHealthChecker...")
+		err = stderrors.Join(err, app.BeholderHealthChecker.Close())
 		if app.FeedsService != nil {
 			app.logger.Debug("Closing Feeds Service...")
 			err = stderrors.Join(err, app.FeedsService.Close())
@@ -1298,6 +1316,10 @@ func (app *ChainlinkApplication) GetAuditLogger() audit.AuditLogger {
 
 func (app *ChainlinkApplication) GetHealthChecker() services.Checker {
 	return app.HealthChecker
+}
+
+func (app *ChainlinkApplication) GetBeholderHealthChecker() services.Checker {
+	return app.BeholderHealthChecker
 }
 
 func (app *ChainlinkApplication) JobSpawner() job.Spawner {
