@@ -555,16 +555,15 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		i.lggr.Infow("INSIDE RELAYER LOOP", "relayID", relayID, "relayChainFam", relayChainFamily)
 
 		cr, err1 := crcw.GetChainReader(ctx, ccipcommon.ChainReaderProviderOpts{
-			Lggr:          i.lggr,
-			Relayer:       relayer,
-			ChainID:       chainID,
-			DestChainID:   destChainID,
-			HomeChainID:   homeChainID,
-			Ofc:           ofc,
-			ChainSelector: chainSelector,
-			ChainFamily:   relayChainFamily,
-
-			Transmitters: i.transmitters,
+			Lggr:            i.lggr,
+			Relayer:         relayer,
+			ChainID:         chainID,
+			DestChainID:     destChainID,
+			HomeChainID:     homeChainID,
+			Ofc:             ofc,
+			ChainSelector:   chainSelector,
+			ChainFamily:     relayChainFamily,
+			DestChainFamily: destChainFamily,
 		})
 		if err1 != nil {
 			return nil, nil, nil, err1
