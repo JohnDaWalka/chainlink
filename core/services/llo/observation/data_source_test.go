@@ -176,18 +176,29 @@ func Test_DataSource(t *testing.T) {
 		t.Run("doesn't set any values if no streams are defined", func(t *testing.T) {
 			reg := &mockRegistry{make(map[streams.StreamID]*mockPipeline)}
 			ds := newDataSource(lggr, reg, telem.NullTelemeter, true)
+			// Ensure cleanup before test ends
+			defer ds.Close()
 
 			vals := makeStreamValues()
 			err := ds.Observe(ctx, vals, opts)
 			assert.NoError(t, err)
 
 			assert.Equal(t, makeStreamValues(), vals)
-			ds.Close()
 		})
 
 		t.Run("observes each stream with success and returns values matching map argument", func(t *testing.T) {
+			// Use a context with timeout to ensure goroutines don't outlive the test
+			testCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
 			reg := &mockRegistry{make(map[streams.StreamID]*mockPipeline)}
 			ds := newDataSource(lggr, reg, telem.NullTelemeter, true)
+			// Ensure cleanup before test ends
+			defer func() {
+				ds.Close()
+				// Give time for the goroutine to finish cleanly
+				time.Sleep(50 * time.Millisecond)
+			}()
 
 			reg.pipelines[1] = makePipelineWithSingleResult[*big.Int](1, big.NewInt(2181), nil)
 			reg.pipelines[2] = makePipelineWithSingleResult[*big.Int](2, big.NewInt(40602), nil)
@@ -197,7 +208,7 @@ func Test_DataSource(t *testing.T) {
 			time.Sleep(2 * observationLoopSleepDuration)
 
 			vals := makeStreamValues()
-			err := ds.Observe(ctx, vals, opts)
+			err := ds.Observe(testCtx, vals, opts)
 			assert.NoError(t, err)
 
 			assert.Equal(t, llo.StreamValues{
@@ -205,12 +216,21 @@ func Test_DataSource(t *testing.T) {
 				2: llo.ToDecimal(decimal.NewFromInt(40602)),
 				3: llo.ToDecimal(decimal.NewFromInt(15)),
 			}, vals, fmt.Sprintf("vals: %v", vals))
-			ds.Close()
 		})
 
 		t.Run("observes each stream and returns success/errors", func(t *testing.T) {
+			// Use a context with timeout to ensure goroutines don't outlive the test
+			testCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
 			reg := &mockRegistry{make(map[streams.StreamID]*mockPipeline)}
 			ds := newDataSource(lggr, reg, telem.NullTelemeter, true)
+			// Ensure cleanup before test ends
+			defer func() {
+				ds.Close()
+				// Give time for the goroutine to finish cleanly
+				time.Sleep(50 * time.Millisecond)
+			}()
 
 			reg.pipelines[11] = makePipelineWithSingleResult[*big.Int](11, big.NewInt(21810), errors.New("something exploded"))
 			reg.pipelines[12] = makePipelineWithSingleResult[*big.Int](12, big.NewInt(40602), nil)
@@ -220,7 +240,7 @@ func Test_DataSource(t *testing.T) {
 			time.Sleep(observationLoopSleepDuration)
 
 			vals := makeStreamValues(11, 12, 13)
-			err := ds.Observe(ctx, vals, opts)
+			err := ds.Observe(testCtx, vals, opts)
 			assert.NoError(t, err)
 
 			assert.Equal(t, llo.StreamValues{
@@ -228,13 +248,22 @@ func Test_DataSource(t *testing.T) {
 				12: llo.ToDecimal(decimal.NewFromInt(40602)),
 				13: nil,
 			}, vals, fmt.Sprintf("vals: %v", vals))
-			ds.Close()
 		})
 
 		t.Run("records telemetry", func(t *testing.T) {
+			// Use a context with timeout to ensure goroutines don't outlive the test
+			testCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
 			tm := &mockTelemeter{}
 			reg := &mockRegistry{make(map[streams.StreamID]*mockPipeline)}
 			ds := newDataSource(lggr, reg, tm, true)
+			// Ensure cleanup before test ends
+			defer func() {
+				ds.Close()
+				// Give time for the goroutine to finish cleanly
+				time.Sleep(50 * time.Millisecond)
+			}()
 
 			reg.pipelines[21] = makePipelineWithSingleResult[*big.Int](100, big.NewInt(2181), nil)
 			reg.pipelines[22] = makePipelineWithSingleResult[*big.Int](101, big.NewInt(40602), nil)
@@ -244,7 +273,7 @@ func Test_DataSource(t *testing.T) {
 			time.Sleep(2 * observationLoopSleepDuration)
 
 			vals := makeStreamValues(21, 22, 23)
-			err := ds.Observe(ctx, vals, opts)
+			err := ds.Observe(testCtx, vals, opts)
 			require.NoError(t, err)
 
 			assert.Equal(t, llo.StreamValues{
@@ -291,20 +320,29 @@ func Test_DataSource(t *testing.T) {
 			assert.Equal(t, uint32(0), obsTelem.DonId)
 			assert.Equal(t, opts.SeqNr(), obsTelem.SeqNr)
 			assert.Equal(t, opts.ConfigDigest().Hex(), hex.EncodeToString(obsTelem.ConfigDigest))
-			ds.Close()
 		})
 
 		t.Run("records telemetry for errors", func(t *testing.T) {
+			// Use a context with timeout to ensure goroutines don't outlive the test
+			testCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
 			tm := &mockTelemeter{}
 			reg := &mockRegistry{make(map[streams.StreamID]*mockPipeline)}
 			ds := newDataSource(lggr, reg, tm, true)
+			// Ensure cleanup before test ends
+			defer func() {
+				ds.Close()
+				// Give time for the goroutine to finish cleanly
+				time.Sleep(50 * time.Millisecond)
+			}()
 
 			reg.pipelines[31] = makePipelineWithSingleResult[*big.Int](100, big.NewInt(2181), errors.New("something exploded"))
 			reg.pipelines[32] = makePipelineWithSingleResult[*big.Int](101, big.NewInt(40602), nil)
 			reg.pipelines[33] = makePipelineWithSingleResult[*big.Int](102, nil, errors.New("something exploded 2"))
 
 			vals := makeStreamValues(31, 32, 33)
-			err := ds.Observe(ctx, vals, opts)
+			err := ds.Observe(testCtx, vals, opts)
 			require.NoError(t, err)
 
 			assert.Equal(t, llo.StreamValues{
@@ -325,9 +363,7 @@ func Test_DataSource(t *testing.T) {
 			assert.Equal(t, opts, pkt.opts)
 			assert.Nil(t, pkt.val)
 			assert.Error(t, pkt.err)
-			ds.Close()
 		})
-
 	})
 }
 
