@@ -130,7 +130,7 @@ func TestConfigureCache(t *testing.T) {
 
 	// For AllowedSender (slice of solana.PublicKey)
 	forwarderProgramID := []solana.PublicKey{
-		solana.SystemProgramID, //should be executable
+		solana.SystemProgramID, // should be executable
 	}
 
 	forwarderCacheID := []solana.PublicKey{
