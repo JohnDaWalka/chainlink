@@ -475,12 +475,12 @@ func saveArtifactPaths() error {
 		return ctfConfigsAbsPathErr
 	}
 
-	artifactPaths := artifactPaths{
+	ap := artifactPaths{
 		EnvArtifact: artifactAbsPath,
 		EnvConfig:   ctfConfigsAbsPath,
 	}
 
-	marshalled, mErr := json.Marshal(artifactPaths)
+	marshalled, mErr := json.Marshal(ap)
 	if mErr != nil {
 		return errors.Wrap(mErr, "failed to marshal artifact paths")
 	}

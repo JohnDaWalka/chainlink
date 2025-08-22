@@ -479,6 +479,7 @@ func createEnvironmentIfNotExists(environmentDir string) error {
 	}
 
 	if _, err := os.Stat(cachedConfigFile); os.IsNotExist(err) {
+		framework.L.Info().Str("cached_config_file", cachedConfigFile).Msg("Cached config file does not exist, starting environment...")
 		cmd := exec.Command("go", "run", ".", "env", "start")
 		cmd.Dir = environmentDir
 		cmd.Stdout = os.Stdout
