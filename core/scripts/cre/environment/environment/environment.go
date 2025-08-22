@@ -71,7 +71,7 @@ const (
 
 func init() {
 	EnvironmentCmd.AddCommand(startCmd())
-	EnvironmentCmd.AddCommand(stopCmd)
+	EnvironmentCmd.AddCommand(stopCmd())
 	EnvironmentCmd.AddCommand(workflowCmds())
 	EnvironmentCmd.AddCommand(beholderCmds())
 
@@ -500,41 +500,44 @@ func trackStartup(success, hasBuiltDockerImage bool, infraType string, errorMess
 	return nil
 }
 
-var stopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stops the environment",
-	Long:  `Stops the local CRE environment (if it's not running, it just fallsthrough)`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		removeErr := framework.RemoveTestContainers()
-		if removeErr != nil {
-			return errors.Wrap(removeErr, "failed to remove environment containers. Please remove them manually")
-		}
-
-		framework.L.Info().Msg("Removing environment state files")
-		// remove cache config files
-		cacheConfigPattern := "configs/*-cache.toml"
-		cacheFiles, globErr := filepath.Glob(cacheConfigPattern)
-		if globErr != nil {
-			fmt.Fprintf(os.Stderr, "failed to find cache config files: %s\n", globErr)
-		} else {
-			for _, file := range cacheFiles {
-				if removeFileErr := os.Remove(file); removeFileErr != nil {
-					framework.L.Warn().Msgf("failed to remove cache config file %s: %s\n", file, removeFileErr)
-				} else {
-					framework.L.Debug().Msgf("Removed cache config file: %s\n", file)
-				}
+func stopCmd() *cobra.Command {
+	var allFlag bool
+	cmd := &cobra.Command{
+		Use:   "stop",
+		Short: "Stops the environment",
+		Long:  `Stops the local CRE environment (if it's not running, it just fallsthrough)`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			removeErr := framework.RemoveTestContainers()
+			if removeErr != nil {
+				return errors.Wrap(removeErr, "failed to remove environment containers. Please remove them manually")
 			}
-		}
 
-		if removeDirErr := os.RemoveAll("env_artifact"); removeDirErr != nil {
-			framework.L.Warn().Msgf("failed to remove env_artifact folder: %s\n", removeDirErr)
-		} else {
-			framework.L.Debug().Msg("Removed env_artifact folder")
-		}
+			var shouldRemove shouldRemove
+			if allFlag {
+				shouldRemove = removeAll
+			} else {
+				shouldRemove = removeCurrentCtfConfigs
+			}
 
-		fmt.Println("Environment stopped successfully")
-		return nil
-	},
+			removeCacheErr := removeCacheFiles(shouldRemove)
+			if removeCacheErr != nil {
+				framework.L.Warn().Msgf("failed to remove cache files: %s\n", removeCacheErr)
+			}
+
+			if removeDirErr := os.RemoveAll("env_artifact"); removeDirErr != nil {
+				framework.L.Warn().Msgf("failed to remove env_artifact folder: %s\n", removeDirErr)
+			} else {
+				framework.L.Debug().Msg("Removed env_artifact folder")
+			}
+
+			fmt.Println("Environment stopped successfully")
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVarP(&allFlag, "all", "a", false, "Remove all environment state files")
+
+	return cmd
 }
 
 func StartCLIEnvironment(
@@ -742,6 +745,44 @@ func validateWorkflowTriggerAndCapabilities(in *envconfig.Config, withExampleFla
 		}
 
 		return nil
+	}
+
+	return nil
+}
+
+type shouldRemove = func(file string) bool
+
+var removeAll = func(_ string) bool {
+	return true
+}
+
+var removeCurrentCtfConfigs = func(file string) bool {
+	ctfConfigs := os.Getenv("CTF_CONFIGS")
+	for config := range strings.SplitSeq(ctfConfigs, ",") {
+		if strings.EqualFold(strings.ReplaceAll(config, ".toml", "-cache.toml"), file) {
+			return true
+		}
+	}
+	return false
+}
+
+func removeCacheFiles(shouldRemove shouldRemove) error {
+	framework.L.Info().Msg("Removing environment state files")
+
+	cacheConfigPattern := "configs/*-cache.toml"
+	cacheFiles, globErr := filepath.Glob(cacheConfigPattern)
+	if globErr != nil {
+		fmt.Fprintf(os.Stderr, "failed to find cache config files: %s\n", globErr)
+	} else {
+		for _, file := range cacheFiles {
+			if shouldRemove(file) {
+				if removeFileErr := os.Remove(file); removeFileErr != nil {
+					framework.L.Warn().Msgf("failed to remove cache config file %s: %s\n", file, removeFileErr)
+				} else {
+					framework.L.Debug().Msgf("Removed cache config file: %s\n", file)
+				}
+			}
+		}
 	}
 
 	return nil

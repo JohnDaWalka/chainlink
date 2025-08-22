@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -61,7 +62,11 @@ import (
 	portypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/types"
 )
 
-const DefaultLocalCreDir = "../../../../core/scripts/cre/environment"
+const (
+	DefaultLocalCreDir     = "../../../../core/scripts/cre/environment"
+	DefaultWorkflowDonFile = "../../../../core/scripts/cre/environment/configs/workflow-don.toml"
+	DefaultEnvArtifactFile = "../../../../core/scripts/cre/environment/env_artifact/env_artifact.json"
+)
 
 /*
 To execute on local start the local CRE first with following command:
@@ -69,17 +74,18 @@ To execute on local start the local CRE first with following command:
 go run . env start
 */
 func Test_CRE_Workflow_Don(t *testing.T) {
-	confErr := setConfigurationIfMissing("../../../../core/scripts/cre/environment/configs/workflow-don-cache.toml", "workflow")
-	require.NoError(t, confErr, "failed to set configuration")
+	confErr := setConfigurationIfMissing(DefaultWorkflowDonFile, DefaultEnvArtifactFile)
+	require.NoError(t, confErr, "failed to set default configuration")
 
-	configurationFiles := os.Getenv("CTF_CONFIGS")
-	require.NotEmpty(t, configurationFiles, "CTF_CONFIGS env var is not set")
-
-	topology := os.Getenv("CRE_TOPOLOGY")
-	require.NotEmpty(t, topology, "CRE_TOPOLOGY env var is not set")
-
-	createErr := createEnvironmentIfNotExists(configurationFiles, DefaultLocalCreDir, topology)
+	createErr := createEnvironmentIfNotExists(DefaultLocalCreDir)
 	require.NoError(t, createErr, "failed to create environment")
+
+	// transform the config file to the cache file, so that we can use the cached environment
+	cachedConfigFile, cacheErr := ctfConfigToCacheFile()
+	require.NoError(t, cacheErr, "failed to get cached config file")
+
+	setErr := os.Setenv("CTF_CONFIGS", cachedConfigFile)
+	require.NoError(t, setErr, "failed to set CTF_CONFIGS env var")
 
 	/*
 		LOAD ENVIRONMENT STATE
@@ -96,12 +102,10 @@ func Test_CRE_Workflow_Don(t *testing.T) {
 	// currently we can't run these tests in parallel, because each test rebuilds environment structs and that includes
 	// logging into CL node with GraphQL API, which allows only 1 session per user at a time.
 	t.Run("cron-based PoR workflow", func(t *testing.T) {
-		// t.Skip() // TODO: remove this
 		executePoRTest(t, in, envArtifact, 5*time.Minute)
 	})
 
 	t.Run("vault DON test", func(t *testing.T) {
-		t.Skip() // TODO: remove this
 		executeVaultTest(t, in, envArtifact)
 	})
 
@@ -111,7 +115,6 @@ func Test_CRE_Workflow_Don(t *testing.T) {
 	})
 
 	t.Run("Beholder test", func(t *testing.T) {
-		t.Skip() // TODO: remove this
 		executeBeholderTest(t, in, envArtifact)
 	})
 }
@@ -375,23 +378,13 @@ const (
 	AuthorizationKey = ""
 )
 
-func createEnvironmentIfNotExists(stateFile, environmentDir, topology string) error {
-	split := strings.Split(stateFile, ",")
-	if _, err := os.Stat(split[0]); os.IsNotExist(err) {
-		ctfConfigs := os.Getenv("CTF_CONFIGS")
-		defer func() {
-			setErr := os.Setenv("CTF_CONFIGS", ctfConfigs)
-			if setErr != nil {
-				framework.L.Error().Err(setErr).Msg("failed to set CTF_CONFIGS env var")
-			}
-		}()
+func createEnvironmentIfNotExists(environmentDir string) error {
+	cachedConfigFile, cacheErr := ctfConfigToCacheFile()
+	if cacheErr != nil {
+		return errors.Wrap(cacheErr, "failed to get cached config file")
+	}
 
-		// remove -cache suffix from the state file to use the correct config file
-		setErr := os.Setenv("CTF_CONFIGS", strings.Replace(stateFile, "-cache", "", 1))
-		if setErr != nil {
-			return errors.Wrap(setErr, "failed to set CTF_CONFIGS env var")
-		}
-
+	if _, err := os.Stat(cachedConfigFile); os.IsNotExist(err) {
 		cmd := exec.Command("go", "run", ".", "env", "start")
 		cmd.Dir = environmentDir
 		cmd.Stdout = os.Stdout
@@ -718,7 +711,7 @@ func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environ
 	testLogger.Info().Msg("Beholder test completed")
 }
 
-func setConfigurationIfMissing(configName, topology string) error {
+func setConfigurationIfMissing(configName, envArtifactPath string) error {
 	if os.Getenv("CTF_CONFIGS") == "" {
 		err := os.Setenv("CTF_CONFIGS", configName)
 		if err != nil {
@@ -726,19 +719,22 @@ func setConfigurationIfMissing(configName, topology string) error {
 		}
 	}
 
-	if os.Getenv("CRE_TOPOLOGY") == "" {
-		err := os.Setenv("CRE_TOPOLOGY", topology)
-		if err != nil {
-			return errors.Wrap(err, "failed to set CRE_TOPOLOGY env var")
-		}
-	}
-
 	if os.Getenv("ENV_ARTIFACT_PATH") == "" {
-		err := os.Setenv("ENV_ARTIFACT_PATH", "../../../..//core/scripts/cre/environment/env_artifact/env_artifact.json")
+		err := os.Setenv("ENV_ARTIFACT_PATH", envArtifactPath)
 		if err != nil {
 			return errors.Wrap(err, "failed to set ENV_ARTIFACT_PATH env var")
 		}
 	}
 
 	return environment.SetDefaultPrivateKeyIfEmpty(blockchain.DefaultAnvilPrivateKey)
+}
+
+func ctfConfigToCacheFile() (string, error) {
+	configFile := os.Getenv("CTF_CONFIGS")
+	if configFile == "" {
+		return "", errors.New("CTF_CONFIGS env var is not set")
+	}
+
+	split := strings.Split(configFile, ",")
+	return fmt.Sprintf("%s-cache.toml", strings.ReplaceAll(split[0], ".toml", "")), nil
 }

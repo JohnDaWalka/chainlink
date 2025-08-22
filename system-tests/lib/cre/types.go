@@ -453,7 +453,7 @@ type CapabilitiesAwareNodeSet struct {
 	CapabilityOverrides map[string]map[string]any `toml:"capability_overrides"`
 
 	// Merged list of global and chain-specific capabilities. The latter ones are transformed to the format "capability-chainID", e.g. "evm-1337" for the evm capability on chain 1337.
-	ComputedCapabilities []string `toml:"-"`
+	ComputedCapabilities []string `toml:"computed_capabilities"`
 }
 
 type CapabilitiesPeeringData struct {

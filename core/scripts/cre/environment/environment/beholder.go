@@ -19,6 +19,8 @@ import (
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 )
 
+const DefaultBeholderConfigFile = "configs/chip-ingress.toml"
+
 func beholderCmds() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "beholder",
@@ -78,6 +80,16 @@ var stopBeholderCmd = &cobra.Command{
 	Short: "Stop the Beholder",
 	Long:  `Stop the Beholder`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		setErr := os.Setenv("CTF_CONFIGS", DefaultBeholderConfigFile)
+		if setErr != nil {
+			return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
+		}
+
+		removeCacheErr := removeCacheFiles(removeCurrentCtfConfigs)
+		if removeCacheErr != nil {
+			framework.L.Warn().Msgf("failed to remove cache files: %s\n", removeCacheErr)
+		}
+
 		return framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
 	},
 }
@@ -126,7 +138,7 @@ func startBeholder(cmdContext context.Context, cleanupWait time.Duration, protoC
 		}
 	}()
 
-	setErr := os.Setenv("CTF_CONFIGS", "configs/chip-ingress.toml")
+	setErr := os.Setenv("CTF_CONFIGS", DefaultBeholderConfigFile)
 	if setErr != nil {
 		return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
 	}
