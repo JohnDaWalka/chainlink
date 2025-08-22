@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 )
 
@@ -170,6 +171,7 @@ func (ks *sui) getByID(id string) (suikey.Key, error) {
 // TODO: the approach below is deprecated, replace it
 type SuiLoopSinger struct {
 	Sui
+	core.UnimplementedKeystore
 }
 
 var _ loop.Keystore = &SuiLoopSinger{}
@@ -184,4 +186,8 @@ func (s *SuiLoopSinger) Accounts(ctx context.Context) (accounts []string, err er
 		accounts = append(accounts, k.ID())
 	}
 	return
+}
+
+func (s *SuiLoopSinger) Sign(ctx context.Context, account string, data []byte) (signed []byte, err error) {
+	return s.Sui.Sign(ctx, account, data)
 }
