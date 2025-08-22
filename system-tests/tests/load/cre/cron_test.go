@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp/benchspy"
 	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
 	pb2 "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
 )
@@ -39,23 +40,27 @@ func TestCron(t *testing.T) {
 	lokiURL := "http://localhost:3030/loki/api/v1/push"
 	lokiToken := ""
 	lokiTenant := ""
+	generator, err := wasp.NewGenerator(&wasp.Config{
+		CallTimeout: executionTime + time.Minute,
+		T:           t,
+		LoadType:    wasp.VU,
+		VU:          vu,
+		Schedule: wasp.Combine(
+			wasp.Plain(100, executionTime),
+		),
+		LokiConfig: wasp.NewLokiConfig(&lokiURL, &lokiTenant, &lokiToken, &lokiToken),
+	})
+	require.NoError(t, err, "could not create generator")
 
-	_, err = wasp.NewProfile().
-		Add(wasp.NewGenerator(&wasp.Config{
-			CallTimeout: executionTime + time.Minute,
-			T:           t,
-			LoadType:    wasp.VU,
-			VU:          vu,
-			Schedule: wasp.Combine(
-				wasp.Plain(50, executionTime),
-				wasp.Plain(100, executionTime),
-				wasp.Plain(200, executionTime),
-				wasp.Plain(300, executionTime),
-			),
-			LokiConfig: wasp.NewLokiConfig(&lokiURL, &lokiTenant, &lokiToken, &lokiToken),
-		})).Run(true)
+	_, err = wasp.NewProfile().Add(generator, nil).Run(true)
 	require.NoError(t, err)
 
+	report, err := benchspy.NewStandardReport("cron-load-test", benchspy.WithStandardQueries(benchspy.StandardQueryExecutor_Direct),
+		benchspy.WithGenerators(generator))
+	require.NoError(t, err, "creating report failed")
+	store, err := report.Store()
+	require.NoError(t, err, "storing report failed")
+	fmt.Printf("Report stored at %s\n", store)
 }
 
 type VirtualUser struct {
