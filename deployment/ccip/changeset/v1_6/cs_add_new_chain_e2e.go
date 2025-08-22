@@ -112,7 +112,7 @@ type AddCandidatesForNewChainConfig struct {
 func (c AddCandidatesForNewChainConfig) prerequisiteConfigForNewChain() changeset.DeployPrerequisiteConfig {
 	return changeset.DeployPrerequisiteConfig{
 		Configs: []changeset.DeployPrerequisiteConfigPerChain{
-			{
+			changeset.DeployPrerequisiteConfigPerChain{
 				ChainSelector: c.NewChain.Selector,
 			},
 		},
@@ -314,7 +314,7 @@ func addCandidatesForNewChainLogic(e cldf.Environment, c AddCandidatesForNewChai
 	}
 	_, err = UpdateFeeQuoterPricesChangeset(e, UpdateFeeQuoterPricesConfig{
 		PricesByChain: map[uint64]FeeQuoterPriceUpdatePerSource{
-			c.NewChain.Selector: {
+			c.NewChain.Selector: FeeQuoterPriceUpdatePerSource{
 				TokenPrices: c.NewChain.TokenPrices,
 				GasPrices:   gasPrices,
 			},
@@ -490,7 +490,7 @@ func (c PromoteNewChainForConfig) setOCR3OffRampConfig() SetOCR3OffRampConfig {
 func (c PromoteNewChainForConfig) updateFeeQuoterDestsConfig(remoteChain ChainDefinition) UpdateFeeQuoterDestsConfig {
 	return UpdateFeeQuoterDestsConfig{
 		UpdatesByChain: map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig{
-			remoteChain.Selector: {
+			remoteChain.Selector: map[uint64]fee_quoter.FeeQuoterDestChainConfig{
 				c.NewChain.Selector: c.NewChain.FeeQuoterDestChainConfig,
 			},
 		},
@@ -501,7 +501,7 @@ func (c PromoteNewChainForConfig) updateFeeQuoterDestsConfig(remoteChain ChainDe
 func (c PromoteNewChainForConfig) updateFeeQuoterPricesConfig(remoteChain ChainDefinition) UpdateFeeQuoterPricesConfig {
 	return UpdateFeeQuoterPricesConfig{
 		PricesByChain: map[uint64]FeeQuoterPriceUpdatePerSource{
-			remoteChain.Selector: {
+			remoteChain.Selector: FeeQuoterPriceUpdatePerSource{
 				TokenPrices: remoteChain.TokenPrices,
 				GasPrices:   map[uint64]*big.Int{c.NewChain.Selector: c.NewChain.GasPrice},
 			},
@@ -902,7 +902,7 @@ func connectRampsAndRouters(
 	out, err = UpdateRouterRampsChangeset(e, UpdateRouterRampsConfig{
 		TestRouter: testRouter,
 		UpdatesByChain: map[uint64]RouterUpdates{
-			chainSelector: {
+			chainSelector: RouterUpdates{
 				OnRampUpdates:  onRampUpdates,
 				OffRampUpdates: offRampUpdates,
 			},
