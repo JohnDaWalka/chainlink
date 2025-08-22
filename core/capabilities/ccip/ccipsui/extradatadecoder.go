@@ -29,6 +29,9 @@ var (
 
 	// bytes4 public constant SVM_EXTRA_EXTRA_ARGS_V1_TAG = 0x1f3b3aba
 	svmExtraArgsV1Tag = hexutil.MustDecode("0x1f3b3aba")
+
+	// bytes4 public constant SUI_EXTRA_ARGS_V1_TAG = 0x21ea4ca9
+	suiVMExtraArgsV1Tag = hexutil.MustDecode("0x21ea4ca9")
 )
 
 // DecodeDestExecDataToMap reformats bytes into a chain agnostic map[string]interface{} representation for dest exec data
@@ -47,7 +50,9 @@ func (d ExtraDataDecoder) DecodeDestExecDataToMap(destExecData cciptypes.Bytes) 
 }
 
 // DecodeExtraArgsToMap reformats bytes into a chain agnostic map[string]any representation for extra args
+// TODO: Handle Aptos -> SUI, Solana -> SUI deoding case as well. Currently only handles EVM -> SUI
 func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[string]any, error) {
+
 	if len(extraArgs) < 4 {
 		return nil, fmt.Errorf("extra args too short: %d, should be at least 4 (i.e the extraArgs tag)", len(extraArgs))
 	}
@@ -62,8 +67,10 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 		return d.decodeGenericExtraArgsV2(des)
 	case string(svmExtraArgsV1Tag):
 		return d.decodeSvmExtraArgsV1(des)
+	case string(suiVMExtraArgsV1Tag):
+		return d.decodeSuiExtraArgsV1(des)
 	default:
-		return nil, fmt.Errorf("unknown extra args tag: %x", tag)
+		return nil, fmt.Errorf("unknown extra args tag SUI DECODER: %x", tag)
 	}
 }
 
@@ -139,6 +146,34 @@ func (d ExtraDataDecoder) decodeSvmExtraArgsV1(des *bcs.Deserializer) (map[strin
 		extraArgs["accounts"] = nil
 	} else {
 		extraArgs["accounts"] = accounts
+	}
+
+	return extraArgs, nil
+}
+
+func (d ExtraDataDecoder) decodeSuiExtraArgsV1(des *bcs.Deserializer) (map[string]any, error) {
+	extraArgs := make(map[string]any)
+
+	gasLimit := des.U256()
+	if des.Error() != nil {
+		return nil, fmt.Errorf("error whilst decoding generic extra args v2: %w", des.Error())
+	}
+
+	extraArgs["gasLimit"] = &gasLimit
+
+	allowOutOfOrderExecution := des.Bool()
+	if des.Error() != nil {
+		// Default to false if not present, consistent with original code.
+		extraArgs["allowOutOfOrderExecution"] = false
+	} else {
+		extraArgs["allowOutOfOrderExecution"] = allowOutOfOrderExecution
+	}
+
+	tokenReceiver := des.ReadBytes()
+	if des.Error() != nil {
+		extraArgs["tokenReceiver"] = nil
+	} else {
+		extraArgs["tokenReceiver"] = tokenReceiver
 	}
 
 	return extraArgs, nil

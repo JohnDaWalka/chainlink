@@ -32,6 +32,13 @@ type DeployLinkTokenConfig struct {
 	ChainSelector uint64
 }
 
+type DeployDummyRecieverConfig struct {
+	ChainSelector uint64
+	CCIPPackageId string
+	McmsPackageId string
+	McmsOwner     string
+}
+
 type UpdateSuiPriceConfig struct {
 	ChainSelector       uint64
 	DestChainSelector   []uint64

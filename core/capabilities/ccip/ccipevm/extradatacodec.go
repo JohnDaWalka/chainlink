@@ -2,6 +2,7 @@ package ccipevm
 
 import (
 	"fmt"
+	"math/big"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
@@ -12,6 +13,7 @@ const (
 	evmV1DecodeName       = "decodeEVMExtraArgsV1"
 	evmV2DecodeName       = "decodeEVMExtraArgsV2"
 	evmDestExecDataKey    = "destGasAmount"
+	suiV1DecodeStructName = "decodeSuiExtraArgsStruct"
 )
 
 // ExtraDataDecoder is a concrete implementation of SourceChainExtraDataCodec
@@ -45,8 +47,10 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 		method = evmV2DecodeName
 	case string(svmExtraArgsV1Tag):
 		method = svmV1DecodeStructName
+	case string(suiVMExtraArgsV1Tag):
+		method = suiV1DecodeStructName
 	default:
-		return nil, fmt.Errorf("unknown extra args tag: %x", extraArgs)
+		return nil, fmt.Errorf("unknown extra args tag EVM DECODER: %x", extraArgs)
 	}
 
 	output := make(map[string]any)
@@ -78,6 +82,22 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 		output["allowOutOfOrderExecution"] = extraArgsStruct.AllowOutOfOrderExecution
 		output["tokenReceiver"] = extraArgsStruct.TokenReceiver
 		output["accounts"] = extraArgsStruct.Accounts
+	case suiV1DecodeStructName:
+		// NOTE: the cast only works with this exact struct layout and types
+		extraArgsStruct, ok := args["extraArgs"].(struct {
+			GasLimit                 *big.Int   `json:"gasLimit"`
+			AllowOutOfOrderExecution bool       `json:"allowOutOfOrderExecution"`
+			TokenReceiver            [32]byte   `json:"tokenReceiver"`
+			ReceiverObjectIds        [][32]byte `json:"receiverObjectIds"`
+		})
+		if !ok {
+			return nil, fmt.Errorf("sui extra args struct is not the equivalent of message_hasher.ClientSuiExtraArgsV1")
+		}
+		output["gasLimit"] = extraArgsStruct.GasLimit
+		output["allowOutOfOrderExecution"] = extraArgsStruct.AllowOutOfOrderExecution
+		output["tokenReceiver"] = extraArgsStruct.TokenReceiver
+		output["receiverObjectIds"] = extraArgsStruct.ReceiverObjectIds
+
 	default:
 		return nil, fmt.Errorf("unknown extra args method: %s", method)
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -37,6 +37,9 @@ var (
 
 	// bytes4 public constant SVM_EXTRA_EXTRA_ARGS_V1_TAG = 0x1f3b3aba
 	svmExtraArgsV1Tag = hexutil.MustDecode("0x1f3b3aba")
+
+	// bytes4 public constant SUI_EXTRA_ARGS_V1_TAG = 0x21ea4ca9
+	suiVMExtraArgsV1Tag = hexutil.MustDecode("0x21ea4ca9")
 )
 
 // MessageHasherV1 implements the MessageHasher interface.

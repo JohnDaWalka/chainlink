@@ -9,6 +9,8 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 // replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
+// replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
+
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../../system-tests/lib
 
 replace github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based => ./cre/environment/examples/workflows/v1/proof-of-reserve/cron-based
@@ -48,7 +50,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250814153237-9a6c5a35e950
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250822081821-2695ee1e0106
 	github.com/smartcontractkit/chainlink-common v0.9.1-0.20250819154659-73aa8dc9bf8c
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.28.1-0.20250820001832-52b4624e398f
