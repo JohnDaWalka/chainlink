@@ -1060,6 +1060,7 @@ func (s *service) transact(ctx context.Context, fn func(datasources) error) erro
 
 // CancelSpec cancels a spec for a job proposal.
 func (s *service) CancelSpec(ctx context.Context, id int64) error {
+	s.lggr.Infow("CANCEL SPEC", "jobdebug", true, "jobid", id)
 	spec, err := s.orm.GetSpec(ctx, id)
 	if err != nil {
 		return errors.Wrap(err, "orm: job proposal spec")
