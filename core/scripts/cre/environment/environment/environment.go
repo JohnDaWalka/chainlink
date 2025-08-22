@@ -393,8 +393,23 @@ func startCmd() *cobra.Command {
 //
 // This makes local iteration and CI reruns faster and deterministic.
 func storeArtifacts(in *envconfig.Config) error {
+	if err := storeCTFConfigs(in); err != nil {
+		return err
+	}
+
+	return saveArtifactPaths()
+}
+
+func storeCTFConfigs[ConfigType any](config *ConfigType) error {
 	// hack, because CTF takes the first config file from the list to select the name of the cache file, we need to remove the default capabilities config file (which we added as the first one, so that other configs can override it)
 	ctfConfigs := os.Getenv("CTF_CONFIGS")
+	defer func() {
+		setErr := os.Setenv("CTF_CONFIGS", ctfConfigs)
+		if setErr != nil {
+			framework.L.Warn().Msgf("failed to restore CTF_CONFIGS env var: %s", setErr)
+		}
+	}()
+
 	splitConfigs := strings.Split(ctfConfigs, ",")
 	if len(splitConfigs) > 1 {
 		if strings.Contains(splitConfigs[0], defaultCapabilitiesConfigFile) {
@@ -407,9 +422,12 @@ func storeArtifacts(in *envconfig.Config) error {
 		}
 	}
 
-	_ = framework.Store(in)
+	storeErr := framework.Store(config)
+	if storeErr != nil {
+		return errors.Wrap(storeErr, "failed to store environment cached config")
+	}
 
-	return saveArtifactPaths()
+	return nil
 }
 
 func saveArtifactPaths() error {

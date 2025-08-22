@@ -6,10 +6,10 @@ import (
 	"slices"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose/chip_ingress_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
-
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
@@ -102,4 +102,13 @@ func ResolveCapabilityConfigForDON(
 	}
 
 	return merged
+}
+
+type ChipIngressConfig struct {
+	ChipIngress *chipingressset.Input `toml:"chip_ingress"`
+	Kafka       *KafkaConfig          `toml:"kafka"`
+}
+
+type KafkaConfig struct {
+	Topics []string `toml:"topics"`
 }

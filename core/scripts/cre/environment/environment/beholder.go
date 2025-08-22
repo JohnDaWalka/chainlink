@@ -15,17 +15,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	chipingressset "github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose/chip_ingress_set"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 )
-
-type ChipIngressConfig struct {
-	ChipIngress *chipingressset.Input `toml:"chip_ingress"`
-	Kafka       *KafkaConfig          `toml:"kafka"`
-}
-
-type KafkaConfig struct {
-	Topics []string `toml:"topics"`
-}
 
 func beholderCmds() *cobra.Command {
 	cmd := &cobra.Command{
@@ -126,13 +118,21 @@ func startBeholder(cmdContext context.Context, cleanupWait time.Duration, protoC
 	stageGen := creenv.NewStageGen(3, "STAGE")
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting Chip Ingress stack")))
 
+	previousCTFConfig := os.Getenv("CTF_CONFIGS")
+	defer func() {
+		setErr := os.Setenv("CTF_CONFIGS", previousCTFConfig)
+		if setErr != nil {
+			framework.L.Warn().Msgf("failed to restore previous CTF_CONFIGS environment variable: %s", setErr)
+		}
+	}()
+
 	setErr := os.Setenv("CTF_CONFIGS", "configs/chip-ingress.toml")
 	if setErr != nil {
 		return fmt.Errorf("failed to set CTF_CONFIGS environment variable: %w", setErr)
 	}
 
 	// Load and validate test configuration
-	in, err := framework.Load[ChipIngressConfig](nil)
+	in, err := framework.Load[envconfig.ChipIngressConfig](nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to load test configuration")
 	}
@@ -170,7 +170,7 @@ func startBeholder(cmdContext context.Context, cleanupWait time.Duration, protoC
 	fmt.Println()
 	fmt.Print("To terminate Beholder stack execute: `go run . env beholder stop`\n\n")
 
-	return nil
+	return storeCTFConfigs(in)
 }
 
 func parseConfigsAndRegisterProtos(ctx context.Context, protoConfigsFlag []string, schemaRegistryExternalURL string) error {
