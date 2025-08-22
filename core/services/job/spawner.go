@@ -177,26 +177,47 @@ func (js *spawner) stopAllServices() {
 // It will always delete the job from memory even if closing the services fail.
 func (js *spawner) stopService(jobID int32) {
 	lggr := js.lggr.With("jobID", jobID)
+	lggr.Info("Spawner.stopService - about to acquire lock")
 	js.activeJobsMu.Lock()
-	defer js.activeJobsMu.Unlock()
+	defer func() {
+		lggr.Info("Spawner.stopService - about to release lock")
+		js.activeJobsMu.Unlock()
+		lggr.Info("Spawner.stopService - released lock")
+	}()
+	lggr.Info("Spawner.stopService - acquired lock")
 
-	aj := js.activeJobs[jobID]
+	aj, found := js.activeJobs[jobID]
+	if !found {
+		lggr.Info("Spawner.stopService - job not active")
+	} else {
+		lggr.Infof("Spawner.stopService - job is active and has %d services", len(aj.services))
+	}
+
+	for i := len(aj.services) - 1; i >= 0; i-- {
+		lggr.Infof("Spawner.stopService - service[%d]: %T", i, reflect.TypeOf(aj.services[i]))
+	}
 
 	for i := len(aj.services) - 1; i >= 0; i-- {
 		service := aj.services[i]
 		sLggr := lggr.With("subservice", i, "serviceType", reflect.TypeOf(service))
 		if c, ok := service.(services.HealthReporter); ok {
+			sLggr.Infof("Spawner.stopService - health reporter")
 			if err := js.checker.Unregister(c.Name()); err != nil {
 				sLggr.Warnw("Failed to unregister service from health checker", "err", err)
 			}
+			sLggr.Info("Spawner.stopService - unregistered health reporter")
 		}
+		sLggr.Info("Spawner.stopService - about to close service")
 		if err := service.Close(); err != nil {
 			sLggr.Criticalw("Error stopping job service", "err", err)
 			js.SvcErrBuffer.Append(pkgerrors.Wrap(err, "error stopping job service"))
 		}
+		sLggr.Info("Spawner.stopService - service closed")
 	}
+	lggr.Info("Spawner.stopService - all services closed")
 
 	delete(js.activeJobs, jobID)
+	lggr.Info("Spawner.stopService - deleted job from active jobs")
 }
 
 func (js *spawner) StartService(ctx context.Context, jb Job) error {
@@ -323,6 +344,7 @@ func (js *spawner) DeleteJob(ctx context.Context, ds sqlutil.DataSource, jobID i
 	aj.delegate.BeforeJobDeleted(aj.spec)
 
 	err := sqlutil.Transact(ctx, js.orm.WithDataSource, ds, nil, func(tx ORM) error {
+		js.lggr.Info("Spawner.Deletejob - starting DB transaction")
 		err := tx.DeleteJob(ctx, jobID, aj.spec.Type)
 		if err != nil {
 			js.lggr.Errorw("Error deleting job", "jobID", jobID, "err", err)
@@ -331,17 +353,23 @@ func (js *spawner) DeleteJob(ctx context.Context, ds sqlutil.DataSource, jobID i
 		// This comes after calling orm.DeleteJob(), so that any non-db side effects inside it only get executed if
 		// we know the DELETE will succeed.  The DELETE will be finalized only if all db transactions in OnDeleteJob()
 		// succeed.  If either of those fails, the job will not be stopped and everything will be rolled back.
+		js.lggr.Info("Spawner.Deletejob - starting DB transaction")
 		err = aj.delegate.OnDeleteJob(ctx, aj.spec)
 		if err != nil {
+			js.lggr.Error("Spawner.Deletejob - failed to call delegate.OnDeleteJob")
 			return err
 		}
 
+		js.lggr.Info("Spawner.Deletejob - finish transaction")
 		return nil
 	})
+	js.lggr.Info("Spawner.Deletejob - after transaction")
 
 	if exists {
+		js.lggr.Info("Spawner.Deletejob - job exists; stopping services")
 		// Stop the service and remove the job from memory, which will always happen even if closing the services fail.
 		js.stopService(jobID)
+		js.lggr.Info("Spawner.Deletejob - job exists; stopped services")
 	}
 	lggr.Infow("Stopped and deleted job")
 
