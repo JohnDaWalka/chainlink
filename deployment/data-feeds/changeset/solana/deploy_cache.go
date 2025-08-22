@@ -24,12 +24,13 @@ const (
 )
 
 type DeployCacheRequest struct {
-	ChainSel    uint64
-	BuildConfig *helpers.BuildSolanaConfig
-	Qualifier   string
-	LabelSet    datastore.LabelSet
-	Version     string
-	FeedAdmins  []solana.PublicKey // Feed admins to be added to the cache
+	ChainSel           uint64
+	BuildConfig        *helpers.BuildSolanaConfig
+	Qualifier          string
+	LabelSet           datastore.LabelSet
+	Version            string
+	FeedAdmins         []solana.PublicKey // Feed admins to be added to the cache
+	ForwarderProgramID solana.PublicKey   // ForwarderProgram that is allowed to write to this cache
 }
 
 var _ cldf.ChangeSetV2[*DeployCacheRequest] = DeployCache{}
@@ -65,9 +66,10 @@ func (cs DeployCache) Apply(env cldf.Environment, req *DeployCacheRequest) (cldf
 	}
 
 	deploySeqInput := seq.DeployCacheSeqInput{
-		ChainSel:    req.ChainSel,
-		ProgramName: "data_feeds_cache",
-		FeedAdmins:  req.FeedAdmins,
+		ChainSel:           req.ChainSel,
+		ProgramName:        "data_feeds_cache",
+		FeedAdmins:         req.FeedAdmins,
+		ForwarderProgramID: req.ForwarderProgramID,
 	}
 
 	deps := operation.Deps{
@@ -242,10 +244,6 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 	cacheState, err := env.DataStore.Addresses().Get(cacheStateRef)
 	if err != nil {
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
-	}
-
-	if err != nil {
-		return out, fmt.Errorf("failed load cache for chain sel %d", req.ChainSel)
 	}
 
 	// Create remaining accounts by deriving PDAs for each DataID

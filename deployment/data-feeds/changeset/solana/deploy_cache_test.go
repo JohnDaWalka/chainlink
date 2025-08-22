@@ -47,6 +47,7 @@ func TestDeployCache(t *testing.T) {
 	chain.ProgramsPath = getProgramsPath()
 	env.BlockChains = cldfchain.NewBlockChains(map[uint64]cldfchain.BlockChain{solSel: chain})
 
+	forwarderProgramID := solana.SystemProgramID // needs to be executable
 	t.Run("should deploy cache", func(t *testing.T) {
 		configuredChangeset := commonchangeset.Configure(DeployCache{},
 			&DeployCacheRequest{
@@ -54,11 +55,12 @@ func TestDeployCache(t *testing.T) {
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
 				BuildConfig: &helpers.BuildSolanaConfig{
-					GitCommitSha:   "17e08b14727dd36659c3929018a361210e07c0d7",
+					GitCommitSha:   "e4f6a7a32fc2afd7191f6e5daa62b4d19828e954",
 					DestinationDir: getProgramsPath(),
 					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
 				},
-				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				FeedAdmins:         []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ForwarderProgramID: forwarderProgramID,
 			},
 		)
 
@@ -128,7 +130,7 @@ func TestConfigureCache(t *testing.T) {
 
 	// For AllowedSender (slice of solana.PublicKey)
 	forwarderProgramID := []solana.PublicKey{
-		solana.MustPublicKeyFromBase58("11111111111111111111111111111112"), // example public key
+		solana.SystemProgramID, //should be executable
 	}
 
 	forwarderCacheID := []solana.PublicKey{
@@ -157,10 +159,11 @@ func TestConfigureCache(t *testing.T) {
 		// First deploy the cache to get the program ID and state
 		deployChangeset := commonchangeset.Configure(DeployCache{},
 			&DeployCacheRequest{
-				ChainSel:   solSel,
-				Qualifier:  testQualifier,
-				Version:    "1.0.0",
-				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ChainSel:           solSel,
+				Qualifier:          testQualifier,
+				Version:            "1.0.0",
+				FeedAdmins:         []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ForwarderProgramID: forwarderProgramID[0],
 			},
 		)
 
@@ -205,10 +208,11 @@ func TestConfigureCache(t *testing.T) {
 		// First deploy the cache
 		deployChangeset := commonchangeset.Configure(DeployCache{},
 			&DeployCacheRequest{
-				ChainSel:   solSel,
-				Qualifier:  testQualifier,
-				Version:    "1.0.0",
-				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ChainSel:           solSel,
+				Qualifier:          testQualifier,
+				Version:            "1.0.0",
+				FeedAdmins:         []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ForwarderProgramID: forwarderProgramID[0],
 			},
 		)
 
@@ -252,10 +256,11 @@ func TestConfigureCache(t *testing.T) {
 
 		deployChangeset := commonchangeset.Configure(DeployCache{},
 			&DeployCacheRequest{
-				ChainSel:   solSel,
-				Qualifier:  testQualifier,
-				Version:    "1.0.0",
-				FeedAdmins: []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ChainSel:           solSel,
+				Qualifier:          testQualifier,
+				Version:            "1.0.0",
+				FeedAdmins:         []solana.PublicKey{chain.DeployerKey.PublicKey()},
+				ForwarderProgramID: forwarderProgramID[0],
 			},
 		)
 
