@@ -30,17 +30,21 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/billing"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+<<<<<<< HEAD
+=======
+	nodeauthjwt "github.com/smartcontractkit/chainlink-common/pkg/nodeauth/jwt"
+	commonsrv "github.com/smartcontractkit/chainlink-common/pkg/services"
+>>>>>>> 5931d35736242c6fa8f538010c8888efd98117a9
 	"github.com/smartcontractkit/chainlink-common/pkg/services/otelhealth"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/promhealth"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
+	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/storage"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/workflows/dontime"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/dontime"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/keys"
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
@@ -323,6 +327,12 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 
 	var billingClient metering.BillingClient
 
+	signer, CSAPubKey, err := keystore.BuildNodeAuth(ctx, csaKeystore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build node auth: %w", err)
+	}
+	jwtGenerator := nodeauthjwt.NewNodeJWTGenerator(signer, CSAPubKey)
+
 	if opts.BillingClient != nil {
 		billingClient = opts.BillingClient
 	} else if cfg.Billing().URL() != "" {
@@ -331,6 +341,8 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		if opts.Config.Billing().TLSEnabled() {
 			workflowOpts = append(workflowOpts, billing.WithWorkflowTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 		}
+
+		workflowOpts = append(workflowOpts, billing.WithJWTGenerator(jwtGenerator))
 
 		billingClient, err = billing.NewWorkflowClient(globalLogger, opts.Config.Billing().URL(), workflowOpts...)
 		if err != nil {
@@ -347,6 +359,8 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		if opts.Config.Capabilities().WorkflowRegistry().WorkflowStorage().TLSEnabled() {
 			workflowOpts = append(workflowOpts, storage.WithWorkflowTransportCredentials(credentials.NewClientTLSFromCert(nil, "")))
 		}
+
+		workflowOpts = append(workflowOpts, storage.WithJWTGenerator(jwtGenerator))
 
 		storageClient, err = storage.NewWorkflowClient(globalLogger, opts.Config.Capabilities().WorkflowRegistry().WorkflowStorage().URL(), workflowOpts...)
 		if err != nil {
@@ -699,13 +713,13 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	)
 	srvcs = append(srvcs, bridgeStatusReporter)
 
-	// healthChecker := commonservices.NewChecker(static.Version, static.Sha)
-	healthChecker := promhealth.NewChecker(static.Version, static.Sha)
-	beholderHealthChecker, err := otelhealth.NewChecker(static.Version, static.Sha, beholder.GetMeter())
-
+	healthCfg := commonsrv.HealthCheckerConfig{Ver: static.Version, Sha: static.Sha}
+	healthCfg = promhealth.ConfigureHooks(healthCfg)
+	healthCfg, err = otelhealth.ConfigureHooks(healthCfg, beholder.GetMeter())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to configure health checker otel hooks: %w", err)
 	}
+	healthChecker := healthCfg.New()
 
 	var lbs []utils.DependentAwaiter
 	for _, c := range legacyEVMChains.Slice() {
@@ -1102,7 +1116,7 @@ func newCREServices(
 						retrieverFunc = nil
 					}
 
-					artifactsStore := artifactsV2.NewStore(lggr, artifactsV2.NewWorkflowRegistryDS(ds, globalLogger),
+					artifactsStore, err := artifactsV2.NewStore(lggr, artifactsV2.NewWorkflowRegistryDS(ds, globalLogger),
 						fetcherFunc,
 						retrieverFunc,
 						clockwork.NewRealClock(), key, custmsg.NewLabeler(), artifactsV2.WithMaxArtifactSize(
@@ -1111,7 +1125,13 @@ func newCREServices(
 								MaxSecretsSize: uint64(capCfg.WorkflowRegistry().MaxEncryptedSecretsSize()),
 								MaxConfigSize:  uint64(capCfg.WorkflowRegistry().MaxConfigSize()),
 							},
-						))
+						),
+						artifactsV2.WithConfig(artifactsV2.StoreConfig{
+							ArtifactStorageHost: capCfg.WorkflowRegistry().WorkflowStorage().ArtifactStorageHost(),
+						}))
+					if err != nil {
+						return nil, fmt.Errorf("unable to create artifact store: %w", err)
+					}
 
 					engineRegistry := syncerV2.NewEngineRegistry()
 
