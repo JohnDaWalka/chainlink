@@ -130,7 +130,6 @@ jobs:
         shell: bash
         id: start-local-cre
         env:
-          TOPOLOGY: ${{ matrix.tests.topology }}
           E2E_JD_IMAGE: "${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/job-distributor"
           E2E_JD_VERSION: "0.12.7"
           E2E_TEST_CHAINLINK_IMAGE: "${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/${{ inputs.ecr_name }}"
@@ -138,9 +137,9 @@ jobs:
           CTF_CONFIGS: ${{ matrix.tests.configs }}
         run: |
           cd core/scripts/cre/environment
-          go run . env start --topology ${TOPOLOGY} --with-plugins-docker-image "${E2E_TEST_CHAINLINK_IMAGE}:${E2E_TEST_CHAINLINK_VERSION}"
+          go run . env start --with-plugins-docker-image "${E2E_TEST_CHAINLINK_IMAGE}:${E2E_TEST_CHAINLINK_VERSION}"
           exit_code=$?
-          
+
           if [ $exit_code -ne 0 ]; then
             echo "Error: failed to start local CRE, exit code $exit_code"
             exit $exit_code
@@ -155,7 +154,6 @@ jobs:
           TEST_NAME: ${{ matrix.tests.test_name }}
           ENV_ARTIFACT_PATH: ${{ steps.start-local-cre.outputs.env_artifact_path }}
           CTF_CONFIGS: ${{ steps.start-local-cre.outputs.env_config_path }}
-          CRE_TOPOLOGY: ${{ matrix.tests.topology }}
           TEST_TIMEOUT: 30m
         run: |
           # Sleep to allow testcontainers to stop

@@ -11,9 +11,10 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
-	"google.golang.org/protobuf/proto"
 )
 
 const DefaultBeholderStackCacheFile = "../../../../core/scripts/cre/environment/configs/chip-ingress-cache.toml"
@@ -107,7 +108,8 @@ func listenForKafkaMessages(
 			msg, err := consumer.ReadMessage(0) // Non-blocking read
 			if err != nil {
 				// Check if it's just a timeout (no messages available)
-				if err.(kafka.Error).Code() == kafka.ErrTimedOut {
+				var kafkaErr kafka.Error
+				if errors.As(err, &kafkaErr) && kafkaErr.Code() == kafka.ErrTimedOut {
 					// Don't log timeouts as they're expected
 					continue
 				}
@@ -205,7 +207,7 @@ func getMapKeys(m map[string]func() proto.Message) []string {
 
 func getValueFromHeader(expectedHeader string, msg *kafka.Message) (string, error) {
 	for _, header := range msg.Headers {
-		if string(header.Key) == expectedHeader {
+		if header.Key == expectedHeader {
 			return string(header.Value), nil
 		}
 	}

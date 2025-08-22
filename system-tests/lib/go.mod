@@ -11,8 +11,6 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
-replace github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose => ../../../chainlink-testing-framework/framework/components/dockercompose
-
 // Uncomment to work with local version of crib-sdk
 // replace github.com/smartcontractkit/crib-sdk => ../../../crib-sdk
 
@@ -38,7 +36,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.12
-	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.8
+	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.9
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2

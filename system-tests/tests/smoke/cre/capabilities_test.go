@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -760,12 +759,11 @@ func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environ
 							default: // Channel might already have a value
 							}
 							return // Exit the processor goroutine
-						} else {
-							testLogger.Warn().
-								Str("expected_log", expectedUserLog).
-								Str("found_message", strings.TrimSpace(logLine.Message)).
-								Msg("Received UserLogs message, but it does not match expected log")
 						}
+						testLogger.Warn().
+							Str("expected_log", expectedUserLog).
+							Str("found_message", strings.TrimSpace(logLine.Message)).
+							Msg("Received UserLogs message, but it does not match expected log")
 					}
 				default:
 					// ignore other message types
@@ -800,7 +798,7 @@ func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environ
 		require.Failf(t, "Timed out waiting for expected user log message", "Expected user log message: '%s' not found after %s", expectedUserLog, timeout.String())
 	case err := <-kafkaErrChan:
 		testLogger.Error().Err(err).Msg("Kafka listener encountered an error during execution")
-		require.Fail(t, "Kafka listener failed: %v", err)
+		require.Fail(t, "Kafka listener failed", err.Error())
 	}
 
 	testLogger.Info().Msg("Beholder test completed")
@@ -831,5 +829,5 @@ func ctfConfigToCacheFile() (string, error) {
 	}
 
 	split := strings.Split(configFile, ",")
-	return fmt.Sprintf("%s-cache.toml", strings.ReplaceAll(split[0], ".toml", "")), nil
+	return strings.ReplaceAll(split[0], ".toml", "") + "-cache.toml", nil
 }
