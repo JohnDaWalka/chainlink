@@ -27,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
-	"github.com/smartcontractkit/chainlink/deployment/helpers"
 )
 
 func TestDeployCache(t *testing.T) {
@@ -54,11 +53,11 @@ func TestDeployCache(t *testing.T) {
 				ChainSel:  solSel,
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
-				BuildConfig: &helpers.BuildSolanaConfig{
-					GitCommitSha:   "e4f6a7a32fc2afd7191f6e5daa62b4d19828e954",
-					DestinationDir: getProgramsPath(),
-					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
-				},
+				//		BuildConfig: &helpers.BuildSolanaConfig{
+				//			GitCommitSha:   "e4f6a7a32fc2afd7191f6e5daa62b4d19828e954",
+				//			DestinationDir: getProgramsPath(),
+				//			LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
+				//		},
 				FeedAdmins:         []solana.PublicKey{chain.DeployerKey.PublicKey()},
 				ForwarderProgramID: forwarderProgramID,
 			},
@@ -116,10 +115,10 @@ func TestConfigureCache(t *testing.T) {
 	chain.ProgramsPath = getProgramsPath()
 	env.BlockChains = cldfchain.NewBlockChains(map[uint64]cldfchain.BlockChain{solSel: chain})
 	// Example array of DataIDs as [][16]uint8
-	DataIDs := [][16]uint8{
-		[16]uint8{'B', 'T', 'C', '/', 'U', 'S', 'D'},
-		[16]uint8{'E', 'T', 'H', '/', 'U', 'S', 'D'},
-		[16]uint8{'S', 'O', 'L', '/', 'U', 'S', 'D'},
+	DataIDs := []string{
+		"0x018e16c39e00032000000",
+		"0x018e16c39e00032000001",
+		"0x018e16c39e00032000002",
 	}
 
 	descriptions := [][32]uint8{

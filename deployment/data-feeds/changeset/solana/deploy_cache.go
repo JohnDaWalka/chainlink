@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
@@ -197,7 +198,7 @@ type InitCacheDecimalReportRequest struct {
 	Version   string
 	Qualifier string
 	MCMS      *proposalutils.TimelockConfig // if set, assumes current ownership
-	DataIDs   [][16]uint8
+	DataIDs   []string
 	FeedAdmin solana.PublicKey
 }
 
@@ -214,8 +215,13 @@ func (cs InitCacheDecimalReport) VerifyPreconditions(env cldf.Environment, req *
 		return err
 	}
 
+	_, err := dataIDsToBytes(req.DataIDs)
+	if err != nil {
+		return err
+	}
+
 	cacheKey := datastore.NewAddressRefKey(req.ChainSel, CacheContract, semver.MustParse(req.Version), req.Qualifier)
-	_, err := env.DataStore.Addresses().Get(cacheKey)
+	_, err = env.DataStore.Addresses().Get(cacheKey)
 	if err != nil {
 		return fmt.Errorf("failed to load cache contract: %w", err)
 	}
@@ -246,8 +252,13 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 		return out, fmt.Errorf("failed load cache state for chain sel %d", req.ChainSel)
 	}
 
+	dataIDs, err := dataIDsToBytes(req.DataIDs)
+	if err != nil {
+		return out, err
+	}
+
 	// Create remaining accounts by deriving PDAs for each DataID
-	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, "decimal_report", req.ChainSel, req.Qualifier, req.Version, req.DataIDs)
+	decimalReportAccounts, err := createRemainingAccounts(env.DataStore, "decimal_report", req.ChainSel, req.Qualifier, req.Version, dataIDs)
 	if err != nil {
 		return out, fmt.Errorf("failed to create remaining accounts: %w", err)
 	}
@@ -257,7 +268,7 @@ func (cs InitCacheDecimalReport) Apply(env cldf.Environment, req *InitCacheDecim
 		MCMS:              req.MCMS,
 		State:             solana.MustPublicKeyFromBase58(cacheState.Address),
 		Type:              cldf.ContractType(CacheContract),
-		DataIDs:           req.DataIDs,
+		DataIDs:           dataIDs,
 		FeedAdmin:         req.FeedAdmin,
 		RemainingAccounts: decimalReportAccounts,
 	}
@@ -345,4 +356,32 @@ func createReportHash(dataID [16]byte, sender solana.PublicKey, owner [20]byte, 
 		name[:],
 	}, nil)
 	return sha256.Sum256(buf)
+}
+
+func dataIDsToBytes(dataIDs []string) ([][16]byte, error) {
+	var out [][16]byte
+	for _, dataID := range dataIDs {
+		id, err := dataIDtoBytes(dataID)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, id)
+	}
+
+	return out, nil
+}
+
+func dataIDtoBytes(dataID string) ([16]byte, error) {
+	var out [16]byte
+	bigID, ok := new(big.Int).SetString(dataID, 0)
+	if !ok {
+		return out, fmt.Errorf("invalid data_id: %v", dataID)
+	}
+	if bigID.BitLen() > 128 {
+		return out, fmt.Errorf("data_id is too long: %d", bigID.BitLen())
+	}
+
+	copy(out[:], bigID.Bytes())
+	return out, nil
 }
