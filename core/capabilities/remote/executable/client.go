@@ -36,6 +36,7 @@ type client struct {
 	mutex                    sync.Mutex
 	stopCh                   services.StopChan
 	wg                       sync.WaitGroup
+	capabilityMethodConfig   map[string]commoncap.CapabilityMethodConfig
 }
 
 var _ commoncap.ExecutableCapability = &client{}
@@ -50,7 +51,7 @@ var (
 )
 
 func NewClient(remoteCapabilityInfo commoncap.CapabilityInfo, localDonInfo commoncap.DON, dispatcher types.Dispatcher,
-	requestTimeout time.Duration, lggr logger.Logger) *client {
+	requestTimeout time.Duration, lggr logger.Logger, capabilityMethodConfig map[string]commoncap.CapabilityMethodConfig) *client {
 	return &client{
 		lggr:                     logger.Named(lggr, "ExecutableCapabilityClient"),
 		remoteCapabilityInfo:     remoteCapabilityInfo,
@@ -59,6 +60,7 @@ func NewClient(remoteCapabilityInfo commoncap.CapabilityInfo, localDonInfo commo
 		requestTimeout:           requestTimeout,
 		requestIDToCallerRequest: make(map[string]*request.ClientRequest),
 		stopCh:                   make(services.StopChan),
+		capabilityMethodConfig:   capabilityMethodConfig,
 	}
 }
 
@@ -161,7 +163,7 @@ func (c *client) UnregisterFromWorkflow(ctx context.Context, unregisterRequest c
 
 func (c *client) Execute(ctx context.Context, capReq commoncap.CapabilityRequest) (commoncap.CapabilityResponse, error) {
 	req, err := request.NewClientExecuteRequest(ctx, c.lggr, capReq, c.remoteCapabilityInfo, c.localDONInfo, c.dispatcher,
-		c.requestTimeout)
+		c.requestTimeout, c.capabilityMethodConfig)
 	if err != nil {
 		return commoncap.CapabilityResponse{}, fmt.Errorf("failed to create client request: %w", err)
 	}

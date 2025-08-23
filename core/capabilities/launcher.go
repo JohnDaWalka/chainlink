@@ -89,13 +89,56 @@ func unmarshalCapabilityConfig(data []byte) (capabilities.CapabilityConfiguratio
 		return capabilities.CapabilityConfiguration{}, err
 	}
 
+	capMethodConfig, err := unmarshalMethodConfig(cconf)
+	if err != nil {
+		return capabilities.CapabilityConfiguration{}, err
+	}
+
 	return capabilities.CapabilityConfiguration{
-		DefaultConfig:       dc,
-		RestrictedKeys:      cconf.RestrictedKeys,
-		RestrictedConfig:    rc,
-		RemoteTriggerConfig: remoteTriggerConfig,
-		RemoteTargetConfig:  remoteTargetConfig,
+		DefaultConfig:          dc,
+		RestrictedKeys:         cconf.RestrictedKeys,
+		RestrictedConfig:       rc,
+		RemoteTriggerConfig:    remoteTriggerConfig,
+		RemoteTargetConfig:     remoteTargetConfig,
+		CapabilityMethodConfig: capMethodConfig,
 	}, nil
+}
+
+func unmarshalMethodConfig(cconf *capabilitiespb.CapabilityConfig) (map[string]capabilities.CapabilityMethodConfig, error) {
+	capMethodConfig := make(map[string]capabilities.CapabilityMethodConfig)
+	if cconf.GetMethodConfigs() == nil {
+		return capMethodConfig, nil // no method configs, return empty map
+	}
+	for methodName, pbMethodConfig := range cconf.GetMethodConfigs() {
+		var deltaStage *time.Duration
+		var actionSchedule *capabilities.ActionSchedule
+
+		if !pbMethodConfig.IsTrigger {
+			// If this is not a trigger, we must set the action schedule
+			switch pbMethodConfig.GetSchedule() {
+			case capabilitiespb.ActionSchedule_AllAtOnce:
+				as := capabilities.ActionSchedule(capabilitiespb.ActionSchedule_AllAtOnce)
+				actionSchedule = &as
+			case capabilitiespb.ActionSchedule_OneAtATime:
+				as := capabilities.ActionSchedule(capabilitiespb.ActionSchedule_OneAtATime)
+				actionSchedule = &as
+				// if it is 'one at a time' it has to have a delta stage
+				if pbMethodConfig.DeltaStage == nil {
+					return nil, fmt.Errorf("action schedule %q requires a delta stage (got nil)", pbMethodConfig.GetSchedule().String())
+				}
+				d := pbMethodConfig.DeltaStage.AsDuration()
+				deltaStage = &d
+			default:
+				return nil, fmt.Errorf("unsupported action schedule: %q", pbMethodConfig.GetSchedule().String())
+			}
+		}
+		capMethodConfig[methodName] = capabilities.CapabilityMethodConfig{
+			IsTrigger:      pbMethodConfig.IsTrigger,
+			ActionSchedule: actionSchedule,
+			DeltaStage:     deltaStage,
+		}
+	}
+	return capMethodConfig, nil
 }
 
 type donNotifier interface {
@@ -420,6 +463,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 					w.dispatcher,
 					defaultTargetRequestTimeout,
 					w.lggr,
+					capabilityConfig.CapabilityMethodConfig,
 				)
 				return client, nil
 			}
@@ -438,6 +482,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 					w.dispatcher,
 					defaultTargetRequestTimeout,
 					w.lggr,
+					capabilityConfig.CapabilityMethodConfig,
 				)
 				return client, nil
 			}
