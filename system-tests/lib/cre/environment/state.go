@@ -66,6 +66,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 	addressBook := cldf.NewMemoryAddressBookFromMap(envArtifact.AddressBook)
 	datastore := datastore.NewMemoryDataStore()
 	for _, addrRef := range envArtifact.AddressRefs {
+		fmt.Println("addrRef", addrRef)
 		addErr := datastore.AddressRefStore.Add(addrRef)
 		if addErr != nil {
 			return nil, nil, errors.Wrapf(addErr, "failed to add address ref to datastore %v", addrRef)
