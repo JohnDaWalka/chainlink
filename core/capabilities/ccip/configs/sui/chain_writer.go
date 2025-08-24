@@ -54,17 +54,17 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 										IsMutable: &nonMutable,
 									},
 									{
-										Name:     "report_context",
+										Name:     "ReportContext",
 										Type:     "vector<vector<u8>>",
 										Required: true,
 									},
 									{
-										Name:     "report",
+										Name:     "Report",
 										Type:     "vector<u8>",
 										Required: true,
 									},
 									{
-										Name:     "signatures",
+										Name:     "Signatures",
 										Type:     "vector<vector<u8>>",
 										Required: true,
 									},
@@ -100,12 +100,12 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 										IsMutable: &nonMutable,
 									},
 									{
-										Name:     "report_context",
+										Name:     "ReportContext",
 										Type:     "vector<vector<u8>>",
 										Required: true,
 									},
 									{
-										Name:     "report",
+										Name:     "Report",
 										Type:     "vector<u8>",
 										Required: true,
 									},
