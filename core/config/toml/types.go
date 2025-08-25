@@ -2020,6 +2020,23 @@ type WorkflowRegistry struct {
 	WorkflowStorage         WorkflowStorage
 }
 
+func (s *WorkflowStorage) ValidateConfig() error {
+	if s.URL == nil || *s.URL == "" {
+		return configutils.ErrInvalid{Name: "URL", Value: "", Msg: "storage service url must be set"}
+	}
+
+	if s.ArtifactStorageHost == nil || *s.ArtifactStorageHost == "" {
+		return configutils.ErrInvalid{Name: "ArtifactStorageHost", Value: "", Msg: "artifact storage host must be set"}
+	}
+
+	if s.TLSEnabled == nil {
+		val := true
+		s.TLSEnabled = &val
+	}
+
+	return nil
+}
+
 func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
 	if f.Address != nil {
 		r.Address = f.Address
