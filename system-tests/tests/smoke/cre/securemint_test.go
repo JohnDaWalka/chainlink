@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"os"
 	"strings"
 	"testing"
+
+	texttmpl "text/template"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -24,12 +25,16 @@ import (
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	df "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset"
 	df_sol "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
+	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/testdata/testspecs"
 	"github.com/stretchr/testify/require"
 )
@@ -98,7 +103,6 @@ func executeSecureMintTest(t *testing.T, in *envconfig.Config, envArtifact envir
 		datastore.AddressRefByQualifier(ks_sol.DefaultForwarderQualifier),
 		datastore.AddressRefByType(ks_sol.ForwarderContract))
 	require.Len(t, forwarders, 1)
-
 	forwarderStates := fullCldEnvOutput.Environment.DataStore.Addresses().Filter(
 		datastore.AddressRefByQualifier(ks_sol.DefaultForwarderQualifier),
 		datastore.AddressRefByType(ks_sol.ForwarderState))
@@ -128,6 +132,7 @@ func executeSecureMintTest(t *testing.T, in *envconfig.Config, envArtifact envir
 	jobSpec := createSecureMintWorkflowJobSpec(t, &s, solChain)
 	proposeSecureMintJob(t, fullCldEnvOutput.Environment.Offchain, jobSpec)
 	framework.L.Info().Msgf("Secure mint job is succesfully posted. Job spec:\n %v", jobSpec)
+	createFakeTrigger(t, fullCldEnvOutput.Environment.Offchain, fullCldEnvOutput.DonTopology)
 }
 
 func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solChain *cre.WrappedBlockchainOutput) {
@@ -181,6 +186,27 @@ func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solCh
 	s.CacheState = mustGetContract(t, env.DataStore, solChain.SolChain.ChainSelector, df_sol.CacheState)
 }
 
+const reportSchema = `{
+      "kind": "struct",
+      "fields": [
+        { "name": "payload", "type": { "vec": { "defined": "DecimalReport" } } }
+      ]
+    }`
+const definedTypes = `
+     [
+      {
+        "name":"DecimalReport",
+         "type":{
+          "kind":"struct",
+          "fields":[
+            { "name":"timestamp", "type":"u32" },
+            { "name":"answer",    "type":"u128" },
+            { "name": "dataId",   "type": {"array": ["u8",16]}}
+          ]
+        }
+      }
+    ]`
+
 const secureMintWorkflowTemplate = `
 name: "{{.WorkflowName}}"
 owner: "{{.WorkflowOwner}}"
@@ -214,24 +240,45 @@ consensus:
         targetChainSelector: "{{.ChainSelector}}" # CHAIN_ID_FOR_WRITE_TARGET: NEW Param, to match write target
         solana:
           account_context: "$(inputs.solana.account_context)"
-      encoder: "Borsh"
+      encoder: "borsh"
       encoder_config:
-        abi: "(bytes16 DataID, uint32 Timestamp, uint224 Answer)[] Reports"
+        report_schema: |
+          {
+            "kind": "struct",
+            "fields": [
+              { "name": "payload", "type": { "vec": { "defined": "DecimalReport" } } }
+            ]
+          }
+        defined_types: |
+          [
+            {
+              "name": "DecimalReport",
+              "type": {
+                "kind": "struct",
+                "fields": [
+                  { "name": "timestamp", "type": "u32" },
+                  { "name": "answer",    "type": "u128" },
+                  { "name": "dataId",    "type": { "array": ["u8", 16] } }
+                ]
+              }
+            }
+          ]
 
 targets:
   - id: "{{.SolanaWriteTargetID}}"
     inputs:
       signed_report: $(secure-mint-consensus.outputs)
+      remaining_accounts: $(solana_data_feeds_cache_accounts.outputs)
     config:
       address: "{{.DFCacheAddr}}"
       params: ["$(report)"]
-      abi: "receive(report bytes)"
       deltaStage: 1s
       schedule: oneAtATime
 `
 
 func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.WrappedBlockchainOutput) string {
-	tmpl, err := template.New("secureMintWorkflow").Parse(secureMintWorkflowTemplate)
+	//tmpl, err := template.New("secureMintWorkflow").Parse(secureMintWorkflowTemplate)
+	tmpl, err := texttmpl.New("secureMintWorkflow").Parse(secureMintWorkflowTemplate)
 	require.NoError(t, err)
 	chainID, err := solChain.SolClient.GetGenesisHash(context.Background())
 	require.NoError(t, err, "failed to receive genesis hash")
@@ -246,6 +293,8 @@ func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.Wrapp
 		"SolanaWriteTargetID": writeCapabilityID,
 		"DeriveID":            deriveCapabilityID,
 		"FeedID":              s.FeedID,
+		"ReportSchema":        reportSchema,
+		"DefinedTypes":        definedTypes,
 	}
 
 	var buf bytes.Buffer
@@ -280,6 +329,63 @@ func proposeSecureMintJob(t *testing.T, offchain offchain.Client, jobSpec string
 		return
 	}
 	require.NoError(t, err, "failed to propose jobs")
+}
+
+func createFakeTrigger(t *testing.T, offchain offchain.Client, dons *cre.DonTopology) {
+	client := createMockClient(t)
+	keys := exportOcr2Keys(t, dons)
+	require.NotEqual(t, len(keys), 0)
+	framework.L.Info().Msg("Successfully exported ocr2 keys")
+	_ = client
+}
+
+func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
+	kb := make([]ocr2key.KeyBundle, 0)
+	for _, don := range dons.DonsWithMetadata {
+		if flags.HasFlag(don.Flags, cre.MockCapability) {
+			for _, n := range don.DON.Nodes {
+				key, err2 := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
+				fmt.Println("bundleID", n.Ocr2KeyBundleID)
+				fmt.Println("exported key", key.Crypto.Cipher)
+				fmt.Println("export key public", key.ConfigPublicKey)
+				fmt.Println("export key ID", key.ID)
+				if err2 == nil {
+					b, err3 := json.Marshal(key)
+					require.NoError(t, err3, "could not marshal OCR2 key")
+					kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
+					require.NoError(t, err3, "could not decrypt OCR2 key json")
+					kb = append(kb, kk)
+				} else {
+					framework.L.Error().Msgf("Could not export OCR2 key: %s", err2)
+				}
+			}
+		}
+	}
+
+	return kb
+}
+
+func createMockClient(t *testing.T) *mock_capability.Controller {
+	in, err := framework.Load[envconfig.Config](nil)
+	require.NoError(t, err, "couldn't load environment state")
+	mockClientsAddress := make([]string, 0)
+	for _, nodeSet := range in.NodeSets {
+		for i, n := range nodeSet.NodeSpecs {
+			if i == 0 {
+				continue
+			}
+			if len(n.Node.CustomPorts) == 0 {
+				panic("no custom port specified, mock capability running in kind must have a custom port in order to connect")
+			}
+			ports := strings.Split(n.Node.CustomPorts[0], ":")
+			mockClientsAddress = append(mockClientsAddress, "127.0.0.1:"+ports[0])
+		}
+	}
+
+	mocksClient := mock_capability.NewMockCapabilityController(framework.L)
+	require.NoError(t, mocksClient.ConnectAll(mockClientsAddress, true, true), " failed to connect mock client")
+
+	return mocksClient
 }
 
 func mustGetContract(t *testing.T, ds datastore.DataStore, sel uint64, ctype datastore.ContractType) solana.PublicKey {

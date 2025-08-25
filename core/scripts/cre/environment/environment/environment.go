@@ -22,7 +22,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/sets"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
@@ -590,8 +592,41 @@ func StartCLIEnvironment(
 	if setupErr != nil {
 		return nil, fmt.Errorf("failed to setup test environment: %w", setupErr)
 	}
+	keys, err := exportOcr2Keys(universalSetupOutput.DonTopology)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println("keys:", keys)
 
 	return universalSetupOutput, nil
+}
+
+// TODO for test only remove on PR cleanup
+func exportOcr2Keys(dons *cre.DonTopology) ([]ocr2key.KeyBundle, error) {
+	kb := make([]ocr2key.KeyBundle, 0)
+	for _, don := range dons.DonsWithMetadata {
+		if flags.HasFlag(don.Flags, cre.MockCapability) {
+			for _, n := range don.DON.Nodes {
+				key, err2 := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
+				fmt.Println("exported key cre", key.Crypto.Cipher)
+				if err2 == nil {
+					b, err3 := json.Marshal(key)
+					if err3 != nil {
+						return nil, err3
+					}
+					kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
+					if err3 != nil {
+						return nil, err3
+					}
+					kb = append(kb, kk)
+				} else {
+					framework.L.Error().Msgf("Could not export OCR2 key: %s", err2)
+				}
+			}
+		}
+	}
+
+	return kb, nil
 }
 
 func isBlockscoutRunning(cmdContext context.Context) bool {
