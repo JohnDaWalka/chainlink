@@ -109,6 +109,11 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 										Type:     "vector<u8>",
 										Required: true,
 									},
+									{
+										Name:     "token_receiver",
+										Type:     "vector<u8>",
+										Required: true,
+									},
 								},
 							},
 							{
