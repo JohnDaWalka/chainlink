@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/spf13/cobra"
@@ -340,7 +341,7 @@ func RegisterTrigger(ctx context.Context) error {
 		return err
 	}
 
-	_, err = mocks.RegisterTrigger(ctx, "cron-trigger@1.0.0", metadata, nil, payload, "")
+	_, err = mocks.RegisterTrigger(ctx, "cron-trigger@1.0.0", metadata, nil, payload, "", uuid.New().String())
 	if err != nil {
 		return err
 	}

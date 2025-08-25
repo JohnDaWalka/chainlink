@@ -235,8 +235,9 @@ func GenerateJobSpecs(donTopology *cre.DonTopology, capabilities []cre.Installab
 func generateConfig(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverride, error) {
 	configOverrides := make(cre.NodeIndexToConfigOverride)
 
+	// if we don't have a gateway connector outputs, we don't need to create any job specs
 	if input.GatewayConnectorOutput == nil || len(input.GatewayConnectorOutput.Configurations) == 0 {
-		return configOverrides, errors.New("gateway connector output or configurations are empty")
+		return configOverrides, nil
 	}
 
 	// find worker nodes

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -133,7 +132,7 @@ func (c *Controller) SendTrigger(ctx context.Context, message *pb2.SendTriggerEv
 	}
 	return nil
 }
-func (c *Controller) RegisterTrigger(ctx context.Context, triggerID string, metadata *pb2.Metadata, config []byte, payload *anypb.Any, method string) ([]chan *capabilities.TriggerResponse, error) {
+func (c *Controller) RegisterTrigger(ctx context.Context, triggerID string, metadata *pb2.Metadata, config []byte, payload *anypb.Any, method string, registrationTriggerID string) ([]chan *capabilities.TriggerResponse, error) {
 	if len(c.Nodes) == 0 {
 		return nil, fmt.Errorf("no nodes available for trigger registration")
 	}
@@ -153,7 +152,7 @@ func (c *Controller) RegisterTrigger(ctx context.Context, triggerID string, meta
 			Config:                config,
 			Payload:               payload,
 			Method:                method,
-			RegistrationTriggerID: uuid.New().String(),
+			RegistrationTriggerID: registrationTriggerID,
 		})
 		if err != nil {
 			registrationErrors = append(registrationErrors, fmt.Errorf("failed to register trigger for client %s: %w", client.URL, err))
@@ -363,6 +362,42 @@ func (c *Controller) HookExecutables(ctx context.Context, ch chan capabilities.C
 		}()
 	}
 	return nil
+}
+
+func (c *Controller) UnregisterTrigger(ctx context.Context, triggerID string, metadata *pb2.Metadata, config []byte, payload *anypb.Any, method string, registrationTriggerID string) error {
+	if len(c.Nodes) == 0 {
+		return fmt.Errorf("no nodes available")
+	}
+
+	var unregistrationErrors []error
+	for _, client := range c.Nodes {
+		c.lggr.Info().Str("client_url", client.URL).Str("trigger_id", triggerID).Msg("Unregistering trigger")
+
+		_, err := client.API.UnregisterTrigger(ctx, &pb2.TriggerRegistrationRequest{
+			TriggerID:             triggerID,
+			Metadata:              metadata,
+			Config:                config,
+			Payload:               payload,
+			Method:                method,
+			RegistrationTriggerID: registrationTriggerID,
+		})
+		if err != nil {
+			unregistrationErrors = append(unregistrationErrors, fmt.Errorf("failed to unregister trigger for client %s: %w", client.URL, err))
+			continue
+		}
+	}
+
+	// If all unregistrations failed, return error
+	if len(unregistrationErrors) == len(c.Nodes) {
+		return fmt.Errorf("all trigger unregistrations failed: %v", unregistrationErrors)
+	}
+
+	// Log partial failures but continue
+	if len(unregistrationErrors) > 0 {
+		c.lggr.Warn().Int("failed_count", len(unregistrationErrors)).Errs("errors", unregistrationErrors).Msg("Some trigger unregistrations failed")
+	}
+
+	return errors.Join(unregistrationErrors...)
 }
 
 func (c *Controller) WaitForCapability(ctx context.Context, capability string, timeoutDuration time.Duration) error {
