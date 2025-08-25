@@ -47,8 +47,15 @@
 
   env_vars = { CL_EVM_CMD = "" }
 
-  capabilities = ["ocr3", "custom-compute", "web-api-target", "web-api-trigger", "vault", "cron", "write-solana"]
+  capabilities = ["ocr3", "custom-compute", "mock", "write-solana"]
   supported_sol_chains = ["5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"]
+  
+  [nodesets.capability_overrides.mock]
+    # add as many as you want:
+    [[nodesets.capability_overrides.mock.DefaultMocks]]
+      Id = "securemint-trigger@1.0.0"
+      Description = "trigger mock for secure mint"
+      Type="trigger"
 
   # See ./examples/workflow-don-overrides.toml to learn how to override capability configs
 
