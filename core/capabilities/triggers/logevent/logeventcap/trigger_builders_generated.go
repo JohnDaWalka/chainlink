@@ -14,7 +14,7 @@ func (cfg Config) New(w *sdk.WorkflowSpecFactory, id string) OutputCap {
 		Inputs: sdk.StepInputs{},
 		Config: map[string]any{
 			"contractAddress":      cfg.ContractAddress,
-			"contractEventName":    cfg.ContractEventName,
+			"contractEventNames":   cfg.ContractEventNames,
 			"contractName":         cfg.ContractName,
 			"contractReaderConfig": cfg.ContractReaderConfig,
 		},

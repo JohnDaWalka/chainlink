@@ -382,9 +382,33 @@ func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventType
 					w.lggr.Debug("readRegistryEventsLoop stopped during processing")
 					return
 				default:
+					w.lggr.Debugw("WorkflowRegistry: About to handle event",
+						"eventType", event.EventType,
+						"eventData", fmt.Sprintf("%T", event.Data))
+
 					err := w.handleWithMetrics(ctx, event.Event)
 					if err != nil {
-						w.lggr.Errorw("failed to handle event", "err", err, "type", event.EventType)
+						w.lggr.Errorw("WorkflowRegistry: failed to handle event",
+							"err", err,
+							"type", event.EventType,
+							"errorDetails", fmt.Sprintf("%+v", err))
+
+						// Log additional context about the event that failed
+						if event.EventType == WorkflowRegisteredEvent {
+							if payload, ok := event.Event.Data.(WorkflowRegisteredV1); ok {
+								w.lggr.Errorw("WorkflowRegistry: WorkflowRegisteredEvent failure details",
+									"workflowID", payload.WorkflowID.Hex(),
+									"workflowName", payload.WorkflowName,
+									"workflowOwner", hex.EncodeToString(payload.WorkflowOwner),
+									"binaryURL", payload.BinaryURL,
+									"configURL", payload.ConfigURL,
+									"secretsURL", payload.SecretsURL,
+									"status", payload.Status)
+							}
+						}
+					} else {
+						w.lggr.Debugw("WorkflowRegistry: Successfully handled event",
+							"eventType", event.EventType)
 					}
 				}
 			}
@@ -393,9 +417,19 @@ func (w *workflowRegistry) readRegistryEventsLoop(ctx context.Context, eventType
 }
 
 func (w *workflowRegistry) handleWithMetrics(ctx context.Context, event Event) error {
+	w.lggr.Debugw("WorkflowRegistry: handleWithMetrics starting",
+		"eventType", event.EventType,
+		"eventData", fmt.Sprintf("%T", event.Data))
+
 	start := time.Now()
 	err := w.handler.Handle(ctx, event)
 	totalDuration := time.Since(start)
+
+	w.lggr.Debugw("WorkflowRegistry: handleWithMetrics completed",
+		"eventType", event.EventType,
+		"duration", totalDuration,
+		"success", err == nil)
+
 	w.metrics.recordHandleDuration(ctx, totalDuration, string(event.EventType), err == nil)
 	return err
 }

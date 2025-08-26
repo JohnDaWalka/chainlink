@@ -31,9 +31,13 @@
                     "type": "string",
                     "minLength": 1
                 },
-                "contractEventName": {
-                    "type": "string",
-                    "minLength": 1
+                "contractEventNames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "minItems": 1
                 },
                 "contractReaderConfig": {
                     "type": "object",
@@ -45,7 +49,7 @@
                     "required": ["contracts"]
                 }
             },
-            "required": ["contractName", "contractAddress", "contractEventName", "contractReaderConfig"]
+            "required": ["contractName", "contractAddress", "contractEventNames", "contractReaderConfig"]
         },
         "output": {
             "type": "object",

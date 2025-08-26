@@ -487,6 +487,9 @@ func StartCLIEnvironment(
 ) (*creenv.SetupOutput, error) {
 	testLogger := framework.L
 
+	fmt.Printf("Starting CLI Environment with topology: %s, workflowTrigger: %s, withPluginsDockerImageFlag: %s\n", topologyFlag, workflowTrigger, withPluginsDockerImageFlag)
+	fmt.Printf("Config validation: NodeSets count: %d, Blockchains count: %d\n", len(in.NodeSets), len(in.Blockchains))
+
 	// make sure that either cron is enabled or withPluginsDockerImageFlag is set, but only if workflowTrigger is cron
 	if withExampleFlag && workflowTrigger == WorkflowTriggerCron && (in.ExtraCapabilities.CronCapabilityBinaryPath == "" && withPluginsDockerImageFlag == "") {
 		return nil, fmt.Errorf("either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag", os.Getenv("CTF_CONFIGS"))
@@ -496,6 +499,7 @@ func StartCLIEnvironment(
 	var capabilitiesAwareNodeSets []*cretypes.CapabilitiesAwareNodeSet
 
 	if topologyFlag == TopologySimplified {
+		fmt.Printf("Using simplified topology with %d nodesets\n", len(in.NodeSets))
 		if len(in.NodeSets) != 1 {
 			return nil, fmt.Errorf("expected 1 nodeset, got %d", len(in.NodeSets))
 		}
@@ -532,7 +536,9 @@ func StartCLIEnvironment(
 				GatewayNodeIndex:   0,
 			},
 		}
+		fmt.Printf("Simplified topology: Created %d capabilities aware node sets\n", len(capabilitiesAwareNodeSets))
 	} else {
+		fmt.Printf("Using full topology with %d nodesets\n", len(in.NodeSets))
 		if len(in.NodeSets) != 3 {
 			return nil, fmt.Errorf("expected 3 nodesets, got %d", len(in.NodeSets))
 		}
@@ -583,10 +589,12 @@ func StartCLIEnvironment(
 				GatewayNodeIndex:   0,
 			},
 		}
+		fmt.Printf("Full topology: Created %d capabilities aware node sets\n", len(capabilitiesAwareNodeSets))
 	}
 
 	// unset DockerFilePath and DockerContext as we cannot use them with existing images
 	if withPluginsDockerImageFlag != "" {
+		fmt.Printf("Using plugins Docker image: %s\n", withPluginsDockerImageFlag)
 		for setIdx := range capabilitiesAwareNodeSets {
 			for nodeIdx := range capabilitiesAwareNodeSets[setIdx].NodeSpecs {
 				capabilitiesAwareNodeSets[setIdx].NodeSpecs[nodeIdx].Node.Image = withPluginsDockerImageFlag
@@ -621,11 +629,13 @@ func StartCLIEnvironment(
 	if pathErr != nil {
 		return nil, fmt.Errorf("failed to get default container directory: %w", pathErr)
 	}
+	fmt.Printf("Container path: %s\n", containerPath)
 
 	homeChainIDInt, chainErr := strconv.Atoi(in.Blockchains[0].ChainID)
 	if chainErr != nil {
 		return nil, fmt.Errorf("failed to convert chain ID to int: %w", chainErr)
 	}
+	fmt.Printf("Home chain ID: %d\n", homeChainIDInt)
 
 	cronBinaryName := filepath.Base(in.ExtraCapabilities.CronCapabilityBinaryPath)
 	if withPluginsDockerImageFlag != "" {
@@ -690,6 +700,9 @@ func StartCLIEnvironment(
 		in.JD.CSAEncryptionKey = hex.EncodeToString(crypto.FromECDSA(key)[:32])
 		fmt.Printf("Generated new CSA encryption key for JD: %s\n", in.JD.CSAEncryptionKey)
 	}
+
+	fmt.Printf("Setting up test environment with %d capability factory functions and %d job spec factory functions\n", len(capabilityFactoryFns), len(jobSpecFactoryFunctions))
+
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets:            capabilitiesAwareNodeSets,
 		CapabilitiesContractFactoryFunctions: capabilityFactoryFns,
@@ -709,11 +722,15 @@ func StartCLIEnvironment(
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)
 	defer cancel()
+
+	fmt.Printf("Calling SetupTestEnvironment with timeout: %v\n", 10*time.Minute)
 	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(ctx, testLogger, cldlogger.NewSingleFileLogger(nil), universalSetupInput)
 	if setupErr != nil {
+		fmt.Printf("SetupTestEnvironment failed: %v\n", setupErr)
 		return nil, fmt.Errorf("failed to setup test environment: %w", setupErr)
 	}
 
+	fmt.Printf("SetupTestEnvironment completed successfully\n")
 	return universalSetupOutput, nil
 }
 

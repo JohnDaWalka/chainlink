@@ -138,54 +138,56 @@ func (l *logEventTrigger) listen() {
 			l.lggr.Infow("Closing trigger server for (waiting for waitGroup)", "ChainID", l.logEventConfig.ChainID,
 				"ContractName", l.reqConfig.ContractName,
 				"ContractAddress", l.reqConfig.ContractAddress,
-				"ContractEventName", l.reqConfig.ContractEventName)
+				"ContractEventNames", l.reqConfig.ContractEventNames)
 			return
 		case t := <-l.ticker.C:
-			l.lggr.Infow("Polling event logs from ContractReader using QueryKey at", "time", t,
-				"startBlockNum", l.startBlockNum,
-				"cursor", cursor)
-			if cursor != "" {
-				limitAndSort.Limit = query.CursorLimit(cursor, query.CursorFollowing, l.logEventConfig.QueryCount)
-			}
-			logs, err = l.contractReader.QueryKey(
-				ctx,
-				types.BoundContract{Name: l.reqConfig.ContractName, Address: l.reqConfig.ContractAddress},
-				query.KeyFilter{
-					Key: l.reqConfig.ContractEventName,
-					Expressions: []query.Expression{
-						query.Confidence(primitives.Finalized),
-						query.Block(strconv.FormatUint(l.startBlockNum, 10), primitives.Gte),
+			for _, c := range l.reqConfig.ContractEventNames {
+				l.lggr.Infow("Polling event logs from ContractReader using QueryKey at", "time", t,
+					"startBlockNum", l.startBlockNum,
+					"cursor", cursor)
+				if cursor != "" {
+					limitAndSort.Limit = query.CursorLimit(cursor, query.CursorFollowing, l.logEventConfig.QueryCount)
+				}
+				logs, err = l.contractReader.QueryKey(
+					ctx,
+					types.BoundContract{Name: l.reqConfig.ContractName, Address: l.reqConfig.ContractAddress},
+					query.KeyFilter{
+						Key: c,
+						Expressions: []query.Expression{
+							query.Confidence(primitives.Finalized),
+							query.Block(strconv.FormatUint(l.startBlockNum, 10), primitives.Gte),
+						},
 					},
-				},
-				limitAndSort,
-				&logData,
-			)
-			if err != nil {
-				l.lggr.Errorw("QueryKey failure", "err", err)
-				continue
-			}
-			// ChainReader QueryKey API provides logs including the cursor value and not
-			// after the cursor value. If the response only consists of the log corresponding
-			// to the cursor and no log after it, then we understand that there are no new
-			// logs
-			if len(logs) == 1 && logs[0].Cursor == cursor {
-				l.lggr.Infow("No new logs since", "cursor", cursor)
-				continue
-			}
-			for _, log := range logs {
-				if log.Cursor == cursor {
+					limitAndSort,
+					&logData,
+				)
+				if err != nil {
+					l.lggr.Errorw("QueryKey failure", "err", err)
 					continue
 				}
-				triggerResp := createTriggerResponse(log, l.logEventConfig.Version(ID))
-				l.ch <- triggerResp
-				cursor = log.Cursor
+				// ChainReader QueryKey API provides logs including the cursor value and not
+				// after the cursor value. If the response only consists of the log corresponding
+				// to the cursor and no log after it, then we understand that there are no new
+				// logs
+				if len(logs) == 1 && logs[0].Cursor == cursor {
+					l.lggr.Infow("No new logs since", "cursor", cursor)
+					continue
+				}
+				for _, log := range logs {
+					if log.Cursor == cursor {
+						continue
+					}
+					triggerResp := createTriggerResponse(log, l.logEventConfig.Version(ID), c)
+					l.ch <- triggerResp
+					cursor = log.Cursor
+				}
 			}
 		}
 	}
 }
 
 // Create log event trigger capability response
-func createTriggerResponse(log types.Sequence, version string) capabilities.TriggerResponse {
+func createTriggerResponse(log types.Sequence, version string, eventName string) capabilities.TriggerResponse {
 	dataAsValuesMap, err := values.WrapMap(log.Data)
 	if err != nil {
 		return capabilities.TriggerResponse{
@@ -199,6 +201,8 @@ func createTriggerResponse(log types.Sequence, version string) capabilities.Trig
 			Err: fmt.Errorf("error decoding log data as map[string]any: %w", err),
 		}
 	}
+
+	dataAsMap["contractEventName"] = eventName
 
 	wrappedPayload, err := values.WrapMap(&logeventcap.Output{
 		Cursor: log.Cursor,

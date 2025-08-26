@@ -11,8 +11,8 @@ type Config struct {
 	// ContractAddress corresponds to the JSON schema field "contractAddress".
 	ContractAddress string `json:"contractAddress" yaml:"contractAddress" mapstructure:"contractAddress"`
 
-	// ContractEventName corresponds to the JSON schema field "contractEventName".
-	ContractEventName string `json:"contractEventName" yaml:"contractEventName" mapstructure:"contractEventName"`
+	// ContractEventNames corresponds to the JSON schema field "contractEventNames".
+	ContractEventNames []string `json:"contractEventNames" yaml:"contractEventNames" mapstructure:"contractEventNames"`
 
 	// ContractName corresponds to the JSON schema field "contractName".
 	ContractName string `json:"contractName" yaml:"contractName" mapstructure:"contractName"`
@@ -56,8 +56,8 @@ func (j *Config) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["contractAddress"]; raw != nil && !ok {
 		return fmt.Errorf("field contractAddress in Config: required")
 	}
-	if _, ok := raw["contractEventName"]; raw != nil && !ok {
-		return fmt.Errorf("field contractEventName in Config: required")
+	if _, ok := raw["contractEventNames"]; raw != nil && !ok {
+		return fmt.Errorf("field contractEventNames in Config: required")
 	}
 	if _, ok := raw["contractName"]; raw != nil && !ok {
 		return fmt.Errorf("field contractName in Config: required")
@@ -73,8 +73,8 @@ func (j *Config) UnmarshalJSON(b []byte) error {
 	if len(plain.ContractAddress) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "contractAddress", 1)
 	}
-	if len(plain.ContractEventName) < 1 {
-		return fmt.Errorf("field %s length: must be >= %d", "contractEventName", 1)
+	if plain.ContractEventNames != nil && len(plain.ContractEventNames) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "contractEventNames", 1)
 	}
 	if len(plain.ContractName) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "contractName", 1)

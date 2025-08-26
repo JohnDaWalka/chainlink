@@ -46,23 +46,28 @@ func NewContractReaderTH(t *testing.T) *ContractReaderTH {
 
 	// Create new contract reader
 	reqConfig := logeventcap.Config{
-		ContractName:      "LogEmitter",
-		ContractAddress:   logEmitterAddress.Hex(),
-		ContractEventName: "Log1",
+		ContractName:       "LogEmitter",
+		ContractAddress:    logEmitterAddress.Hex(),
+		ContractEventNames: []string{"Log1"},
 	}
+
+	m := map[string]*evmtypes.ChainReaderDefinition{}
+
+	for _, c := range reqConfig.ContractEventNames {
+		m[c] = &evmtypes.ChainReaderDefinition{
+			ChainSpecificName: c,
+			ReadType:          evmtypes.Event,
+		}
+	}
+
 	contractReaderCfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			reqConfig.ContractName: {
 				ContractPollingFilter: evmtypes.ContractPollingFilter{
-					GenericEventNames: []string{reqConfig.ContractEventName},
+					GenericEventNames: reqConfig.ContractEventNames,
 				},
 				ContractABI: log_emitter.LogEmitterABI,
-				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					reqConfig.ContractEventName: {
-						ChainSpecificName: reqConfig.ContractEventName,
-						ReadType:          evmtypes.Event,
-					},
-				},
+				Configs:     m,
 			},
 		},
 	}
