@@ -21,7 +21,7 @@ type Registry struct {
 
 	metadataRegistry core.CapabilitiesRegistryMetadata
 	lggr             logger.Logger
-	mu sync.RWMutex
+	mu               sync.RWMutex
 }
 
 func (r *Registry) LocalNode(ctx context.Context) (capabilities.Node, error) {
@@ -98,4 +98,8 @@ func (t *TestMetadataRegistry) NodeByPeerID(ctx context.Context, _ p2ptypes.Peer
 
 func (t *TestMetadataRegistry) ConfigForCapability(ctx context.Context, capabilityID string, donID uint32) (capabilities.CapabilityConfiguration, error) {
 	return capabilities.CapabilityConfiguration{}, nil
+}
+
+func (t *TestMetadataRegistry) DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error) {
+	return capabilities.DON{}, []capabilities.Node{}, nil
 }
