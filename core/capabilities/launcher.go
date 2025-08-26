@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/streams"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 )
@@ -295,6 +296,12 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 			return fmt.Errorf("could not unmarshal capability config for id %s", cid)
 		}
 
+		methodConfig := capabilityConfig.CapabilityMethodConfig
+		if methodConfig != nil { // v2 capability - handle via CombinedClient
+			w.addRemoteCapabilityV2(ctx, capability.ID, methodConfig, myDON, remoteDON, state)
+			continue
+		}
+
 		switch capability.CapabilityType {
 		case capabilities.CapabilityTypeTrigger:
 			newTriggerFn := func(info capabilities.CapabilityInfo) (capabilityService, error) {
@@ -484,6 +491,12 @@ func (w *launcher) exposeCapabilities(ctx context.Context, myPeerID p2ptypes.Pee
 			return fmt.Errorf("could not unmarshal capability config for id %s", cid)
 		}
 
+		methodConfig := capabilityConfig.CapabilityMethodConfig
+		if methodConfig != nil { // v2 capability
+			w.exposeCapabilityV2(ctx, cid, methodConfig, myPeerID, don, idsToDONs)
+			continue
+		}
+
 		switch capability.CapabilityType {
 		case capabilities.CapabilityTypeTrigger:
 			newTriggerPublisher := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
@@ -637,4 +650,146 @@ func signersFor(don registrysyncer.DON, state *registrysyncer.LocalRegistry) ([]
 	}
 
 	return s, nil
+}
+
+// Add a V2 capability with multiple methods, using CombinedClient.
+func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, methodConfig map[string]capabilities.CapabilityMethodConfig, myDON registrysyncer.DON, remoteDON registrysyncer.DON, localRegistry *registrysyncer.LocalRegistry) error {
+	info, err := capabilities.NewRemoteCapabilityInfo(
+		capID,
+		capabilities.CapabilityTypeCombined,
+		"Remote Capability for "+capID,
+		&myDON.DON,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create remote capability info: %w", err)
+	}
+	cc := remote.NewCombinedClient(info)
+
+	for method, config := range methodConfig {
+		var receiver remotetypes.Receiver
+		if config.RemoteTriggerConfig != nil {
+			// TODO: add support for SignedReportAggregator
+			aggregator := aggregation.NewDefaultModeAggregator(uint32(remoteDON.F) + 1)
+			sub := remote.NewTriggerSubscriber(
+				config.RemoteTriggerConfig,
+				info,
+				remoteDON.DON,
+				myDON.DON,
+				w.dispatcher,
+				aggregator,
+				w.lggr,
+			)
+			receiver = sub
+			cc.AddTriggerSubscriber(method, sub)
+		} else if config.RemoteExecutableConfig != nil {
+			client := executable.NewClient( // TODO pass transmission config
+				info,
+				myDON.DON,
+				w.dispatcher,
+				config.RemoteExecutableConfig.RequestTimeout,
+				&transmission.TransmissionConfig{
+					Schedule:   transmission.EnumToString(config.RemoteExecutableConfig.TransmissionSchedule),
+					DeltaStage: config.RemoteExecutableConfig.DeltaStage,
+				},
+				w.lggr,
+			)
+			receiver = client
+			cc.AddExecutableClient(method, client)
+		} else {
+			return fmt.Errorf("no remote config found for method %s of capability %s", method, capID)
+		}
+		if err = w.dispatcher.SetReceiverForMethod(capID, myDON.ID, method, receiver); err != nil {
+			return fmt.Errorf("failed to register receiver: %w", err)
+		}
+	}
+
+	err = w.registry.Add(ctx, cc)
+	if err != nil {
+		return fmt.Errorf("failed to add capability to registry: %w", err)
+	}
+
+	return nil
+}
+
+func (w *launcher) exposeCapabilityV2(ctx context.Context, capID string, methodConfig map[string]capabilities.CapabilityMethodConfig, myPeerID p2ptypes.PeerID, myDON registrysyncer.DON, idsToDONs map[uint32]capabilities.DON) error {
+	info, err := capabilities.NewRemoteCapabilityInfo(
+		capID,
+		capabilities.CapabilityTypeCombined,
+		"Remote Capability for "+capID,
+		&myDON.DON,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create remote capability info: %w", err)
+	}
+	underlying, err := w.registry.Get(ctx, capID)
+	if err != nil {
+		return fmt.Errorf("failed to get capability from registry: %w", err)
+	}
+	for method, config := range methodConfig {
+		var receiver remotetypes.ReceiverService
+		if config.RemoteTriggerConfig != nil {
+			underlyingTriggerCapability, ok := (underlying).(capabilities.TriggerCapability)
+			if !ok {
+				return errors.New("capability does not implement TriggerCapability")
+			}
+			receiver = remote.NewTriggerPublisher(
+				config.RemoteTriggerConfig,
+				underlyingTriggerCapability,
+				info,
+				myDON.DON,
+				idsToDONs,
+				w.dispatcher,
+				w.lggr,
+			)
+		} else if config.RemoteExecutableConfig != nil {
+			underlyingExecutableCapability, ok := (underlying).(capabilities.ExecutableCapability)
+			if !ok {
+				return errors.New("capability does not implement ExecutableCapability")
+			}
+			var requestHasher remotetypes.MessageHasher
+			switch config.RemoteExecutableConfig.RequestHasherType {
+			case capabilities.RequestHasherType_Simple:
+				requestHasher = executable.NewSimpleHasher()
+			case capabilities.RequestHasherType_WriteReportExcludeSignatures:
+				requestHasher = executable.NewWriteReportExcludeSignaturesHasher()
+			default:
+				requestHasher = executable.NewSimpleHasher()
+			}
+			receiver = executable.NewServer(
+				config.RemoteExecutableConfig,
+				myPeerID,
+				underlyingExecutableCapability,
+				info,
+				myDON.DON,
+				idsToDONs,
+				w.dispatcher,
+				config.RemoteExecutableConfig.RequestTimeout,
+				int(config.RemoteExecutableConfig.ServerMaxParallelRequests),
+				requestHasher,
+				w.lggr,
+			)
+		} else {
+			return fmt.Errorf("no remote config found for method %s of capability %s", method, capID)
+		}
+
+		w.lggr.Debugw("Enabling external access for capability", "id", capID, "donID", myDON.ID)
+		err := w.dispatcher.SetReceiverForMethod(capID, myDON.ID, method, receiver)
+		if errors.Is(err, remote.ErrReceiverExists) {
+			// If a receiver already exists, let's log the error for debug purposes, but
+			// otherwise short-circuit here. We've handled this capability in a previous iteration.
+			// TODO what if config changed?
+			w.lggr.Debugf("receiver already exists for cap ID %s and don ID %d: %s", capID, myDON.ID, err)
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("failed to set receiver: %w", err)
+		}
+
+		err = receiver.Start(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to start receiver: %w", err)
+		}
+
+		w.subServices = append(w.subServices, receiver)
+	}
+	return nil
 }

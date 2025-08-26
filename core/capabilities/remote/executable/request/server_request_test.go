@@ -249,6 +249,12 @@ func (t *testDispatcher) SetReceiver(capabilityID string, donID uint32, receiver
 
 func (t *testDispatcher) RemoveReceiver(capabilityID string, donID uint32) {}
 
+func (t *testDispatcher) SetReceiverForMethod(capabilityID string, donID uint32, method string, receiver types.Receiver) error {
+	return nil
+}
+
+func (t *testDispatcher) RemoveReceiverForMethod(capabilityID string, donID uint32, method string) {}
+
 func (t *testDispatcher) Send(peerID p2ptypes.PeerID, msgBody *types.MessageBody) error {
 	t.msgs = append(t.msgs, msgBody)
 	return nil
