@@ -27,6 +27,7 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 )
@@ -104,29 +105,6 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			Nops:         []keystone_changeset.NOP{nop},
 			Capabilities: capabilities,
 		})
-	}
-
-	var transmissionSchedule []int
-
-	for _, metaDon := range input.Topology.DonsMetadata {
-		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
-			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
-				Key:   crenode.NodeTypeKey,
-				Value: cre.WorkerNode,
-			}, crenode.EqualLabels)
-
-			if workerNodesErr != nil {
-				return errors.Wrap(workerNodesErr, "failed to find worker nodes")
-			}
-
-			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
-			transmissionSchedule = []int{len(workerNodes)}
-			break
-		}
-	}
-
-	if len(transmissionSchedule) == 0 {
-		return errors.New("no OCR3-capable DON found in the topology")
 	}
 
 	_, err := operations.ExecuteSequence(
@@ -334,31 +312,12 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 }
 
 // values supplied by Alexandr Yepishev as the expected values for OCR3 config
-func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig, error) {
-	var transmissionSchedule []int
-
-	for _, metaDon := range topology.DonsMetadata {
-		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
-			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
-				Key:   crenode.NodeTypeKey,
-				Value: cre.WorkerNode,
-			}, crenode.EqualLabels)
-
-			if workerNodesErr != nil {
-				return nil, errors.Wrap(workerNodesErr, "failed to find worker nodes")
-			}
-
-			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
-			transmissionSchedule = []int{len(workerNodes)}
-			break
-		}
-	}
-
-	if len(transmissionSchedule) == 0 {
-		return nil, errors.New("no OCR3-capable DON found in the topology")
-	}
-
+func DefaultOCR3Config(topology *types.DonMetadata, flag string) (*keystone_changeset.OracleConfig, error) {
 	// values supplied by Alexandr Yepishev as the expected values for OCR3 config
+	don, err := flags.OneDonMetadataWithFlag(topology.DonsMetadata, flag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get DON for ocr3 config: %w", err)
+	}
 	oracleConfig := &keystone_changeset.OracleConfig{
 		DeltaProgressMillis:               5000,
 		DeltaResendMillis:                 5000,
@@ -368,7 +327,7 @@ func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig
 		DeltaCertifiedCommitRequestMillis: 1000,
 		DeltaStageMillis:                  30000,
 		MaxRoundsPerEpoch:                 10,
-		TransmissionSchedule:              transmissionSchedule,
+		TransmissionSchedule:              []int{len(don.NodesMetadata)},
 		MaxDurationQueryMillis:            1000,
 		MaxDurationObservationMillis:      1000,
 		MaxDurationShouldAcceptMillis:     1000,

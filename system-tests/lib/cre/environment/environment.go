@@ -690,7 +690,7 @@ func SetupTestEnvironment(
 	if input.OCR3Config != nil {
 		configureKeystoneInput.OCR3Config = *input.OCR3Config
 	} else {
-		ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
+		ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology, cre.ConsensusCapability)
 		if ocr3ConfigErr != nil {
 			return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
 		}
@@ -700,7 +700,10 @@ func SetupTestEnvironment(
 	if input.DONTimeConfig != nil {
 		configureKeystoneInput.DONTimeConfig = *input.DONTimeConfig
 	} else {
-		donTimeConfig, donTimeConfigErr := libcontracts.DefaultOCR3Config(topology)
+		// Determine the number of nodes in the consensus capability
+		// TODO: what flag to use here
+		var flag string
+		donTimeConfig, donTimeConfigErr := libcontracts.DefaultOCR3Config(topology, flag)
 		donTimeConfig.DeltaRoundMillis = 0 // Fastest rounds possible
 		if donTimeConfigErr != nil {
 			return nil, pkgerrors.Wrap(donTimeConfigErr, "failed to generate default DON Time config")
@@ -708,18 +711,24 @@ func SetupTestEnvironment(
 		configureKeystoneInput.DONTimeConfig = *donTimeConfig
 	}
 
-	ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
+	// Determine the number of nodes in the consensus capability
+	ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology, cre.VaultCapability)
 	if ocr3ConfigErr != nil {
 		return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
 	}
 	configureKeystoneInput.VaultOCR3Config = *ocr3Config
 
-	defaultOcr3Config, defaultOcr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
-	if defaultOcr3ConfigErr != nil {
-		return nil, pkgerrors.Wrap(defaultOcr3ConfigErr, "failed to generate default OCR3 config for EVM")
+	evmOcr3Config, evmOcr3ConfigErr := libcontracts.DefaultOCR3Config(topology, cre.EVMCapability)
+	if evmOcr3Config != nil {
+		return nil, pkgerrors.Wrap(evmOcr3ConfigErr, "failed to generate default OCR3 config for EVM")
 	}
-	configureKeystoneInput.EVMOCR3Config = *defaultOcr3Config
-	configureKeystoneInput.ConsensusV2OCR3Config = *defaultOcr3Config
+	configureKeystoneInput.EVMOCR3Config = *evmOcr3Config
+
+	consensusV2Ocr3Config, consensusV2Ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology, cre.ConsensusCapabilityV2)
+	if consensusV2Ocr3Config != nil {
+		return nil, pkgerrors.Wrap(consensusV2Ocr3ConfigErr, "failed to generate default OCR3 config for consensus v2")
+	}
+	configureKeystoneInput.ConsensusV2OCR3Config = *consensusV2Ocr3Config
 
 	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFn, 0)
 	for _, capability := range input.Capabilities {
