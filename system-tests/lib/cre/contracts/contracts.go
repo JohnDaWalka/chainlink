@@ -27,7 +27,6 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/types"
 
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 )
@@ -312,7 +311,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 }
 
 // values supplied by Alexandr Yepishev as the expected values for OCR3 config
-func DefaultOCR3Config(topology *types.DonMetadata, flag string) (*keystone_changeset.OracleConfig, error) {
+func DefaultOCR3Config(topology *cre.Topology, flag string) (*keystone_changeset.OracleConfig, error) {
 	// values supplied by Alexandr Yepishev as the expected values for OCR3 config
 	don, err := flags.OneDonMetadataWithFlag(topology.DonsMetadata, flag)
 	if err != nil {
