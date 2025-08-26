@@ -774,9 +774,6 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 		if err := healthChecker.Register(s); err != nil {
 			return nil, err
 		}
-		if err := beholderHealthChecker.Register(s); err != nil {
-			return nil, err
-		}
 	}
 
 	return &ChainlinkApplication{
