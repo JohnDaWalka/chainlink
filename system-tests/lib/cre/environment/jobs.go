@@ -21,7 +21,7 @@ import (
 
 func StartJD(lggr zerolog.Logger, nixShell *nix.Shell, jdInput jd.Input, infraType libtypes.InfraType) (*jd.Output, error) {
 	startTime := time.Now()
-	lggr.Info().Msg("Starting Jod Distributor")
+	lggr.Info().Msg("Starting Job Distributor")
 
 	var jdOutput *jd.Output
 	if infraType == libtypes.CRIB {
@@ -73,7 +73,6 @@ func SetupJobs(
 		if startJDErr != nil {
 			return pkgerrors.Wrap(startJDErr, "failed to start Job Distributor")
 		}
-
 		return nil
 	})
 
@@ -85,7 +84,6 @@ func SetupJobs(
 		if startDonsErr != nil {
 			return pkgerrors.Wrap(startDonsErr, "failed to start DONs")
 		}
-
 		return nil
 	})
 

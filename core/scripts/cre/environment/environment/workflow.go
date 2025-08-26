@@ -151,14 +151,14 @@ func compileCopyAndRegisterWorkflow(ctx context.Context, workflowFilePathFlag, w
 		fmt.Printf("\n✅ Workflow config file copied to Docker container\n\n")
 	}
 
-	fmt.Printf("\n⚙️ Deleting all workflows from the workflow registry\n\n")
-
-	deleteErr := creworkflow.DeleteAllWithContract(ctx, sethClient, common.HexToAddress(workflowRegistryAddressFlag))
-	if deleteErr != nil {
-		return errors.Wrapf(deleteErr, "❌ failed to delete all workflows from the registry %s", workflowRegistryAddressFlag)
-	}
-
-	fmt.Printf("\n✅ All workflows deleted from the workflow registry\n\n")
+	//fmt.Printf("\n⚙️ Deleting all workflows from the workflow registry\n\n")
+	//
+	//deleteErr := creworkflow.DeleteAllWithContract(ctx, sethClient, common.HexToAddress(workflowRegistryAddressFlag))
+	//if deleteErr != nil {
+	//	return errors.Wrapf(deleteErr, "❌ failed to delete all workflows from the registry %s", workflowRegistryAddressFlag)
+	//}
+	//
+	//fmt.Printf("\n✅ All workflows deleted from the workflow registry\n\n")
 	fmt.Printf("\n⚙️ Registering workflow %s with the workflow registry\n\n", workflowNameFlag)
 
 	registerErr := creworkflow.RegisterWithContract(ctx, sethClient, common.HexToAddress(workflowRegistryAddressFlag), 1, workflowNameFlag, "file://"+compressedWorkflowWasmPath, configPath, nil, &containerTargetDirFlag)

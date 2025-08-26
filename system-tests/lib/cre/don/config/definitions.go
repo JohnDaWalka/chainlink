@@ -109,7 +109,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData 
 	[EVM.Workflow]
 	FromAddress = '%s'
 	ForwarderAddress = '%s'
-	GasLimitDefault = 400_000
+	GasLimitDefault = 800_000
 	TxAcceptanceState = 2
 	PollPeriod = '2s'
 	AcceptanceTimeout = '30s'

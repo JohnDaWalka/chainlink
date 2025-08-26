@@ -23,29 +23,43 @@
         "config": {
             "type": "object",
             "properties": {
-                "contractName": {
-                    "type": "string",
-                    "minLength": 1
-                },
-                "contractAddress": {
-                    "type": "string",
-                    "minLength": 1
-                },
-                "contractEventName": {
-                    "type": "string",
-                    "minLength": 1
-                },
-                "contractReaderConfig": {
-                    "type": "object",
-                    "properties": {
-                        "contracts": {
-                            "type": "object"
-                        }
+                "contracts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "contractName": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "contractAddress": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "contractEventNames": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "minItems": 1
+                            },
+                            "contractReaderConfig": {
+                                "type": "object",
+                                "properties": {
+                                    "contracts": {
+                                        "type": "object"
+                                    }
+                                },
+                                "required": ["contracts"]
+                            }
+                        },
+                        "required": ["contractName", "contractAddress", "contractEventNames", "contractReaderConfig"]
                     },
-                    "required": ["contracts"]
+                    "minItems": 1
                 }
             },
-            "required": ["contractName", "contractAddress", "contractEventName", "contractReaderConfig"]
+            "required": ["contracts"]
         },
         "output": {
             "type": "object",

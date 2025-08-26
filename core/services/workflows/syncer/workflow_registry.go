@@ -396,6 +396,7 @@ func (w *workflowRegistry) handleWithMetrics(ctx context.Context, event Event) e
 	start := time.Now()
 	err := w.handler.Handle(ctx, event)
 	totalDuration := time.Since(start)
+
 	w.metrics.recordHandleDuration(ctx, totalDuration, string(event.EventType), err == nil)
 	return err
 }
