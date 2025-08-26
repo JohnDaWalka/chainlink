@@ -61,17 +61,59 @@ func BoostrapDon2DonPeering(peeringData types.CapabilitiesPeeringData) string {
 	)
 }
 
-// could add multichain with something like this:
-//
-//	type EVMChain struct {
-//		ChainID uint64
-//		HTTPRPC string
-//		WSRPC   string
-//	}
-//
-// so that we are future-proof (for bootstrap too!)
-// we'd need to have capabilitiesRegistryChainID too
-func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData types.CapabilitiesPeeringData, chainID uint64, capabilitiesRegistryAddress common.Address, httpRPC, wsRPC string) string {
+type WorkerEVMInput struct {
+	Name                 string
+	ChainID              uint64
+	ChainSelector        uint64
+	HTTPRPC              string
+	WSRPC                string
+	FromAddress          common.Address
+	ForwarderAddress     string
+	HasForwarderContract bool
+}
+
+func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, peeringData types.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*WorkerEVMInput) string {
+	evmChainsConfig := ""
+	for _, chain := range chains {
+		evmChainsConfig += fmt.Sprintf(`
+	[[EVM]]
+	ChainID = '%d'
+	AutoCreateKey = false
+	# reduce workflow registry sync time to minimum to speed up tests & local environment
+	FinalityDepth = 1
+	LogPollInterval = '5s'
+
+	[[EVM.Nodes]]
+	Name = '%s'
+	WSURL = '%s'
+	HTTPURL = '%s'
+`,
+			chain.ChainID,
+			chain.Name,
+			chain.WSRPC,
+			chain.HTTPRPC,
+		)
+
+		if chain.HasForwarderContract {
+			evmChainsConfig += fmt.Sprintf(`
+
+	[EVM.Workflow]
+	FromAddress = '%s'
+	ForwarderAddress = '%s'
+	GasLimitDefault = 800_000
+	TxAcceptanceState = 2
+	PollPeriod = '2s'
+	AcceptanceTimeout = '30s'
+
+	[EVM.Transactions]
+	ForwardersEnabled = true
+	`,
+				chain.FromAddress,
+				chain.ForwarderAddress,
+			)
+		}
+	}
+
 	return fmt.Sprintf(`
 	[Feature]
 	LogPoller = true

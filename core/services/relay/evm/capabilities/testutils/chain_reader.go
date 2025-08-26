@@ -46,25 +46,37 @@ func NewContractReaderTH(t *testing.T) *ContractReaderTH {
 
 	// Create new contract reader
 	reqConfig := logeventcap.Config{
-		ContractName:      "LogEmitter",
-		ContractAddress:   logEmitterAddress.Hex(),
-		ContractEventName: "Log1",
-	}
-	contractReaderCfg := evmtypes.ChainReaderConfig{
-		Contracts: map[string]evmtypes.ChainContractReader{
-			reqConfig.ContractName: {
-				ContractPollingFilter: evmtypes.ContractPollingFilter{
-					GenericEventNames: []string{reqConfig.ContractEventName},
-				},
-				ContractABI: log_emitter.LogEmitterABI,
-				Configs: map[string]*evmtypes.ChainReaderDefinition{
-					reqConfig.ContractEventName: {
-						ChainSpecificName: reqConfig.ContractEventName,
-						ReadType:          evmtypes.Event,
-					},
-				},
+		Contracts: []logeventcap.ConfigContractsElem{
+			{
+				ContractName:       "LogEmitter",
+				ContractAddress:    logEmitterAddress.Hex(),
+				ContractEventNames: []string{"Log1"},
 			},
 		},
+	}
+
+	contractReaderCfg := evmtypes.ChainReaderConfig{
+		Contracts: map[string]evmtypes.ChainContractReader{},
+	}
+
+	// Loop through all contracts in the config
+	for _, contract := range reqConfig.Contracts {
+		chainReaderDefs := map[string]*evmtypes.ChainReaderDefinition{}
+
+		for _, eventName := range contract.ContractEventNames {
+			chainReaderDefs[eventName] = &evmtypes.ChainReaderDefinition{
+				ChainSpecificName: eventName,
+				ReadType:          evmtypes.Event,
+			}
+		}
+
+		contractReaderCfg.Contracts[contract.ContractName] = evmtypes.ChainContractReader{
+			ContractPollingFilter: evmtypes.ContractPollingFilter{
+				GenericEventNames: contract.ContractEventNames,
+			},
+			ContractABI: log_emitter.LogEmitterABI,
+			Configs:     chainReaderDefs,
+		}
 	}
 
 	// Encode contractReaderConfig as JSON and decode it into a map[string]any for
@@ -73,7 +85,7 @@ func NewContractReaderTH(t *testing.T) *ContractReaderTH {
 	// and be chain agnostic
 	contractReaderCfgBytes, err := json.Marshal(contractReaderCfg)
 	require.NoError(t, err)
-	var contractReaderCfgMap logeventcap.ConfigContractReaderConfig
+	var contractReaderCfgMap logeventcap.ConfigContractsElemContractReaderConfig
 	err = json.Unmarshal(contractReaderCfgBytes, &contractReaderCfgMap)
 	require.NoError(t, err)
 	// Encode the config map as JSON to specify in the expected call in mocked object
@@ -82,7 +94,10 @@ func NewContractReaderTH(t *testing.T) *ContractReaderTH {
 	contractReaderCfgBytes, err = json.Marshal(contractReaderCfgMap)
 	require.NoError(t, err)
 
-	reqConfig.ContractReaderConfig = contractReaderCfgMap
+	// Set the contract reader config for each contract
+	for i := range reqConfig.Contracts {
+		reqConfig.Contracts[i].ContractReaderConfig = contractReaderCfgMap
+	}
 
 	config, err := commonvalues.WrapMap(reqConfig)
 	require.NoError(t, err)
