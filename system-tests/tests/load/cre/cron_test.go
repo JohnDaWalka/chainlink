@@ -2,6 +2,7 @@ package cre
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -25,19 +26,27 @@ func TestCron(t *testing.T) {
 	// Connect to the cluster
 	mockClient := mockcapability.NewMockCapabilityController(framework.L)
 
-	err := mockClient.ConnectAll([]string{"192.168.48.23:7777"}, true, false)
+	err := mockClient.ConnectAll([]string{"192.168.48.19:7777"}, true, false)
 	require.NoError(t, err, "connecting with mock client failed")
 
 	// Use WASP to trigger registrations to the cron-trigger
 
 	// We want to see n responses back in order to consider it sucessful
 	// For example if we can sustain it for 5m then we consider it successful
+	metadata := &pb2.Metadata{
+		WorkflowID: "load-test",
+	}
+	payload, err := anypb.New(&cron.Config{Schedule: "*/30 * * * * *"})
+	require.NoError(t, err, "creating payload failed")
 	executionTime := time.Minute * 1
 	vu := &VirtualUser{
 		VUControl:      wasp.NewVUControl(),
 		mockController: mockClient,
 		triggerID:      "cron-trigger@1.0.0",
 		executionTime:  executionTime,
+		payload:        payload,
+		metadata:       metadata,
+		closeCh:        make(chan struct{}),
 	}
 	lokiURL := "http://localhost:3030/loki/api/v1/push"
 	lokiToken := ""
@@ -48,13 +57,9 @@ func TestCron(t *testing.T) {
 		LoadType:    wasp.VU,
 		VU:          vu,
 		Schedule: wasp.Combine(
-			wasp.Plain(300, executionTime),
-			wasp.Plain(10, executionTime),
-			wasp.Plain(30, executionTime),
-			wasp.Plain(10, executionTime),
-			// wasp.Plain(100, executionTime),
-			// wasp.Plain(300, executionTime),
-			// wasp.Plain(2000, executionTime),
+			wasp.Plain(3000, executionTime),
+			wasp.Plain(1, executionTime),
+			wasp.Plain(5000, executionTime),
 		),
 		LokiConfig: wasp.NewLokiConfig(&lokiURL, &lokiTenant, &lokiToken, &lokiToken),
 	})
@@ -78,34 +83,37 @@ type VirtualUser struct {
 	executionTime         time.Duration
 	triggerRegistrationID string
 	triggerCh             []chan *capabilities.TriggerResponse
+	metadata              *pb2.Metadata
+	payload               *anypb.Any
+	closeCh               chan struct{}
 }
 
 func (v *VirtualUser) Clone(l *wasp.Generator) wasp.VirtualUser {
 	return &VirtualUser{
-		VUControl:             wasp.NewVUControl(),
-		mockController:        v.mockController,
-		triggerID:             v.triggerID,
-		executionTime:         v.executionTime,
-		triggerRegistrationID: uuid.New().String(),
+		VUControl:      wasp.NewVUControl(),
+		mockController: v.mockController,
+		triggerID:      v.triggerID,
+		executionTime:  v.executionTime,
+		payload:        v.payload,
+		metadata:       v.metadata,
+		closeCh:        make(chan struct{}),
 	}
 }
 
 func (v *VirtualUser) Setup(l *wasp.Generator) error {
 	v.triggerRegistrationID = uuid.New().String()
+	v.closeCh = make(chan struct{})
+	chList, err := v.mockController.RegisterTrigger(context.Background(), v.triggerID, v.metadata, nil, v.payload, "", v.triggerRegistrationID)
+	if err != nil {
+		return err
+	}
+	v.triggerCh = chList
 	return nil
 }
 
 func (v *VirtualUser) Teardown(l *wasp.Generator) error {
-	metadata := &pb2.Metadata{
-		WorkflowID: "load-test",
-	}
-	payload, err := anypb.New(&cron.Config{Schedule: "*/30 * * * * *"})
-	v.mockController.UnregisterTrigger(context.Background(), v.triggerID, metadata, nil, payload, "", v.triggerRegistrationID)
-
-	for _, ch := range v.triggerCh {
-		close(ch)
-	}
-	return err
+	v.closeCh <- struct{}{}
+	return v.mockController.UnregisterTrigger(context.Background(), v.triggerID, v.metadata, nil, v.payload, "", v.triggerRegistrationID)
 }
 
 func (v *VirtualUser) Call(l *wasp.Generator) {
@@ -114,46 +122,39 @@ func (v *VirtualUser) Call(l *wasp.Generator) {
 	confirmedCalls := make([]int, len(v.mockController.Nodes))
 	lastTicks := make([]time.Time, len(v.mockController.Nodes))
 
-	metadata := &pb2.Metadata{
-		WorkflowID: "load-test",
-	}
-	payload, err := anypb.New(&cron.Config{Schedule: "*/30 * * * * *"})
-
-	chList, err := v.mockController.RegisterTrigger(context.Background(), v.triggerID, metadata, nil, payload, "", v.triggerRegistrationID)
-	if err != nil {
-		l.Responses.Err(&resty.Response{}, "virtual-user-call-generation", err)
-	}
-	v.triggerCh = chList
-
 	for i := range lastTicks {
 		lastTicks[i] = time.Now()
 	}
 
 	wg := sync.WaitGroup{}
-	wg.Add(len(chList))
+	wg.Add(len(v.triggerCh))
 
-	for i, ch := range chList {
+	for i, ch := range v.triggerCh {
 		go func(i int) {
 			defer wg.Done()
 			for {
-				msg, ok := <-ch
-				if !ok {
-					// Channel is closed, exit the goroutine
-					l.Responses.Err(&resty.Response{}, "virtual-user-call-generation", fmt.Errorf("channel %d closed", i))
+				select {
+				case msg, ok := <-ch:
+					if !ok {
+						l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", errors.New("channel closed"))
+						return
+					}
+
+					lastTickDiff := time.Since(lastTicks[i])
+					lastTicks[i] = time.Now()
+					if msg.Err != nil {
+						l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", msg.Err)
+						return
+					}
+					confirmedCalls[i]++
+					l.ResponsesChan <- &wasp.Response{Data: v, Duration: lastTickDiff}
+					if confirmedCalls[i] == expectedCalls {
+						return
+					}
+				case <-v.closeCh:
 					return
 				}
 
-				lastTickDiff := time.Since(lastTicks[i])
-				lastTicks[i] = time.Now()
-				if msg.Err != nil {
-					l.Responses.Err(&resty.Response{}, "virtual-user-call-generation", err)
-					return
-				}
-				confirmedCalls[i]++
-				l.ResponsesChan <- &wasp.Response{Data: v, Duration: lastTickDiff}
-				if confirmedCalls[i] == expectedCalls {
-					return
-				}
 			}
 		}(i)
 	}
