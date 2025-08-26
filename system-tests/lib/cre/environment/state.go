@@ -66,7 +66,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 	addressBook := cldf.NewMemoryAddressBookFromMap(envArtifact.AddressBook)
 	datastore := datastore.NewMemoryDataStore()
 	for _, addrRef := range envArtifact.AddressRefs {
-		fmt.Println("addrRef", addrRef)
 		addErr := datastore.AddressRefStore.Add(addrRef)
 		if addErr != nil {
 			return nil, nil, errors.Wrapf(addErr, "failed to add address ref to datastore %v", addrRef)
@@ -84,6 +83,19 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 
 		for id := range envArtifact.Nodes[don.DonName].Nodes {
 			allNodeIDs = append(allNodeIDs, id)
+		}
+
+		nodeBundleIDs := make(map[string]string)
+		for _, nodes := range envArtifact.Topology.DonsWithMetadata[idx].NodesMetadata {
+			ocr, err := crenode.FindLabelValue(nodes, crenode.NodeOCR2KeyBundleIDKey)
+			if err != nil {
+				continue
+			}
+			id, err := crenode.FindLabelValue(nodes, crenode.NodeIDKey)
+			if err != nil {
+				continue
+			}
+			nodeBundleIDs[id] = ocr
 		}
 
 		bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.DonsWithMetadata[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
@@ -110,10 +122,18 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		if !ok {
 			return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", don.DonName)
 		}
-
 		registeredDon, donErr := deployment_devenv.NewRegisteredDON(ctx, nodeInfo, *jd)
 		if donErr != nil {
 			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
+		}
+
+		// populate with bundleIDs
+		for idx, node := range registeredDon.Nodes {
+			bundleID, ok := nodeBundleIDs[node.NodeID]
+			if !ok {
+				continue
+			}
+			registeredDon.Nodes[idx].Ocr2KeyBundleID = bundleID
 		}
 
 		envArtifact.Topology.DonsWithMetadata[idx].DON = registeredDon

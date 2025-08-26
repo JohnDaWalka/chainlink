@@ -3,8 +3,10 @@ package cre
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"strings"
 	"testing"
@@ -12,11 +14,12 @@ import (
 	texttmpl "text/template"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain"
+	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
@@ -34,8 +37,11 @@ import (
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/testdata/testspecs"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,26 +77,6 @@ func Test_CRE_WorkflowDon_WriteSolana(t *testing.T) {
 	executeSecureMintTest(t, in, envArtifact)
 }
 
-type setup struct {
-	Selector           uint64
-	ForwarderProgramID solana.PublicKey
-	ForwarderState     solana.PublicKey
-	CacheProgramID     solana.PublicKey
-	CacheState         solana.PublicKey
-
-	FeedID       string
-	Descriptions [][32]byte
-	WFOwner      [20]byte
-	WFName       string
-}
-
-var (
-	feedID        = "0x018e16c39e00032000000"
-	wFName        = "testwf"
-	wFDescription = "securemint test"
-	wFOwner       = [20]byte{1, 2, 3}
-)
-
 func executeSecureMintTest(t *testing.T, in *envconfig.Config, envArtifact environment.EnvArtifact) {
 	cldLogger := cldlogger.NewSingleFileLogger(t)
 
@@ -114,7 +100,6 @@ func executeSecureMintTest(t *testing.T, in *envconfig.Config, envArtifact envir
 		if w.BlockchainOutput.Type != blockchain.FamilySolana {
 			continue
 		}
-
 		s.ForwarderProgramID = mustGetContract(t, ds, w.SolChain.ChainSelector, ks_sol.ForwarderContract)
 		s.ForwarderState = mustGetContract(t, ds, w.SolChain.ChainSelector, ks_sol.ForwarderState)
 		// we assume we always have just 1 solana chain
@@ -124,16 +109,43 @@ func executeSecureMintTest(t *testing.T, in *envconfig.Config, envArtifact envir
 	require.False(t, s.ForwarderProgramID.IsZero(), "failed to receive forwarder program id from blockchains output")
 	s.Selector = solChain.SolChain.ChainSelector
 
+	// configure contracts
 	framework.L.Info().Msg("Deploy and configure data-feeds cache programs...")
 	deployAndConfigureCache(t, &s, *fullCldEnvOutput.Environment, solChain)
 	framework.L.Info().Msg("Successfully deployed and configured")
 
+	// configure workflow
 	framework.L.Info().Msg("Generate and propose secure mint job...")
 	jobSpec := createSecureMintWorkflowJobSpec(t, &s, solChain)
 	proposeSecureMintJob(t, fullCldEnvOutput.Environment.Offchain, jobSpec)
 	framework.L.Info().Msgf("Secure mint job is succesfully posted. Job spec:\n %v", jobSpec)
-	createFakeTrigger(t, fullCldEnvOutput.Environment.Offchain, fullCldEnvOutput.DonTopology)
+
+	// trigger workflow
+	trigger := createFakeTrigger(t, &s, fullCldEnvOutput.DonTopology)
+	trigger.Call(t)
+
+	// wait for price update
 }
+
+type setup struct {
+	Selector           uint64
+	ForwarderProgramID solana.PublicKey
+	ForwarderState     solana.PublicKey
+	CacheProgramID     solana.PublicKey
+	CacheState         solana.PublicKey
+
+	FeedID       string
+	Descriptions [][32]byte
+	WFOwner      [20]byte
+	WFName       string
+}
+
+var (
+	feedID        = "0x018e16c39e00032000000"
+	wFName        = "testwf"
+	wFDescription = "securemint test"
+	wFOwner       = [20]byte{1, 2, 3}
+)
 
 func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solChain *cre.WrappedBlockchainOutput) {
 	var d [32]byte
@@ -277,16 +289,18 @@ targets:
 `
 
 func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.WrappedBlockchainOutput) string {
-	//tmpl, err := template.New("secureMintWorkflow").Parse(secureMintWorkflowTemplate)
 	tmpl, err := texttmpl.New("secureMintWorkflow").Parse(secureMintWorkflowTemplate)
 	require.NoError(t, err)
+
 	chainID, err := solChain.SolClient.GetGenesisHash(context.Background())
 	require.NoError(t, err, "failed to receive genesis hash")
+
 	deriveCapabilityID := writetarget.GenerateDeriveRemainingName(chainID.String())
 	writeCapabilityID := writetarget.GenerateWriteTargetName(chainID.String())
+	owner := hex.EncodeToString(s.WFOwner[:])
 	data := map[string]any{
 		"WorkflowName":        s.WFName,
-		"WorkflowOwner":       common.BytesToAddress(s.WFOwner[:]).Hex(),
+		"WorkflowOwner":       "0x" + owner,
 		"ChainSelector":       s.Selector,
 		"DFCacheAddr":         s.CacheProgramID.String(),
 		"CacheStateID":        s.CacheState.String(),
@@ -331,12 +345,99 @@ func proposeSecureMintJob(t *testing.T, offchain offchain.Client, jobSpec string
 	require.NoError(t, err, "failed to propose jobs")
 }
 
-func createFakeTrigger(t *testing.T, offchain offchain.Client, dons *cre.DonTopology) {
+type fakeTrigger struct {
+	triggerCap *mock_capability.Controller
+	setup      *setup
+	triggerID  string
+	keys       []ocr2key.KeyBundle
+}
+
+func (f *fakeTrigger) Call(t *testing.T) {
+	outputs, err := f.createReport()
+	require.NoError(t, err, "failed to create fake report")
+
+	outputsBytes, err := mock_capability.MapToBytes(outputs)
+	require.NoError(t, err, "failed to convert map to bytes")
+
+	message := pb.SendTriggerEventRequest{
+		TriggerID: f.triggerID,
+		ID:        "fake_trigger",
+		Outputs:   outputsBytes,
+	}
+
+	err = f.triggerCap.SendTrigger(t.Context(), &message)
+	require.NoError(t, err, "failed to send trigger to workflow")
+}
+
+func (f *fakeTrigger) createReport() (*values.Map, error) {
+	type secureMintReport struct {
+		ConfigDigest ocr2types.ConfigDigest
+		SeqNr        uint64
+		Block        uint64
+		Mintable     *big.Int
+	}
+	configDigest, _ := hex.DecodeString("000e8613ec1ad47912a636904823e77e92bf4f580fe6fe7f2e6eff395118623c")
+	report := &secureMintReport{
+		ConfigDigest: ocr2types.ConfigDigest(configDigest),
+		SeqNr:        0,
+		Block:        10,
+		Mintable:     big.NewInt(15),
+	}
+
+	reportBytes, err := json.Marshal(report)
+	if err != nil {
+		return nil, err
+	}
+
+	ocr3Report := &ocr3types.ReportWithInfo[uint64]{
+		Report: ocr2types.Report(reportBytes),
+		Info:   f.setup.Selector,
+	}
+
+	jsonReport, err := json.Marshal(ocr3Report)
+	if err != nil {
+		return nil, err
+	}
+
+	var sigs []capabilities.OCRAttributedOnchainSignature
+	for i, key := range f.keys {
+		sig, err2 := key.Sign3(ocr2types.ConfigDigest(configDigest), 0, reportBytes)
+		if err2 != nil {
+			return nil, err2
+		}
+		sigs = append(sigs, capabilities.OCRAttributedOnchainSignature{
+			Signer:    uint32(i), //nolint:gosec // G115 don't care in test code
+			Signature: sig,
+		})
+	}
+
+	event := &capabilities.OCRTriggerEvent{
+		ConfigDigest: configDigest,
+		SeqNr:        0,
+		Report:       jsonReport,
+		Sigs:         sigs,
+	}
+
+	outputs, err := event.ToMap()
+	if err != nil {
+		return nil, err
+	}
+
+	return outputs, nil
+}
+
+func createFakeTrigger(t *testing.T, s *setup, dons *cre.DonTopology) *fakeTrigger {
 	client := createMockClient(t)
 	keys := exportOcr2Keys(t, dons)
 	require.NotEqual(t, len(keys), 0)
 	framework.L.Info().Msg("Successfully exported ocr2 keys")
-	_ = client
+
+	return &fakeTrigger{
+		triggerCap: client,
+		keys:       keys,
+		setup:      s,
+		triggerID:  "securemint-trigger@1.0.0",
+	}
 }
 
 func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
@@ -345,13 +446,9 @@ func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
 		if flags.HasFlag(don.Flags, cre.MockCapability) {
 			for _, n := range don.DON.Nodes {
 				key, err2 := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
-				fmt.Println("bundleID", n.Ocr2KeyBundleID)
-				fmt.Println("exported key", key.Crypto.Cipher)
-				fmt.Println("export key public", key.ConfigPublicKey)
-				fmt.Println("export key ID", key.ID)
 				if err2 == nil {
-					b, err3 := json.Marshal(key)
-					require.NoError(t, err3, "could not marshal OCR2 key")
+					b, err2 := json.Marshal(key)
+					require.NoError(t, err2, "could not marshal OCR2 key")
 					kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
 					require.NoError(t, err3, "could not decrypt OCR2 key json")
 					kb = append(kb, kk)

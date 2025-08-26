@@ -19,7 +19,6 @@ import (
 	webapitargetcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitarget"
 	webapitriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitrigger"
 	writeevmcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writeevm"
-	writesolanacapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writesolana"
 )
 
 func NewDefaultSet(homeChainID uint64, extraAllowedPorts []int, extraAllowedIPs []string, extraAllowedIPsCIDR []string) ([]cre.InstallableCapability, error) {
@@ -97,11 +96,12 @@ func NewDefaultSet(homeChainID uint64, extraAllowedPorts []int, extraAllowedIPs 
 	}
 	capabilities = append(capabilities, writeevm)
 
-	writesol, writeSolErr := writesolanacapability.New()
-	if writeSolErr != nil {
-		return nil, errors.Wrap(writeSolErr, "failed to create write solana capability")
-	}
-	capabilities = append(capabilities, writesol)
+	// temp remove since solana is non-standard anyway
+	//writesol, writeSolErr := writesolanacapability.New()
+	//if writeSolErr != nil {
+	//		return nil, errors.Wrap(writeSolErr, "failed to create write solana capability")
+	//	}
+	//	capabilities = append(capabilities, writesol)
 
 	readContract, readContractErr := readcontractcapability.New()
 	if readContractErr != nil {
