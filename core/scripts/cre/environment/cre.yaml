@@ -1,0 +1,32 @@
+test:
+    dev-platform:
+        don-id: 1
+    user-workflow:
+        workflow-owner-address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+    mcms-config:
+        proposals-directory: ./
+    contracts:
+        registries:
+            - name: CapabilitiesRegistry
+              address: 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+              chain-selector: 3379446385462418246
+            - name: WorkflowRegistry
+              address: 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+              chain-selector: 3379446385462418246
+        keystone:
+            - name: KeystoneForwarder
+              address: 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
+              chain-selector: 3379446385462418246
+    rpcs:
+        - chain-selector: 3379446385462418246
+          url: http://127.0.0.1:8545
+    workflow_storage:
+        gist:
+            github_token: ${CRE_GITHUB_API_TOKEN}
+        minio:
+            endpoint: 127.0.0.1:9000
+            access_key_id: DdbCt5FXv2zd9ctWJh5f
+            secret_access_key: dKg7fphSDKNOJIlhtuu8NUy0SgfJiheBXtirIKsP
+            session_token: 59fc890d-b76f-4341-93af-d26ef28f52a8
+            use_ssl: false
+            region: us-east-1

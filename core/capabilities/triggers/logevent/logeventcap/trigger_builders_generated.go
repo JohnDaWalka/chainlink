@@ -13,10 +13,7 @@ func (cfg Config) New(w *sdk.WorkflowSpecFactory, id string) OutputCap {
 		ID: id, Ref: ref,
 		Inputs: sdk.StepInputs{},
 		Config: map[string]any{
-			"contractAddress":      cfg.ContractAddress,
-			"contractEventName":    cfg.ContractEventName,
-			"contractName":         cfg.ContractName,
-			"contractReaderConfig": cfg.ContractReaderConfig,
+			"contracts": cfg.Contracts,
 		},
 		CapabilityType: capabilities.CapabilityTypeTrigger,
 	}
