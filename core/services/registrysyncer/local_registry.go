@@ -171,6 +171,38 @@ func (l *LocalRegistry) NodeByPeerID(ctx context.Context, peerID types.PeerID) (
 	}, nil
 }
 
+func (l *LocalRegistry) DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error) {
+	err := l.ensureNotEmpty()
+	if err != nil {
+		return capabilities.DON{}, nil, err
+	}
+
+	var foundDON *DON
+	for _, don := range l.IDsToDONs {
+		for cid := range don.CapabilityConfigurations {
+			if cid == capabilityID {
+				foundDON = &don
+			}
+		}
+	}
+
+	if foundDON == nil {
+		return capabilities.DON{}, nil, fmt.Errorf("could not find DON for capability %s", capabilityID)
+	}
+
+	nodes := []capabilities.Node{}
+	for _, n := range foundDON.Members {
+		node, err := l.NodeByPeerID(ctx, n)
+		if err != nil {
+			return capabilities.DON{}, nil, fmt.Errorf("could not find node for peerID %s: %w", n.String(), err)
+		}
+
+		nodes = append(nodes, node)
+	}
+
+	return foundDON.DON, nodes, nil
+}
+
 func (l *LocalRegistry) ConfigForCapability(ctx context.Context, capabilityID string, donID uint32) (capabilities.CapabilityConfiguration, error) {
 	err := l.ensureNotEmpty()
 	if err != nil {
