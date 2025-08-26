@@ -3,11 +3,10 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
-	sdk "github.com/smartcontractkit/cre-sdk-go/cre"
-
+	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
 )
 
@@ -19,9 +18,9 @@ func main() {
 	}).Run(RunSimpleCronWorkflow)
 }
 
-func RunSimpleCronWorkflow(wcx *sdk.Environment[None]) (sdk.Workflow[None], error) {
-	workflows := sdk.Workflow[None]{
-		sdk.Handler(
+func RunSimpleCronWorkflow(_ None, _ *slog.Logger, _ cre.SecretsProvider) (cre.Workflow[None], error) {
+	workflows := cre.Workflow[None]{
+		cre.Handler(
 			cron.Trigger(&cron.Config{Schedule: "*/30 * * * * *"}),
 			onTrigger,
 		),
@@ -29,17 +28,21 @@ func RunSimpleCronWorkflow(wcx *sdk.Environment[None]) (sdk.Workflow[None], erro
 	return workflows, nil
 }
 
-func onTrigger(env *sdk.Environment[None], runtime sdk.Runtime, trigger *cron.Payload) (string, error) {
-	mathPromise := sdk.RunInNodeMode(env, runtime, fetchData, sdk.ConsensusIdenticalAggregation[float64]())
+func onTrigger(cfg None, runtime cre.Runtime, _ *cron.Payload) (string, error) {
+	runtime.Logger().Info("Now triggered fetch of of chain value")
+
+	mathPromise := cre.RunInNodeMode(cfg, runtime, fetchData, cre.ConsensusIdenticalAggregation[float64]())
 	offchainValue, err := mathPromise.Await()
 	if err != nil {
+		runtime.Logger().Info("Got an error oh no2", "error", err)
 		return "", err
 	}
-	env.Logger.Info("Successfully fetched offchain value", "result", offchainValue)
-	return fmt.Sprintf("value: %f", offchainValue), nil
+	runtime.Logger().Info("Successfully fetched offchain value and reached consensus", "result", offchainValue)
+
+	return "such a lovely disaster", nil
 }
 
-func fetchData(env *sdk.NodeEnvironment[None], nodeRuntime sdk.NodeRuntime) (float64, error) {
+func fetchData(cfg None, nodeRuntime cre.NodeRuntime) (float64, error) {
 	// pretend we're fetching some node-mode data
 	return 420.69, nil
 }
