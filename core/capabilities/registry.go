@@ -71,7 +71,9 @@ func NewRegistry(lggr logger.Logger) *Registry {
 
 // TestMetadataRegistry is a test implementation of the metadataRegistry
 // interface. It is used when ExternalCapabilitiesRegistry is not available.
-type TestMetadataRegistry struct{}
+type TestMetadataRegistry struct {
+	core.UnimplementedCapabilitiesRegistryMetadata
+}
 
 func (t *TestMetadataRegistry) LocalNode(ctx context.Context) (capabilities.Node, error) {
 	peerID := p2ptypes.PeerID{}

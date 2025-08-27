@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/libocr/ragep2p/types"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -44,18 +45,32 @@ func TestLocalRegistry_DONForCapability(t *testing.T) {
 				"secondCapabilityID@1.0.0": CapabilityConfiguration{},
 			},
 		},
+		3: {
+			DON: capabilities.DON{
+				Name: "don2",
+				ID:   2,
+				F:    2,
+				Members: []types.PeerID{
+					{0: 5},
+					{0: 6},
+				},
+			},
+			CapabilityConfigurations: map[string]CapabilityConfiguration{
+				"thirdCapabilityID@1.0.0": CapabilityConfiguration{},
+			},
+		},
 	}
 	idsToNodes := map[types.PeerID]NodeInfo{
-		{0: 1}: NodeInfo{
+		{0: 1}: {
 			NodeOperatorID: 0,
 		},
-		{0: 2}: NodeInfo{
+		{0: 2}: {
 			NodeOperatorID: 1,
 		},
-		{0: 3}: NodeInfo{
+		{0: 3}: {
 			NodeOperatorID: 2,
 		},
-		{0: 4}: NodeInfo{
+		{0: 4}: {
 			NodeOperatorID: 3,
 		},
 	}
@@ -71,6 +86,20 @@ func TestLocalRegistry_DONForCapability(t *testing.T) {
 	}
 	lr := NewLocalRegistry(lggr, getPeerID, idsToDons, idsToNodes, idsToCapabilities)
 
-	_, _, err := lr.DONForCapability(t.Context(), "capabilityID@1.0.0")
+	gotDon, gotNodes, err := lr.DONForCapability(t.Context(), "capabilityID@1.0.0")
 	require.NoError(t, err)
+
+	assert.Equal(t, idsToDons[1].DON, gotDon)
+
+	assert.Len(t, gotNodes, 2)
+	assert.Equal(t, *gotNodes[0].PeerID, types.PeerID{0: 1})
+	assert.Equal(t, *gotNodes[1].PeerID, types.PeerID{0: 2})
+
+	// Non-existent DON
+	_, _, err = lr.DONForCapability(t.Context(), "nonExistentCapabilityID@1.0.0")
+	require.ErrorContains(t, err, "could not find DON for capability nonExistentCapabilityID@1.0.0")
+
+	// thirdCapability is on a DON with invalid peers
+	_, _, err = lr.DONForCapability(t.Context(), "thirdCapabilityID@1.0.0")
+	require.ErrorContains(t, err, "could not find node for peerID")
 }
