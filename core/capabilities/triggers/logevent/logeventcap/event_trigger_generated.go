@@ -8,6 +8,11 @@ import (
 )
 
 type Config struct {
+	// Contracts corresponds to the JSON schema field "contracts".
+	Contracts []ConfigContractsElem `json:"contracts" yaml:"contracts" mapstructure:"contracts"`
+}
+
+type ConfigContractsElem struct {
 	// ContractAddress corresponds to the JSON schema field "contractAddress".
 	ContractAddress string `json:"contractAddress" yaml:"contractAddress" mapstructure:"contractAddress"`
 
@@ -19,53 +24,53 @@ type Config struct {
 
 	// ContractReaderConfig corresponds to the JSON schema field
 	// "contractReaderConfig".
-	ContractReaderConfig ConfigContractReaderConfig `json:"contractReaderConfig" yaml:"contractReaderConfig" mapstructure:"contractReaderConfig"`
+	ContractReaderConfig ConfigContractsElemContractReaderConfig `json:"contractReaderConfig" yaml:"contractReaderConfig" mapstructure:"contractReaderConfig"`
 }
 
-type ConfigContractReaderConfig struct {
+type ConfigContractsElemContractReaderConfig struct {
 	// Contracts corresponds to the JSON schema field "contracts".
-	Contracts ConfigContractReaderConfigContracts `json:"contracts" yaml:"contracts" mapstructure:"contracts"`
+	Contracts ConfigContractsElemContractReaderConfigContracts `json:"contracts" yaml:"contracts" mapstructure:"contracts"`
 }
 
-type ConfigContractReaderConfigContracts map[string]interface{}
+type ConfigContractsElemContractReaderConfigContracts map[string]interface{}
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *ConfigContractReaderConfig) UnmarshalJSON(b []byte) error {
+func (j *ConfigContractsElemContractReaderConfig) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["contracts"]; raw != nil && !ok {
-		return fmt.Errorf("field contracts in ConfigContractReaderConfig: required")
+		return fmt.Errorf("field contracts in ConfigContractsElemContractReaderConfig: required")
 	}
-	type Plain ConfigContractReaderConfig
+	type Plain ConfigContractsElemContractReaderConfig
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = ConfigContractReaderConfig(plain)
+	*j = ConfigContractsElemContractReaderConfig(plain)
 	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *Config) UnmarshalJSON(b []byte) error {
+func (j *ConfigContractsElem) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["contractAddress"]; raw != nil && !ok {
-		return fmt.Errorf("field contractAddress in Config: required")
+		return fmt.Errorf("field contractAddress in ConfigContractsElem: required")
 	}
 	if _, ok := raw["contractEventNames"]; raw != nil && !ok {
-		return fmt.Errorf("field contractEventNames in Config: required")
+		return fmt.Errorf("field contractEventNames in ConfigContractsElem: required")
 	}
 	if _, ok := raw["contractName"]; raw != nil && !ok {
-		return fmt.Errorf("field contractName in Config: required")
+		return fmt.Errorf("field contractName in ConfigContractsElem: required")
 	}
 	if _, ok := raw["contractReaderConfig"]; raw != nil && !ok {
-		return fmt.Errorf("field contractReaderConfig in Config: required")
+		return fmt.Errorf("field contractReaderConfig in ConfigContractsElem: required")
 	}
-	type Plain Config
+	type Plain ConfigContractsElem
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
@@ -78,6 +83,27 @@ func (j *Config) UnmarshalJSON(b []byte) error {
 	}
 	if len(plain.ContractName) < 1 {
 		return fmt.Errorf("field %s length: must be >= %d", "contractName", 1)
+	}
+	*j = ConfigContractsElem(plain)
+	return nil
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *Config) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["contracts"]; raw != nil && !ok {
+		return fmt.Errorf("field contracts in Config: required")
+	}
+	type Plain Config
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	if plain.Contracts != nil && len(plain.Contracts) < 1 {
+		return fmt.Errorf("field %s length: must be >= %d", "contracts", 1)
 	}
 	*j = Config(plain)
 	return nil

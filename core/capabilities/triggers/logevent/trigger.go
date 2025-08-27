@@ -28,10 +28,10 @@ type logEventTrigger struct {
 	lggr logger.Logger
 
 	// Contract address and Event Signature to monitor for
-	reqConfig      *logeventcap.Config
-	contractReader types.ContractReader
-	relayer        core.Relayer
-	startBlockNum  uint64
+	reqConfig       *logeventcap.Config
+	contractReaders []types.ContractReader
+	relayer         core.Relayer
+	startBlockNum   uint64
 
 	// Log Event Trigger config with pollPeriod and lookbackBlocks
 	logEventConfig Config
@@ -47,29 +47,37 @@ func newLogEventTrigger(ctx context.Context,
 	reqConfig *logeventcap.Config,
 	logEventConfig Config,
 	relayer core.Relayer) (*logEventTrigger, chan capabilities.TriggerResponse, error) {
-	jsonBytes, err := json.Marshal(reqConfig.ContractReaderConfig)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	// Create a New Contract Reader client, which brings a corresponding ContractReader gRPC service
-	// in Chainlink Core service
-	contractReader, err := relayer.NewContractReader(ctx, jsonBytes)
-	if err != nil {
-		return nil, nil,
-			fmt.Errorf("error fetching contractReader for chainID %s from relayerSet: %w", logEventConfig.ChainID, err)
-	}
+	var contractReaders []types.ContractReader
 
-	// Bind Contract in ContractReader
-	boundContracts := []types.BoundContract{{Name: reqConfig.ContractName, Address: reqConfig.ContractAddress}}
-	err = contractReader.Bind(ctx, boundContracts)
-	if err != nil {
-		return nil, nil, err
-	}
+	for _, cr := range reqConfig.Contracts {
+		jsonBytes, err := json.Marshal(cr.ContractReaderConfig)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	err = contractReader.Start(ctx)
-	if err != nil {
-		return nil, nil, err
+		// Create a New Contract Reader client, which brings a corresponding ContractReader gRPC service
+		// in Chainlink Core service
+		contractReader, err := relayer.NewContractReader(ctx, jsonBytes)
+		if err != nil {
+			return nil, nil,
+				fmt.Errorf("error fetching contractReader for chainID %s from relayerSet: %w", logEventConfig.ChainID, err)
+		}
+
+		// Bind Contract in ContractReader
+		boundContracts := []types.BoundContract{{Name: cr.ContractName, Address: cr.ContractAddress}}
+		err = contractReader.Bind(ctx, boundContracts)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		err = contractReader.Start(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		contractReaders = append(contractReaders, contractReader)
+
 	}
 
 	// Get current block HEAD/tip of the blockchain to start polling from
@@ -99,10 +107,10 @@ func newLogEventTrigger(ctx context.Context,
 		ch:   callbackCh,
 		lggr: logger.Named(lggr, "LogEventTrigger."+workflowID),
 
-		reqConfig:      reqConfig,
-		contractReader: contractReader,
-		relayer:        relayer,
-		startBlockNum:  startBlockNum,
+		reqConfig:       reqConfig,
+		contractReaders: contractReaders,
+		relayer:         relayer,
+		startBlockNum:   startBlockNum,
 
 		logEventConfig: logEventConfig,
 		ticker:         ticker,
@@ -135,51 +143,58 @@ func (l *logEventTrigger) listen() {
 	for {
 		select {
 		case <-ctx.Done():
-			l.lggr.Infow("Closing trigger server for (waiting for waitGroup)", "ChainID", l.logEventConfig.ChainID,
-				"ContractName", l.reqConfig.ContractName,
-				"ContractAddress", l.reqConfig.ContractAddress,
-				"ContractEventNames", l.reqConfig.ContractEventNames)
+
+			for _, ctr := range l.reqConfig.Contracts {
+				l.lggr.Infow("Closing trigger server for (waiting for waitGroup)", "ChainID", l.logEventConfig.ChainID,
+					"ContractName", ctr.ContractName,
+					"ContractAddress", ctr.ContractAddress,
+					"ContractEventNames", ctr.ContractEventNames)
+			}
 			return
 		case t := <-l.ticker.C:
-			for _, c := range l.reqConfig.ContractEventNames {
-				l.lggr.Infow("Polling event logs from ContractReader using QueryKey at", "time", t,
-					"startBlockNum", l.startBlockNum,
-					"cursor", cursor)
-				if cursor != "" {
-					limitAndSort.Limit = query.CursorLimit(cursor, query.CursorFollowing, l.logEventConfig.QueryCount)
-				}
-				logs, err = l.contractReader.QueryKey(
-					ctx,
-					types.BoundContract{Name: l.reqConfig.ContractName, Address: l.reqConfig.ContractAddress},
-					query.KeyFilter{
-						Key: c,
-						Expressions: []query.Expression{
-							query.Confidence(primitives.Finalized),
-							query.Block(strconv.FormatUint(l.startBlockNum, 10), primitives.Gte),
+			for i, ctr := range l.reqConfig.Contracts {
+				contractReader := l.contractReaders[i]
+
+				for _, c := range ctr.ContractEventNames {
+					l.lggr.Infow("Polling event logs from ContractReader using QueryKey at", "time", t,
+						"startBlockNum", l.startBlockNum,
+						"cursor", cursor)
+					if cursor != "" {
+						limitAndSort.Limit = query.CursorLimit(cursor, query.CursorFollowing, l.logEventConfig.QueryCount)
+					}
+					logs, err = contractReader.QueryKey(
+						ctx,
+						types.BoundContract{Name: ctr.ContractName, Address: ctr.ContractAddress},
+						query.KeyFilter{
+							Key: c,
+							Expressions: []query.Expression{
+								query.Confidence(primitives.Finalized),
+								query.Block(strconv.FormatUint(l.startBlockNum, 10), primitives.Gte),
+							},
 						},
-					},
-					limitAndSort,
-					&logData,
-				)
-				if err != nil {
-					l.lggr.Errorw("QueryKey failure", "err", err)
-					continue
-				}
-				// ChainReader QueryKey API provides logs including the cursor value and not
-				// after the cursor value. If the response only consists of the log corresponding
-				// to the cursor and no log after it, then we understand that there are no new
-				// logs
-				if len(logs) == 1 && logs[0].Cursor == cursor {
-					l.lggr.Infow("No new logs since", "cursor", cursor)
-					continue
-				}
-				for _, log := range logs {
-					if log.Cursor == cursor {
+						limitAndSort,
+						&logData,
+					)
+					if err != nil {
+						l.lggr.Errorw("QueryKey failure", "err", err)
 						continue
 					}
-					triggerResp := createTriggerResponse(log, l.logEventConfig.Version(ID), c)
-					l.ch <- triggerResp
-					cursor = log.Cursor
+					// ChainReader QueryKey API provides logs including the cursor value and not
+					// after the cursor value. If the response only consists of the log corresponding
+					// to the cursor and no log after it, then we understand that there are no new
+					// logs
+					if len(logs) == 1 && logs[0].Cursor == cursor {
+						l.lggr.Infow("No new logs since", "cursor", cursor)
+						continue
+					}
+					for _, log := range logs {
+						if log.Cursor == cursor {
+							continue
+						}
+						triggerResp := createTriggerResponse(log, l.logEventConfig.Version(ID), c, ctr.ContractAddress)
+						l.ch <- triggerResp
+						cursor = log.Cursor
+					}
 				}
 			}
 		}
@@ -187,7 +202,7 @@ func (l *logEventTrigger) listen() {
 }
 
 // Create log event trigger capability response
-func createTriggerResponse(log types.Sequence, version string, eventName string) capabilities.TriggerResponse {
+func createTriggerResponse(log types.Sequence, version string, eventName, contractAddress string) capabilities.TriggerResponse {
 	dataAsValuesMap, err := values.WrapMap(log.Data)
 	if err != nil {
 		return capabilities.TriggerResponse{
@@ -203,6 +218,7 @@ func createTriggerResponse(log types.Sequence, version string, eventName string)
 	}
 
 	dataAsMap["contractEventName"] = eventName
+	dataAsMap["contractAddress"] = contractAddress
 
 	wrappedPayload, err := values.WrapMap(&logeventcap.Output{
 		Cursor: log.Cursor,
