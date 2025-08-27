@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -25,10 +26,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
@@ -120,28 +122,220 @@ It will start env + observability + blockscout.
 func Test_CRE_Workflow_Don(t *testing.T) {
 	testEnv := setupTestEnvironment(t)
 
-	// currently we can't run these tests in parallel, because each test rebuilds environment structs and that includes
-	// logging into CL node with GraphQL API, which allows only 1 session per user at a time.
-	t.Run("cron-based PoR workflow", func(t *testing.T) {
-		executePoRTest(t, testEnv)
+	/*
+		// currently we can't run these tests in parallel, because each test rebuilds environment structs and that includes
+		// logging into CL node with GraphQL API, which allows only 1 session per user at a time.
+		t.Run("cron-based PoR workflow", func(t *testing.T) {
+			executePoRTest(t, testEnv)
+		})
+
+		t.Run("vault DON test", func(t *testing.T) {
+			executeVaultTest(t, testEnv)
+		})
+
+		t.Run("http trigger and action test", func(t *testing.T) {
+			executeHTTPTriggerActionTest(t, testEnv)
+		})
+
+		t.Run("DON Time test", func(t *testing.T) {
+			// TODO: Implement smoke test - https://smartcontract-it.atlassian.net/browse/CAPPL-1028
+			t.Skip()
+		})
+
+		t.Run("Beholder test", func(t *testing.T) {
+			executeBeholderTest(t, testEnv)
+		})*/
+
+	t.Run("Consensus test", func(t *testing.T) {
+		executeConsensusTest(t, testEnv)
+	})
+}
+
+func executeConsensusTest(t *testing.T, testEnv *TestEnvironment) {
+	testLogger := framework.L
+
+	bErr := startBeholderStackIfIsNotRunning(DefaultBeholderStackCacheFile, DefaultEnvironmentDir)
+	require.NoError(t, bErr, "failed to start Beholder")
+
+	chipConfig, chipErr := loadBeholderStackCache()
+	require.NoError(t, chipErr, "failed to load chip ingress cache")
+	require.NotNil(t, chipConfig.ChipIngress.Output.RedPanda.KafkaExternalURL, "kafka external url is not set in the cache")
+	require.NotEmpty(t, chipConfig.Kafka.Topics, "kafka topics are not set in the cache")
+
+	workflowFileLocation := "../../../../core/scripts/cre/environment/examples/workflows/v2/node-mode/main.go"
+	workflowName := "consensustest"
+
+	compressedWorkflowWasmPath, compileErr := creworkflow.CompileWorkflow(workflowFileLocation, workflowName)
+	require.NoError(t, compileErr, "failed to compile workflow '%s'", workflowFileLocation)
+
+	homeChainSelector := testEnv.WrappedBlockchainOutputs[0].ChainSelector
+	workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(
+		testEnv.FullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		homeChainSelector,
+		keystone_changeset.WorkflowRegistry.String(),
+	)
+	require.NoError(t, workflowRegistryErr, "failed to find workflow registry address for chain %d", testEnv.WrappedBlockchainOutputs[0].ChainID)
+
+	t.Cleanup(func() {
+		wasmErr := os.Remove(compressedWorkflowWasmPath)
+		if wasmErr != nil {
+			framework.L.Warn().Msgf("failed to remove workflow wasm file %s: %s", compressedWorkflowWasmPath, wasmErr.Error())
+		}
+
+		deleteErr := creworkflow.DeleteWithContract(t.Context(), testEnv.WrappedBlockchainOutputs[0].SethClient, workflowRegistryAddress, workflowName)
+		if deleteErr != nil {
+			framework.L.Warn().Msgf("failed to delete workflow %s: %s. Please delete it manually.", workflowName, deleteErr.Error())
+		}
 	})
 
-	t.Run("vault DON test", func(t *testing.T) {
-		executeVaultTest(t, testEnv)
+	workflowCopyErr := creworkflow.CopyArtifactToDockerContainers(compressedWorkflowWasmPath, creworkflow.DefaultWorkflowNodePattern, creworkflow.DefaultWorkflowTargetDir)
+	require.NoError(t, workflowCopyErr, "failed to copy workflow to docker containers")
+
+	_, registerErr := creworkflow.RegisterWithContract(
+		t.Context(),
+		testEnv.WrappedBlockchainOutputs[0].SethClient, // crucial to use Seth Client connected to home chain (first chain in the set)
+		workflowRegistryAddress,
+		testEnv.FullCldEnvOutput.DonTopology.DonsWithMetadata[0].ID,
+		workflowName,
+		"file://"+compressedWorkflowWasmPath,
+		nil,
+		nil,
+		&creworkflow.DefaultWorkflowTargetDir,
+	)
+	require.NoError(t, registerErr, "failed to register cron beholder workflow")
+
+	listenerCtx, cancelListener := context.WithTimeout(t.Context(), 2*time.Minute)
+	t.Cleanup(func() {
+		cancelListener()
 	})
 
-	t.Run("http trigger and action test", func(t *testing.T) {
-		executeHTTPTriggerActionTest(t, testEnv)
-	})
+	kafkaErrChan := make(chan error, 1)
+	messageChan := make(chan proto.Message, 10)
 
-	t.Run("DON Time test", func(t *testing.T) {
-		// TODO: Implement smoke test - https://smartcontract-it.atlassian.net/browse/CAPPL-1028
-		t.Skip()
-	})
+	// We are interested in UserLogs (successful execution)
+	// or BaseMessage with specific error message (engine initialization failure)
+	messageTypes := map[string]func() proto.Message{
+		"workflows.v1.UserLogs": func() proto.Message {
+			return &workflow_events.UserLogs{}
+		},
+		"BaseMessage": func() proto.Message {
+			return &common_events.BaseMessage{}
+		},
+	}
 
-	t.Run("Beholder test", func(t *testing.T) {
-		executeBeholderTest(t, testEnv)
-	})
+	// Start listening for messages in the background
+	go func() {
+		listenForKafkaMessages(listenerCtx, testLogger, chipConfig.ChipIngress.Output.RedPanda.KafkaExternalURL, chipConfig.Kafka.Topics[0], messageTypes, messageChan, kafkaErrChan)
+	}()
+
+	expectedUserLog := "Successfully fetched"
+
+	foundExpectedResults := make(chan bool, 1) // Channel to signal when expected log is found
+	foundErrorLog := make(chan bool, 1)        // Channel to signal when engine initialization failure is detected
+	receivedUserLogs := 0
+
+	var recievedResults []string
+
+	expectedNumberOfResults := 4
+
+	// Start message processor goroutine
+	go func() {
+		for {
+			select {
+			case <-listenerCtx.Done():
+				return
+			case msg := <-messageChan:
+				// Process received messages
+				switch typedMsg := msg.(type) {
+				case *common_events.BaseMessage:
+					if strings.Contains(typedMsg.Msg, "Workflow Engine initialization failed") {
+						foundErrorLog <- true
+					}
+				case *workflow_events.UserLogs:
+					testLogger.Info().
+						Msg("🎉 Received UserLogs message in test")
+					receivedUserLogs++
+
+					for _, logLine := range typedMsg.LogLines {
+						if strings.Contains(logLine.Message, expectedUserLog) {
+							testLogger.Info().
+								Str("expected_log", expectedUserLog).
+								Str("found_message", strings.TrimSpace(logLine.Message)).
+								Msg("🎯 Found expected user log message!")
+
+							// Define a regex pattern to extract the result value
+
+							pattern := `result=([0-9]+)`
+							re := regexp.MustCompile(pattern)
+
+							// Find the result value
+							matches := re.FindStringSubmatch(logLine.Message)
+							if len(matches) > 1 {
+								recievedResults = append(recievedResults, matches[1])
+							}
+
+							if len(recievedResults) >= expectedNumberOfResults {
+								// check all recievedResults are the same
+								allSame := true
+								first := recievedResults[0]
+								for _, r := range recievedResults[1:] {
+									if r != first {
+										allSame = false
+										break
+									}
+								}
+
+								if allSame {
+									select {
+									case foundExpectedResults <- true:
+									default: // Channel might already have a value
+									}
+									return // Exit the processor goroutine
+								}
+							}
+						}
+						testLogger.Warn().
+							Str("expected_log", expectedUserLog).
+							Str("found_message", strings.TrimSpace(logLine.Message)).
+							Msg("Received UserLogs message, but it does not match expected log")
+					}
+				default:
+					// ignore other message types
+				}
+			}
+		}
+	}()
+
+	timeout := 2 * time.Minute
+
+	testLogger.Info().
+		Str("expected_log", expectedUserLog).
+		Dur("timeout", timeout).
+		Msg("Waiting for expected user log message or timeout")
+
+	// Wait for either the expected log to be found, or engine initialization failure to be detected, or timeout (2 minutes)
+	select {
+	case <-foundExpectedResults:
+		testLogger.Info().
+			Str("expected_log", expectedUserLog).
+			Msg("✅ Test completed successfully - found expected user log message!")
+		return
+	case <-foundErrorLog:
+		require.Fail(t, "Test completed with error - found engine initialization failure message!")
+	case <-time.After(timeout):
+		testLogger.Error().Msg("Timed out waiting for expected user log message")
+		if receivedUserLogs > 0 {
+			testLogger.Warn().Int("received_user_logs", receivedUserLogs).Msg("Received some UserLogs messages, but none matched expected log")
+		} else {
+			testLogger.Warn().Msg("Did not receive any UserLogs messages")
+		}
+		require.Failf(t, "Timed out waiting for expected user log message", "Expected user log message: '%s' not found after %s", expectedUserLog, timeout.String())
+	case err := <-kafkaErrChan:
+		testLogger.Error().Err(err).Msg("Kafka listener encountered an error during execution")
+		require.Fail(t, "Kafka listener failed", err.Error())
+	}
+
+	testLogger.Info().Msg("Beholder test completed")
 }
 
 // WorkflowRegistrationConfig holds configuration for workflow registration
@@ -381,7 +575,7 @@ func executePoRWorkflowTest(t *testing.T, testEnv *TestEnvironment, priceProvide
 		chainID := bcOutput.ChainID
 		workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(
 			fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
-			homeChainSelector, // it should live only on one chain, it is not deployed to all chains
+			homeChainSelector,                              // it should live only on one chain, it is not deployed to all chains
 			keystone_changeset.WorkflowRegistry.String(),
 		)
 		require.NoError(t, workflowRegistryErr, "failed to find Workflow Registry address.")
