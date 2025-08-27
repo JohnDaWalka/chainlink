@@ -826,6 +826,8 @@ type CREOpts struct {
 	BillingClient metering.BillingClient
 
 	StorageClient storage.WorkflowClient
+
+	UseLocalTimeProvider bool // Set this to true if the DON Time Plugin is not running
 }
 
 // creServiceConfig contains the configuration required to create the CRE services
@@ -1065,6 +1067,7 @@ func newCREServices(
 						workflowstore.NewInMemoryStore(lggr, clockwork.NewRealClock()),
 						opts.CapabilitiesRegistry,
 						dontimeStore,
+						opts.UseLocalTimeProvider,
 						engineRegistry,
 						custmsg.NewLabeler(),
 						engineLimiters,
@@ -1139,6 +1142,8 @@ func newCREServices(
 					eventHandler, err := syncerV2.NewEventHandler(
 						lggr,
 						workflowstore.NewInMemoryStore(lggr, clockwork.NewRealClock()),
+						dontimeStore,
+						opts.UseLocalTimeProvider,
 						opts.CapabilitiesRegistry,
 						engineRegistry,
 						custmsg.NewLabeler(),
