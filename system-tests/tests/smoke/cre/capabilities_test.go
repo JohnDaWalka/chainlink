@@ -138,6 +138,10 @@ func Test_CRE_Workflow_Don(t *testing.T) {
 		// TODO: Implement smoke test - https://smartcontract-it.atlassian.net/browse/CAPPL-1028
 		t.Skip()
 	})
+
+	t.Run("Beholder test", func(t *testing.T) {
+		executeBeholderTest(t, testEnv)
+	})
 }
 
 // WorkflowRegistrationConfig holds configuration for workflow registration
@@ -1140,15 +1144,8 @@ func debugPoRTest(t *testing.T, testLogger zerolog.Logger, in *envconfig.Config,
 	}
 }
 
-func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environment.EnvArtifact) {
+func executeBeholderTest(t *testing.T, testEnv *TestEnvironment) {
 	testLogger := framework.L
-	cldLogger := cldlogger.NewSingleFileLogger(t)
-
-	/*
-		BUILD ENVIRONMENT FROM SAVED STATE
-	*/
-	fullCldEnvOutput, wrappedBlockchainOutputs, loadErr := environment.BuildFromSavedState(t.Context(), cldLogger, in, envArtifact)
-	require.NoError(t, loadErr, "failed to load environment")
 
 	bErr := startBeholderStackIfIsNotRunning(DefaultBeholderStackCacheFile, DefaultEnvironmentDir)
 	require.NoError(t, bErr, "failed to start Beholder")
@@ -1164,13 +1161,13 @@ func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environ
 	compressedWorkflowWasmPath, compileErr := creworkflow.CompileWorkflow(workflowFileLocation, workflowName)
 	require.NoError(t, compileErr, "failed to compile workflow '%s'", workflowFileLocation)
 
-	homeChainSelector := wrappedBlockchainOutputs[0].ChainSelector
+	homeChainSelector := testEnv.WrappedBlockchainOutputs[0].ChainSelector
 	workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(
-		fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		testEnv.FullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		homeChainSelector,
 		keystone_changeset.WorkflowRegistry.String(),
 	)
-	require.NoError(t, workflowRegistryErr, "failed to find workflow registry address for chain %d", wrappedBlockchainOutputs[0].ChainID)
+	require.NoError(t, workflowRegistryErr, "failed to find workflow registry address for chain %d", testEnv.WrappedBlockchainOutputs[0].ChainID)
 
 	t.Cleanup(func() {
 		wasmErr := os.Remove(compressedWorkflowWasmPath)
@@ -1178,7 +1175,7 @@ func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environ
 			framework.L.Warn().Msgf("failed to remove workflow wasm file %s: %s", compressedWorkflowWasmPath, wasmErr.Error())
 		}
 
-		deleteErr := creworkflow.DeleteWithContract(t.Context(), wrappedBlockchainOutputs[0].SethClient, workflowRegistryAddress, workflowName)
+		deleteErr := creworkflow.DeleteWithContract(t.Context(), testEnv.WrappedBlockchainOutputs[0].SethClient, workflowRegistryAddress, workflowName)
 		if deleteErr != nil {
 			framework.L.Warn().Msgf("failed to delete workflow %s: %s. Please delete it manually.", workflowName, deleteErr.Error())
 		}
@@ -1189,9 +1186,9 @@ func executeBeholderTest(t *testing.T, in *envconfig.Config, envArtifact environ
 
 	_, registerErr := creworkflow.RegisterWithContract(
 		t.Context(),
-		wrappedBlockchainOutputs[0].SethClient, // crucial to use Seth Client connected to home chain (first chain in the set)
+		testEnv.WrappedBlockchainOutputs[0].SethClient, // crucial to use Seth Client connected to home chain (first chain in the set)
 		workflowRegistryAddress,
-		fullCldEnvOutput.DonTopology.DonsWithMetadata[0].ID,
+		testEnv.FullCldEnvOutput.DonTopology.DonsWithMetadata[0].ID,
 		workflowName,
 		"file://"+compressedWorkflowWasmPath,
 		nil,
