@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 	"testing"
@@ -10,11 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	vaultcommon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 
+	vaultcap "github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
@@ -45,14 +48,33 @@ func setupHandler(t *testing.T) (handlers.Handler, chan handlers.UserCallbackPay
 	methodConfig, err := json.Marshal(handlerConfig)
 	require.NoError(t, err)
 
-	handler, err := NewHandler(methodConfig, donConfig, don, lggr)
+	// TODO
+	handler, err := NewHandler(methodConfig, donConfig, don, nil, lggr)
+	handler.aggregator = &mockAggregator{}
 	require.NoError(t, err)
 
 	return handler, make(chan handlers.UserCallbackPayload), don
 }
 
+type mockAggregator struct{}
+
+func (m *mockAggregator) Aggregate(ctx context.Context, l logger.Logger, ar *activeRequest, currResp *jsonrpc.Response[json.RawMessage]) (*jsonrpc.Response[json.RawMessage], error) {
+	return currResp, nil
+}
+
+type mockCapabilitiesRegistry struct {
+	F     uint8
+	Nodes []capabilities.Node
+}
+
+func (m *mockCapabilitiesRegistry) DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error) {
+	return capabilities.DON{
+		F: m.F,
+	}, m.Nodes, nil
+}
+
 func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
-	createSecretsRequest := vaultcommon.CreateSecretsRequest{
+	createSecretsRequest := &vaultcommon.CreateSecretsRequest{
 		RequestId: "test_request_id",
 		EncryptedSecrets: []*vaultcommon.EncryptedSecret{
 			{
@@ -74,11 +96,11 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 
 		validJSONRequest := jsonrpc.Request[json.RawMessage]{
 			ID:     "1",
-			Method: MethodSecretsCreate,
+			Method: vaultcap.MethodSecretsCreate,
 			Params: (*json.RawMessage)(&params),
 		}
 
-		responseData := vaultcommon.CreateSecretsResponse{
+		responseData := &vaultcommon.CreateSecretsResponse{
 			Responses: []*vaultcommon.CreateSecretResponse{
 				{
 					Id:      createSecretsRequest.EncryptedSecrets[0].Id,
@@ -134,7 +156,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 
 		validJSONRequest := jsonrpc.Request[json.RawMessage]{
 			ID:     "1",
-			Method: MethodSecretsDelete,
+			Method: vaultcap.MethodSecretsDelete,
 			Params: (*json.RawMessage)(&reqDatab),
 		}
 
@@ -152,7 +174,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 		response := jsonrpc.Response[json.RawMessage]{
 			ID:     "1",
 			Result: (*json.RawMessage)(&resultBytes),
-			Method: MethodSecretsDelete,
+			Method: vaultcap.MethodSecretsDelete,
 		}
 		resultBytes, err = json.Marshal(responseData)
 		require.NoError(t, err)
@@ -213,7 +235,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 
 		emptyParamsRequest := jsonrpc.Request[json.RawMessage]{
 			ID:     "3",
-			Method: MethodSecretsCreate,
+			Method: vaultcap.MethodSecretsCreate,
 			Params: &json.RawMessage{},
 		}
 
@@ -243,7 +265,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 		invalidParams := json.RawMessage(`{"request_id": "empty_value_field"}`)
 		invalidParamsRequest := jsonrpc.Request[json.RawMessage]{
 			ID:     "4",
-			Method: MethodSecretsCreate,
+			Method: vaultcap.MethodSecretsCreate,
 			Params: &invalidParams,
 		}
 
@@ -270,7 +292,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 		// Don't expect SendToNode to be called for invalid params
 		don.AssertNotCalled(t, "SendToNode")
 
-		invalidParamsRequest := vaultcommon.CreateSecretsRequest{
+		invalidParamsRequest := &vaultcommon.CreateSecretsRequest{
 			RequestId: "test_request_id",
 			EncryptedSecrets: []*vaultcommon.EncryptedSecret{
 				{
@@ -286,7 +308,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 		require.NoError(t, err2)
 		jsonRequest := jsonrpc.Request[json.RawMessage]{
 			ID:     "4",
-			Method: MethodSecretsCreate,
+			Method: vaultcap.MethodSecretsCreate,
 			Params: (*json.RawMessage)(&params),
 		}
 
@@ -311,7 +333,7 @@ func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {
 		handler, callbackCh, _ := setupHandler(t)
 
 		// Create a response for a request that was never sent or has already been processed
-		responseData := vaultcommon.CreateSecretsResponse{
+		responseData := &vaultcommon.CreateSecretsResponse{
 			Responses: []*vaultcommon.CreateSecretResponse{
 				{
 					Id:      createSecretsRequest.EncryptedSecrets[0].Id,

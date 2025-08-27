@@ -130,7 +130,7 @@ func (r *Response) String() string {
 	return fmt.Sprintf("Response { ID: %s, Error: %s, Payload: %s, Format: %s }", r.ID, r.Error, string(r.Payload), r.Format)
 }
 
-func ValidateSignatures(resp *Response, allowedSigners []common.Address, minRequired int) error {
+func ValidateSignatures(resp *SignedOCRResponse, allowedSigners []common.Address, minRequired int) error {
 	if len(resp.Context) <= 64 {
 		return fmt.Errorf("context too short: expected min 64 bytes, got %d bytes", len(resp.Context))
 	}
@@ -160,7 +160,7 @@ func ValidateSignatures(resp *Response, allowedSigners []common.Address, minRequ
 			Epoch:        epoch,
 			Round:        round,
 		},
-	}, resp.Payload)
+	}, []byte(resp.Payload))
 
 	validSigners := map[common.Address]bool{}
 	for _, s := range resp.Signatures {

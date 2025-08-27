@@ -17,7 +17,7 @@ func Test_ValidateSignatures_Valid(t *testing.T) {
 	require.NoError(t, err)
 
 	payload := []byte(`{"responses":[{"error":"failed to verify ciphertext: cannot unmarshal data: unexpected end of JSON input","id":{"key":"W","namespace":"","owner":"foo"},"success":false}]}`)
-	resp := Response{
+	resp := SignedOCRResponse{
 		Payload: payload,
 		Context: ctx,
 		Signatures: [][]byte{
@@ -42,7 +42,7 @@ func Test_ValidateSignatures_InsufficientSignatures(t *testing.T) {
 	sig1, err := hex.DecodeString("d1067844e2849b404d903730c4cae19f090d53a578a1e8dc16ecbdc0285c1f186599108abbe0073b78bc148a6504907474ed3a6881df917e6d142cff70acfb5900")
 	require.NoError(t, err)
 	payload := []byte(`{"responses":[{"error":"failed to verify ciphertext: cannot unmarshal data: unexpected end of JSON input","id":{"key":"W","namespace":"","owner":"foo"},"success":false}]}`)
-	resp := Response{
+	resp := SignedOCRResponse{
 		Payload: payload,
 		Context: ctx,
 		Signatures: [][]byte{
@@ -66,7 +66,7 @@ func Test_ValidateSignatures_DoesntCountDuplicates(t *testing.T) {
 	sig1, err := hex.DecodeString("d1067844e2849b404d903730c4cae19f090d53a578a1e8dc16ecbdc0285c1f186599108abbe0073b78bc148a6504907474ed3a6881df917e6d142cff70acfb5900")
 	require.NoError(t, err)
 	payload := []byte(`{"responses":[{"error":"failed to verify ciphertext: cannot unmarshal data: unexpected end of JSON input","id":{"key":"W","namespace":"","owner":"foo"},"success":false}]}`)
-	resp := Response{
+	resp := SignedOCRResponse{
 		Payload: payload,
 		Context: ctx,
 		Signatures: [][]byte{
@@ -93,7 +93,7 @@ func Test_ValidateSignatures_InvalidSignature(t *testing.T) {
 	sig2, err := hex.DecodeString("c7517c188d297093a6f602046fad7feafe19454ee9dc269b19c8e6c01268037d1f7b423eeecbc495dd2d9a65e106bc3eab849ddfd74a10cbd4ad50c7d953bd4b01")
 	require.NoError(t, err)
 	payload := []byte(`{"responses":[{"error":"failed to verify ciphertext: cannot unmarshal data: unexpected end of JSON input","id":{"key":"W","namespace":"","owner":"foo"},"success":false}]}`)
-	resp := Response{
+	resp := SignedOCRResponse{
 		Payload: payload,
 		Context: ctx,
 		Signatures: [][]byte{

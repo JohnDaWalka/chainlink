@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
@@ -34,7 +33,7 @@ const (
 
 var (
 	_                                 gwhandlers.Handler = (*handler)(nil)
-	ErrInsufficientResponsesForQuorum                    = errors.New("insufficient valid responses to reach quorum")
+	errInsufficientResponsesForQuorum                    = errors.New("insufficient valid responses to reach quorum")
 )
 
 type metrics struct {
@@ -79,6 +78,10 @@ type capabilitiesRegistry interface {
 	DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error)
 }
 
+type aggregator interface {
+	Aggregate(ctx context.Context, l logger.Logger, ar *activeRequest, currResp *jsonrpc.Response[json.RawMessage]) (*jsonrpc.Response[json.RawMessage], error)
+}
+
 type handler struct {
 	services.StateMachine
 	methodConfig Config
@@ -95,7 +98,7 @@ type handler struct {
 	activeRequests map[string]*activeRequest
 	metrics        *metrics
 
-	capabilitiesRegistry capabilitiesRegistry
+	aggregator aggregator
 }
 
 func (h *handler) HealthReport() map[string]error {
@@ -138,17 +141,17 @@ func NewHandler(methodConfig json.RawMessage, donConfig *config.DONConfig, don g
 	}
 
 	return &handler{
-		methodConfig:         cfg,
-		donConfig:            donConfig,
-		don:                  don,
-		lggr:                 logger.Named(lggr, "VaultHandler:"+donConfig.DonId),
-		requestTimeout:       time.Duration(cfg.RequestTimeoutSec) * time.Second,
-		nodeRateLimiter:      nodeRateLimiter,
-		activeRequests:       make(map[string]*activeRequest),
-		mu:                   sync.RWMutex{},
-		stopCh:               make(services.StopChan),
-		metrics:              metrics,
-		capabilitiesRegistry: capabilitiesRegistry,
+		methodConfig:    cfg,
+		donConfig:       donConfig,
+		don:             don,
+		lggr:            logger.Named(lggr, "VaultHandler:"+donConfig.DonId),
+		requestTimeout:  time.Duration(cfg.RequestTimeoutSec) * time.Second,
+		nodeRateLimiter: nodeRateLimiter,
+		activeRequests:  make(map[string]*activeRequest),
+		mu:              sync.RWMutex{},
+		stopCh:          make(services.StopChan),
+		metrics:         metrics,
+		aggregator:      &baseAggregator{capabilitiesRegistry: capabilitiesRegistry},
 	}, nil
 }
 
@@ -268,27 +271,16 @@ func (h *handler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response[
 		return nil
 	}
 
-	err := h.validateUsingSignatures(ctx, *resp)
-	if err == nil {
-		l.Debugw("successfully validated signatures")
-		h.sendSuccessResponse(ctx, l, ar, resp)
+	ar.mu.Lock()
+	ar.responses = append(ar.responses, resp)
+	ar.mu.Unlock()
+
+	resp, err := h.aggregator.Aggregate(ctx, l, ar, resp)
+	if err != nil {
+		l.Debugw("error aggregating responses", "error", err)
 		return nil
 	}
 
-	l.Debugw("failed to validate signatures, falling back to quorum aggregation", "error", err)
-	err = h.validateUsingQuorum(ctx, ar)
-	switch {
-	case errors.Is(err, ErrInsufficientResponsesForQuorum):
-		ar.mu.Lock()
-		l.Debugw("not enough valid responses to reach quorum", "error", err, "currentResponses", len(ar.responses))
-		ar.responses = append(ar.responses, resp)
-		ar.mu.Unlock()
-	default:
-		l.Errorw("error validating using quorum", "error", err)
-		h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.HandlerError, fmt.Errorf("error validating using quorum: %w", err)))
-	}
-
-	l.Debugw("successfully reached quorum for response")
 	h.sendSuccessResponse(ctx, l, ar, resp)
 	return nil
 }
@@ -313,63 +305,6 @@ func (h *handler) sendSuccessResponse(ctx context.Context, l logger.Logger, ar *
 		ErrorCode:   errorCode,
 	}
 	return h.sendResponse(ctx, ar, successResp)
-}
-
-func (h *handler) validateUsingQuorum(ctx context.Context, ar *activeRequest) error {
-	don, _, err := h.capabilitiesRegistry.DONForCapability(ctx, vaultcommon.CapabilityID)
-	if err != nil {
-		return err
-	}
-
-	requiredQuorum := int(2*don.F + 1)
-
-	ar.mu.Lock()
-	defer ar.mu.Unlock()
-	if len(ar.responses) < requiredQuorum {
-		return ErrInsufficientResponsesForQuorum
-	}
-
-	shaToCount := map[string]int{}
-	for _, r := range ar.responses {
-		sha, err := r.Digest()
-		if err != nil {
-			return fmt.Errorf("failed to validate using quorum: failed to compute digest: %w", err)
-		}
-		if shaToCount[sha] >= requiredQuorum {
-			return nil
-		}
-	}
-
-	return ErrInsufficientResponsesForQuorum
-}
-
-func (h *handler) validateUsingSignatures(ctx context.Context, resp jsonrpc.Response[json.RawMessage]) error {
-	if resp.Result == nil {
-		return errors.New("response result is nil: cannot validate signatures")
-	}
-
-	r := &vaultcap.Response{}
-	err := json.Unmarshal(*resp.Result, r)
-	if err != nil {
-		return err
-	}
-
-	don, nodes, err := h.capabilitiesRegistry.DONForCapability(ctx, vaultcommon.CapabilityID)
-	if err != nil {
-		return err
-	}
-
-	signers := []common.Address{}
-	for _, n := range nodes {
-		signers = append(signers, common.BytesToAddress(n.Signer[0:20]))
-	}
-
-	err = vaultcap.ValidateSignatures(r, signers, int(don.F+1))
-	if err != nil {
-		return fmt.Errorf("failed to validate signatures: %w", err)
-	}
-
-	return nil
 }
 
 func (h *handler) handleSecretsCreate(ctx context.Context, ar *activeRequest) error {
