@@ -130,6 +130,16 @@ func subscribeTransmitEvents(
 				SourceChainSelector: srcChainSel,
 				DestChainSelector:   event.DestChainSelector,
 			}
+
+			// Initialize the sequence number range if it doesn't exist
+			if seqNums[csPair].Start == nil {
+				lggr.Infow("Initializing sequence number range for new chain pair", "csPair", csPair)
+				seqNums[csPair] = SeqNumRange{
+					Start: atomic.NewUint64(math.MaxUint64),
+					End:   atomic.NewUint64(0),
+				}
+			}
+
 			// always store the lowest seen number as the start seq num
 			if event.SequenceNumber < seqNums[csPair].Start.Load() {
 				seqNums[csPair].Start.Store(event.SequenceNumber)
