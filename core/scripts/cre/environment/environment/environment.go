@@ -17,9 +17,11 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
@@ -44,8 +46,10 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 )
 
-const manualCtfCleanupMsg = `unexpected startup error. this may have stranded resources. please manually remove containers with 'ctf' label and delete their volumes`
-const manualBeholderCleanupMsg = `unexpected startup error. this may have stranded resources. please manually remove the 'chip-ingress' stack`
+const (
+	manualCtfCleanupMsg      = `unexpected startup error. this may have stranded resources. please manually remove containers with 'ctf' label and delete their volumes`
+	manualBeholderCleanupMsg = `unexpected startup error. this may have stranded resources. please manually remove the 'chip-ingress' stack`
+)
 
 var (
 	binDir string
@@ -69,6 +73,12 @@ const (
 	WorkflowTriggerCron       = "cron"
 )
 
+var EnvironmentCmd = &cobra.Command{
+	Use:   "env",
+	Short: "Environment commands",
+	Long:  `Commands to manage the environment`,
+}
+
 func init() {
 	EnvironmentCmd.AddCommand(startCmd())
 	EnvironmentCmd.AddCommand(stopCmd)
@@ -82,7 +92,7 @@ func init() {
 	}
 	binDir = filepath.Join(rootPath, "bin")
 	if _, err := os.Stat(binDir); os.IsNotExist(err) {
-		if err := os.Mkdir(binDir, 0755); err != nil {
+		if err := os.Mkdir(binDir, 0o755); err != nil {
 			panic(fmt.Errorf("failed to create bin directory: %w", err))
 		}
 	}
@@ -91,12 +101,6 @@ func init() {
 func waitToCleanUp(d time.Duration) {
 	fmt.Printf("Waiting %s before cleanup\n", d)
 	time.Sleep(d)
-}
-
-var EnvironmentCmd = &cobra.Command{
-	Use:   "env",
-	Short: "Environment commands",
-	Long:  `Commands to manage the environment`,
 }
 
 var StartCmdPreRunFunc = func(cmd *cobra.Command, args []string) {
@@ -157,6 +161,9 @@ var StartCmdRecoverHandlerFunc = func(p any, cleanupWait time.Duration) {
 		if removeErr != nil {
 			fmt.Fprint(os.Stderr, errors.Wrap(removeErr, manualCtfCleanupMsg).Error())
 		}
+
+		// signal that the environment failed to start
+		os.Exit(1)
 	}
 }
 
@@ -191,7 +198,7 @@ var StartCmdGenerateSettingsFile = func(homeChainOut *cre.WrappedBlockchainOutpu
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(targetPath, input, 0600)
+	err = os.WriteFile(targetPath, input, 0o600)
 	if err != nil {
 		return err
 	}
@@ -209,6 +216,7 @@ func startCmd() *cobra.Command {
 		exampleWorkflowTrigger   string
 		exampleWorkflowTimeout   time.Duration
 		withPluginsDockerImage   string
+		withContractsVersion     string
 		doSetup                  bool
 		cleanupWait              time.Duration
 		withBeholder             bool
@@ -227,7 +235,7 @@ func startCmd() *cobra.Command {
 			}()
 
 			if doSetup {
-				setupErr := RunSetup(cmd.Context(), SetupConfig{}, false, false)
+				setupErr := RunSetup(cmd.Context(), SetupConfig{ConfigPath: DefaultSetupConfigPath}, true, false)
 				if setupErr != nil {
 					return errors.Wrap(setupErr, "failed to run setup")
 				}
@@ -272,9 +280,22 @@ func startCmd() *cobra.Command {
 				}
 			}
 
-			capabilityFlagsProvider := flags.NewDefaultCapabilityFlagsProvider()
+			// This will not work with remote images that require authentication, but it will catch early most of the issues with missing env setup
+			if err := ensureDockerImagesExist(cmdContext, framework.L, in, withPluginsDockerImage); err != nil {
+				return err
+			}
 
-			if err := in.Validate(capabilityFlagsProvider); err != nil {
+			contractVersionOverrides := make(map[string]string, 0)
+			if withContractsVersion == "v2" {
+				contractVersionOverrides[keystone_changeset.CapabilitiesRegistry.String()] = "2.0.0"
+				contractVersionOverrides[keystone_changeset.WorkflowRegistry.String()] = "2.0.0"
+			}
+			envDependencies := cre.NewEnvironmentDependencies(
+				flags.NewDefaultCapabilityFlagsProvider(),
+				cre.NewContractVersionsProvider(contractVersionOverrides),
+			)
+
+			if err := in.Validate(envDependencies); err != nil {
 				return errors.Wrap(err, "failed to validate test configuration")
 			}
 
@@ -292,7 +313,7 @@ func startCmd() *cobra.Command {
 				return errors.Wrap(err, "either cron binary path must be set in TOML config (%s) or you must use Docker image with all capabilities included and passed via withPluginsDockerImageFlag")
 			}
 
-			output, startErr := StartCLIEnvironment(cmdContext, in, topology, withPluginsDockerImage, defaultCapabilities, capabilityFlagsProvider)
+			output, startErr := StartCLIEnvironment(cmdContext, in, topology, withPluginsDockerImage, defaultCapabilities, envDependencies)
 			if startErr != nil {
 				fmt.Fprintf(os.Stderr, "Error: %s\n", startErr)
 				fmt.Fprintf(os.Stderr, "Stack trace: %s\n", string(debug.Stack()))
@@ -329,6 +350,20 @@ func startCmd() *cobra.Command {
 					cleanupWait,
 					protoConfigs,
 				)
+
+				metaData := map[string]any{}
+				if startBeholderErr != nil {
+					metaData["result"] = "failure"
+					metaData["error"] = oneLineErrorMessage(startBeholderErr)
+				} else {
+					metaData["result"] = "success"
+				}
+
+				trackingErr := dxTracker.Track(tracking.MetricBeholderStart, metaData)
+				if trackingErr != nil {
+					fmt.Fprintf(os.Stderr, "failed to track beholder start: %s\n", trackingErr)
+				}
+
 				if startBeholderErr != nil {
 					if !strings.Contains(startBeholderErr.Error(), protoRegistrationErrMsg) {
 						beholderRemoveErr := framework.RemoveTestStack(chipingressset.DEFAULT_STACK_NAME)
@@ -380,6 +415,7 @@ func startCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&withBeholder, "with-beholder", "b", false, "Deploy Beholder (Chip Ingress + Red Panda)")
 	cmd.Flags().StringArrayVarP(&protoConfigs, "with-proto-configs", "c", []string{"./proto-configs/default.toml"}, "Protos configs to use (e.g. './proto-configs/config_one.toml,./proto-configs/config_two.toml')")
 	cmd.Flags().BoolVarP(&doSetup, "auto-setup", "a", false, "Run setup before starting the environment")
+	cmd.Flags().StringVar(&withContractsVersion, "with-contracts-version", "v1", "Version of workflow and capabilities registry contracts to use (v1 or v2)")
 	return cmd
 }
 
@@ -446,7 +482,7 @@ func saveArtifactPaths() error {
 		return errors.Wrap(mErr, "failed to marshal artifact paths")
 	}
 
-	return os.WriteFile("artifact_paths.json", marshalled, 0600)
+	return os.WriteFile("artifact_paths.json", marshalled, 0o600)
 }
 
 func trackStartup(success, hasBuiltDockerImage bool, infraType string, errorMessage *string, panicked *bool) error {
@@ -463,13 +499,13 @@ func trackStartup(success, hasBuiltDockerImage bool, infraType string, errorMess
 		metadata["panicked"] = *panicked
 	}
 
-	dxStartupErr := dxTracker.Track("cre.local.startup.result", metadata)
+	dxStartupErr := dxTracker.Track(tracking.MetricStartupResult, metadata)
 	if dxStartupErr != nil {
 		fmt.Fprintf(os.Stderr, "failed to track startup: %s\n", dxStartupErr)
 	}
 
 	if success {
-		dxTimeErr := dxTracker.Track("cre.local.startup.time", map[string]any{
+		dxTimeErr := dxTracker.Track(tracking.MetricStartupTime, map[string]any{
 			"duration_seconds":       time.Since(provisioningStartTime).Seconds(),
 			"has_built_docker_image": hasBuiltDockerImage,
 		})
@@ -525,7 +561,7 @@ func StartCLIEnvironment(
 	topologyFlag string,
 	withPluginsDockerImageFlag string,
 	capabilities []cre.InstallableCapability,
-	capabilityFlagsProvider cre.CapabilityFlagsProvider,
+	env cre.CLIEnvironmentDependencies,
 ) (*creenv.SetupOutput, error) {
 	testLogger := framework.L
 
@@ -575,6 +611,7 @@ func StartCLIEnvironment(
 	universalSetupInput := creenv.SetupInput{
 		CapabilitiesAwareNodeSets: in.NodeSets,
 		BlockchainsInput:          in.Blockchains,
+		ContractVersions:          env.GetContractVersions(),
 		JdInput:                   *in.JD,
 		InfraInput:                *in.Infra,
 		S3ProviderInput:           in.S3ProviderInput,
@@ -722,6 +759,67 @@ func validateWorkflowTriggerAndCapabilities(in *envconfig.Config, withExampleFla
 		if cronCapConfig.BinaryPath == "" {
 			return errors.New("cron binary path must be set in TOML config")
 		}
+
+		return nil
+	}
+
+	return nil
+}
+
+func ensureDockerImagesExist(ctx context.Context, logger zerolog.Logger, in *envconfig.Config, withPluginsDockerImageFlag string) error {
+	// skip this check in CI, as we inject images at runtime and this check would fail
+	if os.Getenv("CI") == "true" {
+		return nil
+	}
+
+	if withPluginsDockerImageFlag != "" {
+		if err := ensureDockerImageExists(ctx, logger, withPluginsDockerImageFlag); err != nil {
+			return errors.Wrapf(err, "Plugins image '%s' not found. Make sure it exists locally", withPluginsDockerImageFlag)
+		}
+	}
+
+	if in.JD != nil {
+		if err := ensureDockerImageExists(ctx, logger, in.JD.Image); err != nil {
+			return errors.Wrapf(err, "Job Distributor image '%s' not found. Make sure it exists locally or run 'go run . env setup' to pull it and other dependencies that also might be missing", in.JD.Image)
+		}
+	}
+
+	for _, nodeSet := range in.NodeSets {
+		for _, nodeSpec := range nodeSet.NodeSpecs {
+			if nodeSpec.Node != nil && nodeSpec.Node.Image != "" {
+				if err := ensureDockerImageExists(ctx, logger, nodeSpec.Node.Image); err != nil {
+					return errors.Wrapf(err, "Node image '%s' not found. Make sure it exists locally", nodeSpec.Node.Image)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// ensureDockerImageExists checks if the image exists locally, if not, it pulls it
+// it returns nil if the image exists locally or was pulled successfully
+// it returns an error if the image does not exist locally and pulling fails
+// it doesn't handle registries that require authentication
+func ensureDockerImageExists(ctx context.Context, logger zerolog.Logger, imageName string) error {
+	dockerClient, dErr := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+	if dErr != nil {
+		return errors.Wrap(dErr, "failed to create Docker client")
+	}
+
+	logger.Debug().Msgf("Checking if image '%s' exists locally", imageName)
+
+	_, err := dockerClient.ImageInspect(ctx, imageName)
+	if err != nil {
+		logger.Debug().Msgf("Image '%s' not found locally, trying to pull it", imageName)
+
+		ioRead, pullErr := dockerClient.ImagePull(ctx, imageName, image.PullOptions{})
+		if pullErr != nil {
+			return fmt.Errorf("image '%s' not found locally and pulling failed", imageName)
+		}
+		defer ioRead.Close()
+
+		logger.Debug().Msgf("Image '%s' pulled successfully", imageName)
 
 		return nil
 	}
