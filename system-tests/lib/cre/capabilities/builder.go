@@ -7,12 +7,15 @@ import (
 )
 
 type Capability struct {
-	flag                         cre.CapabilityFlag
-	jobSpecFn                    cre.JobSpecFn
-	nodeConfigFn                 cre.NodeConfigFn
-	gatewayJobHandlerConfigFn    cre.GatewayHandlerConfigFn
-	capabilityRegistryV1ConfigFn cre.CapabilityRegistryConfigFn
-	validateFn                   func(*Capability) error
+	flag                      cre.CapabilityFlag
+	jobSpecFn                 cre.JobSpecFn
+	nodeConfigFn              cre.NodeConfigFn
+	gatewayJobHandlerConfigFn cre.GatewayHandlerConfigFn
+	registryConfigFns         struct {
+		V1 cre.CapabilityRegistryConfigFn
+		V2 cre.CapabilityRegistryConfigFn
+	}
+	validateFn func(*Capability) error
 }
 
 func (c *Capability) Flag() cre.CapabilityFlag {
@@ -32,7 +35,11 @@ func (c *Capability) GatewayJobHandlerConfigFn() cre.GatewayHandlerConfigFn {
 }
 
 func (c *Capability) CapabilityRegistryV1ConfigFn() cre.CapabilityRegistryConfigFn {
-	return c.capabilityRegistryV1ConfigFn
+	return c.registryConfigFns.V1
+}
+
+func (c *Capability) CapabilityRegistryV2ConfigFn() cre.CapabilityRegistryConfigFn {
+	return c.registryConfigFns.V2
 }
 
 type Option func(*Capability)
@@ -57,7 +64,13 @@ func WithGatewayJobHandlerConfigFn(gatewayJobHandlerConfigFn cre.GatewayHandlerC
 
 func WithCapabilityRegistryV1ConfigFn(capabilityRegistryV1ConfigFn cre.CapabilityRegistryConfigFn) Option {
 	return func(c *Capability) {
-		c.capabilityRegistryV1ConfigFn = capabilityRegistryV1ConfigFn
+		c.registryConfigFns.V1 = capabilityRegistryV1ConfigFn
+	}
+}
+
+func WithCapabilityRegistryV2ConfigFn(capabilityRegistryV1ConfigFn cre.CapabilityRegistryConfigFn) Option {
+	return func(c *Capability) {
+		c.registryConfigFns.V2 = capabilityRegistryV1ConfigFn
 	}
 }
 
