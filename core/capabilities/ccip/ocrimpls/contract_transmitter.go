@@ -188,23 +188,3 @@ func (c *ccipTransmitter) Transmit(
 
 	return nil
 }
-
-// Aptos
-// type aptosChainWriter struct {
-// 	logger    logger.Logger
-// 	txm       *txm.AptosTxm
-// 	feeClient aptos.AptosRpcClient
-// 	config    ChainWriterConfig
-
-// 	starter utils.StartStopOnce
-// }
-
-// Sui
-// type SuiChainWriter struct {
-// 	lggr       logger.Logger
-// 	txm        txm.TxManager
-// 	config     cwConfig.ChainWriterConfig
-// 	simulate   bool
-// 	ptbFactory *ptb.PTBConstructor
-// 	services.StateMachine
-// }

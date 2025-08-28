@@ -10,6 +10,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+	"github.com/smartcontractkit/wsrpc/logger"
 )
 
 // ExecutePluginCodecV1 is a codec for encoding and decoding execute plugin reports.
@@ -25,6 +26,13 @@ func NewExecutePluginCodecV1(extraDataCodec ccipcommon.ExtraDataCodec) *ExecuteP
 }
 
 func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+	lggr, err := logger.New()
+	if err != nil {
+		return nil, err
+	}
+
+	lggr.Info("ENCODING SUI REPORT: ", report.ChainReports)
+
 	if len(report.ChainReports) == 0 {
 		return nil, nil
 	}
@@ -169,6 +177,8 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	if s.Error() != nil {
 		return nil, fmt.Errorf("BCS serialization failed: %w", s.Error())
 	}
+
+	lggr.Info("SERIALIZED SUI REPORT IN BCS FORMAT:  ", s.ToBytes())
 
 	return s.ToBytes(), nil
 }
