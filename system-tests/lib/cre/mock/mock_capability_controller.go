@@ -134,7 +134,7 @@ func (c *Controller) SendTrigger(ctx context.Context, message *pb2.SendTriggerEv
 }
 func (c *Controller) RegisterTrigger(ctx context.Context, triggerID string, metadata *pb2.Metadata, config []byte, payload *anypb.Any, method string, registrationTriggerID string) ([]chan *capabilities.TriggerResponse, error) {
 	if len(c.Nodes) == 0 {
-		return nil, fmt.Errorf("no nodes available for trigger registration")
+		return nil, errors.New("no nodes available for trigger registration")
 	}
 
 	responses := make([]chan *capabilities.TriggerResponse, len(c.Nodes))
@@ -142,7 +142,7 @@ func (c *Controller) RegisterTrigger(ctx context.Context, triggerID string, meta
 
 	for i, client := range c.Nodes {
 		// Create unbuffered channel
-		responses[i] = make(chan *capabilities.TriggerResponse, 0)
+		responses[i] = make(chan *capabilities.TriggerResponse)
 
 		c.lggr.Info().Str("client_url", client.URL).Str("trigger_id", triggerID).Msg("Registering trigger")
 
@@ -366,7 +366,7 @@ func (c *Controller) HookExecutables(ctx context.Context, ch chan capabilities.C
 
 func (c *Controller) UnregisterTrigger(ctx context.Context, triggerID string, metadata *pb2.Metadata, config []byte, payload *anypb.Any, method string, registrationTriggerID string) error {
 	if len(c.Nodes) == 0 {
-		return fmt.Errorf("no nodes available")
+		return errors.New("no nodes available")
 	}
 
 	var unregistrationErrors []error
