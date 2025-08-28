@@ -58,7 +58,7 @@ func TestCron(t *testing.T) {
 
 	// Use WASP to trigger registrations to the cron-trigger
 
-	// We want to see n responses back in order to consider it sucessful,
+	// We want to see n responses back in order to consider it successful,
 	// For example, if we can sustain it for 5m then we consider it successful
 	payload, err := anypb.New(&cron.Config{Schedule: cronSchedule})
 	require.NoError(t, err, "creating payload failed")
