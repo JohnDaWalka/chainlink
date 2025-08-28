@@ -438,7 +438,7 @@ func setupRateLimitingTest(t *testing.T, cfg ServiceConfig) (*gatewayHandler, *j
 	reqBytes, err := json.Marshal(outboundReq)
 	require.NoError(t, err)
 
-	id := fmt.Sprintf("%s/workflowId123/uuid456", gateway_common.MethodHTTPAction)
+	id := gateway_common.MethodHTTPAction + "/workflowId123/uuid456"
 	rawRequest := json.RawMessage(reqBytes)
 	resp := &jsonrpc.Response[json.RawMessage]{
 		ID:     id,
