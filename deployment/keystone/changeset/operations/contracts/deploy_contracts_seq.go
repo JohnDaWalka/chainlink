@@ -8,14 +8,18 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	cap_reg_v2 "github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/operations/contracts"
 )
 
 type DeployKeystoneContractsSequenceDeps struct {
 	Env *deployment.Environment
 }
 
-type EVMChainID uint64
-type Selector uint64
+type (
+	EVMChainID uint64
+	Selector   uint64
+)
 
 // inputs and outputs have to be serializable, and must not contain sensitive data
 
@@ -26,6 +30,9 @@ type DeployKeystoneContractsSequenceInput struct {
 	DeployEVMOCR3         bool
 	EVMChainIDs           map[EVMChainID]Selector
 	DeployConsensusOCR3   bool
+
+	// WithV2Contracts if true will deploy Capability Registry V2
+	WithV2Contracts bool
 }
 
 type DeployKeystoneContractsSequenceOutput struct {
@@ -59,13 +66,29 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 		as := datastore.NewMemoryDataStore()
 
 		// Capabilities Registry contract
-		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-		err = updateAddresses(as.Addresses(), capabilitiesRegistryDeployReport.Output.Addresses, ab, capabilitiesRegistryDeployReport.Output.AddressBook)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
+		if input.WithV2Contracts {
+			v2Report, err := operations.ExecuteOperation(b, cap_reg_v2.DeployCapabilitiesRegistry, cap_reg_v2.DeployCapabilitiesRegistryDeps(deps), cap_reg_v2.DeployCapabilitiesRegistryInput{
+				ChainSelector: input.RegistryChainSelector,
+			})
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+			
+			out, err := ToV1Output(v2Report.Output)
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+
+			err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook)
+		} else {
+			capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+			err = updateAddresses(as.Addresses(), capabilitiesRegistryDeployReport.Output.Addresses, ab, capabilitiesRegistryDeployReport.Output.AddressBook)
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
 		}
 
 		// OCR3 Contract
@@ -155,4 +178,37 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 
 func GetCapabilityContractIdentifier(chainID uint64) string {
 	return fmt.Sprintf("capability_evm_%d", chainID)
+}
+
+// ToV1Output transforms the v2 output to v1 output by creating an address book
+func ToV1Output(in cap_reg_v2.DeployCapabilitiesRegistryOutput) (DeployCapabilityRegistryOutput, error){
+		ab := deployment.NewMemoryAddressBook()
+		ds := datastore.NewMemoryDataStore()
+		r := datastore.AddressRef{
+			ChainSelector: in.ChainSelector,
+			Address:       in.Address,
+			Type:          datastore.ContractType(in.Type),
+			Version:       semver.MustParse(in.Version),
+			Qualifier:     in.Qualifier,
+			Labels:        datastore.NewLabelSet(),
+		}
+		for _, l := range in.Labels {
+			r.Labels.Add(l)
+		}
+		
+		if err := ds.Addresses().Add(r); err != nil {
+			return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to add address ref: %w", err)
+		}
+
+		if err := ab.Save(in.ChainSelector, in.Address, deployment.TypeAndVersion{
+			Type: deployment.ContractType(in.Type),
+			Version: *semver.MustParse(in.Version),
+			Labels: deployment.NewLabelSet(in.Labels...),
+		}); err != nil {
+			return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to save address to address book: %w", err)
+		}
+	return DeployCapabilityRegistryOutput{
+		Addresses: ds.Addresses(),
+		AddressBook: ab,
+	}, nil
 }
