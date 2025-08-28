@@ -129,114 +129,194 @@ func (s *Capability) handleRequest(ctx context.Context, requestID string, reques
 	}
 }
 
-func (s *Capability) CreateSecrets(ctx context.Context, request *vaultcommon.CreateSecretsRequest) (*Response, error) {
-	s.lggr.Infof("Received CreateSecrets call: %s", request.String())
+func ValidateCreateSecretsRequest(request *vaultcommon.CreateSecretsRequest) error {
 	if request.RequestId == "" {
-		return nil, errors.New("request ID must not be empty")
+		return errors.New("request ID must not be empty")
+	}
+
+	if len(request.EncryptedSecrets) == 0 {
+		return errors.New("must have at least one request")
 	}
 
 	if len(request.EncryptedSecrets) >= MaxBatchSize {
-		return nil, fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
+		return fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
 	}
 
 	uniqueIDs := map[string]bool{}
 	for _, req := range request.EncryptedSecrets {
 		if req.Id == nil {
-			return nil, errors.New("secret ID must not be nil")
+			return errors.New("secret ID must not be nil")
 		}
 
 		if req.Id.Key == "" || req.Id.Owner == "" {
-			return nil, fmt.Errorf("secret ID must have both key and owner set: %v", req.Id)
+			return fmt.Errorf("secret ID must have both key and owner set: %v", req.Id)
+		}
+
+		if req.EncryptedValue == "" {
+			return fmt.Errorf("encrypted value must be set for secret ID: %v", req.Id)
 		}
 
 		_, ok := uniqueIDs[KeyFor(req.Id)]
 		if ok {
-			return nil, fmt.Errorf("duplicate secret ID found: %v", req.Id)
+			return fmt.Errorf("duplicate secret ID found: %v", req.Id)
 		}
 
 		uniqueIDs[KeyFor(req.Id)] = true
 	}
 
+	return nil
+}
+
+func (s *Capability) CreateSecrets(ctx context.Context, request *vaultcommon.CreateSecretsRequest) (*Response, error) {
+	s.lggr.Debugw("executing vault capability call", "method", "CreateSecrets", "requestID", request.RequestId)
+	// TODO: validate that secrets are encrypted with the correct key
+	err := ValidateCreateSecretsRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate create secrets request: %w", err)
+	}
+
 	return s.handleRequest(ctx, request.RequestId, request)
+}
+
+func ValidateUpdateSecretsRequest(request *vaultcommon.UpdateSecretsRequest) error {
+	if request.RequestId == "" {
+		return errors.New("request ID must not be empty")
+	}
+
+	if len(request.EncryptedSecrets) == 0 {
+		return errors.New("must have at least one request")
+	}
+
+	if len(request.EncryptedSecrets) >= MaxBatchSize {
+		return fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
+	}
+
+	uniqueIDs := map[string]bool{}
+	for _, req := range request.EncryptedSecrets {
+		if req.Id == nil {
+			return errors.New("secret ID must not be nil")
+		}
+
+		if req.Id.Key == "" || req.Id.Owner == "" {
+			return fmt.Errorf("secret ID must have both key and owner set: %v", req.Id)
+		}
+
+		if req.EncryptedValue == "" {
+			return fmt.Errorf("encrypted value must be set for secret ID: %v", req.Id)
+		}
+
+		_, ok := uniqueIDs[KeyFor(req.Id)]
+		if ok {
+			return fmt.Errorf("duplicate secret ID found: %v", req.Id)
+		}
+
+		uniqueIDs[KeyFor(req.Id)] = true
+	}
+
+	return nil
 }
 
 func (s *Capability) UpdateSecrets(ctx context.Context, request *vaultcommon.UpdateSecretsRequest) (*Response, error) {
-	if request.RequestId == "" {
-		return nil, errors.New("request ID must not be empty")
+	s.lggr.Debugw("executing vault capability call", "method", "UpdateSecrets", "requestID", request.RequestId)
+	// TODO: validate that secrets are encrypted with the correct key
+	err := ValidateUpdateSecretsRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate update secrets request: %w", err)
 	}
 
-	if len(request.EncryptedSecrets) >= MaxBatchSize {
-		return nil, fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
-	}
-
-	uniqueIDs := map[string]bool{}
-	for _, req := range request.EncryptedSecrets {
-		if req.Id == nil {
-			return nil, errors.New("secret ID must not be nil")
-		}
-
-		if req.Id.Key == "" || req.Id.Owner == "" {
-			return nil, fmt.Errorf("secret ID must have both key and owner set: %v", req.Id)
-		}
-
-		_, ok := uniqueIDs[KeyFor(req.Id)]
-		if ok {
-			return nil, fmt.Errorf("duplicate secret ID found: %v", req.Id)
-		}
-
-		uniqueIDs[KeyFor(req.Id)] = true
-	}
-
-	// TODO: secrets should be encrypted with the correct key
 	return s.handleRequest(ctx, request.RequestId, request)
 }
 
-func (s *Capability) DeleteSecrets(ctx context.Context, request *vaultcommon.DeleteSecretsRequest) (*Response, error) {
+func ValidateDeleteSecretsRequest(request *vaultcommon.DeleteSecretsRequest) error {
 	if request.RequestId == "" {
-		return nil, errors.New("request ID must not be empty")
+		return errors.New("request ID must not be empty")
+	}
+
+	if len(request.Ids) == 0 {
+		return errors.New("must have at least one request")
 	}
 
 	if len(request.Ids) >= MaxBatchSize {
-		return nil, fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
+		return fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
 	}
 
 	uniqueIDs := map[string]bool{}
 	for _, id := range request.Ids {
 		if id.Key == "" || id.Owner == "" {
-			return nil, fmt.Errorf("secret ID must have both key and owner set: %v", id)
+			return fmt.Errorf("secret ID must have both key and owner set: %v", id)
 		}
 
 		_, ok := uniqueIDs[KeyFor(id)]
 		if ok {
-			return nil, fmt.Errorf("duplicate secret ID found: %v", id)
+			return fmt.Errorf("duplicate secret ID found: %v", id)
 		}
 
 		uniqueIDs[KeyFor(id)] = true
 	}
 
+	return nil
+}
+
+func (s *Capability) DeleteSecrets(ctx context.Context, request *vaultcommon.DeleteSecretsRequest) (*Response, error) {
+	s.lggr.Debugw("executing vault capability call", "method", "DeleteSecrets", "requestID", request.RequestId)
+	err := ValidateDeleteSecretsRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate delete secrets request: %w", err)
+	}
+
 	return s.handleRequest(ctx, request.RequestId, request)
 }
 
-func (s *Capability) ListSecretIdentifiers(ctx context.Context, request *vaultcommon.ListSecretIdentifiersRequest) (*Response, error) {
+func ValidateListSecretIdentifiersRequest(request *vaultcommon.ListSecretIdentifiersRequest) error {
 	if request.RequestId == "" {
-		return nil, errors.New("request ID must not be empty")
+		return errors.New("request ID must not be empty")
 	}
 
 	if request.Owner == "" {
-		return nil, errors.New("owner must not be empty")
+		return errors.New("owner must not be empty")
+	}
+
+	return nil
+}
+
+func (s *Capability) ListSecretIdentifiers(ctx context.Context, request *vaultcommon.ListSecretIdentifiersRequest) (*Response, error) {
+	s.lggr.Debugw("executing vault capability call", "method", "ListSecretIdentifiers", "requestID", request.RequestId)
+	err := ValidateListSecretIdentifiersRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate list secret identifiers request: %w", err)
 	}
 
 	return s.handleRequest(ctx, request.RequestId, request)
 }
 
-func (s *Capability) GetSecrets(ctx context.Context, requestID string, request *vaultcommon.GetSecretsRequest) (*Response, error) {
-	s.lggr.Infof("Received GetSecrets call: %s", request.String())
+func ValidateGetSecretsRequest(request *vaultcommon.GetSecretsRequest) error {
 	if len(request.Requests) == 0 {
-		return nil, errors.New("no GetSecret request specified in request")
+		return errors.New("no GetSecret request specified in request")
 	}
 	if len(request.Requests) >= MaxBatchSize {
-		return nil, fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
+		return fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
 	}
+
+	for _, req := range request.Requests {
+		id := req.Id
+		if req == nil {
+			return errors.New("secret ID must not be nil")
+		}
+		if id.Key == "" || id.Owner == "" {
+			return fmt.Errorf("secret ID must have both key and owner set: %v", id)
+		}
+	}
+
+	return nil
+}
+
+func (s *Capability) GetSecrets(ctx context.Context, requestID string, request *vaultcommon.GetSecretsRequest) (*Response, error) {
+	s.lggr.Debugw("executing vault capability call", "method", "GetSecrets")
+	err := ValidateGetSecretsRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate get secrets request: %w", err)
+	}
+
 	return s.handleRequest(ctx, requestID, request)
 }
 
@@ -247,7 +327,6 @@ func NewCapability(
 	handler *requests.Handler[*Request, *Response],
 ) *Capability {
 	return &Capability{
-
 		lggr:         lggr.Named("VaultCapability"),
 		clock:        clock,
 		expiresAfter: expiresAfter,
