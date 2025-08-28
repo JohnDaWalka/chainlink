@@ -14,9 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/ratelimit"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/settings/cresettings"
+	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	gateway_config "github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities/v2/metrics"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
@@ -42,11 +44,11 @@ type gatewayHandler struct {
 	services.StateMachine
 	config          ServiceConfig
 	don             handlers.DON
-	donConfig       *config.DONConfig
+	donConfig       *gateway_config.DONConfig
 	lggr            logger.Logger
 	httpClient      network.HTTPClient
 	nodeRateLimiter *ratelimit.RateLimiter // Rate limiter for node requests (e.g. outgoing HTTP requests, HTTP trigger response, auth metadata exchange)
-	userRateLimiter *ratelimit.RateLimiter // Rate limiter for user requests that trigger workflow executions
+	userRateLimiter limits.RateLimiter     // Rate limiter for user requests that trigger workflow executions
 	wg              sync.WaitGroup
 	stopCh          services.StopChan
 	responseCache   ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
@@ -63,7 +65,6 @@ type ResponseCache interface {
 
 type ServiceConfig struct {
 	NodeRateLimiter               ratelimit.RateLimiterConfig `json:"nodeRateLimiter"`
-	UserRateLimiter               ratelimit.RateLimiterConfig `json:"userRateLimiter"`
 	MaxTriggerRequestDurationMs   int                         `json:"maxTriggerRequestDurationMs"`
 	RetryConfig                   RetryConfig                 `json:"retryConfig"`
 	CleanUpPeriodMs               int                         `json:"cleanUpPeriodMs"`
@@ -79,20 +80,22 @@ type RetryConfig struct {
 	Multiplier        float64 `json:"multiplier"`
 }
 
-func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfig, don handlers.DON, httpClient network.HTTPClient, lggr logger.Logger) (*gatewayHandler, error) {
+func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *gateway_config.DONConfig, don handlers.DON, httpClient network.HTTPClient, lggr logger.Logger, lf limits.Factory) (*gatewayHandler, error) {
 	var cfg ServiceConfig
 	err := json.Unmarshal(handlerConfig, &cfg)
 	if err != nil {
 		return nil, err
 	}
 	cfg = WithDefaults(cfg)
+
+	userRateLimiter, err := lf.MakeRateLimiter(cresettings.Default.PerWorkflow.HTTPTrigger.RateLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create workflow rate limiter: %w", err)
+	}
+
 	nodeRateLimiter, err := ratelimit.NewRateLimiter(cfg.NodeRateLimiter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create node rate limiter: %w", err)
-	}
-	userRateLimiter, err := ratelimit.NewRateLimiter(cfg.UserRateLimiter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user rate limiter: %w", err)
 	}
 
 	metrics, err := metrics.NewMetrics()
@@ -108,8 +111,8 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		donConfig:       donConfig,
 		lggr:            logger.With(logger.Named(lggr, handlerName), "donId", donConfig.DonId),
 		httpClient:      httpClient,
-		nodeRateLimiter: nodeRateLimiter,
 		userRateLimiter: userRateLimiter,
+		nodeRateLimiter: nodeRateLimiter,
 		stopCh:          make(services.StopChan),
 		responseCache:   newResponseCache(lggr, cfg.OutboundRequestCacheTTLMs, metrics),
 		triggerHandler:  triggerHandler,

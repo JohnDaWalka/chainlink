@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 
@@ -30,16 +31,18 @@ type handlerFactory struct {
 	ds           sqlutil.DataSource
 	lggr         logger.Logger
 	httpClient   network.HTTPClient
+	lf           limits.Factory
 }
 
 var _ HandlerFactory = (*handlerFactory)(nil)
 
-func NewHandlerFactory(legacyChains legacyevm.LegacyChainContainer, ds sqlutil.DataSource, httpClient network.HTTPClient, lggr logger.Logger) HandlerFactory {
+func NewHandlerFactory(legacyChains legacyevm.LegacyChainContainer, ds sqlutil.DataSource, httpClient network.HTTPClient, lggr logger.Logger, lf limits.Factory) HandlerFactory {
 	return &handlerFactory{
 		legacyChains,
 		ds,
 		lggr,
 		httpClient,
+		lf,
 	}
 }
 
@@ -52,7 +55,7 @@ func (hf *handlerFactory) NewHandler(handlerType HandlerType, handlerConfig json
 	case WebAPICapabilitiesType:
 		return capabilities.NewHandler(handlerConfig, donConfig, don, hf.httpClient, hf.lggr)
 	case HTTPCapabilityType:
-		return v2.NewGatewayHandler(handlerConfig, donConfig, don, hf.httpClient, hf.lggr)
+		return v2.NewGatewayHandler(handlerConfig, donConfig, don, hf.httpClient, hf.lggr, hf.lf)
 	case VaultHandlerType:
 		return vault.NewHandler(handlerConfig, donConfig, don, hf.lggr)
 	default:

@@ -558,7 +558,9 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 				legacyEVMChains,
 				keyStore.Eth(),
 				opts.DS,
-				globalLogger),
+				globalLogger,
+				opts.LimitsFactory,
+			),
 			job.Stream: streams.NewDelegate(
 				globalLogger,
 				streamRegistry,

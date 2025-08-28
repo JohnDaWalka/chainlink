@@ -40,7 +40,7 @@ type ActionMetrics struct {
 type TriggerMetrics struct {
 	requestCount                     metric.Int64Counter
 	requestErrors                    metric.Int64Counter
-	workflowOwnerThrottled           metric.Int64Counter
+	workflowThrottled                metric.Int64Counter
 	globalThrottled                  metric.Int64Counter
 	pendingRequestsCleanUpCount      metric.Int64Counter
 	pendingRequestsCount             metric.Int64Gauge
@@ -212,12 +212,12 @@ func newTriggerMetrics(meter metric.Meter) (*TriggerMetrics, error) {
 		return nil, fmt.Errorf("failed to create HTTP trigger gateway request errors metric: %w", err)
 	}
 
-	m.workflowOwnerThrottled, err = meter.Int64Counter(
-		"http_trigger_gateway_workflow_owner_throttled",
-		metric.WithDescription("Number of HTTP trigger gateway requests throttled per workflow owner"),
+	m.workflowThrottled, err = meter.Int64Counter(
+		"http_trigger_gateway_workflow_throttled",
+		metric.WithDescription("Number of HTTP trigger gateway requests throttled per workflow"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP trigger gateway workflow owner throttled metric: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP trigger gateway workflow throttled metric: %w", err)
 	}
 
 	m.globalThrottled, err = meter.Int64Counter(
@@ -367,8 +367,8 @@ func (m *TriggerMetrics) IncrementRequestErrors(ctx context.Context, errorCode s
 	m.requestErrors.Add(ctx, 1, metric.WithAttributes(attribute.String(AttrErrorCode, errorCode)))
 }
 
-func (m *TriggerMetrics) IncrementWorkflowOwnerThrottled(ctx context.Context, lggr logger.Logger) {
-	m.workflowOwnerThrottled.Add(ctx, 1)
+func (m *TriggerMetrics) IncrementWorkflowThrottled(ctx context.Context, lggr logger.Logger) {
+	m.workflowThrottled.Add(ctx, 1)
 }
 
 func (m *TriggerMetrics) IncrementGlobalThrottled(ctx context.Context, lggr logger.Logger) {

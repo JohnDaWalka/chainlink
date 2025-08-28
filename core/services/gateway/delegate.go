@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -22,16 +23,18 @@ type Delegate struct {
 	ks           keystore.Eth
 	ds           sqlutil.DataSource
 	lggr         logger.Logger
+	lf           limits.Factory
 }
 
 var _ job.Delegate = (*Delegate)(nil)
 
-func NewDelegate(legacyChains legacyevm.LegacyChainContainer, ks keystore.Eth, ds sqlutil.DataSource, lggr logger.Logger) *Delegate {
+func NewDelegate(legacyChains legacyevm.LegacyChainContainer, ks keystore.Eth, ds sqlutil.DataSource, lggr logger.Logger, lf limits.Factory) *Delegate {
 	return &Delegate{
 		legacyChains: legacyChains,
 		ks:           ks,
 		ds:           ds,
 		lggr:         lggr,
+		lf:           lf,
 	}
 }
 
@@ -59,7 +62,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	if err != nil {
 		return nil, err
 	}
-	handlerFactory := NewHandlerFactory(d.legacyChains, d.ds, httpClient, d.lggr)
+	handlerFactory := NewHandlerFactory(d.legacyChains, d.ds, httpClient, d.lggr, d.lf)
 	gateway, err := NewGatewayFromConfig(&gatewayConfig, handlerFactory, d.lggr)
 	if err != nil {
 		return nil, err
