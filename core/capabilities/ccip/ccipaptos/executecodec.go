@@ -92,12 +92,19 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 	s.Struct(&receiverAddr)
 
+	lggr.Infow("Initializing plugin config",
+		"extraDataCodecType", fmt.Sprintf("%T", e.extraDataCodec),
+	)
+
 	// 10. gas_limit: u256
 	// Extract gas limit from ExtraArgs
 	decodedExtraArgsMap, err := e.extraDataCodec.DecodeExtraArgs(message.ExtraArgs, chainReport.SourceChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ExtraArgs: %w", err)
 	}
+
+	lggr.Info("Decoded sui extraArgs map", decodedExtraArgsMap)
+
 	gasLimit, err := parseExtraDataMap(decodedExtraArgsMap) // Use a helper to extract the gas limit
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract gas limit from decoded ExtraArgs map: %w", err)
