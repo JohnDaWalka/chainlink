@@ -239,6 +239,7 @@ func (h *GatewayHandler) errorResponse(
 	return &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      req.ID,
+		Method:  req.Method,
 		Error: &jsonrpc.WireError{
 			Code:    api.ToJSONRPCErrorCode(errorCode),
 			Message: err.Error(),

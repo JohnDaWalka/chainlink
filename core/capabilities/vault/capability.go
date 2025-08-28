@@ -130,11 +130,33 @@ func (s *Capability) handleRequest(ctx context.Context, requestID string, reques
 }
 
 func (s *Capability) CreateSecrets(ctx context.Context, request *vaultcommon.CreateSecretsRequest) (*Response, error) {
-	// TODO validate the request
 	s.lggr.Infof("Received CreateSecrets call: %s", request.String())
+	if request.RequestId == "" {
+		return nil, errors.New("request ID must not be empty")
+	}
+
 	if len(request.EncryptedSecrets) >= MaxBatchSize {
 		return nil, fmt.Errorf("request batch size exceeds maximum of %d", MaxBatchSize)
 	}
+
+	uniqueIDs := map[string]bool{}
+	for _, req := range request.EncryptedSecrets {
+		if req.Id == nil {
+			return nil, errors.New("secret ID must not be nil")
+		}
+
+		if req.Id.Key == "" || req.Id.Owner == "" {
+			return nil, fmt.Errorf("secret ID must have both key and owner set: %v", req.Id)
+		}
+
+		_, ok := uniqueIDs[KeyFor(req.Id)]
+		if ok {
+			return nil, fmt.Errorf("duplicate secret ID found: %v", req.Id)
+		}
+
+		uniqueIDs[KeyFor(req.Id)] = true
+	}
+
 	return s.handleRequest(ctx, request.RequestId, request)
 }
 

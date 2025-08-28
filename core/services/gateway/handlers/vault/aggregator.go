@@ -21,13 +21,10 @@ type baseAggregator struct {
 }
 
 func (a *baseAggregator) Aggregate(ctx context.Context, l logger.Logger, ar *activeRequest, currResp *jsonrpc.Response[json.RawMessage]) (*jsonrpc.Response[json.RawMessage], error) {
-	dons, err := a.capabilitiesRegistry.DONsForCapability(ctx, vaultcommon.CapabilityID)
+	don, err := a.donForVaultCapability(ctx, l)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get DON for vault capability: %w", err)
 	}
-
-	// TODO: pick the correct one based on the capability registry family
-	don := dons[0]
 
 	currResp, err = a.validateUsingSignatures(don.DON, don.Nodes, currResp)
 	if err == nil {
@@ -41,6 +38,24 @@ func (a *baseAggregator) Aggregate(ctx context.Context, l logger.Logger, ar *act
 	}
 
 	return currResp, nil
+}
+
+func (a *baseAggregator) donForVaultCapability(ctx context.Context, l logger.Logger) (*capabilities.DONWithNodes, error) {
+	dons, err := a.capabilitiesRegistry.DONsForCapability(ctx, vaultcommon.CapabilityID)
+	if err != nil {
+		return nil, err
+	}
+	l.Debug("fetching DONs for capability", "dons", dons)
+
+	// TODO: Support multiple vault capabilities in the capability registry.
+	// For the initial Smartcon deployment there will be exactly one Vault capability
+	// split across both DON families.
+	if len(dons) != 1 {
+		return nil, fmt.Errorf("expected exactly one DON for vault capability, found %d", len(dons))
+	}
+
+	don := dons[0]
+	return &don, nil
 }
 
 func (a *baseAggregator) validateUsingQuorum(don capabilities.DON, ar *activeRequest) (*jsonrpc.Response[json.RawMessage], error) {

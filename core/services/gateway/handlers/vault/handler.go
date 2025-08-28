@@ -309,24 +309,35 @@ func (h *handler) sendSuccessResponse(ctx context.Context, l logger.Logger, ar *
 
 func (h *handler) handleSecretsCreate(ctx context.Context, ar *activeRequest) error {
 	l := logger.With(h.lggr, "method", ar.req.Method, "requestID", ar.req.ID)
-	var createSecretsRequests vaultcommon.CreateSecretsRequest
-	if err := json.Unmarshal(*ar.req.Params, &createSecretsRequests); err != nil {
+
+	createSecretsRequest := &vaultcommon.CreateSecretsRequest{}
+	if err := json.Unmarshal(*ar.req.Params, &createSecretsRequest); err != nil {
 		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.UserMessageParseError, err))
 	}
-	if createSecretsRequests.RequestId == "" {
+
+	createSecretsRequest.RequestId = ar.req.ID
+	if createSecretsRequest.RequestId == "" {
 		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("request_id cannot be empty")))
 	}
-	if len(createSecretsRequests.EncryptedSecrets) == 0 {
+	if len(createSecretsRequest.EncryptedSecrets) == 0 {
 		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("must have atleast 1 request")))
 	}
-	if len(createSecretsRequests.EncryptedSecrets) >= vaultcap.MaxBatchSize {
+	if len(createSecretsRequest.EncryptedSecrets) >= vaultcap.MaxBatchSize {
 		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("request batch size exceeds maximum of "+strconv.Itoa(vaultcap.MaxBatchSize))))
 	}
-	for index, secret := range createSecretsRequests.EncryptedSecrets {
+	for index, secret := range createSecretsRequest.EncryptedSecrets {
 		if secret.Id.Key == "" || secret.EncryptedValue == "" || secret.Id.Owner == "" {
 			return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.InvalidParamsError, errors.New("secret id key, owner and EncryptedValue cannot be empty on index "+strconv.Itoa(index))))
 		}
 	}
+
+	reqb, err := json.Marshal(createSecretsRequest)
+	if err != nil {
+		l.Errorw("failed to marshal request", "error", err)
+		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.NodeReponseEncodingError, fmt.Errorf("failed to marshal request: %w", err)))
+	}
+
+	ar.req.Params = (*json.RawMessage)(&reqb)
 	// At this point, we know that the request is valid and we can send it to the nodes
 	return h.fanOutToVaultNodes(ctx, l, ar)
 }
@@ -407,7 +418,8 @@ func (h *handler) handleSecretsDelete(ctx context.Context, ar *activeRequest) er
 
 func (h *handler) handleSecretsGet(ctx context.Context, ar *activeRequest) error {
 	l := logger.With(h.lggr, "method", ar.req.Method, "requestID", ar.req.ID)
-	var secretsGetRequest vaultcommon.GetSecretsRequest
+
+	secretsGetRequest := &vaultcommon.GetSecretsRequest{}
 	if err := json.Unmarshal(*ar.req.Params, &secretsGetRequest); err != nil {
 		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.UserMessageParseError, err))
 	}
@@ -425,7 +437,6 @@ func (h *handler) handleSecretsGet(ctx context.Context, ar *activeRequest) error
 		}
 	}
 
-	// At this point, we know that the request is valid and we can send it to the nodes
 	return h.fanOutToVaultNodes(ctx, l, ar)
 }
 
