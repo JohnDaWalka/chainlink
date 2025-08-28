@@ -67,10 +67,15 @@ type mockCapabilitiesRegistry struct {
 	Nodes []capabilities.Node
 }
 
-func (m *mockCapabilitiesRegistry) DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error) {
-	return capabilities.DON{
-		F: m.F,
-	}, m.Nodes, nil
+func (m *mockCapabilitiesRegistry) DONsForCapability(ctx context.Context, capabilityID string) ([]capabilities.DONWithNodes, error) {
+	return []capabilities.DONWithNodes{
+		{
+			DON: capabilities.DON{
+				F: m.F,
+			},
+			Nodes: m.Nodes,
+		},
+	}, nil
 }
 
 func TestVaultHandler_HandleJSONRPCUserMessage(t *testing.T) {

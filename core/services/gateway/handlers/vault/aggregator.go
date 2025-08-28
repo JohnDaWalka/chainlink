@@ -21,18 +21,21 @@ type baseAggregator struct {
 }
 
 func (a *baseAggregator) Aggregate(ctx context.Context, l logger.Logger, ar *activeRequest, currResp *jsonrpc.Response[json.RawMessage]) (*jsonrpc.Response[json.RawMessage], error) {
-	don, nodes, err := a.capabilitiesRegistry.DONForCapability(ctx, vaultcommon.CapabilityID)
+	dons, err := a.capabilitiesRegistry.DONsForCapability(ctx, vaultcommon.CapabilityID)
 	if err != nil {
 		return nil, err
 	}
 
-	currResp, err = a.validateUsingSignatures(don, nodes, currResp)
+	// TODO: pick the correct one based on the capability registry family
+	don := dons[0]
+
+	currResp, err = a.validateUsingSignatures(don.DON, don.Nodes, currResp)
 	if err == nil {
 		return currResp, nil
 	}
 
 	l.Debugw("failed to validate signatures, falling back to quorum aggregation", "error", err)
-	currResp, err = a.validateUsingQuorum(don, ar)
+	currResp, err = a.validateUsingQuorum(don.DON, ar)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate using quorum: %w", err)
 	}

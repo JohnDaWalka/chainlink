@@ -75,7 +75,7 @@ type activeRequest struct {
 }
 
 type capabilitiesRegistry interface {
-	DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error)
+	DONsForCapability(ctx context.Context, capabilityID string) ([]capabilities.DONWithNodes, error)
 }
 
 type aggregator interface {

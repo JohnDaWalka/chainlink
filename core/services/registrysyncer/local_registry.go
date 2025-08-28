@@ -171,36 +171,60 @@ func (l *LocalRegistry) NodeByPeerID(ctx context.Context, peerID types.PeerID) (
 	}, nil
 }
 
-func (l *LocalRegistry) DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error) {
+func (l *LocalRegistry) DONsForCapability(ctx context.Context, capabilityID string) ([]capabilities.DONWithNodes, error) {
 	err := l.ensureNotEmpty()
 	if err != nil {
-		return capabilities.DON{}, nil, err
+		return []capabilities.DONWithNodes{}, err
 	}
 
-	var foundDON *DON
+	foundDONs := []capabilities.DONWithNodes{}
 	for _, don := range l.IDsToDONs {
 		for cid := range don.CapabilityConfigurations {
 			if cid == capabilityID {
-				foundDON = &don
+				nodes, err := l.nodesForDON(ctx, don.DON)
+				if err != nil {
+					return nil, err
+				}
+				donWithNodes := capabilities.DONWithNodes{DON: don.DON, Nodes: nodes}
+				foundDONs = append(foundDONs, donWithNodes)
 			}
 		}
 	}
 
-	if foundDON == nil {
-		return capabilities.DON{}, nil, fmt.Errorf("could not find DON for capability %s", capabilityID)
+	if len(foundDONs) == 0 {
+		return nil, fmt.Errorf("could not find DON for capability %s", capabilityID)
 	}
 
+	for _, d := range foundDONs {
+		nodes := []capabilities.Node{}
+		for _, n := range d.DON.Members {
+			node, err := l.NodeByPeerID(ctx, n)
+			if err != nil {
+				return nil, fmt.Errorf("could not find node for peerID %s: %w", n.String(), err)
+			}
+
+			nodes = append(nodes, node)
+
+			fmt.Printf("d: %+v\n", d)
+		}
+		(&d).Nodes = nodes
+	}
+
+	fmt.Printf("foundDONs: %+v\n", foundDONs)
+	return foundDONs, nil
+}
+
+func (l *LocalRegistry) nodesForDON(ctx context.Context, don capabilities.DON) ([]capabilities.Node, error) {
 	nodes := []capabilities.Node{}
-	for _, n := range foundDON.Members {
+	for _, n := range don.Members {
 		node, err := l.NodeByPeerID(ctx, n)
 		if err != nil {
-			return capabilities.DON{}, nil, fmt.Errorf("could not find node for peerID %s: %w", n.String(), err)
+			return nil, fmt.Errorf("could not find node for peerID %s: %w", n.String(), err)
 		}
 
 		nodes = append(nodes, node)
 	}
-
-	return foundDON.DON, nodes, nil
+	return nodes, nil
 }
 
 func (l *LocalRegistry) ConfigForCapability(ctx context.Context, capabilityID string, donID uint32) (capabilities.CapabilityConfiguration, error) {

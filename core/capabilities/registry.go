@@ -53,6 +53,16 @@ func (r *Registry) ConfigForCapability(ctx context.Context, capabilityID string,
 	return r.metadataRegistry.ConfigForCapability(ctx, capabilityID, donID)
 }
 
+func (r *Registry) DONsForCapability(ctx context.Context, capabilityID string) ([]capabilities.DONWithNodes, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.metadataRegistry == nil {
+		return nil, errors.New("metadataRegistry information not available")
+	}
+
+	return r.metadataRegistry.DONsForCapability(ctx, capabilityID)
+}
+
 // SetLocalRegistry sets a local copy of the offchain registry for the registry to use.
 // This is only public for testing purposes; the only production use should be from the CapabilitiesLauncher.
 func (r *Registry) SetLocalRegistry(lr core.CapabilitiesRegistryMetadata) {
@@ -102,6 +112,6 @@ func (t *TestMetadataRegistry) ConfigForCapability(ctx context.Context, capabili
 	return capabilities.CapabilityConfiguration{}, nil
 }
 
-func (t *TestMetadataRegistry) DONForCapability(ctx context.Context, capabilityID string) (capabilities.DON, []capabilities.Node, error) {
-	return capabilities.DON{}, []capabilities.Node{}, nil
+func (t *TestMetadataRegistry) DONsForCapability(ctx context.Context, capabilityID string) ([]capabilities.DONWithNodes, error) {
+	return []capabilities.DONWithNodes{}, nil
 }
