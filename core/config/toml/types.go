@@ -1823,8 +1823,9 @@ type StreamsConfig struct {
 }
 
 type CreConfig struct {
-	Streams         *StreamsConfig         `toml:",omitempty"`
-	WorkflowFetcher *WorkflowFetcherConfig `toml:",omitempty"`
+	Streams              *StreamsConfig         `toml:",omitempty"`
+	WorkflowFetcher      *WorkflowFetcherConfig `toml:",omitempty"`
+	UseLocalTimeProvider *bool                  `toml:",omitempty"`
 }
 
 // WorkflowFetcherConfig holds the configuration for fetching workflow files
@@ -1851,6 +1852,12 @@ func (c *CreConfig) setFrom(f *CreConfig) {
 		}
 		if v := f.WorkflowFetcher.URL; v != nil {
 			c.WorkflowFetcher.URL = v
+		}
+	}
+
+	if f.UseLocalTimeProvider != nil {
+		if c.UseLocalTimeProvider == nil {
+			c.UseLocalTimeProvider = f.UseLocalTimeProvider
 		}
 	}
 }
@@ -2010,8 +2017,8 @@ func (s *WorkflowStorage) setFrom(f *WorkflowStorage) {
 
 func (s *WorkflowStorage) ValidateConfig() error {
 	URLIsSet := s.URL != nil && *s.URL != ""
-	ArtifactStorageHostIsNotSet := s.ArtifactStorageHost == nil || *s.ArtifactStorageHost == ""
-	if URLIsSet && !ArtifactStorageHostIsNotSet {
+	ArtifactStorageHostIsSet := s.ArtifactStorageHost != nil && *s.ArtifactStorageHost != ""
+	if URLIsSet && !ArtifactStorageHostIsSet {
 		return configutils.ErrInvalid{Name: "ArtifactStorageHost", Value: "", Msg: "workflow storage service artifact storage host must be set"}
 	}
 
