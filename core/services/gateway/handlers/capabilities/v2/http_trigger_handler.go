@@ -12,18 +12,20 @@ import (
 
 	"github.com/jpillora/backoff"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/contexts"
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings"
+	"github.com/smartcontractkit/chainlink-common/pkg/settings/cresettings"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common/aggregation"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	gateway_config "github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities/v2/metrics"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -42,13 +44,14 @@ type httpTriggerHandler struct {
 	services.StateMachine
 	config                  ServiceConfig
 	don                     handlers.DON
-	donConfig               *config.DONConfig
+	donConfig               *gateway_config.DONConfig
 	lggr                    logger.Logger
 	callbacksMu             sync.Mutex
 	callbacks               map[string]savedCallback // requestID -> savedCallback
 	stopCh                  services.StopChan
 	workflowMetadataHandler *WorkflowMetadataHandler
 	userRateLimiter         limits.RateLimiter
+	payloadSizeLimiter      limits.BoundLimiter[config.Size]
 	metrics                 *metrics.Metrics
 }
 
@@ -58,7 +61,12 @@ type HTTPTriggerHandler interface {
 	HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error
 }
 
-func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *config.DONConfig, don handlers.DON, workflowMetadataHandler *WorkflowMetadataHandler, userRateLimiter limits.RateLimiter, metrics *metrics.Metrics) *httpTriggerHandler {
+func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *gateway_config.DONConfig, don handlers.DON, workflowMetadataHandler *WorkflowMetadataHandler, userRateLimiter limits.RateLimiter, lf limits.Factory, metrics *metrics.Metrics) (*httpTriggerHandler, error) {
+	payloadSizeLimiter, err := limits.MakeBoundLimiter(lf, cresettings.Default.PerWorkflow.HTTPTrigger.IncomingPayloadSizeLimit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payload size limiter: %w", err)
+	}
+
 	return &httpTriggerHandler{
 		lggr:                    logger.Named(lggr, "RequestCallbacks"),
 		callbacks:               make(map[string]savedCallback),
@@ -68,8 +76,9 @@ func NewHTTPTriggerHandler(lggr logger.Logger, cfg ServiceConfig, donConfig *con
 		stopCh:                  make(services.StopChan),
 		workflowMetadataHandler: workflowMetadataHandler,
 		userRateLimiter:         userRateLimiter,
+		payloadSizeLimiter:      payloadSizeLimiter,
 		metrics:                 metrics,
-	}
+	}, nil
 }
 
 func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *jsonrpc.Request[json.RawMessage], callbackCh chan<- handlers.UserCallbackPayload, requestStartTime time.Time) error {
@@ -115,6 +124,12 @@ func (h *httpTriggerHandler) validatedTriggerRequest(ctx context.Context, req *j
 	if req.Params == nil {
 		h.handleUserError(ctx, "", jsonrpc.ErrInvalidRequest, "request params is nil", callbackCh)
 		return nil, errors.New("request params is nil")
+	}
+
+	payloadSize := config.Size(len(*req.Params))
+	if err := h.payloadSizeLimiter.Check(ctx, payloadSize); err != nil {
+		h.handleUserError(ctx, req.ID, jsonrpc.ErrInvalidParams, fmt.Sprintf("payload size %d exceeds limit", payloadSize), callbackCh)
+		return nil, fmt.Errorf("payload size %d exceeds limit: %w", payloadSize, err)
 	}
 
 	triggerReq, err := h.parseTriggerRequest(ctx, req, callbackCh)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
@@ -48,7 +49,7 @@ func main() {
 
 	lggr, _ := logger.NewLogger()
 
-	handlerFactory := gateway.NewHandlerFactory(nil, nil, nil, lggr)
+	handlerFactory := gateway.NewHandlerFactory(nil, nil, nil, lggr, limits.Factory{Logger: lggr})
 	gw, err := gateway.NewGatewayFromConfig(&cfg, handlerFactory, lggr)
 	if err != nil {
 		fmt.Println("error creating Gateway object:", err)

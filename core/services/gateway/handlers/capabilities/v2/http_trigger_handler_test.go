@@ -104,6 +104,38 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest(t *testing.T) {
 		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrParse))
 	})
 
+	t.Run("payload size exceeds limit", func(t *testing.T) {
+		handler, _ := createTestTriggerHandler(t)
+		callbackCh := make(chan handlers.UserCallbackPayload, 1)
+
+		largeValue := strings.Repeat("a", 100*1024) // 100 kb
+		largeInputJSON := fmt.Sprintf(`{"largeField": "%s"}`, largeValue)
+
+		triggerReq := gateway_common.HTTPTriggerRequest{
+			Workflow: gateway_common.WorkflowSelector{
+				WorkflowID: workflowID,
+			},
+			Input: []byte(largeInputJSON),
+		}
+		reqBytes, err := json.Marshal(triggerReq)
+		require.NoError(t, err)
+
+		rawParams := json.RawMessage(reqBytes)
+		req := &jsonrpc.Request[json.RawMessage]{
+			Version: "2.0",
+			ID:      requestID,
+			Method:  gateway_common.MethodWorkflowExecute,
+			Params:  &rawParams,
+		}
+
+		err = handler.HandleUserTriggerRequest(testutils.Context(t), req, callbackCh, time.Now())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "payload size")
+		require.Contains(t, err.Error(), "exceeds limit")
+
+		requireUserErrorSent(t, callbackCh, int(jsonrpc.ErrInvalidParams))
+	})
+
 	t.Run("empty request ID", func(t *testing.T) {
 		handler, _ := createTestTriggerHandler(t)
 		callbackCh := make(chan handlers.UserCallbackPayload, 1)
@@ -505,7 +537,8 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest_Retries(t *testing.T) {
 	metadataHandler := createTestMetadataHandler(t)
 	userRateLimiter := createTestUserRateLimiter(t)
 	testMetrics := createTestMetrics(t)
-	handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, userRateLimiter, testMetrics)
+	handler, err := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, userRateLimiter, limits.Factory{Logger: lggr}, testMetrics)
+	require.NoError(t, err)
 	workflowID := "0x1234567890abcdef1234567890abcdef12345678901234567890abcdef123456"
 	privateKey := createTestPrivateKey(t)
 	registerWorkflow(t, handler, workflowID, privateKey)
@@ -959,7 +992,8 @@ func createTestTriggerHandlerWithConfig(t *testing.T, cfg ServiceConfig) (*httpT
 	userRateLimiter := createTestUserRateLimiter(t)
 	testMetrics := createTestMetrics(t)
 
-	handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, userRateLimiter, testMetrics)
+	handler, err := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, userRateLimiter, limits.Factory{Logger: lggr}, testMetrics)
+	require.NoError(t, err)
 	return handler, mockDon
 }
 
@@ -986,7 +1020,8 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest_RateLimiting(t *testing.T) 
 
 	t.Run("successful rate limit check with CRE context", func(t *testing.T) {
 		userRateLimiter := createTestUserRateLimiter(t) // Unlimited
-		handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, userRateLimiter, testMetrics)
+		handler, err := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, userRateLimiter, limits.Factory{Logger: lggr}, testMetrics)
+		require.NoError(t, err)
 
 		privateKey := createTestPrivateKey(t)
 		workflowID := "0x1234567890abcdef1234567890abcdef12345678901234567890abcdef123456"
@@ -1032,7 +1067,8 @@ func TestHttpTriggerHandler_HandleUserTriggerRequest_RateLimiting(t *testing.T) 
 	t.Run("rate limit exceeded returns proper error", func(t *testing.T) {
 		// Create a rate limiter with very restrictive limits
 		restrictiveRateLimiter := limits.WorkflowRateLimiter(1, 0)
-		handler := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, restrictiveRateLimiter, testMetrics)
+		handler, err := NewHTTPTriggerHandler(lggr, cfg, donConfig, mockDon, metadataHandler, restrictiveRateLimiter, limits.Factory{Logger: lggr}, testMetrics)
+		require.NoError(t, err)
 
 		privateKey := createTestPrivateKey(t)
 		workflowID := "0x1234567890abcdef1234567890abcdef12345678901234567890abcdef123456"

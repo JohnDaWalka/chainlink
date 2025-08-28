@@ -104,7 +104,10 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *gateway_config.
 	}
 
 	metadataHandler := NewWorkflowMetadataHandler(lggr, cfg, don, donConfig, metrics)
-	triggerHandler := NewHTTPTriggerHandler(lggr, cfg, donConfig, don, metadataHandler, userRateLimiter, metrics)
+	triggerHandler, err := NewHTTPTriggerHandler(lggr, cfg, donConfig, don, metadataHandler, userRateLimiter, lf, metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create trigger handler: %w", err)
+	}
 	return &gatewayHandler{
 		config:          cfg,
 		don:             don,
