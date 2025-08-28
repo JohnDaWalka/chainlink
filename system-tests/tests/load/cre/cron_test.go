@@ -20,55 +20,102 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp/benchspy"
 	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
 	pb2 "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
+
+	"github.com/docker/docker/client"
 )
 
+const (
+	// cronSchedule defines the cron expression for triggering every 30 seconds
+	cronSchedule = "*/30 * * * * *"
+	// triggerID is the identifier for the cron trigger capability
+	triggerID = "cron-trigger@1.0.0"
+	// workflowID is the unique identifier for the test workflow
+	workflowID = "cron-load-test"
+	// defaultLokiURL is the default endpoint for Loki logging integration
+	defaultLokiURL = "http://localhost:3030/loki/api/v1/push"
+	// defaultMockEndpoint is the default address for the mock capability controller
+	defaultMockEndpoint     = "192.168.48.14:7777"
+	defaultMockEndpointPort = 7777
+)
+
+// TestCron performs a comprehensive load test of the cron trigger capability.
+// It validates that the cron trigger can handle sustained load and provides
+// timing for scheduled executions across multiple nodes.
+//
+// The test performs the following steps:
+// 1. Sets up a mock capability controller
+// 2. Configures a cron trigger with 30-second intervals
+// 3. Runs a load test with multiple virtual users
+// 4. Validates trigger responses and timing accuracy
+// 5. Generates performance reports
 func TestCron(t *testing.T) {
 	// Connect to the cluster
+	ip, err := getDockerContainerIP("workflow-node1")
+	require.NoError(t, err, "could not get container IP")
 	mockClient := mockcapability.NewMockCapabilityController(framework.L)
-
-	err := mockClient.ConnectAll([]string{"192.168.48.19:7777"}, true, false)
+	err = mockClient.ConnectAll([]string{fmt.Sprintf("%s:%d", ip, defaultMockEndpointPort)}, true, false)
 	require.NoError(t, err, "connecting with mock client failed")
 
 	// Use WASP to trigger registrations to the cron-trigger
 
 	// We want to see n responses back in order to consider it sucessful
 	// For example if we can sustain it for 5m then we consider it successful
-	metadata := &pb2.Metadata{
-		WorkflowID: "load-test",
-	}
-	payload, err := anypb.New(&cron.Config{Schedule: "*/30 * * * * *"})
+	payload, err := anypb.New(&cron.Config{Schedule: cronSchedule})
 	require.NoError(t, err, "creating payload failed")
-	executionTime := time.Minute * 1
+	executionTime := time.Minute * 2
 	vu := &VirtualUser{
 		VUControl:      wasp.NewVUControl(),
 		mockController: mockClient,
-		triggerID:      "cron-trigger@1.0.0",
+		triggerID:      triggerID,
 		executionTime:  executionTime,
 		payload:        payload,
-		metadata:       metadata,
-		closeCh:        make(chan struct{}),
+		metadata: &pb2.Metadata{
+			WorkflowID: workflowID,
+		},
 	}
-	lokiURL := "http://localhost:3030/loki/api/v1/push"
-	lokiToken := ""
-	lokiTenant := ""
+	lokiURL := defaultLokiURL
+	emptyString := ""
+	lokiConfig := wasp.NewLokiConfig(&lokiURL, &emptyString, &emptyString, &emptyString)
 	generator, err := wasp.NewGenerator(&wasp.Config{
+		GenName:     "cron-load-test",
+		Labels:      map[string]string{"branch": "profile-check", "commit": "profile-check"},
 		CallTimeout: executionTime + time.Minute,
 		T:           t,
 		LoadType:    wasp.VU,
 		VU:          vu,
 		Schedule: wasp.Combine(
-			wasp.Plain(3000, executionTime),
-			wasp.Plain(1, executionTime),
-			wasp.Plain(5000, executionTime),
+			wasp.Plain(100, executionTime),
+			wasp.Plain(200, executionTime),
+			wasp.Plain(300, executionTime),
+			wasp.Plain(400, executionTime),
 		),
-		LokiConfig: wasp.NewLokiConfig(&lokiURL, &lokiTenant, &lokiToken, &lokiToken),
+		LokiConfig: lokiConfig,
 	})
 	require.NoError(t, err, "could not create generator")
 
 	_, err = wasp.NewProfile().Add(generator, nil).Run(true)
 	require.NoError(t, err)
 
-	report, err := benchspy.NewStandardReport("cron-load-test", benchspy.WithStandardQueries(benchspy.StandardQueryExecutor_Direct),
+	prometheusExecutor, err := benchspy.NewPrometheusQueryExecutor(
+		map[string]string{
+			"cpu":         `rate(container_cpu_usage_seconds_total{name="workflow-node1"}[5m]) * 100`,
+			"mem":         `container_memory_working_set_bytes{name="workflow-node1"} /1024/1024`,
+			"mem_rss":     `container_memory_rss{name="workflow-node1"} /1024/1024`,
+			"network_tx":  `rate(container_network_transmit_bytes_total{name="workflow-node1"}[5m])`,
+			"network_rx":  `rate(container_network_receive_bytes_total{name="workflow-node1"}[5m])`,
+			"disk_reads":  `rate(container_fs_reads_bytes_total{name="workflow-node1"}[5m])`,
+			"disk_writes": `rate(container_fs_writes_bytes_total{name="workflow-node1"}[5m])`,
+		},
+		&benchspy.PrometheusConfig{
+			Url:               "http://localhost:9099",
+			NameRegexPatterns: []string{},
+		},
+	)
+	require.NoError(t, err)
+
+	report, err := benchspy.NewStandardReport("profile-check",
+		// benchspy.WithQueryExecutors(benchspy.NewLokiQueryExecutor("cron-load-test", map[string]string{}, lokiConfig)),
+		benchspy.WithQueryExecutors(prometheusExecutor),
 		benchspy.WithGenerators(generator))
 	require.NoError(t, err, "creating report failed")
 	store, err := report.Store()
@@ -85,7 +132,6 @@ type VirtualUser struct {
 	triggerCh             []chan *capabilities.TriggerResponse
 	metadata              *pb2.Metadata
 	payload               *anypb.Any
-	closeCh               chan struct{}
 }
 
 func (v *VirtualUser) Clone(l *wasp.Generator) wasp.VirtualUser {
@@ -96,13 +142,11 @@ func (v *VirtualUser) Clone(l *wasp.Generator) wasp.VirtualUser {
 		executionTime:  v.executionTime,
 		payload:        v.payload,
 		metadata:       v.metadata,
-		closeCh:        make(chan struct{}),
 	}
 }
 
 func (v *VirtualUser) Setup(l *wasp.Generator) error {
 	v.triggerRegistrationID = uuid.New().String()
-	v.closeCh = make(chan struct{})
 	chList, err := v.mockController.RegisterTrigger(context.Background(), v.triggerID, v.metadata, nil, v.payload, "", v.triggerRegistrationID)
 	if err != nil {
 		return err
@@ -112,8 +156,8 @@ func (v *VirtualUser) Setup(l *wasp.Generator) error {
 }
 
 func (v *VirtualUser) Teardown(l *wasp.Generator) error {
-	v.closeCh <- struct{}{}
-	return v.mockController.UnregisterTrigger(context.Background(), v.triggerID, v.metadata, nil, v.payload, "", v.triggerRegistrationID)
+	// return v.mockController.UnregisterTrigger(context.Background(), v.triggerID, v.metadata, nil, v.payload, "", v.triggerRegistrationID)
+	return nil
 }
 
 func (v *VirtualUser) Call(l *wasp.Generator) {
@@ -133,25 +177,21 @@ func (v *VirtualUser) Call(l *wasp.Generator) {
 		go func(i int) {
 			defer wg.Done()
 			for {
-				select {
-				case msg, ok := <-ch:
-					if !ok {
-						l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", errors.New("channel closed"))
-						return
-					}
+				msg, ok := <-ch
+				if !ok {
+					l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", errors.New("channel closed"))
+					return
+				}
 
-					lastTickDiff := time.Since(lastTicks[i])
-					lastTicks[i] = time.Now()
-					if msg.Err != nil {
-						l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", msg.Err)
-						return
-					}
-					confirmedCalls[i]++
-					l.ResponsesChan <- &wasp.Response{Data: v, Duration: lastTickDiff}
-					if confirmedCalls[i] == expectedCalls {
-						return
-					}
-				case <-v.closeCh:
+				lastTickDiff := time.Since(lastTicks[i])
+				lastTicks[i] = time.Now()
+				if msg.Err != nil {
+					l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", msg.Err)
+					return
+				}
+				confirmedCalls[i]++
+				l.ResponsesChan <- &wasp.Response{Data: v, Duration: lastTickDiff}
+				if confirmedCalls[i] == expectedCalls {
 					return
 				}
 
@@ -159,4 +199,27 @@ func (v *VirtualUser) Call(l *wasp.Generator) {
 		}(i)
 	}
 	wg.Wait()
+	err := v.Teardown(l)
+	if err != nil {
+		l.Responses.Err(&resty.Response{Request: &resty.Request{}}, "virtual-user-call-generation", err)
+	}
+}
+
+func getDockerContainerIP(containerName string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+
+	inspect, err := cli.ContainerInspect(context.Background(), containerName)
+	if err != nil {
+		return "", err
+	}
+
+	n, ok := inspect.NetworkSettings.Networks["ctf"]
+	if !ok {
+		return "", errors.New("ctf network not found")
+	}
+
+	return n.IPAddress, nil
 }
