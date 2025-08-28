@@ -52,7 +52,12 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 
 	message := chainReport.Messages[0]
-	offchainTokenData := chainReport.OffchainTokenData[0]
+	var offchainTokenData [][]byte
+	if len(chainReport.OffchainTokenData) > 0 {
+		offchainTokenData = chainReport.OffchainTokenData[0]
+	} else {
+		offchainTokenData = [][]byte{}
+	}
 
 	s := &bcs.Serializer{}
 
@@ -111,6 +116,12 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 	s.U256(*gasLimit)
 
+	lggr.Infow("Extracted gasLimit from ExtraArgs", "gasLimit", gasLimit.String())
+
+	if message.TokenAmounts == nil {
+		message.TokenAmounts = []cciptypes.RampTokenAmount{}
+	}
+
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
 	bcs.SerializeSequenceWithFunction(message.TokenAmounts, s, func(s *bcs.Serializer, item cciptypes.RampTokenAmount) {
 		// 11a. source_pool_address: vector<u8>
@@ -163,6 +174,10 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 	if s.Error() != nil { // Check error set within the lambda (though unlikely here)
 		return nil, fmt.Errorf("failed to serialize offchain_token_data: %w", s.Error())
+	}
+
+	if chainReport.Proofs == nil {
+		chainReport.Proofs = []cciptypes.Bytes32{}
 	}
 
 	// 13. proofs: vector<fixed_vector_u8(32)>
