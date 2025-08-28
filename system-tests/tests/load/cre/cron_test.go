@@ -62,7 +62,7 @@ func TestCron(t *testing.T) {
 	// For example if we can sustain it for 5m then we consider it successful
 	payload, err := anypb.New(&cron.Config{Schedule: cronSchedule})
 	require.NoError(t, err, "creating payload failed")
-	executionTime := time.Minute * 2
+	executionTime := time.Minute * 1
 	vu := &VirtualUser{
 		VUControl:      wasp.NewVUControl(),
 		mockController: mockClient,
@@ -88,6 +88,10 @@ func TestCron(t *testing.T) {
 			wasp.Plain(200, executionTime),
 			wasp.Plain(300, executionTime),
 			wasp.Plain(400, executionTime),
+			wasp.Plain(500, executionTime),
+			wasp.Plain(1000, executionTime),
+			wasp.Plain(1500, executionTime),
+			wasp.Plain(2000, executionTime),
 		),
 		LokiConfig: lokiConfig,
 	})
@@ -114,7 +118,7 @@ func TestCron(t *testing.T) {
 	require.NoError(t, err)
 
 	report, err := benchspy.NewStandardReport("profile-check",
-		// benchspy.WithQueryExecutors(benchspy.NewLokiQueryExecutor("cron-load-test", map[string]string{}, lokiConfig)),
+		benchspy.WithStandardQueries(benchspy.StandardQueryExecutor_Loki),
 		benchspy.WithQueryExecutors(prometheusExecutor),
 		benchspy.WithGenerators(generator))
 	require.NoError(t, err, "creating report failed")
