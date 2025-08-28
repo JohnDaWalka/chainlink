@@ -2,7 +2,7 @@ package sui
 
 import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	sui_ops "github.com/smartcontractkit/chainlink-sui-internal/ops"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 

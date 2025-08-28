@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	_ "github.com/smartcontractkit/chainlink-sui-internal/relayer/chainwriter"
-	"github.com/smartcontractkit/chainlink-sui-internal/relayer/chainwriter/config"
-	chainwriter "github.com/smartcontractkit/chainlink-sui-internal/relayer/chainwriter/config"
-	"github.com/smartcontractkit/chainlink-sui-internal/relayer/codec"
+	_ "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
+	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
+	chainwriter "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
+	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 )
 
 func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, error) {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	ccip_ops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip"
+	ccip_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 

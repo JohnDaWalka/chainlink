@@ -7,7 +7,7 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../../
 
-// replace github.com/smartcontractkit/chainlink-sui-internal => ../../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 
@@ -488,7 +488,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-d98d7674da89 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250820135304-632bebc0e802 // indirect
-	github.com/smartcontractkit/chainlink-sui-internal v0.0.0-20250828073500-8111014a7d24 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250828070007-e72dc27a4cba // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335 // indirect

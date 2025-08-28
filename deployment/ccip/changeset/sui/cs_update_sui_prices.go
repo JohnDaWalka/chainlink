@@ -5,9 +5,9 @@ import (
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-sui-internal/bindings/bind"
-	sui_ops "github.com/smartcontractkit/chainlink-sui-internal/ops"
-	ccipops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip"
+	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 

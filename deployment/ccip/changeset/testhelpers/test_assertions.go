@@ -26,8 +26,8 @@ import (
 	aptos_ccip_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
-	sui_module_offramp "github.com/smartcontractkit/chainlink-sui-internal/bindings/generated/ccip/ccip_offramp/offramp"
-	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui-internal/bindings/packages/offramp"
+	sui_module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
+	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui/bindings/packages/offramp"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"

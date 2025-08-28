@@ -52,7 +52,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/helpers"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	suiutil "github.com/smartcontractkit/chainlink-sui-internal/bindings/utils"
+	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/don_id_claimer"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/factory_burn_mint_erc20"
