@@ -32,9 +32,9 @@ const (
 	// workflowID is the unique identifier for the test workflow
 	workflowID = "cron-load-test"
 	// defaultLokiURL is the default endpoint for Loki logging integration
-	defaultLokiURL = "http://localhost:3030/loki/api/v1/push"
+	defaultLokiURL       = "http://localhost:3030/loki/api/v1/push"
+	defaultPrometheusURL = "http://localhost:9099"
 	// defaultMockEndpoint is the default address for the mock capability controller
-	defaultMockEndpoint     = "192.168.48.14:7777"
 	defaultMockEndpointPort = 7777
 )
 
@@ -111,7 +111,7 @@ func TestCron(t *testing.T) {
 			"disk_writes": `rate(container_fs_writes_bytes_total{name="workflow-node1"}[5m])`,
 		},
 		&benchspy.PrometheusConfig{
-			Url:               "http://localhost:9099",
+			Url:               defaultPrometheusURL,
 			NameRegexPatterns: []string{},
 		},
 	)
