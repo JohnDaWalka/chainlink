@@ -16,7 +16,7 @@ COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=secret,id=GIT_AUTH_TOKEN \
     ./plugins/scripts/setup_git_auth.sh && \
-    GOPRIVATE=github.com/smartcontractkit/chainlink-sui go mod download
+    GOPRIVATE=github.com/smartcontractkit/chainlink-sui-internal go mod download
 
 # Install Delve for debugging with cache mounts
 RUN --mount=type=cache,target=/go/pkg/mod \

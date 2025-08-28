@@ -9,7 +9,7 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.0.0-20250826151008-ae5ec0ee6f2c
 
-// replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui-internal => ../../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
 
@@ -55,7 +55,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250820135304-632bebc0e802
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250828070007-e72dc27a4cba
+	github.com/smartcontractkit/chainlink-sui-internal v0.0.0-20250828073500-8111014a7d24
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358

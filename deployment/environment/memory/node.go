@@ -23,7 +23,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
+	sui_testutils "github.com/smartcontractkit/chainlink-sui-internal/relayer/testutils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"

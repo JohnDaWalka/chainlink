@@ -2,7 +2,7 @@ module github.com/smartcontractkit/chainlink/v2
 
 go 1.24.5
 
-// replace github.com/smartcontractkit/chainlink-sui => ../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui-internal => ../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../chainlink-ccip
 
@@ -104,7 +104,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-d98d7674da89
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250820135304-632bebc0e802
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250828070007-e72dc27a4cba
+	github.com/smartcontractkit/chainlink-sui-internal v0.0.0-20250828073500-8111014a7d24
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335
 	github.com/smartcontractkit/cre-sdk-go v0.5.1-0.20250818135829-9ea58491207f
 	github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.5.1-0.20250818141131-0b979c98bab0

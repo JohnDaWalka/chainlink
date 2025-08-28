@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	chainreaderConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
-	"github.com/smartcontractkit/chainlink-sui/relayer/client"
-	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
+	chainreaderConfig "github.com/smartcontractkit/chainlink-sui-internal/relayer/chainreader/config"
+	"github.com/smartcontractkit/chainlink-sui-internal/relayer/client"
+	"github.com/smartcontractkit/chainlink-sui-internal/relayer/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"golang.org/x/crypto/blake2b"
 )

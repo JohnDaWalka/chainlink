@@ -6,14 +6,14 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
-	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
-	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
-	onrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_onramp"
-	routerops "github.com/smartcontractkit/chainlink-sui/ops/ccip_router"
-	tokenpoolops "github.com/smartcontractkit/chainlink-sui/ops/ccip_token_pool"
-	mcmsops "github.com/smartcontractkit/chainlink-sui/ops/mcms"
+	"github.com/smartcontractkit/chainlink-sui-internal/bindings/bind"
+	sui_ops "github.com/smartcontractkit/chainlink-sui-internal/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip"
+	offrampops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip_offramp"
+	onrampops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip_onramp"
+	routerops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip_router"
+	tokenpoolops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip_token_pool"
+	mcmsops "github.com/smartcontractkit/chainlink-sui-internal/ops/mcms"
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -114,7 +114,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 
 			// TODO: retrieve thesevalues from config
 			// Fee Quoter destination chain configuration
-			// values retried from here: https://github.com/smartcontractkit/chainlink-sui/pull/277/files#diff-5088e21cdbdb4efead9c1142c365a8717bcfe1a912cb0f2b54d0c0b7aad7e3c1R496
+			// values retried from here: https://github.com/smartcontractkit/chainlink-sui-internal/pull/277/files#diff-5088e21cdbdb4efead9c1142c365a8717bcfe1a912cb0f2b54d0c0b7aad7e3c1R496
 			IsEnabled:                         true,
 			MaxNumberOfTokensPerMsg:           1,
 			MaxDataBytes:                      30_000,

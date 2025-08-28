@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	ccip_ops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	ccip_ops "github.com/smartcontractkit/chainlink-sui-internal/ops/ccip"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 )
 
