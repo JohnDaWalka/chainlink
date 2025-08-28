@@ -44,7 +44,8 @@ const (
 	`
 )
 
-func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitiesRegistryAddress common.Address, chains []*WorkerEVMInput) string {
+func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitiesRegistryAddress common.Address, 
+	chains []*WorkerEVMInput, withV2RegistryContracts bool) string {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -62,6 +63,10 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitie
 			chain.WSRPC,
 			chain.HTTPRPC,
 		)
+	}
+	version := "1.0.0"
+	if withV2RegistryContracts {
+		version = "2.0.0"
 	}
 	return fmt.Sprintf(`
 	[Feature]
@@ -85,11 +90,13 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitie
 	Address = '%s'
 	NetworkID = 'evm'
 	ChainID = '%d'
+	ContractVersion = '%s'
 `,
 		donBootstrapNodePeerID,
 		evmChainsConfig,
 		capabilitiesRegistryAddress,
 		homeChainID,
+		version,
 	)
 }
 
@@ -119,7 +126,9 @@ type WorkerEVMInput struct {
 	WorkflowConfig   map[string]any // Configuration for EVM.Workflow section
 }
 
-func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData, capabilitiesPeeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*WorkerEVMInput) (string, error) {
+func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData, 
+	capabilitiesPeeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, 
+	homeChainID uint64, chains []*WorkerEVMInput, withV2RegistryContracts bool) (string, error) {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -165,6 +174,11 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		}
 	}
 
+		version := "1.0.0"
+	if withV2RegistryContracts {
+		version = "2.0.0"
+	}
+
 	return fmt.Sprintf(`
 	[Feature]
 	LogPoller = true
@@ -191,6 +205,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 	Address = '%s'
 	NetworkID = 'evm'
 	ChainID = '%d'
+	ContractVersion = '%s'
 `,
 		ocrPeeringData.Port,
 		donBootstrapNodePeerID,
@@ -203,6 +218,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		evmChainsConfig,
 		capabilitiesRegistryAddress,
 		homeChainID,
+		version,
 	), nil
 }
 

@@ -40,7 +40,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-
 	"github.com/smartcontractkit/chainlink/deployment"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
@@ -120,12 +119,17 @@ func mustGetAddress(dataStore datastore.MutableDataStore, chainSel uint64, contr
 	return addrRef.Address
 }
 
+func useV2registryContracts(cvs map[string]string) bool {
+	return false
+}
+
 func SetupTestEnvironment(
 	ctx context.Context,
 	testLogger zerolog.Logger,
 	singleFileLogger logger.Logger,
 	input SetupInput,
 ) (*SetupOutput, error) {
+	withV2RegistryContracts := useV2registryContracts(input.ContractVersions)
 	topologyErr := libdon.ValidateTopology(input.CapabilitiesAwareNodeSets, input.InfraInput)
 	if topologyErr != nil {
 		return nil, pkgerrors.Wrap(topologyErr, "failed to validate topology")
@@ -268,6 +272,7 @@ func SetupTestEnvironment(
 			DeployEVMOCR3:         evmOCR3AddrFlag,
 			EVMChainIDs:           chainsWithEVMCapability,
 			DeployConsensusOCR3:   consensusV2AddrFlag,
+			WithV2Contracts:       withV2RegistryContracts,
 		},
 	)
 	if err != nil {
@@ -409,6 +414,7 @@ func SetupTestEnvironment(
 		input.Capabilities,
 		input.CapabilityConfigs,
 		input.CopyCapabilityBinaries,
+		withV2RegistryContracts,
 	)
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")
@@ -726,7 +732,12 @@ func SetupTestEnvironment(
 
 	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFn, 0)
 	for _, capability := range input.Capabilities {
-		capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, capability.CapabilityRegistryV1ConfigFn())
+		configFn := capability.CapabilityRegistryV1ConfigFn()
+		if withV2RegistryContracts { 
+			configFn = capability.CapabilityRegistryV2ConfigFn()
+		}
+
+		capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, configFn)
 	}
 
 	// Deprecated, use Capabilities instead

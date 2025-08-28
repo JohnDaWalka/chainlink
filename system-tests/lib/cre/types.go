@@ -467,6 +467,7 @@ type GenerateConfigsInput struct {
 	NodeSet                 *CapabilitiesAwareNodeSet
 	CapabilityConfigs       CapabilityConfigs
 	GatewayConnectorOutput  *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
+	WithV2RegistryContracts bool
 }
 
 func (g *GenerateConfigsInput) Validate() error {
@@ -1072,4 +1073,8 @@ type InstallableCapability interface {
 	// CapabilityRegistryV1ConfigFn returns a function to generate capability registry
 	// configuration for the v1 registry format
 	CapabilityRegistryV1ConfigFn() CapabilityRegistryConfigFn
+
+	// CapabilityRegistryV2ConfigFn returns a function to generate capability registry
+	// configuration for the v2 registry format
+	CapabilityRegistryV2ConfigFn() CapabilityRegistryConfigFn
 }

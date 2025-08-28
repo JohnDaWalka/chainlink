@@ -3,18 +3,21 @@ package capabilities
 import (
 	"github.com/pkg/errors"
 
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 )
+
+type registryConfigFns struct {
+		V1 cre.CapabilityRegistryConfigFn
+		V2 cre.CapabilityRegistryConfigFn
+}
 
 type Capability struct {
 	flag                      cre.CapabilityFlag
 	jobSpecFn                 cre.JobSpecFn
 	nodeConfigFn              cre.NodeConfigFn
 	gatewayJobHandlerConfigFn cre.GatewayHandlerConfigFn
-	registryConfigFns         struct {
-		V1 cre.CapabilityRegistryConfigFn
-		V2 cre.CapabilityRegistryConfigFn
-	}
+	registryConfigFns         registryConfigFns
 	validateFn func(*Capability) error
 }
 
@@ -83,6 +86,10 @@ func WithValidateFn(validateFn func(*Capability) error) Option {
 func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
 	capability := &Capability{
 		flag: flag,
+		registryConfigFns: registryConfigFns{
+			V1: unimplmentedConfigFn,
+			V2: unimplmentedConfigFn,
+		},
 	}
 	for _, opt := range opts {
 		opt(capability)
@@ -95,4 +102,8 @@ func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
 	}
 
 	return capability, nil
+}
+
+func unimplmentedConfigFn(donFlags []cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error){
+	return nil, errors.New("config function is not implemented")
 }

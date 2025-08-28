@@ -156,7 +156,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 		}
 
 		// generate configuration for the bootstrap node
-		configOverrides[nodeIndex] = BootstrapEVM(donBootstrapNodePeerID, homeChainID, capabilitiesRegistryAddress, workerEVMInputs)
+		configOverrides[nodeIndex] = BootstrapEVM(donBootstrapNodePeerID, homeChainID, capabilitiesRegistryAddress, workerEVMInputs, input.WithV2RegistryContracts)
 		if flags.HasFlag(input.Flags, cre.WorkflowDON) {
 			configOverrides[nodeIndex] += BoostrapDon2DonPeering(input.CapabilitiesPeeringData)
 		}
@@ -300,7 +300,8 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 		// connect worker nodes to all the chains, add chain ID for registry (home chain)
 		// we configure both EVM chains, nodes and EVM.Workflow with Forwarder
 		var workerErr error
-		configOverrides[nodeIndex], workerErr = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.OCRPeeringData, input.CapabilitiesPeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs)
+		configOverrides[nodeIndex], workerErr = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.OCRPeeringData, 
+			input.CapabilitiesPeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs, input.WithV2RegistryContracts)
 		if workerErr != nil {
 			return nil, errors.Wrap(workerErr, "failed to generate worker [EVM.Workflow] config")
 		}
