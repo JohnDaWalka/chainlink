@@ -94,8 +94,8 @@ func TestLocalRegistry_DONsForCapability(t *testing.T) {
 
 	nodes := gotDons[0].Nodes
 	assert.Len(t, nodes, 2)
-	assert.Equal(t, *nodes[0].PeerID, types.PeerID{0: 1})
-	assert.Equal(t, *nodes[1].PeerID, types.PeerID{0: 2})
+	assert.Equal(t, types.PeerID{0: 1}, *nodes[0].PeerID)
+	assert.Equal(t, types.PeerID{0: 2}, *nodes[1].PeerID)
 
 	// Non-existent DON
 	_, err = lr.DONsForCapability(t.Context(), "nonExistentCapabilityID@1.0.0")

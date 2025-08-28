@@ -13,7 +13,6 @@ import (
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
-	vaultcap "github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
 )
 
 func TestAggregator_Valid_Signatures(t *testing.T) {
@@ -54,7 +53,7 @@ func TestAggregator_Valid_Signatures(t *testing.T) {
 	currResp := &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      "1",
-		Method:  vaultcap.MethodSecretsGet,
+		Method:  vault.MethodSecretsGet,
 		Result:  (*json.RawMessage)(&rawResp),
 	}
 	ar := &activeRequest{
@@ -65,8 +64,8 @@ func TestAggregator_Valid_Signatures(t *testing.T) {
 	assert.Equal(t, currResp, resp)
 }
 
-func mustRandom(len int) []byte {
-	randomBytes := make([]byte, len)
+func mustRandom(length int) []byte {
+	randomBytes := make([]byte, length)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		panic(err)
@@ -94,7 +93,7 @@ func newMessage(t *testing.T) *jsonrpc.Response[json.RawMessage] {
 	return &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      "1",
-		Method:  vaultcap.MethodSecretsGet,
+		Method:  vault.MethodSecretsGet,
 		Result:  (*json.RawMessage)(&rawResp),
 	}
 }
@@ -108,7 +107,7 @@ func TestAggregator_Valid_FallsBackToQuorum(t *testing.T) {
 	currResp := &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      "1",
-		Method:  vaultcap.MethodSecretsGet,
+		Method:  vault.MethodSecretsGet,
 		Result:  (*json.RawMessage)(nil),
 		Error: &jsonrpc.WireError{
 			Code:    123,
@@ -148,7 +147,7 @@ func TestAggregator_InsufficientResponses(t *testing.T) {
 	currResp := &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      "1",
-		Method:  vaultcap.MethodSecretsGet,
+		Method:  vault.MethodSecretsGet,
 		Result:  &rm,
 	}
 	ar := &activeRequest{

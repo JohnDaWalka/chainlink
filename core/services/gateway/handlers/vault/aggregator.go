@@ -21,7 +21,7 @@ type baseAggregator struct {
 }
 
 func (a *baseAggregator) Aggregate(ctx context.Context, l logger.Logger, ar *activeRequest, currResp *jsonrpc.Response[json.RawMessage]) (*jsonrpc.Response[json.RawMessage], error) {
-	don, err := a.donForVaultCapability(ctx, l)
+	don, err := a.donForVaultCapability(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get DON for vault capability: %w", err)
 	}
@@ -40,13 +40,11 @@ func (a *baseAggregator) Aggregate(ctx context.Context, l logger.Logger, ar *act
 	return currResp, nil
 }
 
-func (a *baseAggregator) donForVaultCapability(ctx context.Context, l logger.Logger) (*capabilities.DONWithNodes, error) {
+func (a *baseAggregator) donForVaultCapability(ctx context.Context) (*capabilities.DONWithNodes, error) {
 	dons, err := a.capabilitiesRegistry.DONsForCapability(ctx, vaultcommon.CapabilityID)
 	if err != nil {
 		return nil, err
 	}
-	l.Debug("fetching DONs for capability", "dons", dons)
-
 	// TODO: Support multiple vault capabilities in the capability registry.
 	// For the initial Smartcon deployment there will be exactly one Vault capability
 	// split across both DON families.
@@ -78,7 +76,6 @@ func (a *baseAggregator) validateUsingQuorum(don capabilities.DON, ar *activeReq
 		if shaToCount[sha] >= requiredQuorum {
 			return r, nil
 		}
-		fmt.Printf("shaToCount: %+v", shaToCount)
 	}
 
 	return nil, errInsufficientResponsesForQuorum

@@ -210,6 +210,7 @@ func (h *handler) Methods() []string {
 		vaultcap.MethodSecretsGet,
 		vaultcap.MethodSecretsUpdate,
 		vaultcap.MethodSecretsDelete,
+		vaultcap.MethodSecretsList,
 	}
 }
 
@@ -243,6 +244,8 @@ func (h *handler) HandleJSONRPCUserMessage(ctx context.Context, req jsonrpc.Requ
 		return h.handleSecretsUpdate(ctx, ar)
 	case vaultcap.MethodSecretsDelete:
 		return h.handleSecretsDelete(ctx, ar)
+	case vaultcap.MethodSecretsList:
+		return h.handleSecretsList(ctx, ar)
 	default:
 		return h.sendResponse(ctx, ar, h.errorResponse(req, api.UnsupportedMethodError, errors.New("this method is unsupported: "+req.Method)))
 	}
@@ -281,8 +284,7 @@ func (h *handler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Response[
 		return nil
 	}
 
-	h.sendSuccessResponse(ctx, l, ar, resp)
-	return nil
+	return h.sendSuccessResponse(ctx, l, ar, resp)
 }
 
 func (h *handler) sendSuccessResponse(ctx context.Context, l logger.Logger, ar *activeRequest, resp *jsonrpc.Response[json.RawMessage]) error {
@@ -437,6 +439,26 @@ func (h *handler) handleSecretsGet(ctx context.Context, ar *activeRequest) error
 		}
 	}
 
+	return h.fanOutToVaultNodes(ctx, l, ar)
+}
+
+func (h *handler) handleSecretsList(ctx context.Context, ar *activeRequest) error {
+	l := logger.With(h.lggr, "method", ar.req.Method, "requestId", ar.req.ID)
+
+	req := &vaultcommon.ListSecretIdentifiersRequest{}
+	if err := json.Unmarshal(*ar.req.Params, req); err != nil {
+		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.UserMessageParseError, err))
+	}
+
+	req.RequestId = ar.req.ID
+
+	reqb, err := json.Marshal(req)
+	if err != nil {
+		l.Errorw("failed to marshal request", "error", err)
+		return h.sendResponse(ctx, ar, h.errorResponse(ar.req, api.NodeReponseEncodingError, fmt.Errorf("failed to marshal request: %w", err)))
+	}
+
+	ar.req.Params = (*json.RawMessage)(&reqb)
 	return h.fanOutToVaultNodes(ctx, l, ar)
 }
 

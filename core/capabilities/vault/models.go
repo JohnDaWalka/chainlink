@@ -9,11 +9,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"google.golang.org/protobuf/proto"
 
 	vaultcommon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 var DefaultNamespace = "main"
@@ -25,6 +25,7 @@ const (
 	MethodSecretsGet    = "vault.secrets.get"
 	MethodSecretsUpdate = "vault.secrets.update"
 	MethodSecretsDelete = "vault.secrets.delete"
+	MethodSecretsList   = "vault.secrets.list"
 
 	MaxBatchSize = 10
 )
@@ -49,6 +50,7 @@ type SecretsService interface {
 	UpdateSecrets(ctx context.Context, request *vaultcommon.UpdateSecretsRequest) (*Response, error)
 	GetSecrets(ctx context.Context, requestID string, request *vaultcommon.GetSecretsRequest) (*Response, error)
 	DeleteSecrets(ctx context.Context, request *vaultcommon.DeleteSecretsRequest) (*Response, error)
+	ListSecretIdentifiers(ctx context.Context, request *vaultcommon.ListSecretIdentifiersRequest) (*Response, error)
 }
 
 func KeyFor(id *vaultcommon.SecretIdentifier) string {
@@ -131,7 +133,7 @@ func (r *Response) String() string {
 }
 
 func ValidateSignatures(resp *SignedOCRResponse, allowedSigners []common.Address, minRequired int) error {
-	if len(resp.Context) <= 64 {
+	if len(resp.Context) < 64 {
 		return fmt.Errorf("context too short: expected min 64 bytes, got %d bytes", len(resp.Context))
 	}
 
@@ -152,7 +154,7 @@ func ValidateSignatures(resp *SignedOCRResponse, allowedSigners []common.Address
 	}
 
 	epoch := binary.BigEndian.Uint32(epochRound[27:31])
-	round := uint8(epochRound[31])
+	round := epochRound[31]
 
 	fullHash := ocr2key.ReportToSigData(ocr2types.ReportContext{
 		ReportTimestamp: ocr2types.ReportTimestamp{
