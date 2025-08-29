@@ -25,13 +25,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
+
+	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 
 	common_events "github.com/smartcontractkit/chainlink-protos/workflows/go/common"
 	workflow_events "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
@@ -1011,13 +1012,6 @@ func configureDataFeedsCacheContract(testLogger zerolog.Logger, input *configure
 	_, configErr := crecontracts.ConfigureDataFeedsCache(testLogger, configInput)
 
 	return configErr
-}
-
-func logTestInfo(l zerolog.Logger, feedID, dataFeedsCacheAddr, forwarderAddr string) {
-	l.Info().Msg("------ Test configuration:")
-	l.Info().Msgf("Feed ID: %s", feedID)
-	l.Info().Msgf("DataFeedsCache address: %s", dataFeedsCacheAddr)
-	l.Info().Msgf("KeystoneForwarder address: %s", forwarderAddr)
 }
 
 // Creates workflow configuration file storing the necessary values used by a workflow (i.e. feedID, read/write contract addresses)
