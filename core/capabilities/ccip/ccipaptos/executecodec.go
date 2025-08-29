@@ -121,10 +121,14 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	if message.TokenAmounts == nil {
 		message.TokenAmounts = []cciptypes.RampTokenAmount{}
 	}
+	if offchainTokenData == nil {
+		offchainTokenData = [][]byte{}
+	}
+	if chainReport.Proofs == nil {
+		chainReport.Proofs = []cciptypes.Bytes32{}
+	}
 
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
-	// Manually write ULEB128 length then items (so empty => writes 0x00)
-	s.Uleb128(uint32(len(message.TokenAmounts)))
 	bcs.SerializeSequenceWithFunction(message.TokenAmounts, s, func(s *bcs.Serializer, item cciptypes.RampTokenAmount) {
 		// 11a. source_pool_address: vector<u8>
 		s.WriteBytes(item.SourcePoolAddress)
@@ -168,8 +172,6 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 
 	// 12. offchain_token_data: vector<vector<u8>>
-	// Manually write ULEB128 length then items
-	s.Uleb128(uint32(len(offchainTokenData)))
 	bcs.SerializeSequenceWithFunction(offchainTokenData, s, func(s *bcs.Serializer, item []byte) {
 		s.WriteBytes(item)
 	})
@@ -185,8 +187,6 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 
 	// 13. proofs: vector<fixed_vector_u8(32)>
-	// Manually write ULEB128 length then items
-	s.Uleb128(uint32(len(chainReport.Proofs)))
 	bcs.SerializeSequenceWithFunction(chainReport.Proofs, s, func(s *bcs.Serializer, item cciptypes.Bytes32) {
 		if len(item) != 32 {
 			s.SetError(fmt.Errorf("invalid proof length: expected 32, got %d", len(item)))
