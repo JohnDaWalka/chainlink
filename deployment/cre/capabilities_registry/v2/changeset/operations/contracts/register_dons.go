@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -38,16 +39,21 @@ var RegisterDons = operations.NewOperation[RegisterDonsInput, RegisterDonsOutput
 			return RegisterDonsOutput{}, fmt.Errorf("chain not found for selector %d", input.ChainSelector)
 		}
 
-		// Get the CapabilitiesRegistryTransactor contract
-		capabilityRegistryTransactor, err := capabilities_registry_v2.NewCapabilitiesRegistryTransactor(
-			common.HexToAddress(input.Address),
-			chain.Client,
-		)
+		capReg, err := capabilities_registry_v2.NewCapabilitiesRegistry(common.HexToAddress(input.Address), chain.Client)
 		if err != nil {
-			return RegisterDonsOutput{}, fmt.Errorf("failed to create CapabilitiesRegistryTransactor: %w", err)
+			return RegisterDonsOutput{}, fmt.Errorf("failed to create CapabilitiesRegistry: %w", err)
 		}
-
-		tx, err := capabilityRegistryTransactor.AddDONs(chain.DeployerKey, input.DONs)
+		/*
+			// Get the CapabilitiesRegistryTransactor contract
+			capabilityRegistryTransactor, err := capabilities_registry_v2.NewCapabilitiesRegistryTransactor(
+				common.HexToAddress(input.Address),
+				chain.Client,
+			)
+			if err != nil {
+				return RegisterDonsOutput{}, fmt.Errorf("failed to create CapabilitiesRegistryTransactor: %w", err)
+			}
+		*/
+		tx, err := capReg.AddDONs(chain.DeployerKey, input.DONs)
 		if err != nil {
 			err = cldf.DecodeErr(capabilities_registry_v2.CapabilitiesRegistryABI, err)
 			return RegisterDonsOutput{}, fmt.Errorf("failed to call AddDONs: %w", err)
@@ -61,16 +67,20 @@ var RegisterDons = operations.NewOperation[RegisterDonsInput, RegisterDonsOutput
 		resp := RegisterDonsOutput{}
 
 		// Get the CapabilitiesRegistryCaller contract
-		capabilityRegistryCaller, err := capabilities_registry_v2.NewCapabilitiesRegistryCaller(
-			common.HexToAddress(input.Address),
-			chain.Client,
-		)
-		if err != nil {
-			return RegisterDonsOutput{}, fmt.Errorf("failed to create CapabilitiesRegistryCaller: %w", err)
-		}
-		donInfo, err := capabilityRegistryCaller.GetDONs(nil)
-		if err != nil {
-			return RegisterDonsOutput{}, fmt.Errorf("failed to get DONs: %w", err)
+		var donInfo []capabilities_registry_v2.CapabilitiesRegistryDONInfo
+		for _, d := range input.DONs {
+			di, err := capReg.GetDONByName(&bind.CallOpts{}, d.Name)
+			if err != nil {
+				return RegisterDonsOutput{}, fmt.Errorf("failed to get DONs: %w", err)
+			}
+			allDons, err := capReg.GetDONs(&bind.CallOpts{})
+			if err != nil {
+				return RegisterDonsOutput{}, fmt.Errorf("failed to get all DONs: %w", err)
+			}
+			fmt.Printf("All DONs after registering %s: %+v\n", d.Name, allDons)
+			n, _ := capReg.GetNextDONId(&bind.CallOpts{})
+			fmt.Printf("Next DON ID: %d\n", n)
+			donInfo = append(donInfo, di)
 		}
 
 		resp.DONs = donInfo

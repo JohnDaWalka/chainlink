@@ -107,6 +107,7 @@ func SetupEnvV2(t *testing.T, useMCMS bool) *EnvWrapperV2 {
 		datastore.AddressRefByType("CapabilitiesRegistry"),
 	)
 	require.Len(t, registryAddrs, 1)
+	capRegAddr := registryAddrs[0].Address
 
 	chainID, err := chain_selectors.GetChainIDFromSelector(registryChainSel)
 	require.NoError(t, err)
@@ -219,6 +220,7 @@ func SetupEnvV2(t *testing.T, useMCMS bool) *EnvWrapperV2 {
 		t:                t,
 		Env:              &env,
 		RegistrySelector: registryChainSel,
+		RegistryAddress:  common.HexToAddress(capRegAddr),
 	}
 }
 

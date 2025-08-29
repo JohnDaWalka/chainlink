@@ -22,11 +22,6 @@ type ReserveDonsInput struct {
 	N             int    `json:"n" yaml:"n"`
 }
 
-type ReserveDonsOutput struct {
-	RegisterDonsOutput contracts.RegisterDonsOutput `json:"registerDonsOutput" yaml:"registerDonsOutput"`
-	ReservedDonNames   []string                     `json:"reservedDonNames" yaml:"reservedDonNames"`
-}
-
 type ReserveDons struct{}
 
 func (r ReserveDons) VerifyPreconditions(e cldf.Environment, config ReserveDonsInput) error {

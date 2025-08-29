@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset"
+	"github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/operations/contracts"
 	"github.com/smartcontractkit/chainlink/deployment/cre/test"
 )
 
@@ -20,6 +21,7 @@ func TestReserveDons(t *testing.T) {
 		input       changeset.ReserveDonsInput
 		expectError bool
 		errorMsg    string
+		checkOutput func(t *testing.T, output contracts.RegisterDonsOutput)
 	}{
 		{
 			name: "valid input with 3 DONs",
@@ -29,6 +31,13 @@ func TestReserveDons(t *testing.T) {
 				N:             3,
 			},
 			expectError: false,
+			checkOutput: func(t *testing.T, output contracts.RegisterDonsOutput) {
+				require.NotNil(t, output, "output should not be nil")
+				//require.NotNil(t, output.DataStore, "datastore should not be nil")
+				//addresses := output.DataStore.Addresses().Filter(changeset.AddressRefByQualifierPrefix("reserved-"))
+				require.Len(t, output.DONs, 3, "should have 3 reserved DON addresses")
+
+			},
 		},
 		/*
 			{
@@ -91,8 +100,13 @@ func TestReserveDons(t *testing.T) {
 			if !tt.expectError {
 				// Note: This will likely fail without proper contract deployment
 				// In a real test, you'd need to deploy a CapabilitiesRegistry contract first
-				_, err := cs.Apply(env, tt.input)
+				out, err := cs.Apply(env, tt.input)
 				require.NoError(t, err, "Apply should succeed for valid input")
+				require.NotNil(t, out, "output should not be nil")
+				require.Len(t, out.Reports, 1, "should have one report, corresponding to RegisterDons")
+				x := (out.Reports[0].Output).(contracts.RegisterDonsOutput)
+				tt.checkOutput(t, x)
+
 				// For now, we just verify the method can be called
 				// In a complete test, you'd verify the output structure
 				t.Logf("Apply result: err=%v", err)
