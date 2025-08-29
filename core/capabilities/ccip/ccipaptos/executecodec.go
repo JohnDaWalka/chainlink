@@ -213,7 +213,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 
 	logLen("final")
-	lggr.Info("SERIALIZED SUI REPORT IN BCS FORMAT:  ", s.ToBytes())
+	lggr.Info("SERIALIZED SUI REPORT IN BCS FORMAT: ", s.ToBytes(), "length", len(s.ToBytes()))
 
 	return s.ToBytes(), nil
 }
