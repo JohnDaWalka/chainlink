@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
-	vaultapi "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/vault"
 )
 
 var (
@@ -95,15 +94,15 @@ func (h *GatewayHandler) HandleGatewayMessage(ctx context.Context, gatewayID str
 
 	var response *jsonrpc.Response[json.RawMessage]
 	switch req.Method {
-	case vaultapi.MethodSecretsCreate:
+	case MethodSecretsCreate:
 		response = h.handleSecretsCreate(ctx, gatewayID, req)
-	case vaultapi.MethodSecretsGet:
+	case MethodSecretsGet:
 		response = h.handleSecretsGet(ctx, gatewayID, req)
-	case vaultapi.MethodSecretsUpdate:
+	case MethodSecretsUpdate:
 		response = h.handleSecretsUpdate(ctx, gatewayID, req)
-	case vaultapi.MethodSecretsDelete:
+	case MethodSecretsDelete:
 		response = h.handleSecretsDelete(ctx, gatewayID, req)
-	case vaultapi.MethodSecretsList:
+	case MethodSecretsList:
 		response = h.handleSecretsList(ctx, gatewayID, req)
 	default:
 		response = h.errorResponse(ctx, gatewayID, req, api.UnsupportedMethodError, errors.New("unsupported method: "+req.Method))
@@ -266,6 +265,7 @@ func (h *GatewayHandler) errorResponse(
 	return &jsonrpc.Response[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      req.ID,
+		Method:  req.Method,
 		Error: &jsonrpc.WireError{
 			Code:    api.ToJSONRPCErrorCode(errorCode),
 			Message: err.Error(),
