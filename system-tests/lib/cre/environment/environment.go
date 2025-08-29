@@ -324,11 +324,6 @@ func SetupTestEnvironment(
 
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting Job Distributor, DONs and creating Jobs with Job Distributor")))
 
-	testLogger.Info().Msg("SetupTestEnvironment: About to call SetupJobs")
-	testLogger.Info().Msgf("SetupTestEnvironment: JD input image: %s", input.JdInput.Image)
-	testLogger.Info().Msgf("SetupTestEnvironment: Infrastructure type: %s", input.InfraInput.InfraType)
-	testLogger.Info().Msgf("SetupTestEnvironment: Node sets count: %d", len(updatedNodeSets))
-
 	jdOutput, nodeSetOutput, jobsSeqErr := SetupJobs(
 		testLogger,
 		input.JdInput,
@@ -339,12 +334,8 @@ func SetupTestEnvironment(
 		updatedNodeSets,
 	)
 	if jobsSeqErr != nil {
-		testLogger.Error().Err(jobsSeqErr).Msg("SetupTestEnvironment: SetupJobs failed")
 		return nil, pkgerrors.Wrap(jobsSeqErr, "failed to setup jobs")
 	}
-
-	testLogger.Info().Msg("SetupTestEnvironment: SetupJobs completed successfully")
-	testLogger.Info().Msgf("SetupTestEnvironment: Got %d node set outputs", len(nodeSetOutput))
 
 	// Prepare the CLD environment that's required by the keystone changeset
 	// Ugly glue hack ¯\_(ツ)_/¯
@@ -574,23 +565,17 @@ func SetupTestEnvironment(
 }
 
 func CreateJobDistributor(input *jd.Input) (*jd.Output, error) {
-	fmt.Printf("CreateJobDistributor: Starting with image: %s\n", input.Image)
-
 	if os.Getenv("CI") == "true" {
 		jdImage := ctfconfig.MustReadEnvVar_String(E2eJobDistributorImageEnvVarName)
 		jdVersion := os.Getenv(E2eJobDistributorVersionEnvVarName)
 		input.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
-		fmt.Printf("CreateJobDistributor: CI environment detected, using image: %s\n", input.Image)
 	}
 
-	fmt.Printf("CreateJobDistributor: Calling jd.NewJD with image: %s\n", input.Image)
 	jdOutput, err := jd.NewJD(input)
 	if err != nil {
-		fmt.Printf("CreateJobDistributor: Failed to create new job distributor: %v\n", err)
 		return nil, pkgerrors.Wrap(err, "failed to create new job distributor")
 	}
 
-	fmt.Printf("CreateJobDistributor: Successfully created job distributor\n")
 	return jdOutput, nil
 }
 

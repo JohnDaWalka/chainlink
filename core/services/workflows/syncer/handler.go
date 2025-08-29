@@ -220,10 +220,6 @@ func (h *eventHandler) Close() error {
 }
 
 func (h *eventHandler) Handle(ctx context.Context, event Event) error {
-	h.lggr.Debugw("WorkflowHandler: Starting to handle event", 
-		"eventType", event.EventType,
-		"eventData", fmt.Sprintf("%T", event.Data))
-	
 	switch event.EventType {
 	case ForceUpdateSecretsEvent:
 		payload, ok := event.Data.(ForceUpdateSecretsRequestedV1)
@@ -244,7 +240,6 @@ func (h *eventHandler) Handle(ctx context.Context, event Event) error {
 		h.lggr.Debugw("handled event", "urlHash", payload.SecretsURLHash, "workflowOwner", hex.EncodeToString(payload.Owner), "type", ForceUpdateSecretsEvent)
 		return nil
 	case WorkflowRegisteredEvent:
-		h.lggr.Debugw("WorkflowHandler: Processing WorkflowRegisteredEvent")
 		payload, ok := event.Data.(WorkflowRegisteredV1)
 		if !ok {
 			return newHandlerTypeError(event.Data)
@@ -258,17 +253,7 @@ func (h *eventHandler) Handle(ctx context.Context, event Event) error {
 			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
 		)
 
-		h.lggr.Debugw("WorkflowHandler: About to call workflowRegisteredEvent", 
-			"workflowID", wfID,
-			"workflowName", payload.WorkflowName,
-			"workflowOwner", hex.EncodeToString(payload.WorkflowOwner))
-
 		if err := h.workflowRegisteredEvent(ctx, payload); err != nil {
-			h.lggr.Errorw("WorkflowHandler: workflowRegisteredEvent failed", 
-				"workflowID", wfID,
-				"workflowName", payload.WorkflowName,
-				"error", err,
-				"errorDetails", fmt.Sprintf("%+v", err))
 			logCustMsg(ctx, cma, fmt.Sprintf("failed to handle workflow registered event: %v", err), h.lggr)
 			return err
 		}
@@ -470,58 +455,21 @@ func (h *eventHandler) createWorkflowSpec(ctx context.Context, payload WorkflowR
 	wfID := payload.WorkflowID.Hex()
 	owner := hex.EncodeToString(payload.WorkflowOwner)
 
-	h.lggr.Debugw("WorkflowHandler: createWorkflowSpec starting", 
-		"workflowID", wfID,
-		"workflowName", payload.WorkflowName,
-		"workflowOwner", owner,
-		"binaryURL", payload.BinaryURL,
-		"configURL", payload.ConfigURL,
-		"secretsURL", payload.SecretsURL)
-
-	h.lggr.Debugw("WorkflowHandler: Fetching workflow artifacts", 
-		"workflowID", wfID,
-		"binaryURL", payload.BinaryURL,
-		"configURL", payload.ConfigURL)
 	decodedBinary, config, err := h.workflowArtifactsStore.FetchWorkflowArtifacts(ctx, wfID, payload.BinaryURL, payload.ConfigURL)
 	if err != nil {
-		h.lggr.Errorw("WorkflowHandler: Failed to fetch workflow artifacts", 
-			"workflowID", wfID,
-			"binaryURL", payload.BinaryURL,
-			"configURL", payload.ConfigURL,
-			"error", err)
 		return nil, err
 	}
-
-	h.lggr.Debugw("WorkflowHandler: Successfully fetched workflow artifacts", 
-		"workflowID", wfID,
-		"binaryLength", len(decodedBinary),
-		"configLength", len(config))
 
 	// Always fetch secrets from the SecretsURL
 	var secrets []byte
 	if payload.SecretsURL != "" {
-		h.lggr.Debugw("WorkflowHandler: Fetching secrets", 
-			"workflowID", wfID,
-			"secretsURL", payload.SecretsURL)
 		secrets, err = h.workflowArtifactsStore.GetSecrets(ctx, payload.SecretsURL, payload.WorkflowID, payload.WorkflowOwner)
 		if err != nil {
-			h.lggr.Errorw("WorkflowHandler: Failed to get secrets", 
-				"workflowID", wfID,
-				"secretsURL", payload.SecretsURL,
-				"error", err)
 			return nil, fmt.Errorf("failed to get secrets: %w", err)
 		}
-		h.lggr.Debugw("WorkflowHandler: Successfully fetched secrets", 
-			"workflowID", wfID,
-			"secretsLength", len(secrets))
 	}
 
 	status := toSpecStatus(payload.Status)
-
-	h.lggr.Debugw("WorkflowHandler: Creating workflow spec entry", 
-		"workflowID", wfID,
-		"workflowName", payload.WorkflowName,
-		"status", status)
 
 	// Create a new entry in the workflow_spec table corresponding for the new workflow, with the contents of the binaryURL + configURL in the table
 	entry := &job.WorkflowSpec{
@@ -536,31 +484,15 @@ func (h *eventHandler) createWorkflowSpec(ctx context.Context, payload WorkflowR
 		ConfigURL:     payload.ConfigURL,
 	}
 
-	h.lggr.Debugw("WorkflowHandler: Getting secrets URL hash", 
-		"workflowID", wfID,
-		"secretsURL", payload.SecretsURL)
 	secretsURLHash, err := h.workflowArtifactsStore.GetSecretsURLHash(payload.WorkflowOwner, []byte(payload.SecretsURL))
 	if err != nil {
-		h.lggr.Errorw("WorkflowHandler: Failed to get secrets URL hash", 
-			"workflowID", wfID,
-			"secretsURL", payload.SecretsURL,
-			"error", err)
 		return nil, fmt.Errorf("failed to get secrets URL hash: %w", err)
 	}
 
-	h.lggr.Debugw("WorkflowHandler: Upserting workflow spec with secrets", 
-		"workflowID", wfID,
-		"secretsURLHash", hex.EncodeToString(secretsURLHash))
 	if _, err = h.workflowArtifactsStore.UpsertWorkflowSpecWithSecrets(ctx, entry, payload.SecretsURL, hex.EncodeToString(secretsURLHash), string(secrets)); err != nil {
-		h.lggr.Errorw("WorkflowHandler: Failed to upsert workflow spec with secrets", 
-			"workflowID", wfID,
-			"error", err)
 		return nil, fmt.Errorf("failed to upsert workflow spec with secrets: %w", err)
 	}
 
-	h.lggr.Debugw("WorkflowHandler: createWorkflowSpec completed successfully", 
-		"workflowID", wfID,
-		"workflowName", payload.WorkflowName)
 	return entry, nil
 }
 
@@ -575,24 +507,10 @@ func (h *eventHandler) engineFactoryFn(ctx context.Context, workflowID string, o
 	h.lggr.Debugf("Finished creating module for workflowID %s", workflowID)
 
 	if module.IsLegacyDAG() { // V1 aka "DAG"
-		h.lggr.Debugw("WorkflowHandler: Module is legacy DAG, getting workflow SDK spec", 
-			"workflowID", workflowID,
-			"configLength", len(config),
-			"binaryLength", len(binary))
-		
-		// This is where the WASM panic is likely occurring
 		sdkSpec, err := host.GetWorkflowSpec(ctx, moduleConfig, binary, config)
 		if err != nil {
-			h.lggr.Errorw("WorkflowHandler: Failed to get workflow sdk spec", 
-				"workflowID", workflowID,
-				"error", err,
-				"errorDetails", fmt.Sprintf("%+v", err))
 			return nil, fmt.Errorf("failed to get workflow sdk spec: %w", err)
 		}
-
-		h.lggr.Debugw("WorkflowHandler: Successfully got workflow SDK spec", 
-			"workflowID", workflowID,
-			"sdkSpecType", fmt.Sprintf("%T", sdkSpec))
 
 		cfg := workflows.Config{
 			Lggr:           h.lggr,
