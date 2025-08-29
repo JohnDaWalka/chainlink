@@ -31,12 +31,28 @@ import (
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 )
 
+type ocrDonCfg struct {
+	transmissionSchedule []int
+}
+
+type donConfig struct {
+	keystone_changeset.DonCapabilities
+	// transmissionSchedule is the transmission schedule for the DON, if applicable
+	*ocrDonCfg
+}
+
+var ocrDons map[string]ocrDonCfg // map of DON name to ocrDon struct
+
 func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfigFns []cre.CapabilityRegistryConfigFn) error {
+	lggr := input.CldEnv.Logger
+
 	if err := input.Validate(); err != nil {
 		return errors.Wrap(err, "input validation failed")
 	}
 
 	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.Topology.DonsMetadata))
+	d2 := make(map[string]donConfig) // map of DON name to donConfig struct
+	//ocrDons = make(map[string]ocrDonCfg)
 
 	for donIdx, donMetadata := range input.Topology.DonsMetadata {
 		// if it's only a gateway DON, we don't want to register it with the Capabilities Registry
@@ -53,12 +69,12 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 				continue
 			}
 
-			capabilitiesFn, configFnErr := configFn(donMetadata.Flags, input.NodeSets[donIdx])
-			if configFnErr != nil {
-				return errors.Wrap(configFnErr, "failed to get capabilities from config function")
+			enabledCapabilities, err2 := configFn(donMetadata.Flags, input.NodeSets[donIdx])
+			if err2 != nil {
+				return errors.Wrap(err2, "failed to get capabilities from config function")
 			}
 
-			capabilities = append(capabilities, capabilitiesFn...)
+			capabilities = append(capabilities, enabledCapabilities...)
 		}
 
 		workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
@@ -98,34 +114,30 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		}
 
 		donName := donMetadata.Name + "-don"
-		donCapabilities = append(donCapabilities, keystone_changeset.DonCapabilities{
+		c := keystone_changeset.DonCapabilities{
 			Name:         donName,
 			F:            libc.MustSafeUint8(forwarderF),
 			Nops:         []keystone_changeset.NOP{nop},
 			Capabilities: capabilities,
-		})
-	}
+		}
+		donCapabilities = append(donCapabilities, c)
 
-	var transmissionSchedule []int
+		ocrCfg, err := newOCRCfg(donMetadata)
+		if errors.Is(err, unsupportedDONTypeErr) {
+			// we simply skip DONs that do not support OCR3
+			lggr.Warnw("skipping transmission schedule determination for DON that does not support OCR3", "donName", donMetadata.Name)
+		} else if err != nil {
+			return errors.Wrap(err, "failed to determine transmission schedule")
+		}
 
-	for _, metaDon := range input.Topology.DonsMetadata {
-		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
-			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
-				Key:   crenode.NodeTypeKey,
-				Value: cre.WorkerNode,
-			}, crenode.EqualLabels)
-
-			if workerNodesErr != nil {
-				return errors.Wrap(workerNodesErr, "failed to find worker nodes")
-			}
-
-			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
-			transmissionSchedule = []int{len(workerNodes)}
-			break
+		d2[donName] = donConfig{
+			DonCapabilities: c,
+			ocrDonCfg:       ocrCfg,
 		}
 	}
 
-	if len(transmissionSchedule) == 0 {
+	// this can probably be removed, maintaining for compatibility for now
+	if len(ocrDons) == 0 {
 		return errors.New("no OCR3-capable DON found in the topology")
 	}
 
@@ -331,6 +343,29 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		}
 	}
 	return nil
+}
+
+var unsupportedDONTypeErr = errors.New("unsupported DON type for transmission schedule determination")
+
+func newOCRCfg(donMetadata *cre.DonMetadata) (*ocrDonCfg, error) {
+	// determine transmission schedule for OCR3-capable DONs
+	// todo extend and abstract this logic when we have for non-workflow DONs
+	if flags.HasFlag(donMetadata.Flags, cre.ConsensusCapability) || flags.HasFlag(donMetadata.Flags, cre.ConsensusCapabilityV2) {
+		workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
+			Key:   crenode.NodeTypeKey,
+			Value: cre.WorkerNode,
+		}, crenode.EqualLabels)
+
+		if workerNodesErr != nil {
+			return nil, errors.Wrap(workerNodesErr, "failed to find worker nodes")
+		}
+
+		return &ocrDonCfg{
+			transmissionSchedule: []int{len(workerNodes)},
+		}, nil
+	}
+	return nil, unsupportedDONTypeErr
+
 }
 
 // values supplied by Alexandr Yepishev as the expected values for OCR3 config
