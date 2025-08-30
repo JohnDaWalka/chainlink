@@ -103,10 +103,18 @@ func (d *dons) shouldBeOneDon(flag cre.CapabilityFlag) (donConfig, error) {
 	return dons[0], nil
 }
 
-func (d *dons) allKeystoneDons() []ks_contracts_op.ConfigureKeystoneDON {
+func (d *dons) donNodesets() []ks_contracts_op.ConfigureKeystoneDON {
 	out := make([]ks_contracts_op.ConfigureKeystoneDON, 0, len(d.c))
 	for _, don := range d.c {
 		out = append(out, don.keystoneDonConfig())
+	}
+	return out
+}
+
+func (d *dons) allDonCapabilities() []keystone_changeset.DonCapabilities {
+	out := make([]keystone_changeset.DonCapabilities, 0, len(d.c))
+	for _, don := range d.c {
+		out = append(out, don.DonCapabilities)
 	}
 	return out
 }
@@ -116,7 +124,6 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		return errors.Wrap(err, "input validation failed")
 	}
 
-	donCapabilities := make([]keystone_changeset.DonCapabilities, 0, len(input.Topology.DonsMetadata))
 	dons := &dons{
 		c: make(map[string]donConfig),
 	}
@@ -185,7 +192,6 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			Nops:         []keystone_changeset.NOP{nop},
 			Capabilities: capabilities,
 		}
-		donCapabilities = append(donCapabilities, c)
 
 		dons.c[donName] = donConfig{
 			DonCapabilities: c,
@@ -198,7 +204,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeq,
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeqDeps{
 			Env:  input.CldEnv,
-			Dons: donCapabilities,
+			Dons: dons.allDonCapabilities(),
 		},
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeqInput{
 			RegistryChainSel: input.ChainSelector,
@@ -242,7 +248,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 
 	// configure Solana forwarder only if we have some
 	if len(solChainsWithForwarder) > 0 {
-		for _, don := range dons.allKeystoneDons() {
+		for _, don := range dons.donNodesets() {
 			cs := commonchangeset.Configure(ks_solana.ConfigureForwarders{},
 				&ks_solana.ConfigureForwarderRequest{
 					WFDonName:        don.Name,
@@ -272,7 +278,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			},
 			ks_contracts_op.ConfigureForwardersSeqInput{
 				RegistryChainSel: input.ChainSelector,
-				DONs:             dons.allKeystoneDons(),
+				DONs:             dons.donNodesets(),
 				Chains:           evmChainsWithForwarders,
 			},
 		)

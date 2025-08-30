@@ -57,10 +57,9 @@ type DeployOCR3ContractSequenceInput struct {
 }
 
 type DeployOCR3ContractSequenceOutput struct {
-	// Not sure if we can serialize the address book without modifications, but whatever is returned needs to be serializable.
-	// This could also be the address datastore instead.
-	AddressBook deployment.AddressBook
-	Datastore   datastore.DataStore // Keeping the address store for backward compatibility, as not everything has been migrated to address book
+	// TODO: CRE-742 remove AddressBook
+	AddressBook deployment.AddressBook // Keeping the address store for backward compatibility, as not everything has been migrated to datastore
+	Datastore   datastore.DataStore
 }
 
 // DeployKeystoneContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).

@@ -20,7 +20,8 @@ type DeployKeystoneForwardersInput struct {
 }
 
 type DeployKeystoneForwardersOutput struct {
-	Addresses   datastore.AddressRefStore
+	Addresses datastore.AddressRefStore
+	// TODO: CRE-742 remove AddressBook
 	AddressBook cldf.AddressBook // The address book containing the deployed Keystone Forwarders
 	Datastore   datastore.DataStore
 }

@@ -26,7 +26,7 @@ func Test_DeployForwardersSeq(t *testing.T) {
 	registrySel := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]
 	otherChainSel := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[1]
 	b := optest.NewBundle(t)
-	deps := contracts.DeployKeystoneForwardersSequenceDeps{
+	deps := contracts.DeployForwardersSequenceDeps{
 		Env: &env,
 	}
 	input := contracts.DeployKeystoneForwardersInput{

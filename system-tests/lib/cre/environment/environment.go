@@ -252,25 +252,8 @@ func SetupTestEnvironment(
 			}
 		}
 	}
-	/*
-		// use CLD to deploy the necessary contracts
-		homeChainSelector := homeChainOutput.ChainSelector
-		deployKeystoneReport, err := operations.ExecuteSequence(
-			allChainsCLDEnvironment.OperationsBundle,
-			ks_contracts_op.DeployKeystoneContractsSequence,
-			ks_contracts_op.DeployKeystoneContractsSequenceDeps{
-				Env: allChainsCLDEnvironment,
-			},
-			ks_contracts_op.DeployKeystoneContractsSequenceInput{
-				RegistryChainSelector: homeChainSelector,
-				ForwardersSelectors:   evmForwardersSelectors,
-				DeployVaultOCR3:       vaultOCR3AddrFlag,
-				DeployEVMOCR3:         evmOCR3AddrFlag,
-				EVMChainIDs:           chainsWithEVMCapability,
-				DeployConsensusOCR3:   consensusV2AddrFlag,
-			},
-		)
-	*/
+
+	// use CLD to deploy the registry contracts, which are required before constructing the node TOML configs
 	homeChainSelector := homeChainOutput.ChainSelector
 	registryContractsReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
@@ -1019,6 +1002,7 @@ func deployOCR3Contract(qualifier string, selector uint64, env *cldf.Environment
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy OCR3 contract '%s' on chain %d: %w", qualifier, selector, err)
 	}
+	// TODO: CRE-742 remove address book
 	if err = env.ExistingAddresses.Merge(ocr3DeployReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
 		return nil, fmt.Errorf("failed to merge address book with OCR3 contract address for '%s' on chain %d: %w", qualifier, selector, err)
 	}
