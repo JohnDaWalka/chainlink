@@ -33,15 +33,11 @@ import (
 
 type donConfig struct {
 	keystone_changeset.DonCapabilities
-	// transmissionSchedule is the transmission schedule for the DON, if applicable
-	// todo this should be a method rather than a field; can be computed flags + default ocr config. only need to compute the xmission schedule for OCR3-capable DONs
 	flags []cre.CapabilityFlag
 }
 
 func (d *donConfig) resolveOcr3Config(c keystone_changeset.OracleConfig) *keystone_changeset.OracleConfig {
-	// compute the xmission schedule
-	s := []int{d.N()}
-	c.TransmissionSchedule = s
+	c.TransmissionSchedule = []int{d.N()}
 	return &c
 }
 
@@ -196,7 +192,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			flags:           donMetadata.Flags,
 		}
 	}
-	// get the values of
+
 	_, err := operations.ExecuteSequence(
 		input.CldEnv.OperationsBundle,
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeq,
