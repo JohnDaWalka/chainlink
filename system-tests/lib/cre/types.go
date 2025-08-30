@@ -464,6 +464,15 @@ func (g *GenerateConfigsInput) Validate() error {
 	if addrErr != nil {
 		return fmt.Errorf("failed to get addresses for chain %d: %w", g.HomeChainSelector, addrErr)
 	}
+	_, dsErr := g.Datastore.Addresses().Fetch()
+	if dsErr != nil {
+		return fmt.Errorf("failed to get addresses from datastore: %w", dsErr)
+	}
+	h := g.Datastore.Addresses().Filter(datastore.AddressRefByChainSelector(g.HomeChainSelector))
+	if len(h) == 0 {
+		return fmt.Errorf("no addresses found for home chain %d in datastore", g.HomeChainSelector)
+	}
+	// TODO check for required registry contracts by type and version
 	return nil
 }
 

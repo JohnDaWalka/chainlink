@@ -41,8 +41,6 @@ type donConfig struct {
 	*ocrDonCfg
 }
 
-var ocrDons map[string]ocrDonCfg // map of DON name to ocrDon struct
-
 func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfigFns []cre.CapabilityRegistryConfigFn) error {
 	lggr := input.CldEnv.Logger
 
@@ -134,11 +132,6 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			DonCapabilities: c,
 			ocrDonCfg:       ocrCfg,
 		}
-	}
-
-	// this can probably be removed, maintaining for compatibility for now
-	if len(ocrDons) == 0 {
-		return errors.New("no OCR3-capable DON found in the topology")
 	}
 
 	_, err := operations.ExecuteSequence(
@@ -419,6 +412,7 @@ func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig
 	return oracleConfig, nil
 }
 
+// TODO: CRE-742 use datastore
 func FindAddressesForChain(addressBook cldf.AddressBook, chainSelector uint64, contractName string) (common.Address, error) {
 	addresses, err := addressBook.AddressesForChain(chainSelector)
 	if err != nil {
@@ -436,6 +430,7 @@ func FindAddressesForChain(addressBook cldf.AddressBook, chainSelector uint64, c
 	return common.Address{}, fmt.Errorf("failed to find %s address in the address book for chain %d", contractName, chainSelector)
 }
 
+// TODO: CRE-742 use datastore
 func MustFindAddressesForChain(addressBook cldf.AddressBook, chainSelector uint64, contractName string) common.Address {
 	addr, err := FindAddressesForChain(addressBook, chainSelector, contractName)
 	if err != nil {

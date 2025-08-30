@@ -509,17 +509,7 @@ func SetupTestEnvironment(
 		startTime = time.Now()
 		fmt.Print(libformat.PurpleText("---> [BACKGROUND 1/3] Configuring Workflow Registry contract\n"))
 
-		allAddresses, addrErr := allChainsCLDEnvironment.ExistingAddresses.Addresses() //nolint:staticcheck // ignore SA1019 as ExistingAddresses is deprecated but still used
-		if addrErr != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr, "failed to get addresses from address book")}
-			return
-		}
-
 		chainsWithContracts := make(map[uint64]bool)
-		for chainSelector, addresses := range allAddresses {
-			chainsWithContracts[chainSelector] = len(addresses) > 0
-		}
-
 		addresses, addrErr1 := allChainsCLDEnvironment.DataStore.Addresses().Fetch()
 		if addrErr1 != nil {
 			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr1, "failed to get addresses from datastore")}
