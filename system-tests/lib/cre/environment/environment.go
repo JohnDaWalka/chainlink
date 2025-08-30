@@ -365,6 +365,7 @@ func SetupTestEnvironment(
 	// TODO move this deeper into the stack when we have all the p2p ids and can deploy and configure in one sequence
 	// deploy OCR3 contract
 	// we deploy OCR3 contract with a qualifier, so that we can distinguish it from other OCR3 contracts (Vault, EVM, ConsensusV2)
+	// TODO track the qualifiers in vars/consts rather than raw strings
 	_, err = deployOCR3Contract("capability_ocr3", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy OCR3 contract %w", err)
