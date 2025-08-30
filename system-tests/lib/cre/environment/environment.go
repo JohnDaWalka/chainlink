@@ -363,6 +363,28 @@ func SetupTestEnvironment(
 
 	// deploy the various ocr contracts
 	// TODO move this deeper into the stack when we have all the p2p ids and can deploy and configure in one sequence
+	// deploy OCR3 contract
+	// we deploy OCR3 contract with a qualifier, so that we can distinguish it from other OCR3 contracts (Vault, EVM, ConsensusV2)
+	ocr3DeployReport, err := operations.ExecuteSequence(
+		allChainsCLDEnvironment.OperationsBundle,
+		ks_contracts_op.DeployOCR3ContractsSequence,
+		ks_contracts_op.DeployOCR3ContractSequenceDeps{
+			Env: allChainsCLDEnvironment,
+		},
+		ks_contracts_op.DeployOCR3ContractSequenceInput{
+			RegistryChainSelector: homeChainSelector,
+			Qualifier:             "capability_ocr3",
+		},
+	)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to deploy OCR3 contract")
+	}
+	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(ocr3DeployReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+		return nil, pkgerrors.Wrap(err, "failed to merge address book with OCR3 contract address")
+	}
+	if err = memoryDatastore.Merge(ocr3DeployReport.Output.Datastore); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to merge datastore with OCR3 contract address")
+	}
 
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 

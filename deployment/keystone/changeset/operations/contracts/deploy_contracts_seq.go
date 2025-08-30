@@ -10,16 +10,12 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+type EVMChainID uint64
+type Selector uint64
+
 type DeployContractsSequenceDeps struct {
 	Env *deployment.Environment
 }
-
-type DeployKeystoneContractsSequenceDeps struct {
-	Env *deployment.Environment
-}
-
-type EVMChainID uint64
-type Selector uint64
 
 type DeployRegistryContractsSequenceInput struct {
 	RegistryChainSelector uint64
@@ -33,6 +29,10 @@ type DeployContractSequenceOutput struct {
 }
 
 // inputs and outputs have to be serializable, and must not contain sensitive data
+
+type DeployKeystoneContractsSequenceDeps struct {
+	Env *deployment.Environment
+}
 
 type DeployKeystoneContractsSequenceInput struct {
 	RegistryChainSelector uint64

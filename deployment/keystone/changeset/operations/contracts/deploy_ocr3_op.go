@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -43,5 +44,47 @@ var DeployOCR3Op = operations.NewOperation[DeployOCR3OpInput, DeployOCR3OpOutput
 		return DeployOCR3OpOutput{
 			Addresses: ocr3Output.DataStore.Addresses(), AddressBook: ocr3Output.AddressBook, //nolint:staticcheck // keeping the address book since not everything has been migrated to datastore
 		}, nil
+	},
+)
+
+type DeployOCR3ContractSequenceDeps struct {
+	Env *deployment.Environment
+}
+
+type DeployOCR3ContractSequenceInput struct {
+	RegistryChainSelector uint64
+	Qualifier             string // qualifier for the OCR3 contract deployment
+}
+
+type DeployOCR3ContractSequenceOutput struct {
+	// Not sure if we can serialize the address book without modifications, but whatever is returned needs to be serializable.
+	// This could also be the address datastore instead.
+	AddressBook deployment.AddressBook
+	Datastore   datastore.DataStore // Keeping the address store for backward compatibility, as not everything has been migrated to address book
+}
+
+// DeployKeystoneContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).
+var DeployOCR3ContractsSequence = operations.NewSequence[DeployOCR3ContractSequenceInput, DeployOCR3ContractSequenceOutput, DeployOCR3ContractSequenceDeps](
+	"deploy-registry-contracts-seq",
+	semver.MustParse("1.0.0"),
+	"Deploy registry Contracts (Capabilities Registry, Workflow Registry)",
+	func(b operations.Bundle, deps DeployOCR3ContractSequenceDeps, input DeployOCR3ContractSequenceInput) (output DeployOCR3ContractSequenceOutput, err error) {
+		ab := deployment.NewMemoryAddressBook()
+		as := datastore.NewMemoryDataStore()
+
+		// OCR3 Contract
+		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: input.Qualifier})
+		if err != nil {
+			return DeployOCR3ContractSequenceOutput{}, err
+		}
+		err = updateAddresses(as.Addresses(), ocr3DeployReport.Output.Addresses, ab, ocr3DeployReport.Output.AddressBook)
+		if err != nil {
+			return DeployOCR3ContractSequenceOutput{}, err
+		}
+		return DeployOCR3ContractSequenceOutput{
+			AddressBook: ab,
+			Datastore:   as.Seal(),
+		}, nil
+
 	},
 )
