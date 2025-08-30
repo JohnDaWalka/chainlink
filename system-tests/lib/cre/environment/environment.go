@@ -365,27 +365,36 @@ func SetupTestEnvironment(
 	// TODO move this deeper into the stack when we have all the p2p ids and can deploy and configure in one sequence
 	// deploy OCR3 contract
 	// we deploy OCR3 contract with a qualifier, so that we can distinguish it from other OCR3 contracts (Vault, EVM, ConsensusV2)
-	ocr3DeployReport, err := operations.ExecuteSequence(
-		allChainsCLDEnvironment.OperationsBundle,
-		ks_contracts_op.DeployOCR3ContractsSequence,
-		ks_contracts_op.DeployOCR3ContractSequenceDeps{
-			Env: allChainsCLDEnvironment,
-		},
-		ks_contracts_op.DeployOCR3ContractSequenceInput{
-			RegistryChainSelector: homeChainSelector,
-			Qualifier:             "capability_ocr3",
-		},
-	)
+	_, err = deployOCR3Contract("capability_ocr3", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to deploy OCR3 contract")
+		return nil, fmt.Errorf("failed to deploy OCR3 contract %w", err)
 	}
-	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(ocr3DeployReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
-		return nil, pkgerrors.Wrap(err, "failed to merge address book with OCR3 contract address")
+	// deploy DONTime contract
+	_, err = deployOCR3Contract("DONTime", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy DONTime contract %w", err)
 	}
-	if err = memoryDatastore.Merge(ocr3DeployReport.Output.Datastore); err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to merge datastore with OCR3 contract address")
+	if vaultOCR3AddrFlag {
+		_, err = deployOCR3Contract("capability_vault", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy Vault OCR3 contract %w", err)
+		}
 	}
-
+	if evmOCR3AddrFlag {
+		for chainID, selector := range chainsWithEVMCapability {
+			qualifier := ks_contracts_op.GetCapabilityContractIdentifier(uint64(chainID))
+			_, err = deployOCR3Contract(qualifier, uint64(selector), allChainsCLDEnvironment, memoryDatastore)
+			if err != nil {
+				return nil, fmt.Errorf("failed to deploy EVM OCR3 contract for chainID %d, selector %d: %w", chainID, selector, err)
+			}
+		}
+	}
+	if consensusV2AddrFlag {
+		_, err = deployOCR3Contract("capability_consensus", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deploy Consensus V2 OCR3 contract %w", err)
+		}
+	}
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 
 	ocr3Addr := mustGetAddress(memoryDatastore, homeChainSelector, keystone_changeset.OCR3Capability.String(), input.ContractVersions[keystone_changeset.OCR3Capability.String()], "capability_ocr3")
@@ -1002,4 +1011,28 @@ func getAllFilters(ctx context.Context, logger logger.Logger, chainID *big.Int, 
 
 	defer db.Close()
 	return orm.LoadFilters(ctx)
+}
+
+func deployOCR3Contract(qualifier string, selector uint64, env *cldf.Environment, ds datastore.MutableDataStore) (*ks_contracts_op.DeployOCR3ContractSequenceOutput, error) {
+	ocr3DeployReport, err := operations.ExecuteSequence(
+		env.OperationsBundle,
+		ks_contracts_op.DeployOCR3ContractsSequence,
+		ks_contracts_op.DeployOCR3ContractSequenceDeps{
+			Env: env,
+		},
+		ks_contracts_op.DeployOCR3ContractSequenceInput{
+			RegistryChainSelector: selector,
+			Qualifier:             qualifier,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy OCR3 contract '%s' on chain %d: %w", qualifier, selector, err)
+	}
+	if err = env.ExistingAddresses.Merge(ocr3DeployReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+		return nil, fmt.Errorf("failed to merge address book with OCR3 contract address for '%s' on chain %d: %w", qualifier, selector, err)
+	}
+	if err = ds.Merge(ocr3DeployReport.Output.Datastore); err != nil {
+		return nil, fmt.Errorf("failed to merge datastore with OCR3 contract address for '%s' on chain %d: %w", qualifier, selector, err)
+	}
+	return &ocr3DeployReport.Output, nil
 }
