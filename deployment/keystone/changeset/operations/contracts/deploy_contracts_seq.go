@@ -10,12 +10,27 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
+type DeployContractsSequenceDeps struct {
+	Env *deployment.Environment
+}
+
 type DeployKeystoneContractsSequenceDeps struct {
 	Env *deployment.Environment
 }
 
 type EVMChainID uint64
 type Selector uint64
+
+type DeployRegistryContractsSequenceInput struct {
+	RegistryChainSelector uint64
+}
+
+type DeployContractSequenceOutput struct {
+	// Not sure if we can serialize the address book without modifications, but whatever is returned needs to be serializable.
+	// This could also be the address datastore instead.
+	AddressBook deployment.AddressBook
+	Datastore   datastore.DataStore // Keeping the address store for backward compatibility, as not everything has been migrated to address book
+}
 
 // inputs and outputs have to be serializable, and must not contain sensitive data
 
@@ -48,6 +63,41 @@ func updateAddresses(addr datastore.MutableAddressRefStore, as datastore.Address
 
 	return sourceAB.Merge(ab)
 }
+
+// DeployKeystoneContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).
+var DeployRegistryContractsSequence = operations.NewSequence[DeployRegistryContractsSequenceInput, DeployContractSequenceOutput, DeployContractsSequenceDeps](
+	"deploy-registry-contracts-seq",
+	semver.MustParse("1.0.0"),
+	"Deploy registry Contracts (Capabilities Registry, Workflow Registry)",
+	func(b operations.Bundle, deps DeployContractsSequenceDeps, input DeployRegistryContractsSequenceInput) (output DeployContractSequenceOutput, err error) {
+		ab := deployment.NewMemoryAddressBook()
+		as := datastore.NewMemoryDataStore()
+
+		// Capabilities Registry contract
+		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+		err = updateAddresses(as.Addresses(), capabilitiesRegistryDeployReport.Output.Addresses, ab, capabilitiesRegistryDeployReport.Output.AddressBook)
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+		// Workflow Registry contract
+		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+		err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+		return DeployContractSequenceOutput{
+			AddressBook: ab,
+			Datastore:   as.Seal(),
+		}, nil
+
+	},
+)
 
 // DeployKeystoneContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).
 var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContractsSequenceInput, DeployKeystoneContractsSequenceOutput, DeployKeystoneContractsSequenceDeps](

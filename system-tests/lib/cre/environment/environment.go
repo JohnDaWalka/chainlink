@@ -252,36 +252,72 @@ func SetupTestEnvironment(
 			}
 		}
 	}
-
-	// use CLD to deploy the necessary contracts
+	/*
+		// use CLD to deploy the necessary contracts
+		homeChainSelector := homeChainOutput.ChainSelector
+		deployKeystoneReport, err := operations.ExecuteSequence(
+			allChainsCLDEnvironment.OperationsBundle,
+			ks_contracts_op.DeployKeystoneContractsSequence,
+			ks_contracts_op.DeployKeystoneContractsSequenceDeps{
+				Env: allChainsCLDEnvironment,
+			},
+			ks_contracts_op.DeployKeystoneContractsSequenceInput{
+				RegistryChainSelector: homeChainSelector,
+				ForwardersSelectors:   evmForwardersSelectors,
+				DeployVaultOCR3:       vaultOCR3AddrFlag,
+				DeployEVMOCR3:         evmOCR3AddrFlag,
+				EVMChainIDs:           chainsWithEVMCapability,
+				DeployConsensusOCR3:   consensusV2AddrFlag,
+			},
+		)
+	*/
 	homeChainSelector := homeChainOutput.ChainSelector
-	deployKeystoneReport, err := operations.ExecuteSequence(
+	registryContractsReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
-		ks_contracts_op.DeployKeystoneContractsSequence,
-		ks_contracts_op.DeployKeystoneContractsSequenceDeps{
+		ks_contracts_op.DeployRegistryContractsSequence,
+		ks_contracts_op.DeployContractsSequenceDeps{
 			Env: allChainsCLDEnvironment,
 		},
-		ks_contracts_op.DeployKeystoneContractsSequenceInput{
+		ks_contracts_op.DeployRegistryContractsSequenceInput{
 			RegistryChainSelector: homeChainSelector,
-			ForwardersSelectors:   evmForwardersSelectors,
-			DeployVaultOCR3:       vaultOCR3AddrFlag,
-			DeployEVMOCR3:         evmOCR3AddrFlag,
-			EVMChainIDs:           chainsWithEVMCapability,
-			DeployConsensusOCR3:   consensusV2AddrFlag,
 		},
 	)
 	if err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
 	}
 
-	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(deployKeystoneReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(registryContractsReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
 		return nil, pkgerrors.Wrap(err, "failed to merge address book with Keystone contracts addresses")
 	}
 
-	if err = memoryDatastore.Merge(deployKeystoneReport.Output.Datastore); err != nil {
+	if err = memoryDatastore.Merge(registryContractsReport.Output.Datastore); err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
 	}
 
+	// deploy evm forwarders
+	evmForwardersReport, err := operations.ExecuteSequence(
+		allChainsCLDEnvironment.OperationsBundle,
+		ks_contracts_op.DeployKeystoneForwardersSequence,
+		ks_contracts_op.DeployKeystoneForwardersSequenceDeps{
+			Env: allChainsCLDEnvironment,
+		},
+		ks_contracts_op.DeployKeystoneForwardersInput{
+			Targets: evmForwardersSelectors,
+		},
+	)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to deploy evm forwarder")
+	}
+
+	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(evmForwardersReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+		return nil, pkgerrors.Wrap(err, "failed to merge address book with Keystone contracts addresses")
+	}
+
+	if err = memoryDatastore.Merge(evmForwardersReport.Output.Datastore); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
+	}
+
+	// deploy solana forwarders
 	for _, sel := range solForwardersSelectors {
 		out, err := operations.ExecuteSequence(
 			allChainsCLDEnvironment.OperationsBundle,
@@ -324,6 +360,10 @@ func SetupTestEnvironment(
 
 		testLogger.Info().Msgf("Deployed Forwarder contract on Solana chain chain %d programID: %s state: %s", sel, out.Output.ProgramID.String(), out.Output.State.String())
 	}
+
+	// deploy the various ocr contracts
+	// TODO move this deeper into the stack when we have all the p2p ids and can deploy and configure in one sequence
+
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 
 	ocr3Addr := mustGetAddress(memoryDatastore, homeChainSelector, keystone_changeset.OCR3Capability.String(), input.ContractVersions[keystone_changeset.OCR3Capability.String()], "capability_ocr3")
