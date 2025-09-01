@@ -133,8 +133,8 @@ type SimpleTransactionV2 = SimpleTransaction
 type MCMSTransactionV2 = MCMSTransaction
 
 // GetMCMSContracts retrieves MCMS contracts from the environment using DataStore
-func GetMCMSContracts(e cldf.Environment, chainSelector uint64) (*commonchangeset.MCMSWithTimelockState, error) {
-	states, err := commonchangeset.MaybeLoadMCMSWithTimelockStateDataStore(e, []uint64{chainSelector})
+func GetMCMSContracts(e cldf.Environment, chainSelector uint64, qualifier string) (*commonchangeset.MCMSWithTimelockState, error) {
+	states, err := commonchangeset.MaybeLoadMCMSWithTimelockStateDataStoreWithQualifier(e, []uint64{chainSelector}, qualifier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load MCMS contracts for chain %d: %w", chainSelector, err)
 	}

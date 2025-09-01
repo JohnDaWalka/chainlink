@@ -84,6 +84,10 @@ func MaybeLoadMCMSWithTimelockState(env cldf.Environment, chainSelectors []uint6
 
 // MaybeLoadMCMSWithTimelockStateDataStore loads the MCMSWithTimelockState state for each chain in the given environment from the DataStore.
 func MaybeLoadMCMSWithTimelockStateDataStore(env cldf.Environment, chainSelectors []uint64) (map[uint64]*MCMSWithTimelockState, error) {
+	return MaybeLoadMCMSWithTimelockStateDataStoreWithQualifier(env, chainSelectors, "")
+}
+
+func MaybeLoadMCMSWithTimelockStateDataStoreWithQualifier(env cldf.Environment, chainSelectors []uint64, qualifier string) (map[uint64]*MCMSWithTimelockState, error) {
 	result := map[uint64]*MCMSWithTimelockState{}
 	for _, chainSelector := range chainSelectors {
 		chain, ok := env.BlockChains.EVMChains()[chainSelector]
@@ -91,7 +95,7 @@ func MaybeLoadMCMSWithTimelockStateDataStore(env cldf.Environment, chainSelector
 			return nil, fmt.Errorf("chain %d not found", chainSelector)
 		}
 
-		addressesChain, err := loadAddressesFromDataStore(env.DataStore, chainSelector)
+		addressesChain, err := loadAddressesFromDataStore(env.DataStore, chainSelector, qualifier)
 		if err != nil {
 			return nil, err
 		}
@@ -106,9 +110,18 @@ func MaybeLoadMCMSWithTimelockStateDataStore(env cldf.Environment, chainSelector
 }
 
 // TODO there should be some common utility/adapter for this
-func loadAddressesFromDataStore(ds datastore.DataStore, chainSelector uint64) (map[string]cldf.TypeAndVersion, error) {
+func loadAddressesFromDataStore(ds datastore.DataStore, chainSelector uint64, qualifier string) (map[string]cldf.TypeAndVersion, error) {
 	addressesChain := make(map[string]cldf.TypeAndVersion)
-	addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(chainSelector))
+
+	// Build filter list starting with chain selector
+	filters := []datastore.FilterFunc[datastore.AddressRefKey, datastore.AddressRef]{datastore.AddressRefByChainSelector(chainSelector)}
+
+	// Add qualifier filter if provided
+	if qualifier != "" {
+		filters = append(filters, datastore.AddressRefByQualifier(qualifier))
+	}
+
+	addresses := ds.Addresses().Filter(filters...)
 	if len(addresses) == 0 {
 		return nil, fmt.Errorf("no addresses found for chain %d", chainSelector)
 	}

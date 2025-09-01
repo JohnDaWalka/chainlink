@@ -40,7 +40,7 @@ func TestMultipleMCMSDeploymentsConflict(t *testing.T) {
 	t.Log("Team A's MCMS infrastructure deployed successfully")
 
 	// Get Team A's MCMS contracts
-	teamAMCMSContracts, err := strategies.GetMCMSContracts(teamAEnv, chainSelector)
+	teamAMCMSContracts, err := strategies.GetMCMSContracts(teamAEnv, chainSelector, "team-a")
 	require.NoError(t, err, "should be able to get Team A's MCMS contracts")
 	require.NotNil(t, teamAMCMSContracts, "Team A's MCMS contracts should not be nil")
 
@@ -102,7 +102,7 @@ func TestMultipleMCMSDeploymentsConflict(t *testing.T) {
 	}
 
 	// Get MCMS contracts that will be used for Team B's configuration
-	teamBMCMSContracts, err := strategies.GetMCMSContracts(teamBEnv, chainSelector)
+	teamBMCMSContracts, err := strategies.GetMCMSContracts(teamBEnv, chainSelector, "team-b")
 	require.NoError(t, err, "failed to get MCMS contracts for Team B")
 
 	usedTimelockAddr := teamBMCMSContracts.Timelock.Address()
