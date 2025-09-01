@@ -255,7 +255,7 @@ func SetupTestEnvironment(
 
 	// use CLD to deploy the registry contracts, which are required before constructing the node TOML configs
 	homeChainSelector := homeChainOutput.ChainSelector
-	registryContractsReport, err := operations.ExecuteSequence(
+	registryContractsReport, seqErr := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
 		ks_contracts_op.DeployRegistryContractsSequence,
 		ks_contracts_op.DeployContractsSequenceDeps{
@@ -265,20 +265,20 @@ func SetupTestEnvironment(
 			RegistryChainSelector: homeChainSelector,
 		},
 	)
-	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to deploy Keystone contracts")
+	if seqErr != nil {
+		return nil, pkgerrors.Wrap(seqErr, "failed to deploy Keystone contracts")
 	}
 
-	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(registryContractsReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
+	if err := allChainsCLDEnvironment.ExistingAddresses.Merge(registryContractsReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
 		return nil, pkgerrors.Wrap(err, "failed to merge address book with Keystone contracts addresses")
 	}
 
-	if err = memoryDatastore.Merge(registryContractsReport.Output.Datastore); err != nil {
+	if err := memoryDatastore.Merge(registryContractsReport.Output.Datastore); err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
 	}
 
 	// deploy evm forwarders
-	evmForwardersReport, err := operations.ExecuteSequence(
+	evmForwardersReport, seqErr := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
 		ks_contracts_op.DeployKeystoneForwardersSequence,
 		ks_contracts_op.DeployKeystoneForwardersSequenceDeps{
@@ -288,16 +288,16 @@ func SetupTestEnvironment(
 			Targets: evmForwardersSelectors,
 		},
 	)
-	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to deploy evm forwarder")
+	if seqErr != nil {
+		return nil, pkgerrors.Wrap(seqErr, "failed to deploy evm forwarder")
 	}
 
-	if err = allChainsCLDEnvironment.ExistingAddresses.Merge(evmForwardersReport.Output.AddressBook); err != nil { //nolint:staticcheck // won't migrate now
-		return nil, pkgerrors.Wrap(err, "failed to merge address book with Keystone contracts addresses")
+	if seqErr = allChainsCLDEnvironment.ExistingAddresses.Merge(evmForwardersReport.Output.AddressBook); seqErr != nil { //nolint:staticcheck // won't migrate now
+		return nil, pkgerrors.Wrap(seqErr, "failed to merge address book with Keystone contracts addresses")
 	}
 
-	if err = memoryDatastore.Merge(evmForwardersReport.Output.Datastore); err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to merge datastore with Keystone contracts addresses")
+	if seqErr = memoryDatastore.Merge(evmForwardersReport.Output.Datastore); seqErr != nil {
+		return nil, pkgerrors.Wrap(seqErr, "failed to merge datastore with Keystone contracts addresses")
 	}
 
 	// deploy solana forwarders
@@ -349,34 +349,34 @@ func SetupTestEnvironment(
 	// deploy OCR3 contract
 	// we deploy OCR3 contract with a qualifier, so that we can distinguish it from other OCR3 contracts (Vault, EVM, ConsensusV2)
 	// TODO track the qualifiers in vars/consts rather than raw strings
-	_, err = deployOCR3Contract("capability_ocr3", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy OCR3 contract %w", err)
+	_, seqErr = deployOCR3Contract("capability_ocr3", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+	if seqErr != nil {
+		return nil, fmt.Errorf("failed to deploy OCR3 contract %w", seqErr)
 	}
 	// deploy DONTime contract
-	_, err = deployOCR3Contract("DONTime", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy DONTime contract %w", err)
+	_, seqErr = deployOCR3Contract("DONTime", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+	if seqErr != nil {
+		return nil, fmt.Errorf("failed to deploy DONTime contract %w", seqErr)
 	}
 	if vaultOCR3AddrFlag {
-		_, err = deployOCR3Contract("capability_vault", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deploy Vault OCR3 contract %w", err)
+		_, seqErr = deployOCR3Contract("capability_vault", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+		if seqErr != nil {
+			return nil, fmt.Errorf("failed to deploy Vault OCR3 contract %w", seqErr)
 		}
 	}
 	if evmOCR3AddrFlag {
 		for chainID, selector := range chainsWithEVMCapability {
 			qualifier := ks_contracts_op.GetCapabilityContractIdentifier(uint64(chainID))
-			_, err = deployOCR3Contract(qualifier, uint64(selector), allChainsCLDEnvironment, memoryDatastore)
-			if err != nil {
-				return nil, fmt.Errorf("failed to deploy EVM OCR3 contract for chainID %d, selector %d: %w", chainID, selector, err)
+			_, seqErr = deployOCR3Contract(qualifier, uint64(selector), allChainsCLDEnvironment, memoryDatastore)
+			if seqErr != nil {
+				return nil, fmt.Errorf("failed to deploy EVM OCR3 contract for chainID %d, selector %d: %w", chainID, selector, seqErr)
 			}
 		}
 	}
 	if consensusV2AddrFlag {
-		_, err = deployOCR3Contract("capability_consensus", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deploy Consensus V2 OCR3 contract %w", err)
+		_, seqErr = deployOCR3Contract("capability_consensus", homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
+		if seqErr != nil {
+			return nil, fmt.Errorf("failed to deploy Consensus V2 OCR3 contract %w", seqErr)
 		}
 	}
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()

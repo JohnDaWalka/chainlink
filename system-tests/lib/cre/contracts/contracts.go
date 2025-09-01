@@ -80,7 +80,7 @@ func (d *dons) ListByCapability(capName, capVersion string) ([]donConfig, error)
 	out := make([]donConfig, 0)
 	for _, don := range d.c {
 		for _, cap := range don.Capabilities {
-			if cap.Capability.LabelledName == capName && cap.Capability.Version == capVersion {
+			if strings.EqualFold(cap.Capability.LabelledName, capName) && strings.EqualFold(cap.Capability.Version, capVersion) {
 				out = append(out, don)
 				break
 			}
@@ -358,7 +358,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 
 	for chainSelector, evmOCR3Address := range *input.EVMOCR3Addresses {
 		// not sure how to map EVM chains to DONs, so for now we assume that there's only one DON that supports EVM chains
-		evmDON, err := dons.shouldBeOneDon(cre.ReadContractCapability)
+		evmDON, err := dons.shouldBeOneDon(cre.EVMCapability)
 		if err != nil {
 			return fmt.Errorf("failed to get EVM DON: %w", err)
 		}

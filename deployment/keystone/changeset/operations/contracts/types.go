@@ -2,5 +2,5 @@ package contracts
 
 type ConfigureKeystoneDON struct {
 	Name    string
-	NodeIDs []string // usually peer IDs
+	NodeIDs []string // jd node ids or peer IDs
 }

@@ -496,7 +496,7 @@ type DonMetadata struct {
 
 func (m *DonMetadata) RequiresOCR() bool {
 	return slices.Contains(m.Flags, ConsensusCapability) || slices.Contains(m.Flags, ConsensusCapabilityV2) ||
-		slices.Contains(m.Flags, VaultCapability) || slices.Contains(m.Flags, ReadContractCapability)
+		slices.Contains(m.Flags, VaultCapability) || slices.Contains(m.Flags, EVMCapability)
 }
 
 type Label struct {

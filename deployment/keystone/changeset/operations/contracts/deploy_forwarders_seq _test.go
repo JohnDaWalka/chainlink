@@ -26,7 +26,7 @@ func Test_DeployForwardersSeq(t *testing.T) {
 	registrySel := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]
 	otherChainSel := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[1]
 	b := optest.NewBundle(t)
-	deps := contracts.DeployForwardersSequenceDeps{
+	deps := contracts.DeployKeystoneForwardersSequenceDeps{
 		Env: &env,
 	}
 	input := contracts.DeployKeystoneForwardersInput{
@@ -39,4 +39,5 @@ func Test_DeployForwardersSeq(t *testing.T) {
 	addrRefs, err := got.Output.Addresses.Fetch()
 	require.NoError(t, err)
 	require.Len(t, addrRefs, len(input.Targets))
+	require.NotEmpty(t, got.Output.Datastore)
 }

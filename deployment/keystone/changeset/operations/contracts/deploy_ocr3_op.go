@@ -6,7 +6,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -48,7 +47,7 @@ var DeployOCR3Op = operations.NewOperation[DeployOCR3OpInput, DeployOCR3OpOutput
 )
 
 type DeployOCR3ContractSequenceDeps struct {
-	Env *deployment.Environment
+	Env *cldf.Environment
 }
 
 type DeployOCR3ContractSequenceInput struct {
@@ -58,7 +57,7 @@ type DeployOCR3ContractSequenceInput struct {
 
 type DeployOCR3ContractSequenceOutput struct {
 	// TODO: CRE-742 remove AddressBook
-	AddressBook deployment.AddressBook // Keeping the address store for backward compatibility, as not everything has been migrated to datastore
+	AddressBook cldf.AddressBook // Keeping the address store for backward compatibility, as not everything has been migrated to datastore
 	Datastore   datastore.DataStore
 }
 
@@ -68,7 +67,7 @@ var DeployOCR3ContractsSequence = operations.NewSequence[DeployOCR3ContractSeque
 	semver.MustParse("1.0.0"),
 	"Deploy registry Contracts (Capabilities Registry, Workflow Registry)",
 	func(b operations.Bundle, deps DeployOCR3ContractSequenceDeps, input DeployOCR3ContractSequenceInput) (output DeployOCR3ContractSequenceOutput, err error) {
-		ab := deployment.NewMemoryAddressBook()
+		ab := cldf.NewMemoryAddressBook()
 		as := datastore.NewMemoryDataStore()
 
 		// OCR3 Contract
