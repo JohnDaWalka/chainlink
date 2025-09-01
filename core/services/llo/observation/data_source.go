@@ -288,9 +288,11 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 
 		timeToDeadline := time.Until(observationDeadline)
 		if timeToDeadline > 0 {
+			// sleep a little shorter, so we don't accidentally hit the deadline and timeout the context
+			sleep := timeToDeadline - time.Millisecond
 			lggr.Debugw("Observation loop sleep", "elapsed_ms", elapsed.Milliseconds(),
-				"time_to_deadline_ms", timeToDeadline.Milliseconds(), "sleep_ms", timeToDeadline.Milliseconds())
-			time.Sleep(timeToDeadline)
+				"time_to_deadline_ms", timeToDeadline.Milliseconds(), "sleep_ms", sleep.Milliseconds())
+			time.Sleep(sleep)
 		} else {
 			lggr.Debugw("Observation loop", "elapsed_ms", elapsed.Milliseconds(), "time_to_deadline_ms", timeToDeadline.Milliseconds())
 		}
