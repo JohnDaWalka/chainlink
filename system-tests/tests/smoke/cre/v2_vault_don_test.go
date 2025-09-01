@@ -20,17 +20,29 @@ import (
 	vaultcommon "github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crevault "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/vault"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
 )
 
+func hasVaultOutsideWorkflowDON(testEnv *TestEnvironment) bool {
+	for _, nodeSet := range testEnv.Config.NodeSets {
+		if !flags.HasFlag(nodeSet.DONTypes, cre.WorkflowDON) && flags.HasFlag(nodeSet.ComputedCapabilities, cre.VaultCapability) {
+			return true
+		}
+	}
+	return false
+}
+
 func ExecuteVaultTest(t *testing.T, testEnv *TestEnvironment) {
-	// Skip till we figure out and fix the issues with environment startup on this test
-	const skipReason = "Skip till the errors with topology TopologyWorkflowGatewayCapabilities are fixed: https://smartcontract-it.atlassian.net/browse/PRIV-160"
-	t.Skipf("Skipping test for the following reason: %s", skipReason)
+	if hasVaultOutsideWorkflowDON(testEnv) {
+		t.Skip("Skip until we have fixed the errors resulting when vault capability is located outside of the Workflow DON: https://smartcontract-it.atlassian.net/browse/PRIV-160")
+	}
+
 	/*
 		BUILD ENVIRONMENT FROM SAVED STATE
 	*/
