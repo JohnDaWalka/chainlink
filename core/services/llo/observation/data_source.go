@@ -200,9 +200,10 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 			}
 		}
 
+		// This mutex protects both successfulStreamIDs and errs.
 		var mu sync.Mutex
 		successfulStreamIDs := make([]streams.StreamID, 0, len(streamValues))
-		var errs []ErrObservationFailed
+		errs := make([]ErrObservationFailed, 0)
 
 		var wg sync.WaitGroup
 		wg.Add(len(streamValues))
@@ -227,6 +228,18 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 					mu.Unlock()
 					return
 				}
+
+				if val == nil {
+					// This should not happen, but it is possible based on the code in oc.Observe().
+					// A stream with an observed value of nil cannot be considered as successful.
+					d.lggr.Debugw("Observed value is nil", "streamID", streamID)
+					return
+				}
+
+				// mark the stream as successful for logging purposes
+				mu.Lock()
+				successfulStreamIDs = append(successfulStreamIDs, streamID)
+				mu.Unlock()
 
 				// cache the observed value
 				d.cache.Add(streamID, val)
@@ -263,13 +276,9 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 			lggr = logger.With(lggr, "elapsed", elapsed, "nSuccessfulStreams",
 				len(successfulStreamIDs), "nFailedStreams", len(failedStreamIDs), "errs", errStrs)
 
-			if opts.VerboseLogging() {
-				lggr = logger.With(lggr, "streamValues", streamValues)
-			}
-
-			if len(errs) == 0 && opts.VerboseLogging() {
+			if len(errs) == 0 {
 				lggr.Infow("Observation succeeded for all streamsToObserve")
-			} else if len(errs) > 0 {
+			} else {
 				lggr.Warnw("Observation failed for streamsToObserve")
 			}
 		}
