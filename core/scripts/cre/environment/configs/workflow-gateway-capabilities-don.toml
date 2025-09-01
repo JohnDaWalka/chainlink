@@ -84,7 +84,7 @@
       """
 
 [[nodesets]]
-  nodes = 2
+  nodes = 4
   name = "capabilities"
   don_types = ["capabilities"]
   override_mode = "all"
