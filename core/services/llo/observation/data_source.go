@@ -158,7 +158,7 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 		}
 
 		startTS := time.Now()
-		opts, streamValues, observationInterval := d.getObservableStreams()
+		opts, streamValues, observationDeadline := d.getObservableStreams()
 		if len(streamValues) == 0 || opts == nil {
 			// There is nothing to observe, exit and let the next Observe() call reinitialize the loop.
 			d.lggr.Debugw("invalid observation loop parameters", "opts", opts, "streamValues", streamValues)
@@ -170,7 +170,7 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(stopChanCtx, observationInterval)
+		ctx, cancel := context.WithTimeout(stopChanCtx, time.Until(observationDeadline))
 		lggr := logger.With(d.lggr, "observationTimestamp", opts.ObservationTimestamp(), "configDigest", opts.ConfigDigest(), "seqNr", opts.OutCtx().SeqNr)
 
 		if opts.VerboseLogging() {
@@ -286,12 +286,13 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 		promObservationLoopDuration.WithLabelValues(
 			opts.ConfigDigest().String()).Observe(float64(elapsed.Milliseconds()))
 
-		if elapsed < observationInterval {
+		timeToDeadline := time.Until(observationDeadline)
+		if timeToDeadline > 0 {
 			lggr.Debugw("Observation loop sleep", "elapsed_ms", elapsed.Milliseconds(),
-				"interval_ms", observationInterval.Milliseconds(), "sleep_ms", observationInterval-elapsed)
-			time.Sleep(observationInterval - elapsed)
+				"time_to_deadline_ms", timeToDeadline.Milliseconds(), "sleep_ms", timeToDeadline.Milliseconds())
+			time.Sleep(timeToDeadline)
 		} else {
-			lggr.Debugw("Observation loop", "elapsed_ms", elapsed.Milliseconds(), "interval_ms", observationInterval.Milliseconds())
+			lggr.Debugw("Observation loop", "elapsed_ms", elapsed.Milliseconds(), "time_to_deadline_ms", timeToDeadline.Milliseconds())
 		}
 
 		// Cancel the context, so the linter doesn't complain.
@@ -308,9 +309,9 @@ func (d *dataSource) Close() error {
 }
 
 type observableStreamValues struct {
-	opts                llo.DSOpts
-	streamValues        llo.StreamValues
-	observationInterval time.Duration
+	opts         llo.DSOpts
+	streamValues llo.StreamValues
+	deadline     time.Time
 }
 
 func (o *observableStreamValues) IsActive() (bool, error) {
@@ -346,9 +347,9 @@ func (d *dataSource) setObservableStreams(ctx context.Context, streamValues llo.
 
 	d.configDigestToStreamMu.Lock()
 	d.configDigestToStream[opts.ConfigDigest()] = observableStreamValues{
-		opts:                opts,
-		streamValues:        streamVals,
-		observationInterval: time.Until(deadline),
+		opts:         opts,
+		streamValues: streamVals,
+		deadline:     deadline,
 	}
 	d.configDigestToStreamMu.Unlock()
 }
@@ -356,7 +357,7 @@ func (d *dataSource) setObservableStreams(ctx context.Context, streamValues llo.
 // getObservableStreams returns the active plugin data source options, the streams to observe and the observation interval
 // the observation interval is the maximum time we can spend observing streams. We ensure that we don't exceed this time and
 // we wait for the remaining time in the observation loop.
-func (d *dataSource) getObservableStreams() (llo.DSOpts, llo.StreamValues, time.Duration) {
+func (d *dataSource) getObservableStreams() (llo.DSOpts, llo.StreamValues, time.Time) {
 	d.configDigestToStreamMu.Lock()
 	streamsToObserve := make([]observableStreamValues, 0, len(d.configDigestToStream))
 	for _, vals := range d.configDigestToStream {
@@ -372,11 +373,11 @@ func (d *dataSource) getObservableStreams() (llo.DSOpts, llo.StreamValues, time.
 		}
 
 		if active {
-			return vals.opts, vals.streamValues, vals.observationInterval
+			return vals.opts, vals.streamValues, vals.deadline
 		}
 
 	}
 
 	d.lggr.Errorw("getObservableStreams: no active OCR instance found")
-	return nil, nil, 0
+	return nil, nil, time.Now()
 }
