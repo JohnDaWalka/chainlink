@@ -39,7 +39,7 @@ import (
 
 func ExecuteHTTPTriggerActionTest(t *testing.T, testEnv *TestEnvironment) {
 	HTTPWorkflowFileLocation := "../../../../core/scripts/cre/environment/examples/workflows/v2/http_simple/main.go"
-	var testLogger = framework.L
+	testLogger := framework.L
 
 	homeChainSelector := testEnv.WrappedBlockchainOutputs[0].ChainSelector
 	testEnv.Logger.Info().Msg("Starting HTTP trigger and action test...")
@@ -59,7 +59,7 @@ func ExecuteHTTPTriggerActionTest(t *testing.T, testEnv *TestEnvironment) {
 	compressedWorkflowWasmPath, httpConfigFilePath := createWorkflowArtifacts(t, testLogger, uniqueWorkflowName, &httpWorkflowConfig, HTTPWorkflowFileLocation)
 
 	testLogger.Info().Msg("Registering HTTP workflow")
-	workflowRegistryAddress, err := crecontracts.FindAddressesForChain(testEnv.FullCldEnvOutput.Environment.ExistingAddresses, homeChainSelector, keystone_changeset.WorkflowRegistry.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
+	workflowRegistryAddress, _, err := crecontracts.FindAddressesForChain(testEnv.FullCldEnvOutput.Environment.ExistingAddresses, homeChainSelector, keystone_changeset.WorkflowRegistry.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
 	require.NoError(t, err, "failed to find workflow registry address for chain %d", homeChainSelector)
 
 	regConfig := &WorkflowRegistrationConfig{
@@ -197,7 +197,7 @@ type HTTPWorkflowConfig struct {
 }
 
 func createHTTPWorkflowConfigFile(workflowName string, cfg *HTTPWorkflowConfig) (string, error) {
-	var testLogger = framework.L
+	testLogger := framework.L
 	mockServerURL := cfg.URL
 	parsedURL, urlErr := url.Parse(mockServerURL)
 	if urlErr != nil {
@@ -218,7 +218,7 @@ func createHTTPWorkflowConfigFile(workflowName string, cfg *HTTPWorkflowConfig) 
 	configFileName := fmt.Sprintf("test_http_workflow_config_%s.json", workflowName)
 	configPath := filepath.Join(os.TempDir(), configFileName)
 
-	writeErr := os.WriteFile(configPath, configBytes, 0644) //nolint:gosec // this is a test file
+	writeErr := os.WriteFile(configPath, configBytes, 0o644) //nolint:gosec // this is a test file
 	if writeErr != nil {
 		return "", errors.Wrap(writeErr, "failed to write HTTP workflow config file")
 	}
