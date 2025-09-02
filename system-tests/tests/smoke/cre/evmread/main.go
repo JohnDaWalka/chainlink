@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/google/go-cmp/cmp"
 	sdkpb "github.com/smartcontractkit/chainlink-protos/cre/go/sdk"
@@ -67,9 +68,12 @@ func onReadTrigger(cfg config.Config, runtime sdk.Runtime, payload *cron.Payload
 	runtime.Logger().Info("Successfully called contract")
 	requireReceipt(t, runtime, cfg, client)
 	runtime.Logger().Info("Successfully got receipt")
-	requireTx(t, runtime, cfg, client)
+	var expectedTx types.Transaction
+	err := expectedTx.UnmarshalBinary(cfg.ExpectedBinaryTx)
+	require.NoError(t, err)
+	requireTx(t, runtime, &expectedTx, client)
 	runtime.Logger().Info("Successfully got transaction")
-	requireEstimatedGas(t, runtime, cfg, client)
+	requireEstimatedGas(t, runtime, cfg, expectedTx.Data(), client)
 	runtime.Logger().Info("Successfully estimated gas")
 	requireError(t, runtime, cfg, client)
 	runtime.Logger().Info("Successfully got error for non-existing transaction")
@@ -97,11 +101,11 @@ func requireError(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Clien
 	runtime.Logger().Info("Successfully got error for non-existing transaction", "error", err)
 }
 
-func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
+func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg config.Config, txData []byte, client evm.Client) {
 	estimatedGasReply, err := client.EstimateGas(runtime, &evm.EstimateGasRequest{
 		Msg: &evm.CallMsg{
 			To:   cfg.ContractAddress,
-			Data: cfg.ExpectedTx.Data,
+			Data: txData,
 		},
 	}).Await()
 	require.NoError(t, err, "failed to estimate gas")
@@ -109,12 +113,35 @@ func requireEstimatedGas(t *T, runtime sdk.Runtime, cfg config.Config, client ev
 	require.Greater(t, estimatedGasReply.Gas, uint64(0), "Estimated gas should greater than 0")
 }
 
-func requireTx(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
-	txReply, err := client.GetTransactionByHash(runtime, &evm.GetTransactionByHashRequest{Hash: cfg.TxHash}).Await()
+func requireTx(t *T, runtime sdk.Runtime, expectedTx *types.Transaction, client evm.Client) {
+	txReply, err := client.GetTransactionByHash(runtime, &evm.GetTransactionByHashRequest{Hash: expectedTx.Hash().Bytes()}).Await()
 	require.NoError(t, err, "failed to get transaction by hash")
 	require.NotNil(t, txReply, "GetTransactionByHashReply should not be nil")
 	require.NotNil(t, txReply.Transaction, "Transaction should not be nil")
-	require.Empty(t, cmp.Diff(txReply.Transaction, cfg.ExpectedTx, protocmp.Transform()))
+	sdkExpectedTx := &evm.Transaction{
+		Nonce:    expectedTx.Nonce(),
+		Gas:      expectedTx.Gas(),
+		To:       expectedTx.To().Bytes(),
+		Data:     expectedTx.Data(),
+		Hash:     expectedTx.Hash().Bytes(),
+		Value:    pb.NewBigIntFromInt(expectedTx.Value()),
+		GasPrice: pb.NewBigIntFromInt(expectedTx.GasPrice()),
+	}
+	require.Empty(t, cmp.Diff(txReply.Transaction, sdkExpectedTx, protocmp.Transform()))
+}
+
+func gethToSDKReceipt(r *types.Receipt) *evm.Receipt {
+	return &evm.Receipt{
+		Status:            r.Status,
+		Logs:              make([]*evm.Log, len(r.Logs)), // workflow compares only number of logs, not their content
+		TxHash:            r.TxHash.Bytes(),
+		ContractAddress:   r.ContractAddress.Bytes(),
+		GasUsed:           r.GasUsed,
+		BlockHash:         r.BlockHash.Bytes(),
+		BlockNumber:       pb.NewBigIntFromInt(r.BlockNumber),
+		TxIndex:           uint64(r.TransactionIndex),
+		EffectiveGasPrice: pb.NewBigIntFromInt(r.EffectiveGasPrice),
+	}
 }
 
 func requireReceipt(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Client) {
@@ -125,7 +152,8 @@ func requireReceipt(t *T, runtime sdk.Runtime, cfg config.Config, client evm.Cli
 	require.Equal(t, len(cfg.ExpectedReceipt.Logs), len(receiptReply.Receipt.Logs), "Logs length should match expected value")
 	cfg.ExpectedReceipt.Logs = nil
 	receiptReply.Receipt.Logs = nil
-	require.Empty(t, cmp.Diff(receiptReply.Receipt, cfg.ExpectedReceipt, protocmp.Transform()))
+	expectedReceipt := gethToSDKReceipt(cfg.ExpectedReceipt)
+	require.Empty(t, cmp.Diff(receiptReply.Receipt, expectedReceipt, protocmp.Transform()))
 }
 
 func requireContractCall(t *T, cfg config.Config, runtime sdk.Runtime, client evm.Client) {
