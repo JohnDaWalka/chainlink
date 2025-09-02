@@ -34,12 +34,12 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/smartcontractkit/chain-selectors v1.0.67
 	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250901094903-99c1fc59d32c
-	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.31.1-0.20250822085500-af4aee833c2b
 	github.com/smartcontractkit/chainlink-evm v0.3.2
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.12
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.15
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.13
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
