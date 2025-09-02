@@ -119,7 +119,7 @@ func mustGetAddress(dataStore datastore.MutableDataStore, chainSel uint64, contr
 	return addrRef.Address
 }
 
-func useV2registryContracts(cvs map[string]string) bool {
+func useV2registryContracts(_ map[string]string) bool {
 	return false
 }
 
