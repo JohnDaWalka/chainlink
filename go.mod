@@ -97,7 +97,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250710151719-d98d7674da89
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250825214255-03a54a1c2010
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250829192031-320018b87b36
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335
 	github.com/smartcontractkit/cre-sdk-go v0.5.1-0.20250818135829-9ea58491207f
 	github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.5.1-0.20250818141131-0b979c98bab0
@@ -399,3 +399,5 @@ require (
 )
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250528121202-292529af39df
+
+

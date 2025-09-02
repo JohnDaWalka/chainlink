@@ -56,7 +56,7 @@ func TestDeployForwarder(t *testing.T) {
 				Qualifier: testQualifier,
 				Version:   "1.0.0",
 				BuildConfig: &helpers.BuildSolanaConfig{
-					GitCommitSha:   "e4f6a7a32fc2afd7191f6e5daa62b4d19828e954",
+					GitCommitSha:   "320018b87b360e598322bc7692a28ce536def1ad",
 					DestinationDir: getProgramsPath(),
 					LocalBuild:     helpers.LocalBuildConfig{BuildLocally: true, CreateDestinationDir: true},
 				},

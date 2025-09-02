@@ -64,16 +64,30 @@ func toNodeKeys(o *deployment.Node, registryChainSel uint64) NodeKeys {
 	var aptosOcr2KeyBundleId string
 	var aptosOnchainPublicKey string
 	var aptosCC *deployment.OCRConfig
+	var solanaOcr2KeyBundleId string
+	var solanaCC *deployment.OCRConfig
+	var solanaOnchainPublickey string
 	for details, cfg := range o.SelToOCRConfig {
-		if family, err := chainsel.GetSelectorFamily(details.ChainSelector); err == nil && family == chainsel.FamilyAptos {
-			aptosCC = &cfg
-			break
+		if family, err := chainsel.GetSelectorFamily(details.ChainSelector); err == nil {
+			if family == chainsel.FamilyAptos {
+				aptosCC = &cfg
+			}
+			if family == chainsel.FamilySolana {
+				solanaCC = &cfg
+			}
 		}
 	}
+
 	if aptosCC != nil {
 		aptosOcr2KeyBundleId = aptosCC.KeyBundleID
 		aptosOnchainPublicKey = fmt.Sprintf("%x", aptosCC.OnchainPublicKey[:])
 	}
+
+	if solanaCC != nil {
+		solanaOcr2KeyBundleId = solanaCC.KeyBundleID
+		solanaOnchainPublickey = fmt.Sprintf("%x", solanaCC.OnchainPublicKey[:])
+	}
+
 	evmCC, exists := o.OCRConfigForChainSelector(registryChainSel)
 	if !exists {
 		panic(fmt.Sprintf("ocr2 config not found for chain selector %d", registryChainSel))
@@ -91,8 +105,10 @@ func toNodeKeys(o *deployment.Node, registryChainSel uint64) NodeKeys {
 		EncryptionPublicKey: strings.TrimPrefix(o.CSAKey, "csa_"),
 		// TODO Aptos support. How will that be modeled in clo data?
 		// TODO: AptosAccount is unset but probably unused
-		AptosBundleID:         aptosOcr2KeyBundleId,
-		AptosOnchainPublicKey: aptosOnchainPublicKey,
+		AptosBundleID:          aptosOcr2KeyBundleId,
+		AptosOnchainPublicKey:  aptosOnchainPublicKey,
+		SolanaOnchainPublicKey: solanaOnchainPublickey,
+		SolanaBundleID:         solanaOcr2KeyBundleId,
 	}
 }
 func makeNodeKeysSlice(nodes []deployment.Node, registryChainSel uint64) []NodeKeys {

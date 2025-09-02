@@ -286,6 +286,9 @@ type ConfigureKeystoneInput struct {
 	EVMOCR3Config    keystone_changeset.OracleConfig
 	EVMOCR3Addresses *map[uint64]common.Address
 
+	SolanaOCR3Config  keystone_changeset.OracleConfig
+	solanaOCR3Address *common.Address
+
 	ConsensusV2OCR3Config  keystone_changeset.OracleConfig
 	ConsensusV2OCR3Address *common.Address
 

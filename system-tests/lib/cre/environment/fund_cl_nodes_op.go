@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -41,6 +42,7 @@ var FundCLNodesOp = operations.NewOperation[FundCLNodesOpInput, FundCLNodesOpOut
 	func(b operations.Bundle, deps FundCLNodesOpDeps, input FundCLNodesOpInput) (FundCLNodesOpOutput, error) {
 		ctx := b.GetContext()
 		// Fund the nodes
+		time.Sleep(time.Second)
 		concurrentNonceMap, concurrentNonceMapErr := NewConcurrentNonceMap(ctx, deps.BlockchainOutputs)
 		if concurrentNonceMapErr != nil {
 			return FundCLNodesOpOutput{}, pkgerrors.Wrap(concurrentNonceMapErr, "failed to create concurrent nonce map")
@@ -54,7 +56,8 @@ var FundCLNodesOp = operations.NewOperation[FundCLNodesOpInput, FundCLNodesOpOut
 		errGroup := &errgroup.Group{}
 		for _, metaDon := range deps.DonTopology.DonsWithMetadata {
 			for _, bcOut := range deps.BlockchainOutputs {
-				if !flags.RequiresForwarderContract(metaDon.Flags, bcOut.ChainID) {
+				if !flags.RequiresForwarderContract(metaDon.Flags, bcOut.ChainID) &&
+					bcOut.SolChain == nil { // consider solana chains always have forwarder
 					continue
 				}
 				for _, node := range metaDon.DON.Nodes {
@@ -72,6 +75,7 @@ var FundCLNodesOp = operations.NewOperation[FundCLNodesOpInput, FundCLNodesOpOut
 								return fmt.Errorf("failed to fund Solana node: %w", err)
 							}
 							deps.Env.Logger.Infof("successfully funded Solana account %s", recipient.String())
+							fmt.Println("fund solana account", recipient.String())
 							return nil
 						}
 

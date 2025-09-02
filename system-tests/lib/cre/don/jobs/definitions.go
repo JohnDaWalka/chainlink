@@ -249,12 +249,14 @@ func DonTimeJob(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	}
 }
 
-func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocr2KeyBundles map[string]string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
+	strategyName := "single-chain"
+	if len(ocr2KeyBundles) > 1 {
+		strategyName = "multi-chain"
+	}
 
-	return &jobv1.ProposeJobRequest{
-		NodeId: nodeID,
-		Spec: fmt.Sprintf(`
+	spec := fmt.Sprintf(`
 	type = "offchainreporting2"
 	schemaVersion = 1
 	externalJobID = "%s"
@@ -276,20 +278,29 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	providerType = "ocr3-capability"
 	telemetryType = "plugin"
 	[onchainSigningStrategy]
-	strategyName = 'multi-chain'
+	strategyName = "%s"
 	[onchainSigningStrategy.config]
-	evm = "%s"
 `,
-			uuid,
-			cre.ConsensusCapability,
-			ocr3CapabilityAddress,
-			ocr2KeyBundleID,
-			ocrPeeringData.OCRBootstraperPeerID,
-			fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
-			nodeEthAddress,
-			chainID,
-			ocr2KeyBundleID,
-		),
+		uuid,
+		cre.ConsensusCapability,
+		ocr3CapabilityAddress,
+		ocr2KeyBundles["evm"], // use EVM as offchain key
+		ocrPeeringData.OCRBootstraperPeerID,
+		fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
+		nodeEthAddress,
+		chainID,
+		strategyName,
+	)
+	for family, key := range ocr2KeyBundles {
+		spec += fmt.Sprintf(`
+        %s = "%s"`, family, key)
+		spec += "\n"
+	}
+
+	fmt.Println("ocr3 spec:", spec)
+	return &jobv1.ProposeJobRequest{
+		NodeId: nodeID,
+		Spec:   spec,
 	}
 }
 

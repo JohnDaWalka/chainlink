@@ -142,7 +142,7 @@ type setup struct {
 
 var (
 	feedID        = "0x018e16c39e00032000000"
-	wFName        = "testwf"
+	wFName        = "testwf1234"
 	wFDescription = "securemint test"
 	wFOwner       = [20]byte{1, 2, 3}
 )
@@ -191,7 +191,6 @@ func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solCh
 			AllowedWorkflowName:  [][10]byte{df.HashedWorkflowName(s.WFName)},
 			Descriptions:         s.Descriptions,
 		})
-
 	env, _, cacheErr := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployCS, initCS, configureCS})
 	require.NoError(t, cacheErr)
 	s.CacheProgramID = mustGetContract(t, env.DataStore, solChain.SolChain.ChainSelector, df_sol.CacheContract)
@@ -240,18 +239,17 @@ consensus:
     ref: "secure-mint-consensus"
     inputs:
       observations:
-        - "$(trigger.outputs)"
+        - "$(solana_data_feeds_cache_accounts.outputs)"
       solana:
-        account_context:
-          - "$(solana_data_feeds_cache_accounts.outputs)"
+        remaining_accounts:
+          - "$(solana_data_feeds_cache_accounts.outputs.remaining_accounts)"
     config:
       report_id: "0003"  
       key_id: "solana"
       aggregation_method: "secure_mint" 
       aggregation_config:
         targetChainSelector: "{{.ChainSelector}}" # CHAIN_ID_FOR_WRITE_TARGET: NEW Param, to match write target
-        solana:
-          account_context: "$(inputs.solana.account_context)"
+        aggregation_config_field: "my field"
       encoder: "borsh"
       encoder_config:
         report_schema: |
@@ -280,7 +278,7 @@ targets:
   - id: "{{.SolanaWriteTargetID}}"
     inputs:
       signed_report: $(secure-mint-consensus.outputs)
-      remaining_accounts: $(solana_data_feeds_cache_accounts.outputs)
+      remaining_accounts: $(solana_data_feeds_cache_accounts.outputs.remaining_accounts)
     config:
       address: "{{.DFCacheAddr}}"
       params: ["$(report)"]
@@ -332,11 +330,11 @@ func proposeSecureMintJob(t *testing.T, offchain offchain.Client, jobSpec string
 		if strings.Contains(n.Name, "bootstrap") {
 			continue
 		}
+
 		specs = append(specs, &job.ProposeJobRequest{
 			Spec:   jobSpec,
 			NodeId: n.Id,
 		})
-
 	}
 	err = jobs.Create(t.Context(), offchain, specs)
 	if err != nil && strings.Contains(err.Error(), "is already approved") {
@@ -376,7 +374,8 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 		Block        uint64
 		Mintable     *big.Int
 	}
-	configDigest, _ := hex.DecodeString("000e8613ec1ad47912a636904823e77e92bf4f580fe6fe7f2e6eff395118623c")
+
+	configDigest, _ := hex.DecodeString("000eb2d48aa4727bab3d60885ed3ab7be6e9d6b5855f706b4b01086797ac7730")
 	report := &secureMintReport{
 		ConfigDigest: ocr2types.ConfigDigest(configDigest),
 		SeqNr:        0,
@@ -411,19 +410,17 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 		})
 	}
 
-	event := &capabilities.OCRTriggerEvent{
-		ConfigDigest: configDigest,
-		SeqNr:        0,
-		Report:       jsonReport,
-		Sigs:         sigs,
-	}
-
-	outputs, err := event.ToMap()
+	event, err := values.NewMap(map[string]any{
+		"ConfigDigest": configDigest,
+		"SeqNr":        0,
+		"Report":       jsonReport,
+		//"Sigs":         sigs,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return outputs, nil
+	return event, nil
 }
 
 func createFakeTrigger(t *testing.T, s *setup, dons *cre.DonTopology) *fakeTrigger {
@@ -455,6 +452,7 @@ func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
 				} else {
 					framework.L.Error().Msgf("Could not export OCR2 key: %s", err2)
 				}
+				fmt.Printf("actual ocr signer pubkey: %v \n", key.OnchainPublicKey)
 			}
 		}
 	}

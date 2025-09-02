@@ -108,6 +108,20 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 				Key:   libnode.NodeOCR2KeyBundleIDKey,
 				Value: don.Nodes[j].Ocr2KeyBundleID,
 			})
+
+			ocrSupportedFamilies := make([]string, 0)
+			for family, key := range don.Nodes[j].ChainsOcr2KeyBundlesID {
+				node.Labels = append(node.Labels, &cre.Label{
+					Key:   libnode.CreateNodeOCR2KeyBundleIDKey(family),
+					Value: key,
+				})
+				ocrSupportedFamilies = append(ocrSupportedFamilies, family)
+			}
+
+			node.Labels = append(node.Labels, &cre.Label{
+				Key:   libnode.NodeOCRFamiliesKey,
+				Value: libnode.CreateNodeOCRFamiliesListValue(ocrSupportedFamilies),
+			})
 		}
 	}
 

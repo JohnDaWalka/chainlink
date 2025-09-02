@@ -184,9 +184,15 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					return nil, errors.Wrap(tErr, "failed to get transmitter address from bootstrap node labels")
 				}
 
+				// TODO remove once key Bundles families handled
 				keyBundle, kErr := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
 				if kErr != nil {
 					return nil, errors.Wrap(kErr, "failed to get key bundle id from worker node labels")
+				}
+
+				bundlesPerFamily, kbErr := node.ExtractBundleKeysPerFamily(workerNode)
+				if kbErr != nil {
+					return nil, errors.Wrap(kbErr, "failed to get ocr families bundle id from worker node labels")
 				}
 
 				keyNodeAddress := node.AddressKeyFromSelector(chain.Selector)
@@ -200,6 +206,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				if pErr != nil {
 					return nil, errors.Wrap(pErr, "failed to get p2p key id from bootstrap node labels")
 				}
+
 				// remove the prefix if it exists, to match the expected format
 				bootstrapNodeP2pKeyID = strings.TrimPrefix(bootstrapNodeP2pKeyID, "p2p_")
 				bootstrapPeers := make([]string, len(internalHostsBS))
@@ -207,6 +214,10 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					bootstrapPeers[i] = fmt.Sprintf("%s@%s:5001", bootstrapNodeP2pKeyID, workflowName)
 				}
 
+				strategyName := "single-chain"
+				if len(bundlesPerFamily) > 1 {
+					strategyName = "multi-chain"
+				}
 				oracleFactoryConfigInstance := job.OracleFactoryConfig{
 					Enabled:            true,
 					ChainID:            chainIDStr,
@@ -215,8 +226,8 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					OCRKeyBundleID:     keyBundle,
 					TransmitterID:      transmitterAddress,
 					OnchainSigning: job.OnchainSigningStrategy{
-						StrategyName: "single-chain",
-						Config:       map[string]string{"evm": keyBundle},
+						StrategyName: strategyName,
+						Config:       bundlesPerFamily,
 					},
 				}
 

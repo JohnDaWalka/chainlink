@@ -415,6 +415,7 @@ func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error)
 				return nil, errors.Wrap(err, "failed to generate P2P keys")
 			}
 			output.P2PKeys[donMetadata.ID] = p2pKeys
+			fmt.Println()
 		}
 
 		if len(input.GenerateEVMKeysForChainIDs) > 0 {

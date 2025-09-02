@@ -105,17 +105,19 @@ func (oc OracleConfig) MarshalJSON() ([]byte, error) {
 }
 
 type NodeKeys struct {
-	EthAddress            string `json:"EthAddress"`
-	AptosAccount          string `json:"AptosAccount"`
-	AptosBundleID         string `json:"AptosBundleID"`
-	AptosOnchainPublicKey string `json:"AptosOnchainPublicKey"`
-	P2PPeerID             string `json:"P2PPeerID"`             // p2p_<key>
-	OCR2BundleID          string `json:"OCR2BundleID"`          // used only in job spec
-	OCR2OnchainPublicKey  string `json:"OCR2OnchainPublicKey"`  // ocr2on_evm_<key>
-	OCR2OffchainPublicKey string `json:"OCR2OffchainPublicKey"` // ocr2off_evm_<key>
-	OCR2ConfigPublicKey   string `json:"OCR2ConfigPublicKey"`   // ocr2cfg_evm_<key>
-	CSAPublicKey          string `json:"CSAPublicKey"`
-	EncryptionPublicKey   string `json:"EncryptionPublicKey"`
+	EthAddress             string `json:"EthAddress"`
+	AptosAccount           string `json:"AptosAccount"`
+	AptosBundleID          string `json:"AptosBundleID"`
+	AptosOnchainPublicKey  string `json:"AptosOnchainPublicKey"`
+	SolanaOnchainPublicKey string `json:"SolanaOnchainPublicKey"`
+	SolanaBundleID         string `json:"SolanaBundleID"`
+	P2PPeerID              string `json:"P2PPeerID"`             // p2p_<key>
+	OCR2BundleID           string `json:"OCR2BundleID"`          // used only in job spec
+	OCR2OnchainPublicKey   string `json:"OCR2OnchainPublicKey"`  // ocr2on_evm_<key>
+	OCR2OffchainPublicKey  string `json:"OCR2OffchainPublicKey"` // ocr2off_evm_<key>
+	OCR2ConfigPublicKey    string `json:"OCR2ConfigPublicKey"`   // ocr2cfg_evm_<key>
+	CSAPublicKey           string `json:"CSAPublicKey"`
+	EncryptionPublicKey    string `json:"EncryptionPublicKey"`
 }
 
 // OCR2OracleConfig is the input configuration for an OCR2/3 contract.
@@ -221,6 +223,15 @@ func GenerateOCR3Config(cfg OracleConfig, nca []NodeKeys, secrets cldf.OCRSecret
 			}
 			pubKeys[string(chaintype.Aptos)] = aptosPubKey
 		}
+		// add solana key if present
+		if n.SolanaOnchainPublicKey != "" {
+			solPubKey, err := hex.DecodeString(n.SolanaOnchainPublicKey)
+			if err != nil {
+				return OCR2OracleConfig{}, fmt.Errorf("failed to decode SolanaOnchainPublicKey: %w", err)
+			}
+			pubKeys[string(chaintype.Solana)] = solPubKey
+		}
+
 		// validate uniqueness of each individual key
 		for _, key := range pubKeys {
 			raw := hex.EncodeToString(key)

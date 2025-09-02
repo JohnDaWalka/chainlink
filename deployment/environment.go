@@ -190,6 +190,9 @@ func (n Node) OCRConfigForChainSelector(chainSel uint64) (OCRConfig, bool) {
 	if want.ChainName == "" {
 		want.ChainName = strconv.FormatUint(want.ChainSelector, 10)
 	}
+	for details, cfg := range n.SelToOCRConfig {
+		fmt.Println("node", n.NodeID, "family", details.ChainName, "key bundle", cfg.KeyBundleID, "pubkey", cfg.KeyBundleID)
+	}
 	c, ok := n.SelToOCRConfig[want]
 	return c, ok
 }
