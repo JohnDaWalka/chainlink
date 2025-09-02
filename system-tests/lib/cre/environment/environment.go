@@ -119,8 +119,8 @@ func mustGetAddress(dataStore datastore.MutableDataStore, chainSel uint64, contr
 	return addrRef.Address
 }
 
-func useV2registryContracts(_ map[string]string) bool {
-	return false
+func useV2registryContracts(cv map[string]string) bool {
+	return cv[keystone_changeset.CapabilitiesRegistry.String()] == "2.0.0" && cv[keystone_changeset.WorkflowRegistry.String()] == "2.0.0"
 }
 
 func SetupTestEnvironment(
@@ -733,7 +733,7 @@ func SetupTestEnvironment(
 	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFn, 0)
 	for _, capability := range input.Capabilities {
 		configFn := capability.CapabilityRegistryV1ConfigFn()
-		if withV2RegistryContracts { 
+		if withV2RegistryContracts {
 			configFn = capability.CapabilityRegistryV2ConfigFn()
 		}
 
