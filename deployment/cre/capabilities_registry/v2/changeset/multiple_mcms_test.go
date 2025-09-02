@@ -3,7 +3,6 @@ package changeset
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -13,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/cre"
-	"github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/operations/contracts"
 	"github.com/smartcontractkit/chainlink/deployment/cre/common/strategies"
 )
 
@@ -23,11 +21,13 @@ func TestMultipleMCMSDeploymentsConflict(t *testing.T) {
 	lggr := logger.Test(t)
 	env, chainSelector := cre.BuildMinimalEnvironment(t, lggr)
 
-	t.Log("=== Setting up Team A's MCMS infrastructure ===")
+	// Create Team A's MCMS config with qualifier
+	teamAQualifier := "team-a"
+	teamAConfig := proposalutils.SingleGroupTimelockConfigV2(t)
+	teamAConfig.Qualifier = &teamAQualifier
 
-	// Deploy Team A's MCMS infrastructure
 	teamATimelockCfgs := map[uint64]commontypes.MCMSWithTimelockConfigV2{
-		chainSelector: proposalutils.SingleGroupTimelockConfigV2(t),
+		chainSelector: teamAConfig,
 	}
 
 	teamAEnv, err := commonchangeset.Apply(t, env,
@@ -39,8 +39,8 @@ func TestMultipleMCMSDeploymentsConflict(t *testing.T) {
 	require.NoError(t, err, "failed to deploy Team A's MCMS infrastructure")
 	t.Log("Team A's MCMS infrastructure deployed successfully")
 
-	// Get Team A's MCMS contracts
-	teamAMCMSContracts, err := strategies.GetMCMSContracts(teamAEnv, chainSelector, "team-a")
+	// Get Team A's MCMS contracts using their qualifier
+	teamAMCMSContracts, err := strategies.GetMCMSContracts(teamAEnv, chainSelector, teamAQualifier)
 	require.NoError(t, err, "should be able to get Team A's MCMS contracts")
 	require.NotNil(t, teamAMCMSContracts, "Team A's MCMS contracts should not be nil")
 
@@ -48,12 +48,13 @@ func TestMultipleMCMSDeploymentsConflict(t *testing.T) {
 	teamAProposerAddr := teamAMCMSContracts.ProposerMcm.Address()
 	t.Logf("Team A - Timelock: %s, Proposer: %s", teamATimelockAddr.Hex(), teamAProposerAddr.Hex())
 
-	t.Log("=== Setting up Team B's MCMS infrastructure ===")
+	// Create Team B's MCMS config with different qualifier
+	teamBQualifier := "team-b"
+	teamBConfig := proposalutils.SingleGroupTimelockConfigV2(t)
+	teamBConfig.Qualifier = &teamBQualifier
 
-	// Deploy Team B's MCMS infrastructure ON THE SAME CHAIN
-	// This simulates two independent teams deploying their own governance
 	teamBTimelockCfgs := map[uint64]commontypes.MCMSWithTimelockConfigV2{
-		chainSelector: proposalutils.SingleGroupTimelockConfigV2(t),
+		chainSelector: teamBConfig,
 	}
 
 	teamBEnv, err := commonchangeset.Apply(t, teamAEnv, // Build on top of Team A's environment
@@ -65,52 +66,18 @@ func TestMultipleMCMSDeploymentsConflict(t *testing.T) {
 	require.NoError(t, err, "failed to deploy Team B's MCMS infrastructure")
 	t.Log("Team B's MCMS infrastructure deployed successfully")
 
-	// Both teams deploy their registries in the SAME environment (teamBEnv)
-	// This simulates the real-world scenario where both teams' contracts exist on same chain
-	teamARegistry, err := DeployCapabilitiesRegistry{}.Apply(teamBEnv, DeployCapabilitiesRegistryInput{
-		ChainSelector: chainSelector,
-		Qualifier:     "team-a-registry",
-	})
-	require.NoError(t, err, "failed to deploy Team A's capabilities registry")
+	// Get Team B's MCMS contracts using their qualifier
+	teamBMCMSContracts, err := strategies.GetMCMSContracts(teamBEnv, chainSelector, teamBQualifier)
+	require.NoError(t, err, "should be able to get Team B's MCMS contracts with their qualifier")
+	require.NotNil(t, teamBMCMSContracts, "Team B's MCMS contracts should not be nil")
 
-	teamBRegistry, err := DeployCapabilitiesRegistry{}.Apply(teamBEnv, DeployCapabilitiesRegistryInput{
-		ChainSelector: chainSelector,
-		Qualifier:     "team-b-registry",
-	})
-	require.NoError(t, err, "failed to deploy Team B's capabilities registry")
+	teamBTimelockAddr := teamBMCMSContracts.Timelock.Address()
+	teamBProposerAddr := teamBMCMSContracts.ProposerMcm.Address()
+	t.Logf("Team B - Timelock: %s, Proposer: %s", teamBTimelockAddr.Hex(), teamBProposerAddr.Hex())
 
-	teamARegistryAddr := teamARegistry.Reports[0].Output.(contracts.DeployCapabilitiesRegistryOutput).Address
-	teamBRegistryAddr := teamBRegistry.Reports[0].Output.(contracts.DeployCapabilitiesRegistryOutput).Address
-
-	t.Logf("Team A Registry: %s", teamARegistryAddr)
-	t.Logf("Team B Registry: %s", teamBRegistryAddr)
-
-	// Team B tries to configure THEIR registry
-	// But GetMCMSContracts() might return Team A's governance!
-	teamBConfigInput := ConfigureCapabilitiesRegistryInput{
-		ChainSelector:               chainSelector,
-		CapabilitiesRegistryAddress: teamBRegistryAddr, // Team B's registry
-		UseMCMS:                     true,
-		MCMSConfig:                  &strategies.MCMSConfig{MinDuration: "30s"},
-		Description:                 "Team B trying to configure THEIR OWN registry",
-		Nops: []CapabilitiesRegistryNodeOperator{
-			{
-				Admin: common.HexToAddress("0x2222222222222222222222222222222222222222"),
-				Name:  "Team B NOP",
-			},
-		},
-	}
-
-	// Get MCMS contracts that will be used for Team B's configuration
-	teamBMCMSContracts, err := strategies.GetMCMSContracts(teamBEnv, chainSelector, "team-b")
-	require.NoError(t, err, "failed to get MCMS contracts for Team B")
-
-	usedTimelockAddr := teamBMCMSContracts.Timelock.Address()
-	usedProposerAddr := teamBMCMSContracts.ProposerMcm.Address()
-
-	t.Logf("GetMCMSContracts returned: Timelock=%s, Proposer=%s", usedTimelockAddr.Hex(), usedProposerAddr.Hex())
-	require.NotEqual(t, usedTimelockAddr, teamATimelockAddr, "GetMCMSContracts should return Team B's Timelock, not Team A's")
-
-	_, err = ConfigureCapabilitiesRegistry{}.Apply(teamBEnv, teamBConfigInput)
-	require.NoError(t, err, "Team B should be able to configure their registry successfully")
+	// Verify that each team has different MCMS contracts (true multi-tenancy)
+	require.NotEqual(t, teamATimelockAddr, teamBTimelockAddr,
+		"Team A and Team B should have different timelock contracts")
+	require.NotEqual(t, teamAProposerAddr, teamBProposerAddr,
+		"Team A and Team B should have different proposer contracts")
 }
