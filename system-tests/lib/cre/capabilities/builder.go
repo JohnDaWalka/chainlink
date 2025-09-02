@@ -8,8 +8,8 @@ import (
 )
 
 type registryConfigFns struct {
-		V1 cre.CapabilityRegistryConfigFn
-		V2 cre.CapabilityRegistryConfigFn
+	V1 cre.CapabilityRegistryConfigFn
+	V2 cre.CapabilityRegistryConfigFn
 }
 
 type Capability struct {
@@ -18,7 +18,7 @@ type Capability struct {
 	nodeConfigFn              cre.NodeConfigFn
 	gatewayJobHandlerConfigFn cre.GatewayHandlerConfigFn
 	registryConfigFns         registryConfigFns
-	validateFn func(*Capability) error
+	validateFn                func(*Capability) error
 }
 
 func (c *Capability) Flag() cre.CapabilityFlag {
@@ -65,15 +65,15 @@ func WithGatewayJobHandlerConfigFn(gatewayJobHandlerConfigFn cre.GatewayHandlerC
 	}
 }
 
-func WithCapabilityRegistryV1ConfigFn(capabilityRegistryV1ConfigFn cre.CapabilityRegistryConfigFn) Option {
+func WithCapabilityRegistryV1ConfigFn(fn cre.CapabilityRegistryConfigFn) Option {
 	return func(c *Capability) {
-		c.registryConfigFns.V1 = capabilityRegistryV1ConfigFn
+		c.registryConfigFns.V1 = fn
 	}
 }
 
-func WithCapabilityRegistryV2ConfigFn(capabilityRegistryV1ConfigFn cre.CapabilityRegistryConfigFn) Option {
+func WithCapabilityRegistryV2ConfigFn(fn cre.CapabilityRegistryConfigFn) Option {
 	return func(c *Capability) {
-		c.registryConfigFns.V2 = capabilityRegistryV1ConfigFn
+		c.registryConfigFns.V2 = fn
 	}
 }
 
@@ -104,6 +104,6 @@ func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
 	return capability, nil
 }
 
-func unimplmentedConfigFn(donFlags []cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error){
+func unimplmentedConfigFn(donFlags []cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	return nil, errors.New("config function is not implemented")
 }

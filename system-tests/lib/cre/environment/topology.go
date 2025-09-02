@@ -32,7 +32,6 @@ func BuildTopology(
 	capabilities []cre.InstallableCapability,
 	capabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
-	withV2RegistryContracts bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
 	topologyErr := libdon.ValidateTopology(nodeSets, infraInput)
 	if topologyErr != nil {
@@ -128,7 +127,6 @@ func BuildTopology(
 					GatewayConnectorOutput:  topology.GatewayConnectorOutput,
 					NodeSet:                 localNodeSets[i],
 					CapabilityConfigs:       capabilityConfigs,
-					WithV2RegistryContracts: withV2RegistryContracts,
 				},
 				configFactoryFunctions,
 			)

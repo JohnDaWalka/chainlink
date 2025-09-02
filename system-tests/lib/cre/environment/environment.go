@@ -414,7 +414,6 @@ func SetupTestEnvironment(
 		input.Capabilities,
 		input.CapabilityConfigs,
 		input.CopyCapabilityBinaries,
-		withV2RegistryContracts,
 	)
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")

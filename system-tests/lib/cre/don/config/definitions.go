@@ -9,6 +9,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/pkg/errors"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 )
@@ -44,8 +45,14 @@ const (
 	`
 )
 
-func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitiesRegistryAddress common.Address, 
-	chains []*WorkerEVMInput, withV2RegistryContracts bool) string {
+type AddressTypeVersion struct {
+	Address common.Address
+	cldf.TypeAndVersion
+}
+
+func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capRegistry AddressTypeVersion,
+	chains []*WorkerEVMInput,
+) string {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -64,10 +71,7 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitie
 			chain.HTTPRPC,
 		)
 	}
-	version := "1.0.0"
-	if withV2RegistryContracts {
-		version = "2.0.0"
-	}
+
 	return fmt.Sprintf(`
 	[Feature]
 	LogPoller = true
@@ -94,9 +98,9 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitie
 `,
 		donBootstrapNodePeerID,
 		evmChainsConfig,
-		capabilitiesRegistryAddress,
+		capRegistry.Address,
 		homeChainID,
-		version,
+		capRegistry.Version,
 	)
 }
 
@@ -126,9 +130,10 @@ type WorkerEVMInput struct {
 	WorkflowConfig   map[string]any // Configuration for EVM.Workflow section
 }
 
-func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData, 
-	capabilitiesPeeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, 
-	homeChainID uint64, chains []*WorkerEVMInput, withV2RegistryContracts bool) (string, error) {
+func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData,
+	capabilitiesPeeringData cre.CapabilitiesPeeringData, capRegistry AddressTypeVersion,
+	homeChainID uint64, chains []*WorkerEVMInput,
+) (string, error) {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -174,11 +179,6 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		}
 	}
 
-		version := "1.0.0"
-	if withV2RegistryContracts {
-		version = "2.0.0"
-	}
-
 	return fmt.Sprintf(`
 	[Feature]
 	LogPoller = true
@@ -216,9 +216,9 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		capabilitiesPeeringData.GlobalBootstraperHost,
 		capabilitiesPeeringData.Port,
 		evmChainsConfig,
-		capabilitiesRegistryAddress,
+		capRegistry.Address,
 		homeChainID,
-		version,
+		capRegistry.Version,
 	), nil
 }
 

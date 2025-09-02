@@ -151,7 +151,7 @@ func generateConfig(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverri
 		return nil, errors.Wrap(homeErr, "failed to get home chain ID")
 	}
 
-	workflowRegistryAddress, workErr := crecontracts.FindAddressesForChain(input.AddressBook, input.HomeChainSelector, keystone_changeset.WorkflowRegistry.String())
+	workflowRegistryAddress, _, workErr := crecontracts.FindAddressesForChain(input.AddressBook, input.HomeChainSelector, keystone_changeset.WorkflowRegistry.String())
 	if workErr != nil {
 		return nil, errors.Wrap(workErr, "failed to find WorkflowRegistry address")
 	}

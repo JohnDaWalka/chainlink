@@ -467,7 +467,6 @@ type GenerateConfigsInput struct {
 	NodeSet                 *CapabilitiesAwareNodeSet
 	CapabilityConfigs       CapabilityConfigs
 	GatewayConnectorOutput  *GatewayConnectorOutput // optional, automatically set if some DON in the topology has the GatewayDON flag
-	WithV2RegistryContracts bool
 }
 
 func (g *GenerateConfigsInput) Validate() error {

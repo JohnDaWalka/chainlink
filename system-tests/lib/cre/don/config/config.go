@@ -106,9 +106,14 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 	}
 
 	// find contract addresses
-	capabilitiesRegistryAddress, capErr := crecontracts.FindAddressesForChain(input.AddressBook, input.HomeChainSelector, keystone_changeset.CapabilitiesRegistry.String())
+	capabilitiesRegistryAddress, capRegTypeVersion, capErr := crecontracts.FindAddressesForChain(input.AddressBook, input.HomeChainSelector, keystone_changeset.CapabilitiesRegistry.String())
 	if capErr != nil {
 		return nil, errors.Wrap(capErr, "failed to find CapabilitiesRegistry address")
+	}
+
+	capRegistry := AddressTypeVersion{
+		Address:        capabilitiesRegistryAddress,
+		TypeAndVersion: capRegTypeVersion,
 	}
 
 	// find bootstrap node for the Don
@@ -156,7 +161,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 		}
 
 		// generate configuration for the bootstrap node
-		configOverrides[nodeIndex] = BootstrapEVM(donBootstrapNodePeerID, homeChainID, capabilitiesRegistryAddress, workerEVMInputs, input.WithV2RegistryContracts)
+		configOverrides[nodeIndex] = BootstrapEVM(donBootstrapNodePeerID, homeChainID, capRegistry, workerEVMInputs)
 		if flags.HasFlag(input.Flags, cre.WorkflowDON) {
 			configOverrides[nodeIndex] += BoostrapDon2DonPeering(input.CapabilitiesPeeringData)
 		}
@@ -300,8 +305,8 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigFns []cre.NodeConfigFn) 
 		// connect worker nodes to all the chains, add chain ID for registry (home chain)
 		// we configure both EVM chains, nodes and EVM.Workflow with Forwarder
 		var workerErr error
-		configOverrides[nodeIndex], workerErr = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.OCRPeeringData, 
-			input.CapabilitiesPeeringData, capabilitiesRegistryAddress, homeChainID, workerEVMInputs, input.WithV2RegistryContracts)
+		configOverrides[nodeIndex], workerErr = WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost, input.OCRPeeringData,
+			input.CapabilitiesPeeringData, capRegistry, homeChainID, workerEVMInputs)
 		if workerErr != nil {
 			return nil, errors.Wrap(workerErr, "failed to generate worker [EVM.Workflow] config")
 		}
