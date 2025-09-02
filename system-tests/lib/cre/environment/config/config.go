@@ -57,7 +57,7 @@ func (c Config) Validate(envDependencies cre.CLIEnvironmentDependencies) error {
 }
 
 func validateContractVersions(envDependencies cre.CLIEnvironmentDependencies) error {
-	supportedSet := GetDefaultContractSet(envDependencies.GetCLIFlags().WithV2Registries)
+	supportedSet := GetDefaultContractSet(envDependencies.GetCLIFlags().WithV2Registries())
 	cv := envDependencies.GetContractVersions()
 	for k, v := range supportedSet {
 		version, ok := cv[k]

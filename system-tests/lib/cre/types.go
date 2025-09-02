@@ -66,39 +66,26 @@ const (
 type CLIEnvironmentDependencies interface {
 	CapabilityFlagsProvider
 	ContractVersionsProvider
-	CLIFlagsProvider
-}
-
-type CLIFlags struct {
-	WithV2Registries       bool
-	WithPluginsDockerImage string
-	WithBeholder           bool
+	GetCLIFlags() CLIFlagsProvider
 }
 
 type CLIFlagsProvider interface {
-	GetCLIFlags() *CLIFlags
+	// If true, then use V2 Capability and Workflow Registries.
+	WithV2Registries() bool
 }
 
-func NewCLIFlagsProvider(
-	withPluginsDockerImage string,
-	withV2Registries, withBeholder bool,
-) *cliFlagsProvider {
-	flags := &CLIFlags{
-		WithV2Registries:       withV2Registries,
-		WithPluginsDockerImage: withPluginsDockerImage,
-		WithBeholder:           withBeholder,
-	}
+func NewCLIFlagsProvider(withV2Registries bool) *cliFlagsProvider {
 	return &cliFlagsProvider{
-		flags: flags,
+		withV2Registries: withV2Registries,
 	}
 }
 
 type cliFlagsProvider struct {
-	flags *CLIFlags
+	withV2Registries bool
 }
 
-func (cfp *cliFlagsProvider) GetCLIFlags() *CLIFlags {
-	return cfp.flags
+func (cfp *cliFlagsProvider) WithV2Registries() bool {
+	return cfp.withV2Registries
 }
 
 type ContractVersionsProvider interface {
@@ -127,9 +114,7 @@ func NewContractVersionsProvider(overrides map[string]string) *contractVersionsP
 			ks_sol.ForwarderState.String():                   "1.0.0",
 		},
 	}
-	for k, v := range overrides {
-		cvp.contracts[k] = v
-	}
+	maps.Copy(cvp.contracts, overrides)
 	return cvp
 }
 
@@ -157,8 +142,8 @@ type envionmentDependencies struct {
 	cliFlagsProvider    CLIFlagsProvider
 }
 
-func (e *envionmentDependencies) GetCLIFlags() *CLIFlags {
-	return e.cliFlagsProvider.GetCLIFlags()
+func (e *envionmentDependencies) GetCLIFlags() CLIFlagsProvider {
+	return e.cliFlagsProvider
 }
 
 func (e *envionmentDependencies) GetContractVersions() map[string]string {

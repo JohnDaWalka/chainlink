@@ -290,7 +290,7 @@ func startCmd() *cobra.Command {
 			envDependencies := cre.NewEnvironmentDependencies(
 				flags.NewDefaultCapabilityFlagsProvider(),
 				cre.NewContractVersionsProvider(envconfig.GetDefaultContractSet(withV2Registries)),
-				cre.NewCLIFlagsProvider(withPluginsDockerImage, withV2Registries, withBeholder),
+				cre.NewCLIFlagsProvider(withV2Registries),
 			)
 
 			if err := in.Validate(envDependencies); err != nil {
