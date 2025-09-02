@@ -57,9 +57,10 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 	tokenPoolAddress := state.SuiChains[config.ChainSelector].TokenPoolAddress // BurnMintTokenPoolPackage
 	ccipObjectRefId := state.SuiChains[config.ChainSelector].CCIPObjectRef
 
-	linkTokenPkgId := "0xfd58da048fbf8d9c2749bc1fdaccf479a3e66065f5ab4a9e45c47a96921b882d"
-	linkTokenObjectMetadataId := "0xabe4fe817da6fbd92f02ebcdf355822ce50f116b57dc5a043a119214c26019c9"
-	linkTokenTreasuryCapId := "0x93a630e91e6d517cf3594cc8a224305485ff10e052bf11704dd0c2ce74556f0d"
+	// TODO Mkae this part of the config
+	linkTokenPkgId := "0xabadadbac6b415c4487d5be2620062f81e317269f4a872d59153bacb469683b3"
+	linkTokenObjectMetadataId := "0x6da379ec6b61305d0e34a871c2d795c0f3ec45573803ccb143f7ba0f0d43a0f2"
+	linkTokenTreasuryCapId := "0x59dab72e1edf714c59e72c15bba6132571a1633f578736ee1e71d4dd0f12b0ec"
 
 	CCIPPackageId := state.SuiChains[config.ChainSelector].CCIPAddress
 	MCMsPackageId := state.SuiChains[config.ChainSelector].MCMsAddress
@@ -85,7 +86,7 @@ func (d DeploySuiBurnMintTp) Apply(e cldf.Environment, config DeploySuiBurnMintT
 				MCMSOwnerAddress:       signerAddr,
 			},
 
-			CoinObjectTypeArg:      linkTokenPkgId + "::link_token::LINK_TOKEN",
+			CoinObjectTypeArg:      linkTokenPkgId + "::link::LINK",
 			CCIPObjectRefObjectId:  ccipObjectRefId,
 			CoinMetadataObjectId:   linkTokenObjectMetadataId,
 			TreasuryCapObjectId:    linkTokenTreasuryCapId,

@@ -563,17 +563,17 @@ func configureTokenPool(
 	chainAdditions = []token_pool.TokenPoolChainUpdate{
 		{
 			RemoteChainSelector: 9762610643973837292,
-			RemotePoolAddresses: [][]byte{ // 0xa273867cfe2e47311fd9d07e20a72c643866b298e36523bace8c721c59e1e3dc
-				{162, 115, 134, 124, 254, 46, 71, 49,
-					31, 217, 208, 126, 32, 167, 44, 100,
-					56, 102, 178, 152, 227, 101, 35, 186,
-					206, 140, 114, 28, 89, 225, 227, 220},
+			RemotePoolAddresses: [][]byte{
+				{155, 101, 40, 190, 102, 232, 18, 167,
+					221, 209, 143, 83, 51, 116, 209, 168,
+					126, 74, 77, 57, 250, 52, 59, 254,
+					229, 167, 85, 38, 9, 75, 91, 199},
 			},
-			RemoteTokenAddress: []byte{ // 0xfd58da048fbf8d9c2749bc1fdaccf479a3e66065f5ab4a9e45c47a96921b882d
-				253, 88, 218, 4, 143, 191, 141, 156,
-				39, 73, 188, 31, 218, 204, 244, 121,
-				163, 230, 96, 101, 245, 171, 74, 158,
-				69, 196, 122, 150, 146, 27, 136, 45,
+			RemoteTokenAddress: []byte{
+				109, 163, 121, 236, 107, 97, 48, 93,
+				14, 52, 168, 113, 194, 215, 149, 192,
+				243, 236, 69, 87, 56, 3, 204, 177,
+				67, 247, 186, 15, 13, 67, 160, 242,
 			},
 			OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: false,
@@ -590,6 +590,7 @@ func configureTokenPool(
 	fmt.Println("TOKENPOOL: ", tokenPool.Address())
 	// Handle new chain support
 	if len(chainAdditions) > 0 {
+		fmt.Println("APPLYING CHAIN UPDATES")
 		_, err = tokenPool.ApplyChainUpdates(opts, []uint64{}, chainAdditions)
 		if err != nil {
 			return fmt.Errorf("failed to create applyChainUpdates transaction for token pool with address %s: %w", tokenPool.Address(), err)
@@ -629,7 +630,7 @@ func GetTokenStateFromPoolEVM(
 	// if !ok {
 	// 	return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("token pool does not exist on %s with symbol %s, type %s, and version %s", chain.String(), symbol, poolType, version)
 	// }
-	tokenPool, err := token_pool.NewTokenPool(common.HexToAddress("0x1f6693980BeC000ee7F7C0F039970299Fe13126B"), chain.Client)
+	tokenPool, err := token_pool.NewTokenPool(common.HexToAddress("0x014F276D748098570E78720D9BB2503D1D607da1"), chain.Client)
 	if err != nil {
 		return nil, utils.ZeroAddress, token_admin_registry.TokenAdminRegistryTokenConfig{}, fmt.Errorf("failed to connect token pool with address %s on chain %s to token pool bindings: %w", tokenPoolAddress, chain, err)
 	}
