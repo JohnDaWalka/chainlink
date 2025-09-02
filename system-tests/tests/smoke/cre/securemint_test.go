@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"os"
 	"strings"
 	"testing"
 
@@ -30,10 +29,8 @@ import (
 	df_sol "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
-	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
@@ -50,38 +47,19 @@ var (
 )
 
 func Test_CRE_WorkflowDon_WriteSolana(t *testing.T) {
-	confErr := setConfigurationIfMissing(solWriterDonConfig, "workflow-solana")
-	require.NoError(t, confErr, "failed to set configuration")
+	tenv := SetupTestEnvironmentV2(t, &TestConfig{
+		EnvironmentDirPath:      "../../../../core/scripts/cre/environment",
+		EnvironmentConfigPath:   "../../../../core/scripts/cre/environment/configs/workflow-solana-don.toml",
+		EnvironmentArtifactPath: "../../../../core/scripts/cre/environment/env_artifact/env_artifact.json",
+		BeholderConfigPath:      "../../../../core/scripts/cre/environment/configs/chip-ingress-cache.toml",
+	})
 
-	configurationFiles := os.Getenv("CTF_CONFIGS")
-	require.NotEmpty(t, configurationFiles, "CTF_CONFIGS env var is not set")
-
-	topology := os.Getenv("CRE_TOPOLOGY")
-	require.NotEmpty(t, topology, "CRE_TOPOLOGY env var is not set")
-
-	createErr := createEnvironmentIfNotExists(configurationFiles, "../../../../core/scripts/cre/environment", topology)
-	require.NoError(t, createErr, "failed to create environment")
-
-	/*
-		LOAD ENVIRONMENT STATE
-	*/
-	in, err := framework.Load[envconfig.Config](nil)
-	require.NoError(t, err, "couldn't load environment state")
-
-	var envArtifact environment.EnvArtifact
-	artFile, err := os.ReadFile(os.Getenv("ENV_ARTIFACT_PATH"))
-	require.NoError(t, err, "failed to read artifact file")
-	err = json.Unmarshal(artFile, &envArtifact)
-	require.NoError(t, err, "failed to unmarshal artifact file")
-
-	executeSecureMintTest(t, in, envArtifact)
+	executeSecureMintTest(t, tenv)
 }
 
-func executeSecureMintTest(t *testing.T, in *envconfig.Config, envArtifact environment.EnvArtifact) {
-	cldLogger := cldlogger.NewSingleFileLogger(t)
-
-	fullCldEnvOutput, wrappedBlockchainOutputs, loadErr := environment.BuildFromSavedState(t.Context(), cldLogger, in, envArtifact)
-	require.NoError(t, loadErr, "failed to load environment")
+func executeSecureMintTest(t *testing.T, tenv *TestEnvironment) {
+	fullCldEnvOutput := tenv.FullCldEnvOutput
+	wrappedBlockchainOutputs := tenv.WrappedBlockchainOutputs
 	ds := fullCldEnvOutput.Environment.DataStore
 
 	// prevalidate environment
@@ -141,7 +119,7 @@ type setup struct {
 }
 
 var (
-	feedID        = "0x018e16c39e00032000000"
+	feedID        = [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	wFName        = "testwf1234"
 	wFDescription = "securemint test"
 	wFOwner       = [20]byte{1, 2, 3}
@@ -153,7 +131,7 @@ func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solCh
 	s.Descriptions = append(s.Descriptions, d)
 	s.WFName = wFName
 	s.WFOwner = wFOwner
-	s.FeedID = feedID
+	s.FeedID = new(big.Int).SetBytes(feedID[:]).String()
 	// deploy df cache
 	deployCS := commonchangeset.Configure(df_sol.DeployCache{}, &df_sol.DeployCacheRequest{
 		ChainSel:           solChain.SolChain.ChainSelector,
@@ -249,6 +227,7 @@ consensus:
       aggregation_method: "secure_mint" 
       aggregation_config:
         targetChainSelector: "{{.ChainSelector}}" # CHAIN_ID_FOR_WRITE_TARGET: NEW Param, to match write target
+        dataID: "{{.DataID}}"
         aggregation_config_field: "my field"
       encoder: "borsh"
       encoder_config:
@@ -296,6 +275,7 @@ func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.Wrapp
 	deriveCapabilityID := writetarget.GenerateDeriveRemainingName(chainID.String())
 	writeCapabilityID := writetarget.GenerateWriteTargetName(chainID.String())
 	owner := hex.EncodeToString(s.WFOwner[:])
+	d, _ := new(big.Int).SetString(s.FeedID, 0)
 	data := map[string]any{
 		"WorkflowName":        s.WFName,
 		"WorkflowOwner":       "0x" + owner,
@@ -305,6 +285,7 @@ func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.Wrapp
 		"SolanaWriteTargetID": writeCapabilityID,
 		"DeriveID":            deriveCapabilityID,
 		"FeedID":              s.FeedID,
+		"DataID":              hex.EncodeToString(d.Bytes()),
 		"ReportSchema":        reportSchema,
 		"DefinedTypes":        definedTypes,
 	}
