@@ -66,6 +66,39 @@ const (
 type CLIEnvironmentDependencies interface {
 	CapabilityFlagsProvider
 	ContractVersionsProvider
+	CLIFlagsProvider
+}
+
+type CLIFlags struct {
+	WithV2Registries       bool
+	WithPluginsDockerImage string
+	WithBeholder           bool
+}
+
+type CLIFlagsProvider interface {
+	GetCLIFlags() *CLIFlags
+}
+
+func NewCLIFlagsProvider(
+	withPluginsDockerImage string,
+	withV2Registries, withBeholder bool,
+) *cliFlagsProvider {
+	flags := &CLIFlags{
+		WithV2Registries:       withV2Registries,
+		WithPluginsDockerImage: withPluginsDockerImage,
+		WithBeholder:           withBeholder,
+	}
+	return &cliFlagsProvider{
+		flags: flags,
+	}
+}
+
+type cliFlagsProvider struct {
+	flags *CLIFlags
+}
+
+func (cfp *cliFlagsProvider) GetCLIFlags() *CLIFlags {
+	return cfp.flags
 }
 
 type ContractVersionsProvider interface {
@@ -106,16 +139,26 @@ type CapabilityFlagsProvider interface {
 	ChainSpecificCapabilityFlags() []CapabilityFlag
 }
 
-func NewEnvironmentDependencies(cfp CapabilityFlagsProvider, cvp ContractVersionsProvider) *envionmentDependencies {
+func NewEnvironmentDependencies(
+	cfp CapabilityFlagsProvider,
+	cvp ContractVersionsProvider,
+	cliFlagsProvider CLIFlagsProvider,
+) *envionmentDependencies {
 	return &envionmentDependencies{
 		flagsProvider:       cfp,
 		contractSetProvider: cvp,
+		cliFlagsProvider:    cliFlagsProvider,
 	}
 }
 
 type envionmentDependencies struct {
 	flagsProvider       CapabilityFlagsProvider
 	contractSetProvider ContractVersionsProvider
+	cliFlagsProvider    CLIFlagsProvider
+}
+
+func (e *envionmentDependencies) GetCLIFlags() *CLIFlags {
+	return e.cliFlagsProvider.GetCLIFlags()
 }
 
 func (e *envionmentDependencies) GetContractVersions() map[string]string {
