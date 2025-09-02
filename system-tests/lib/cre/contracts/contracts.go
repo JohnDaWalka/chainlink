@@ -13,9 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	ks_solana "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 
-	"github.com/smartcontractkit/chainlink/deployment/common/changeset"
+	cre_contracts "github.com/smartcontractkit/chainlink/deployment/cre/contracts"
 	df_changeset "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset"
 	df_changeset_types "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -143,7 +146,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		return errors.Wrap(err, "failed to configure capabilities registry")
 	}
 
-	capReg, err := keystone_changeset.GetOwnedContractV2[*kcr.CapabilitiesRegistry](
+	capReg, err := cre_contracts.GetOwnedContractV2[*kcr.CapabilitiesRegistry](
 		input.CldEnv.DataStore.Addresses(),
 		input.CldEnv.BlockChains.EVMChains()[input.ChainSelector],
 		input.CapabilitiesRegistryAddress.Hex(),
@@ -168,30 +171,61 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 	if addrErr != nil {
 		return errors.Wrap(addrErr, "failed to get addresses from address book")
 	}
-	chainsWithForwarders := make(map[uint64]struct{})
+
+	evmChainsWithForwarders := make(map[uint64]struct{})
 	for chainSelector, addresses := range allAddresses {
 		for _, typeAndVersion := range addresses {
 			if typeAndVersion.Type == keystone_changeset.KeystoneForwarder {
-				chainsWithForwarders[chainSelector] = struct{}{}
+				evmChainsWithForwarders[chainSelector] = struct{}{}
 			}
 		}
 	}
 
-	_, err = operations.ExecuteSequence(
-		input.CldEnv.OperationsBundle,
-		ks_contracts_op.ConfigureForwardersSeq,
-		ks_contracts_op.ConfigureForwardersSeqDeps{
-			Env:      input.CldEnv,
-			Registry: capReg.Contract,
-		},
-		ks_contracts_op.ConfigureForwardersSeqInput{
-			RegistryChainSel: input.ChainSelector,
-			DONs:             configDONs,
-			Chains:           chainsWithForwarders,
-		},
-	)
-	if err != nil {
-		return errors.Wrap(err, "failed to configure forwarders")
+	solChainsWithForwarder := make(map[uint64]struct{})
+	solForwarders := input.CldEnv.DataStore.Addresses().Filter(datastore.AddressRefByQualifier(ks_solana.DefaultForwarderQualifier))
+	for _, forwarder := range solForwarders {
+		solChainsWithForwarder[forwarder.ChainSelector] = struct{}{}
+	}
+
+	// configure Solana forwarder only if we have some
+	if len(solChainsWithForwarder) > 0 {
+		for _, don := range configDONs {
+			cs := commonchangeset.Configure(ks_solana.ConfigureForwarders{},
+				&ks_solana.ConfigureForwarderRequest{
+					WFDonName:        don.Name,
+					WFNodeIDs:        don.NodeIDs,
+					RegistryChainSel: input.ChainSelector,
+					Chains:           solChainsWithForwarder,
+					Qualifier:        ks_solana.DefaultForwarderQualifier,
+					Version:          "1.0.0",
+				},
+			)
+
+			_, err = cs.Apply(*input.CldEnv)
+			if err != nil {
+				return errors.Wrap(err, "failed to configure Solana forwarders")
+			}
+		}
+	}
+
+	// configure EVM forwarders only if we have some
+	if len(evmChainsWithForwarders) > 0 {
+		_, err = operations.ExecuteSequence(
+			input.CldEnv.OperationsBundle,
+			ks_contracts_op.ConfigureForwardersSeq,
+			ks_contracts_op.ConfigureForwardersSeqDeps{
+				Env:      input.CldEnv,
+				Registry: capReg.Contract,
+			},
+			ks_contracts_op.ConfigureForwardersSeqInput{
+				RegistryChainSel: input.ChainSelector,
+				DONs:             configDONs,
+				Chains:           evmChainsWithForwarders,
+			},
+		)
+		if err != nil {
+			return errors.Wrap(err, "failed to configure forwarders")
+		}
 	}
 
 	_, err = operations.ExecuteOperation(
@@ -375,6 +409,29 @@ func MustFindAddressesForChain(addressBook cldf.AddressBook, chainSelector uint6
 	return addr
 }
 
+// MergeAllDataStores merges all DataStores (after contracts deployments)
+func MergeAllDataStores(fullCldEnvOutput *cre.FullCLDEnvironmentOutput, changesetOutputs ...cldf.ChangesetOutput) {
+	fmt.Print("Merging DataStores (after contracts deployments)...")
+	minChangesetsCap := 2
+	if len(changesetOutputs) < minChangesetsCap {
+		panic(fmt.Errorf("DataStores merging failed: at least %d changesets required", minChangesetsCap))
+	}
+
+	// Start with the first changeset's data store
+	baseDataStore := changesetOutputs[0].DataStore
+
+	// Merge all subsequent changesets into the base data store
+	for i := 1; i < len(changesetOutputs); i++ {
+		otherDataStore := changesetOutputs[i].DataStore
+		mergeErr := baseDataStore.Merge(otherDataStore.Seal())
+		if mergeErr != nil {
+			panic(errors.Wrap(mergeErr, "DataStores merging failed"))
+		}
+	}
+
+	fullCldEnvOutput.Environment.DataStore = baseDataStore.Seal()
+}
+
 func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input *cre.WorkflowRegistryInput) (*cre.WorkflowRegistryOutput, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
@@ -437,7 +494,7 @@ func ConfigureDataFeedsCache(testLogger zerolog.Logger, input *cre.ConfigureData
 			AdminAddress:  input.AdminAddress,
 			IsAdmin:       true,
 		}
-		_, setAdminErr := changeset.RunChangeset(df_changeset.SetFeedAdminChangeset, *input.CldEnv, setAdminConfig)
+		_, setAdminErr := commonchangeset.RunChangeset(df_changeset.SetFeedAdminChangeset, *input.CldEnv, setAdminConfig)
 		if setAdminErr != nil {
 			return nil, errors.Wrap(setAdminErr, "failed to set feed admin")
 		}
@@ -457,7 +514,7 @@ func ConfigureDataFeedsCache(testLogger zerolog.Logger, input *cre.ConfigureData
 		feeIDs = append(feeIDs, feedID[:32])
 	}
 
-	_, setFeedConfigErr := changeset.RunChangeset(df_changeset.SetFeedConfigChangeset, *input.CldEnv, df_changeset_types.SetFeedDecimalConfig{
+	_, setFeedConfigErr := commonchangeset.RunChangeset(df_changeset.SetFeedConfigChangeset, *input.CldEnv, df_changeset_types.SetFeedDecimalConfig{
 		ChainSelector:    input.ChainSelector,
 		CacheAddress:     input.DataFeedsCacheAddress,
 		DataIDs:          feeIDs,
@@ -484,4 +541,62 @@ func ConfigureDataFeedsCache(testLogger zerolog.Logger, input *cre.ConfigureData
 	input.Out = out
 
 	return out, nil
+}
+
+func DeployDataFeedsCacheContract(testLogger zerolog.Logger, chainSelector uint64, fullCldEnvOutput *cre.FullCLDEnvironmentOutput) (common.Address, cldf.ChangesetOutput, error) {
+	testLogger.Info().Msg("Deploying Data Feeds Cache contract...")
+	deployDfConfig := df_changeset_types.DeployConfig{
+		ChainsToDeploy: []uint64{chainSelector},
+		Labels:         []string{"data-feeds"}, // label required by the changeset
+	}
+
+	dfOutput, dfErr := commonchangeset.RunChangeset(df_changeset.DeployCacheChangeset, *fullCldEnvOutput.Environment, deployDfConfig)
+	if dfErr != nil {
+		return common.Address{}, cldf.ChangesetOutput{}, errors.Wrapf(dfErr, "failed to deploy Data Feeds Cache contract on chain %d", chainSelector)
+	}
+
+	mergeErr := fullCldEnvOutput.Environment.ExistingAddresses.Merge(dfOutput.AddressBook) //nolint:staticcheck // won't migrate now
+	if mergeErr != nil {
+		return common.Address{}, cldf.ChangesetOutput{}, errors.Wrap(mergeErr, "failed to merge address book of Data Feeds Cache contract")
+	}
+	testLogger.Info().Msgf("Data Feeds Cache contract deployed to %d", chainSelector)
+
+	dataFeedsCacheAddress, dataFeedsCacheErr := FindAddressesForChain(
+		fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		chainSelector,
+		df_changeset.DataFeedsCache.String(),
+	)
+	if dataFeedsCacheErr != nil {
+		return common.Address{}, cldf.ChangesetOutput{}, errors.Wrapf(dataFeedsCacheErr, "failed to find Data Feeds Cache contract address on chain %d", chainSelector)
+	}
+	testLogger.Info().Msgf("Data Feeds Cache contract found on chain %d at address %s", chainSelector, dataFeedsCacheAddress)
+
+	return dataFeedsCacheAddress, dfOutput, nil
+}
+
+func DeployReadBalancesContract(testLogger zerolog.Logger, chainSelector uint64, fullCldEnvOutput *cre.FullCLDEnvironmentOutput) (common.Address, cldf.ChangesetOutput, error) {
+	testLogger.Info().Msg("Deploying Read Balances contract...")
+	deployReadBalanceRequest := &keystone_changeset.DeployRequestV2{ChainSel: chainSelector}
+	rbOutput, rbErr := keystone_changeset.DeployBalanceReaderV2(*fullCldEnvOutput.Environment, deployReadBalanceRequest)
+	if rbErr != nil {
+		return common.Address{}, cldf.ChangesetOutput{}, errors.Wrap(rbErr, "failed to deploy Read Balances contract")
+	}
+
+	mergeErr2 := fullCldEnvOutput.Environment.ExistingAddresses.Merge(rbOutput.AddressBook) //nolint:staticcheck // won't migrate now
+	if mergeErr2 != nil {
+		return common.Address{}, cldf.ChangesetOutput{}, errors.Wrap(mergeErr2, "failed to merge address book of Read Balances contract")
+	}
+	testLogger.Info().Msgf("Read Balances contract deployed to %d", chainSelector)
+
+	readBalancesAddress, readContractErr := FindAddressesForChain(
+		fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck // won't migrate now
+		chainSelector,
+		keystone_changeset.BalanceReader.String(),
+	)
+	if readContractErr != nil {
+		return common.Address{}, cldf.ChangesetOutput{}, errors.Wrap(readContractErr, "failed to find Read Balances contract address")
+	}
+	testLogger.Info().Msgf("Read Balances contract found on chain %d at address %s", chainSelector, readBalancesAddress)
+
+	return readBalancesAddress, rbOutput, nil
 }
