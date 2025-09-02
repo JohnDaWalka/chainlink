@@ -650,6 +650,7 @@ func StartCLIEnvironment(
 		CapabilitiesAwareNodeSets: in.NodeSets,
 		BlockchainsInput:          in.Blockchains,
 		ContractVersions:          env.GetContractVersions(),
+		WithV2Registries:          env.GetCLIFlags().WithV2Registries(),
 		JdInput:                   *in.JD,
 		InfraInput:                *in.Infra,
 		S3ProviderInput:           in.S3ProviderInput,

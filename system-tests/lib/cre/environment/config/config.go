@@ -81,7 +81,7 @@ func GetDefaultContractSet(withV2Registries bool) map[string]string {
 	}
 
 	if withV2Registries {
-		supportedSet[keystone_changeset.WorkflowRegistry.String()] = "2.0.0"
+		supportedSet[keystone_changeset.WorkflowRegistry.String()] = "2.0.0-dev"
 		supportedSet[keystone_changeset.CapabilitiesRegistry.String()] = "2.0.0"
 	}
 

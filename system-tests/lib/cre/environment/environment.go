@@ -82,6 +82,7 @@ type SetupInput struct {
 	JdInput                   jd.Input
 	InfraInput                infra.Input
 	ContractVersions          map[string]string
+	WithV2Registries          bool
 	OCR3Config                *keystone_changeset.OracleConfig
 	DONTimeConfig             *keystone_changeset.OracleConfig
 	VaultOCR3Config           *keystone_changeset.OracleConfig
@@ -119,17 +120,12 @@ func mustGetAddress(dataStore datastore.MutableDataStore, chainSel uint64, contr
 	return addrRef.Address
 }
 
-func useV2registryContracts(cv map[string]string) bool {
-	return cv[keystone_changeset.CapabilitiesRegistry.String()] == "2.0.0" && cv[keystone_changeset.WorkflowRegistry.String()] == "2.0.0"
-}
-
 func SetupTestEnvironment(
 	ctx context.Context,
 	testLogger zerolog.Logger,
 	singleFileLogger logger.Logger,
 	input SetupInput,
 ) (*SetupOutput, error) {
-	withV2RegistryContracts := useV2registryContracts(input.ContractVersions)
 	topologyErr := libdon.ValidateTopology(input.CapabilitiesAwareNodeSets, input.InfraInput)
 	if topologyErr != nil {
 		return nil, pkgerrors.Wrap(topologyErr, "failed to validate topology")
@@ -261,18 +257,18 @@ func SetupTestEnvironment(
 	homeChainSelector := homeChainOutput.ChainSelector
 	deployKeystoneReport, err := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
-		ks_contracts_op.DeployKeystoneContractsSequence,
-		ks_contracts_op.DeployKeystoneContractsSequenceDeps{
+		ks_contracts_op.DeployContractsSequence,
+		ks_contracts_op.DeployContractsSequenceDeps{
 			Env: allChainsCLDEnvironment,
 		},
-		ks_contracts_op.DeployKeystoneContractsSequenceInput{
+		ks_contracts_op.DeployContractsSequenceInput{
 			RegistryChainSelector: homeChainSelector,
 			ForwardersSelectors:   evmForwardersSelectors,
 			DeployVaultOCR3:       vaultOCR3AddrFlag,
 			DeployEVMOCR3:         evmOCR3AddrFlag,
 			EVMChainIDs:           chainsWithEVMCapability,
 			DeployConsensusOCR3:   consensusV2AddrFlag,
-			WithV2Contracts:       withV2RegistryContracts,
+			WithV2Contracts:       input.WithV2Registries,
 		},
 	)
 	if err != nil {
@@ -337,9 +333,7 @@ func SetupTestEnvironment(
 	donTimeAddr := mustGetAddress(memoryDatastore, homeChainSelector, keystone_changeset.OCR3Capability.String(), input.ContractVersions[keystone_changeset.OCR3Capability.String()], "DONTime")
 	testLogger.Info().Msgf("Deployed OCR3 %s (DON Time) contract on chain %d at %s", input.ContractVersions[keystone_changeset.OCR3Capability.String()], homeChainSelector, donTimeAddr)
 
-	wfRegVersion := input.ContractVersions[keystone_changeset.WorkflowRegistry.String()]
-	wfRegVersion = "1.0.0" // TODO(mstreet3): replace hardcoding of wf registry version
-	wfRegAddr := mustGetAddress(memoryDatastore, homeChainSelector, keystone_changeset.WorkflowRegistry.String(), wfRegVersion, "")
+	wfRegAddr := mustGetAddress(memoryDatastore, homeChainSelector, keystone_changeset.WorkflowRegistry.String(), input.ContractVersions[keystone_changeset.WorkflowRegistry.String()], "")
 	testLogger.Info().Msgf("Deployed Workflow Registry %s contract on chain %d at %s", input.ContractVersions[keystone_changeset.WorkflowRegistry.String()], homeChainSelector, wfRegAddr)
 
 	capRegAddr := mustGetAddress(memoryDatastore, homeChainSelector, keystone_changeset.CapabilitiesRegistry.String(), input.ContractVersions[keystone_changeset.CapabilitiesRegistry.String()], "")
@@ -734,7 +728,7 @@ func SetupTestEnvironment(
 	capabilitiesContractFactoryFunctions := make([]cre.CapabilityRegistryConfigFn, 0)
 	for _, capability := range input.Capabilities {
 		configFn := capability.CapabilityRegistryV1ConfigFn()
-		if withV2RegistryContracts {
+		if input.WithV2Registries {
 			configFn = capability.CapabilityRegistryV2ConfigFn()
 		}
 
