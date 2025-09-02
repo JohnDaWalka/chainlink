@@ -118,7 +118,7 @@ func (d *dataSource) Observe(ctx context.Context, streamValues llo.StreamValues,
 	// Observation loop logic
 	{
 		// Update the list of streams to observe for this config digest and set the timeout
-		// StreamValues  needs a copy to avoid concurrent access
+		// StreamValues needs a copy to avoid concurrent access
 		d.setObservableStreams(ctx, streamValues, opts)
 
 		if !d.observationLoopStarted.Load() {
@@ -294,7 +294,7 @@ func (d *dataSource) startObservationLoop(loopStartedCh chan struct{}) {
 				"time_to_deadline_ms", timeToDeadline.Milliseconds(), "sleep_ms", sleep.Milliseconds())
 			time.Sleep(sleep)
 		} else {
-			lggr.Debugw("Observation loop", "elapsed_ms", elapsed.Milliseconds(), "time_to_deadline_ms", timeToDeadline.Milliseconds())
+			lggr.Debugw("Observation loop no sleep", "elapsed_ms", elapsed.Milliseconds(), "time_to_deadline_ms", timeToDeadline.Milliseconds())
 		}
 
 		// Cancel the context, so the linter doesn't complain.
