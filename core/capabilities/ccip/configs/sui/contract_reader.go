@@ -270,7 +270,9 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 							Event:  "ExecutionStateChanged",
 						},
 						EventFilterRenames: map[string]string{
-							"SourceChain": "SourceChainSelector",
+							"SourceChain":    "sourceChainSelector",
+							"SequenceNumber": "sequenceNumber",
+							"State":          "state",
 						},
 					},
 					"CommitReportAccepted": {
