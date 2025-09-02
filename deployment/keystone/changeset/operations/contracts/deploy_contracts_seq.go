@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	cap_reg_v2 "github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/operations/contracts"
+	wf_reg_v2 "github.com/smartcontractkit/chainlink/deployment/cre/workflow_registry/v2/changeset/operations/contracts"
 )
 
 type DeployKeystoneContractsSequenceDeps struct {
@@ -74,7 +75,7 @@ var DeployKeystoneContractsSequence = operations.NewSequence(
 				return DeployKeystoneContractsSequenceOutput{}, err
 			}
 
-			out, err := ToV1Output(v2Report.Output)
+			out, err := toV1Output(v2Report.Output)
 			if err != nil {
 				return DeployKeystoneContractsSequenceOutput{}, err
 			}
@@ -102,13 +103,29 @@ var DeployKeystoneContractsSequence = operations.NewSequence(
 		}
 
 		// Workflow Registry contract
-		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
-		}
-		err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
-		if err != nil {
-			return DeployKeystoneContractsSequenceOutput{}, err
+		if input.WithV2Contracts {
+			v2Report, err := operations.ExecuteOperation(b, wf_reg_v2.DeployWorkflowRegistryOp, wf_reg_v2.DeployWorkflowRegistryOpDeps(deps), wf_reg_v2.DeployWorkflowRegistryOpInput{
+				ChainSelector: input.RegistryChainSelector,
+			})
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+
+			out, err := toV1Output(v2Report.Output)
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+
+			err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook)
+		} else {
+			workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
+			err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
+			if err != nil {
+				return DeployKeystoneContractsSequenceOutput{}, err
+			}
 		}
 
 		// Keystone Forwarder contract
@@ -180,34 +197,62 @@ func GetCapabilityContractIdentifier(chainID uint64) string {
 	return fmt.Sprintf("capability_evm_%d", chainID)
 }
 
-// ToV1Output transforms the v2 output to v1 output by creating an address book
-func ToV1Output(in cap_reg_v2.DeployCapabilitiesRegistryOutput) (DeployCapabilityRegistryOutput, error) {
+type DeprecatedOutput struct {
+	Addresses   datastore.AddressRefStore
+	AddressBook deployment.AddressBook
+}
+
+// toV1Output transforms a v2 output to a common v1 output format.
+// It accepts any v2 output type and returns a generic struct that handles
+// the deprecated address book.
+func toV1Output(in any) (DeprecatedOutput, error) {
 	ab := deployment.NewMemoryAddressBook()
 	ds := datastore.NewMemoryDataStore()
-	r := datastore.AddressRef{
-		ChainSelector: in.ChainSelector,
-		Address:       in.Address,
-		Type:          datastore.ContractType(in.Type),
-		Version:       semver.MustParse(in.Version),
-		Qualifier:     in.Qualifier,
-		Labels:        datastore.NewLabelSet(),
-	}
-	for _, l := range in.Labels {
-		r.Labels.Add(l)
+	labels := deployment.NewLabelSet()
+	var r datastore.AddressRef
+
+	switch v := in.(type) {
+	case cap_reg_v2.DeployCapabilitiesRegistryOutput:
+		r = datastore.AddressRef{
+			ChainSelector: v.ChainSelector,
+			Address:       v.Address,
+			Type:          datastore.ContractType(v.Type),
+			Version:       semver.MustParse(v.Version),
+			Qualifier:     v.Qualifier,
+			Labels:        datastore.NewLabelSet(v.Labels...),
+		}
+		for _, l := range v.Labels {
+			labels.Add(l)
+		}
+	case wf_reg_v2.DeployWorkflowRegistryOpOutput:
+		r = datastore.AddressRef{
+			ChainSelector: v.ChainSelector,
+			Address:       v.Address,
+			Type:          datastore.ContractType(v.Type),
+			Version:       semver.MustParse(v.Version),
+			Qualifier:     v.Qualifier,
+			Labels:        datastore.NewLabelSet(v.Labels...),
+		}
+		for _, l := range v.Labels {
+			labels.Add(l)
+		}
+	default:
+		return DeprecatedOutput{}, fmt.Errorf("unsupported input type for toCommonV1Output: %T", in)
 	}
 
 	if err := ds.Addresses().Add(r); err != nil {
-		return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to add address ref: %w", err)
+		return DeprecatedOutput{}, fmt.Errorf("failed to add address ref: %w", err)
 	}
 
-	if err := ab.Save(in.ChainSelector, in.Address, deployment.TypeAndVersion{
-		Type:    deployment.ContractType(in.Type),
-		Version: *semver.MustParse(in.Version),
-		Labels:  deployment.NewLabelSet(in.Labels...),
+	if err := ab.Save(r.ChainSelector, r.Address, deployment.TypeAndVersion{
+		Type:    deployment.ContractType(r.Type),
+		Version: *r.Version,
+		Labels:  labels,
 	}); err != nil {
-		return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to save address to address book: %w", err)
+		return DeprecatedOutput{}, fmt.Errorf("failed to save address to address book: %w", err)
 	}
-	return DeployCapabilityRegistryOutput{
+
+	return DeprecatedOutput{
 		Addresses:   ds.Addresses(),
 		AddressBook: ab,
 	}, nil
