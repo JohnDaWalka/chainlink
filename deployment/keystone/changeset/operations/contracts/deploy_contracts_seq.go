@@ -32,7 +32,7 @@ type DeployContractsSequenceInput struct {
 	EVMChainIDs           map[EVMChainID]Selector
 	DeployConsensusOCR3   bool
 
-	// WithV2Contracts if true will deploy Capability Registry V2
+	// WithV2Contracts if true will deploy Capability Registry and Workflow Registry V2
 	WithV2Contracts bool
 }
 
