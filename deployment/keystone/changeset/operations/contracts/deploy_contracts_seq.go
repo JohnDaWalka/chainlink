@@ -57,7 +57,7 @@ func updateAddresses(addr datastore.MutableAddressRefStore, as datastore.Address
 }
 
 // DeployKeystoneContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).
-var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContractsSequenceInput, DeployKeystoneContractsSequenceOutput, DeployKeystoneContractsSequenceDeps](
+var DeployKeystoneContractsSequence = operations.NewSequence(
 	"deploy-keystone-contracts-seq",
 	semver.MustParse("1.0.0"),
 	"Deploy Keystone Contracts (BalanceReader, OCR3, DON Time, Vault-OCR3, EVM-OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder)",
@@ -73,7 +73,7 @@ var DeployKeystoneContractsSequence = operations.NewSequence[DeployKeystoneContr
 			if err != nil {
 				return DeployKeystoneContractsSequenceOutput{}, err
 			}
-			
+
 			out, err := ToV1Output(v2Report.Output)
 			if err != nil {
 				return DeployKeystoneContractsSequenceOutput{}, err
@@ -181,34 +181,34 @@ func GetCapabilityContractIdentifier(chainID uint64) string {
 }
 
 // ToV1Output transforms the v2 output to v1 output by creating an address book
-func ToV1Output(in cap_reg_v2.DeployCapabilitiesRegistryOutput) (DeployCapabilityRegistryOutput, error){
-		ab := deployment.NewMemoryAddressBook()
-		ds := datastore.NewMemoryDataStore()
-		r := datastore.AddressRef{
-			ChainSelector: in.ChainSelector,
-			Address:       in.Address,
-			Type:          datastore.ContractType(in.Type),
-			Version:       semver.MustParse(in.Version),
-			Qualifier:     in.Qualifier,
-			Labels:        datastore.NewLabelSet(),
-		}
-		for _, l := range in.Labels {
-			r.Labels.Add(l)
-		}
-		
-		if err := ds.Addresses().Add(r); err != nil {
-			return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to add address ref: %w", err)
-		}
+func ToV1Output(in cap_reg_v2.DeployCapabilitiesRegistryOutput) (DeployCapabilityRegistryOutput, error) {
+	ab := deployment.NewMemoryAddressBook()
+	ds := datastore.NewMemoryDataStore()
+	r := datastore.AddressRef{
+		ChainSelector: in.ChainSelector,
+		Address:       in.Address,
+		Type:          datastore.ContractType(in.Type),
+		Version:       semver.MustParse(in.Version),
+		Qualifier:     in.Qualifier,
+		Labels:        datastore.NewLabelSet(),
+	}
+	for _, l := range in.Labels {
+		r.Labels.Add(l)
+	}
 
-		if err := ab.Save(in.ChainSelector, in.Address, deployment.TypeAndVersion{
-			Type: deployment.ContractType(in.Type),
-			Version: *semver.MustParse(in.Version),
-			Labels: deployment.NewLabelSet(in.Labels...),
-		}); err != nil {
-			return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to save address to address book: %w", err)
-		}
+	if err := ds.Addresses().Add(r); err != nil {
+		return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to add address ref: %w", err)
+	}
+
+	if err := ab.Save(in.ChainSelector, in.Address, deployment.TypeAndVersion{
+		Type:    deployment.ContractType(in.Type),
+		Version: *semver.MustParse(in.Version),
+		Labels:  deployment.NewLabelSet(in.Labels...),
+	}); err != nil {
+		return DeployCapabilityRegistryOutput{}, fmt.Errorf("failed to save address to address book: %w", err)
+	}
 	return DeployCapabilityRegistryOutput{
-		Addresses: ds.Addresses(),
+		Addresses:   ds.Addresses(),
 		AddressBook: ab,
 	}, nil
 }
