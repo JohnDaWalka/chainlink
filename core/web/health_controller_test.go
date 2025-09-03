@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"text/template"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -111,39 +110,12 @@ var (
 )
 
 func TestHealthController_Health_body(t *testing.T) {
-	templateData := map[string]interface{}{
-		"chainID": testutils.FixtureChainID.String(),
-	}
-
-	bodyJSONTmplt, err := template.New("health.json").Parse(bodyJSON)
-	require.NoError(t, err)
-	bodyJSONRes := &bytes.Buffer{}
-	require.NoError(t, bodyJSONTmplt.Execute(bodyJSONRes, templateData))
-
-	bodyHTMLTmplt, err := template.New("health.html").Parse(bodyHTML)
-	require.NoError(t, err)
-	bodyHTMLRes := &bytes.Buffer{}
-	require.NoError(t, bodyHTMLTmplt.Execute(bodyHTMLRes, templateData))
-
-	bodyTXTmplt, err := template.New("health.txt").Parse(bodyTXT)
-	require.NoError(t, err)
-	bodyTXTRes := &bytes.Buffer{}
-	require.NoError(t, bodyTXTmplt.Execute(bodyTXTRes, templateData))
-
-	bodyJSONFailingTmplt, err := template.New("health.json").Parse(bodyJSONFailing)
-	require.NoError(t, err)
-	bodyJSONFailingRes := &bytes.Buffer{}
-	require.NoError(t, bodyJSONFailingTmplt.Execute(bodyJSONFailingRes, templateData))
-
-	bodyHTMLFailingTmplt, err := template.New("health.html").Parse(bodyHTMLFailing)
-	require.NoError(t, err)
-	bodyHTMLFailingRes := &bytes.Buffer{}
-	require.NoError(t, bodyHTMLFailingTmplt.Execute(bodyHTMLFailingRes, templateData))
-
-	bodyTXTFailingTmplt, err := template.New("health.txt").Parse(bodyTXTFailing)
-	require.NoError(t, err)
-	bodyTXTFailingRes := &bytes.Buffer{}
-	require.NoError(t, bodyTXTFailingTmplt.Execute(bodyTXTFailingRes, templateData))
+	bodyJSON = strings.ReplaceAll(bodyJSON, "1399100", testutils.FixtureChainID.String())
+	bodyHTML = strings.ReplaceAll(bodyHTML, "1399100", testutils.FixtureChainID.String())
+	bodyTXT = strings.ReplaceAll(bodyTXT, "1399100", testutils.FixtureChainID.String())
+	bodyJSONFailing = strings.ReplaceAll(bodyJSONFailing, "1399100", testutils.FixtureChainID.String())
+	bodyHTMLFailing = strings.ReplaceAll(bodyHTMLFailing, "1399100", testutils.FixtureChainID.String())
+	bodyTXTFailing = strings.ReplaceAll(bodyTXTFailing, "1399100", testutils.FixtureChainID.String())
 
 	for _, tc := range []struct {
 		name    string
@@ -151,17 +123,17 @@ func TestHealthController_Health_body(t *testing.T) {
 		headers map[string]string
 		expBody string
 	}{
-		{"default", "/health", nil, bodyJSONRes.String()},
-		{"json", "/health", map[string]string{"Accept": gin.MIMEJSON}, bodyJSONRes.String()},
-		{"html", "/health", map[string]string{"Accept": gin.MIMEHTML}, bodyHTMLRes.String()},
-		{"text", "/health", map[string]string{"Accept": gin.MIMEPlain}, bodyTXTRes.String()},
-		{".txt", "/health.txt", nil, bodyTXTRes.String()},
+		{"default", "/health", nil, bodyJSON},
+		{"json", "/health", map[string]string{"Accept": gin.MIMEJSON}, bodyJSON},
+		{"html", "/health", map[string]string{"Accept": gin.MIMEHTML}, bodyHTML},
+		{"text", "/health", map[string]string{"Accept": gin.MIMEPlain}, bodyTXT},
+		{".txt", "/health.txt", nil, bodyTXT},
 
-		{"default-failing", "/health?failing", nil, bodyJSONFailingRes.String()},
-		{"json-failing", "/health?failing", map[string]string{"Accept": gin.MIMEJSON}, bodyJSONFailingRes.String()},
-		{"html-failing", "/health?failing", map[string]string{"Accept": gin.MIMEHTML}, bodyHTMLFailingRes.String()},
-		{"text-failing", "/health?failing", map[string]string{"Accept": gin.MIMEPlain}, bodyTXTFailingRes.String()},
-		{".txt-failing", "/health.txt?failing", nil, bodyTXTFailingRes.String()},
+		{"default-failing", "/health?failing", nil, bodyJSONFailing},
+		{"json-failing", "/health?failing", map[string]string{"Accept": gin.MIMEJSON}, bodyJSONFailing},
+		{"html-failing", "/health?failing", map[string]string{"Accept": gin.MIMEHTML}, bodyHTMLFailing},
+		{"text-failing", "/health?failing", map[string]string{"Accept": gin.MIMEPlain}, bodyTXTFailing},
+		{".txt-failing", "/health.txt?failing", nil, bodyTXTFailing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := configtest.NewGeneralConfig(t, func(cfg *chainlink.Config, secrets *chainlink.Secrets) {
@@ -182,7 +154,7 @@ func TestHealthController_Health_body(t *testing.T) {
 			assert.Equal(t, http.StatusMultiStatus, resp.StatusCode)
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			if tc.expBody == bodyJSONRes.String() {
+			if tc.expBody == bodyJSON {
 				// pretty print for comparison
 				var b bytes.Buffer
 				require.NoError(t, json.Indent(&b, body, "", "  "))

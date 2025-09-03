@@ -11,117 +11,117 @@
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}",
+      "id": "EVM.1399100",
       "attributes": {
-        "name": "EVM.{{.chainID}}",
+        "name": "EVM.1399100",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.BalanceMonitor",
+      "id": "EVM.1399100.BalanceMonitor",
       "attributes": {
-        "name": "EVM.{{.chainID}}.BalanceMonitor",
+        "name": "EVM.1399100.BalanceMonitor",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.HeadBroadcaster",
+      "id": "EVM.1399100.HeadBroadcaster",
       "attributes": {
-        "name": "EVM.{{.chainID}}.HeadBroadcaster",
+        "name": "EVM.1399100.HeadBroadcaster",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.HeadTracker",
+      "id": "EVM.1399100.HeadTracker",
       "attributes": {
-        "name": "EVM.{{.chainID}}.HeadTracker",
+        "name": "EVM.1399100.HeadTracker",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.HeadTracker.HeadListener",
+      "id": "EVM.1399100.HeadTracker.HeadListener",
       "attributes": {
-        "name": "EVM.{{.chainID}}.HeadTracker.HeadListener",
+        "name": "EVM.1399100.HeadTracker.HeadListener",
         "status": "failing",
         "output": "Listener connected = false, receiving heads = false"
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.LogBroadcaster",
+      "id": "EVM.1399100.LogBroadcaster",
       "attributes": {
-        "name": "EVM.{{.chainID}}.LogBroadcaster",
+        "name": "EVM.1399100.LogBroadcaster",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Relayer",
+      "id": "EVM.1399100.Relayer",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Relayer",
+        "name": "EVM.1399100.Relayer",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Txm",
+      "id": "EVM.1399100.Txm",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Txm",
+        "name": "EVM.1399100.Txm",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Txm.BlockHistoryEstimator",
+      "id": "EVM.1399100.Txm.BlockHistoryEstimator",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Txm.BlockHistoryEstimator",
+        "name": "EVM.1399100.Txm.BlockHistoryEstimator",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Txm.Broadcaster",
+      "id": "EVM.1399100.Txm.Broadcaster",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Txm.Broadcaster",
+        "name": "EVM.1399100.Txm.Broadcaster",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Txm.Confirmer",
+      "id": "EVM.1399100.Txm.Confirmer",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Txm.Confirmer",
+        "name": "EVM.1399100.Txm.Confirmer",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Txm.Finalizer",
+      "id": "EVM.1399100.Txm.Finalizer",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Txm.Finalizer",
+        "name": "EVM.1399100.Txm.Finalizer",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.{{.chainID}}.Txm.WrappedEvmEstimator",
+      "id": "EVM.1399100.Txm.WrappedEvmEstimator",
       "attributes": {
-        "name": "EVM.{{.chainID}}.Txm.WrappedEvmEstimator",
+        "name": "EVM.1399100.Txm.WrappedEvmEstimator",
         "status": "passing",
         "output": ""
       }
