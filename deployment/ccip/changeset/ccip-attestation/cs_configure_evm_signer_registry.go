@@ -26,35 +26,37 @@ var (
 type SetNewSignerAddressesConfig struct {
 	// MCMS defines the delay to use for Timelock (if absent, the changeset will attempt to use the deployer key).
 	MCMS *proposalutils.TimelockConfig
-	// SignerUpdates maps existing signer addresses to their new addresses
-	SignerUpdates map[common.Address]common.Address
+	// UpdatesByChain maps chain selector -> (existing signer -> new signer) for per-chain updates.
+	UpdatesByChain map[uint64]map[common.Address]common.Address
 }
 
 func signerRegistrySetNewSignerAddressesPrecondition(env cldf.Environment, config SetNewSignerAddressesConfig) error {
-	if len(config.SignerUpdates) == 0 {
+	if len(config.UpdatesByChain) == 0 {
 		return fmt.Errorf("no signer updates provided")
 	}
 
-	for existingAddr, newAddr := range config.SignerUpdates {
-		if existingAddr == utils.ZeroAddress {
-			return fmt.Errorf("existing signer address cannot be zero address")
+	// Per-chain basic validation and duplicate checks
+	for chainSelector, updates := range config.UpdatesByChain {
+		if len(updates) == 0 {
+			return fmt.Errorf("no signer updates provided for chain selector %d", chainSelector)
 		}
-		if newAddr == utils.ZeroAddress {
-			return fmt.Errorf("new signer address for %s cannot be zero address", existingAddr.Hex())
+		seenNew := make(map[common.Address]common.Address)
+		for existingAddr, newAddr := range updates {
+			if existingAddr == utils.ZeroAddress {
+				return fmt.Errorf("existing signer address cannot be zero address")
+			}
+			if newAddr == utils.ZeroAddress {
+				return fmt.Errorf("new signer address for %s cannot be zero address", existingAddr.Hex())
+			}
+			if existingAddr == newAddr {
+				return fmt.Errorf("existing address %s and new address are the same", existingAddr.Hex())
+			}
+			if prevExisting, exists := seenNew[newAddr]; exists {
+				return fmt.Errorf("duplicate new address %s for existing signers %s and %s",
+					newAddr.Hex(), prevExisting.Hex(), existingAddr.Hex())
+			}
+			seenNew[newAddr] = existingAddr
 		}
-		if existingAddr == newAddr {
-			return fmt.Errorf("existing address %s and new address are the same", existingAddr.Hex())
-		}
-	}
-
-	// Check for duplicate new addresses
-	seen := make(map[common.Address]common.Address)
-	for existingAddr, newAddr := range config.SignerUpdates {
-		if prevExisting, exists := seen[newAddr]; exists {
-			return fmt.Errorf("duplicate new address %s for existing signers %s and %s",
-				newAddr.Hex(), prevExisting.Hex(), existingAddr.Hex())
-		}
-		seen[newAddr] = existingAddr
 	}
 
 	state, err := stateview.LoadOnchainState(env)
@@ -62,8 +64,8 @@ func signerRegistrySetNewSignerAddressesPrecondition(env cldf.Environment, confi
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
 
-	// Validate signers exist on each chain using the loaded state
-	for chainSelector := range env.BlockChains.EVMChains() {
+	// Validate signers exist on each provided chain using the loaded state
+	for chainSelector, updates := range config.UpdatesByChain {
 		chainState, exists := state.Chains[chainSelector]
 		if !exists {
 			continue
@@ -83,8 +85,8 @@ func signerRegistrySetNewSignerAddressesPrecondition(env cldf.Environment, confi
 			}
 		}
 
-		// Check each address we want to update exists in the registry
-		for existingAddr, newAddr := range config.SignerUpdates {
+		// Check each address we want to update exists in the registry for this chain
+		for existingAddr, newAddr := range updates {
 			if !existingSigners[existingAddr] {
 				return fmt.Errorf("address %s is not a registered signer on chain selector %d", existingAddr.Hex(), chainSelector)
 			}
@@ -113,7 +115,11 @@ func signerRegistrySetNewSignerAddressesLogic(env cldf.Environment, config SetNe
 	timelocks := make(map[uint64]string)
 	inspectors := make(map[uint64]mcmssdk.Inspector)
 
-	for _, chain := range env.BlockChains.EVMChains() {
+	for chainSelector, updates := range config.UpdatesByChain {
+		chain, ok := env.BlockChains.EVMChains()[chainSelector]
+		if !ok {
+			continue
+		}
 		// Get addresses for this chain
 		addresses, err := env.ExistingAddresses.AddressesForChain(chain.ChainSelector())
 		if err != nil {
@@ -144,7 +150,7 @@ func signerRegistrySetNewSignerAddressesLogic(env cldf.Environment, config SetNe
 		// Prepare arrays for the contract call
 		var existingAddresses []common.Address
 		var newAddresses []common.Address
-		for existing, newAddr := range config.SignerUpdates {
+		for existing, newAddr := range updates {
 			existingAddresses = append(existingAddresses, existing)
 			newAddresses = append(newAddresses, newAddr)
 		}
@@ -178,16 +184,16 @@ func signerRegistrySetNewSignerAddressesLogic(env cldf.Environment, config SetNe
 			if chainState.Timelock == nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("timelock not found on chain %s", chain.String())
 			}
-			timelocks[chain.ChainSelector()] = chainState.Timelock.Address().Hex()
+			timelocks[chainSelector] = chainState.Timelock.Address().Hex()
 
 			inspector, err := proposalutils.McmsInspectorForChain(env, chain.ChainSelector())
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to get inspector for chain %s: %w", chain.String(), err)
 			}
-			inspectors[chain.ChainSelector()] = inspector
+			inspectors[chainSelector] = inspector
 
 			batchOperation, err := proposalutils.BatchOperationForChain(
-				chain.ChainSelector(),
+				chainSelector,
 				signerRegistryAddress.Hex(),
 				tx.Data(),
 				big.NewInt(0),

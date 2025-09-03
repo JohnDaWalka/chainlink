@@ -104,12 +104,6 @@ func signerRegistryDeploymentLogic(e cldf.Environment, config SignerRegistryChan
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy signer registry: %w", err)
 		}
 
-		// Save the deployed address to the address book
-		err = addressBook.Save(chain.ChainSelector(), signerRegistry.Address.String(), cldf.NewTypeAndVersion(shared.EVMSignerRegistry, deployment.Version1_0_0))
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save signer registry address to address book: %w", err)
-		}
-
 		e.Logger.Infof("Successfully deployed signer registry %s on %s", signerRegistry.Address.String(), chain.String())
 	}
 
