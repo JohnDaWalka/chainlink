@@ -116,6 +116,7 @@ func waitForFeedUpdate(t *testing.T, solclient *rpc.Client, s *setup) {
 		for {
 			select {
 			case <-ctx.Done():
+				require.FailNow(t, "feed wasn't update before reaching timeout")
 				return
 			case <-tt.C:
 				reportAcc := getDecimalReportAccount(t, s)
@@ -143,9 +144,10 @@ func waitForFeedUpdate(t *testing.T, solclient *rpc.Client, s *setup) {
 				r.answer = amount
 
 				if r.answer.Uint64() == 0 {
-					fmt.Println("feed hasn't been updated yet, waiting...")
+					framework.L.Info().Msgf("Feed is not update yet")
 					continue
 				}
+				framework.L.Info().Msg("Feed is updated. Asserting results...")
 				require.Equal(t, Mintable.String(), r.answer.String(), "onchain answer value is not equal to sent value")
 				require.Equal(t, uint32(SeqNr), r.timestamp)
 				return
@@ -326,7 +328,7 @@ consensus:
       aggregation_config:
         targetChainSelector: "{{.ChainSelector}}" # CHAIN_ID_FOR_WRITE_TARGET: NEW Param, to match write target
         dataID: "{{.DataID}}"
-      encoder: "borsh"
+      encoder: "Borsh"
       encoder_config:
         report_schema: |
           {

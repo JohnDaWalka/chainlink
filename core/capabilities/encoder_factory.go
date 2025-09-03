@@ -17,7 +17,7 @@ func NewEncoder(name string, config *values.Map, lggr logger.Logger) (types.Enco
 	switch ocr3cap.Encoder(name) {
 	case ocr3cap.EncoderEVM:
 		return evm.NewEVMEncoder(config)
-	case "borsh": // TODO move to ocr3cap
+	case ocr3cap.EncoderBorsh:
 		return solana.NewEncoder(config)
 	case ocr3cap.EncoderValueMap:
 		return ocr3.ValueMapEncoder{}, nil
