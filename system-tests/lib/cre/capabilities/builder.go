@@ -3,7 +3,6 @@ package capabilities
 import (
 	"github.com/pkg/errors"
 
-	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 )
 
@@ -38,11 +37,17 @@ func (c *Capability) GatewayJobHandlerConfigFn() cre.GatewayHandlerConfigFn {
 }
 
 func (c *Capability) CapabilityRegistryV1ConfigFn() cre.CapabilityRegistryConfigFn {
-	return c.registryConfigFns.V1
+	if c.registryConfigFns != nil {
+		return c.registryConfigFns.V1
+	}
+	return nil
 }
 
 func (c *Capability) CapabilityRegistryV2ConfigFn() cre.CapabilityRegistryConfigFn {
-	return c.registryConfigFns.V2
+	if c.registryConfigFns != nil {
+		return c.registryConfigFns.V2
+	}
+	return nil
 }
 
 type Option func(*Capability)
@@ -67,12 +72,24 @@ func WithGatewayJobHandlerConfigFn(gatewayJobHandlerConfigFn cre.GatewayHandlerC
 
 func WithCapabilityRegistryV1ConfigFn(fn cre.CapabilityRegistryConfigFn) Option {
 	return func(c *Capability) {
+		if c.registryConfigFns == nil {
+			c.registryConfigFns = &registryConfigFns{
+				V1: fn,
+			}
+			return
+		}
 		c.registryConfigFns.V1 = fn
 	}
 }
 
 func WithCapabilityRegistryV2ConfigFn(fn cre.CapabilityRegistryConfigFn) Option {
 	return func(c *Capability) {
+		if c.registryConfigFns == nil {
+			c.registryConfigFns = &registryConfigFns{
+				V2: fn,
+			}
+			return
+		}
 		c.registryConfigFns.V2 = fn
 	}
 }
@@ -86,10 +103,6 @@ func WithValidateFn(validateFn func(*Capability) error) Option {
 func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
 	capability := &Capability{
 		flag: flag,
-		registryConfigFns: &registryConfigFns{
-			V1: unimplmentedConfigFn,
-			V2: unimplmentedConfigFn,
-		},
 	}
 	for _, opt := range opts {
 		opt(capability)
@@ -102,8 +115,4 @@ func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
 	}
 
 	return capability, nil
-}
-
-func unimplmentedConfigFn(donFlags []cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
-	return nil, errors.New("config function is not implemented")
 }
