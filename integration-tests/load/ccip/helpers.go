@@ -495,7 +495,7 @@ func subscribeSkippedIncorrectNonce(
 }
 
 // fundAdditionalKeys will create len(targetChains) new addresses, and send funds to them on every targetChain
-func fundAdditionalKeys(lggr logger.Logger, e cldf.Environment, destChains []uint64) (map[uint64][]*bind.TransactOpts, error) {
+func fundAdditionalKeys(lggr logger.Logger, e cldf.Environment, destChains []uint64, fundingAmount uint64) (map[uint64][]*bind.TransactOpts, error) {
 	deployerMap := make(map[uint64][]*bind.TransactOpts)
 	addressMap := make(map[uint64][]common.Address)
 	numAccounts := len(destChains)
@@ -529,8 +529,9 @@ func fundAdditionalKeys(lggr logger.Logger, e cldf.Environment, destChains []uin
 	g := new(errgroup.Group)
 	for sel, addresses := range addressMap {
 		sel, addresses := sel, addresses
+		funding := deployment.UBigInt(fundingAmount)
+
 		// Fund more on AVAX
-		funding := fundingAmount
 		if sel == chainselectors.AVALANCHE_TESTNET_FUJI.Selector {
 			funding = deployment.UBigInt(10000000000000000000)
 		}

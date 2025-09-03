@@ -493,8 +493,7 @@ func TestSendRequest(
 	return msgSentEvent
 }
 
-<<<<<<< HEAD
-=======
+
 type CCIPSendReqConfig struct {
 	SourceChain  uint64
 	DestChain    uint64
@@ -551,7 +550,6 @@ func WithDestChain(destChain uint64) SendReqOpts {
 	}
 }
 
->>>>>>> f921dcb032 (Stash)
 // SendRequest similar to TestSendRequest but returns an error.
 func SendRequest(
 	e cldf.Environment,
@@ -926,11 +924,6 @@ type AptosTokenAmount struct {
 func SendRequestAptos(
 	e cldf.Environment,
 	state stateview.CCIPOnChainState,
-<<<<<<< HEAD
-	cfg *ccipclient.CCIPSendReqConfig,
-) (*ccipclient.AnyMsgSentEvent, error) {
-	sender := e.BlockChains.AptosChains()[cfg.SourceChain].DeployerSigner
-=======
 	cfg *CCIPSendReqConfig,
 ) (*AnyMsgSentEvent, error) {
 	var sender aptos.TransactionSigner

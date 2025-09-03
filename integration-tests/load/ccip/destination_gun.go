@@ -434,7 +434,7 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			return router.ClientEVM2AnyMessage{}, 0, err
 		}
 
-		if *m.testConfig.Testnet {
+		if *m.testConfig.TestnetConfig.Testnet {
 			token = TestnetBnMTokenAddress[src]
 		}
 

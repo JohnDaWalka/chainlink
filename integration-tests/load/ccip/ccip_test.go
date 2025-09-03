@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -39,13 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/testconfig/ccip"
 )
 
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
 var (
 	CommonTestLabels = map[string]string{
 		"branch": "ccip_load_1_6",
@@ -56,10 +48,14 @@ var (
 
 // this key only works on simulated geth chains in crib
 var (
+	ethFundingAmount   = uint64(900000000000000000)
+	solFundingAmount   = uint64(800000000)
+	aptosFundingAmount = uint64(800000000)
+
 	// Deployer keys with support for env var loading in case of testnet runs
-	simChainTestKey = getEnvOrDefault("SIM_CHAIN_TEST_KEY", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-	solTestKey      = getEnvOrDefault("SOL_TEST_KEY", "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC")
-	aptosTestKey    = getEnvOrDefault("APTOS_TEST_KEY", "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366")
+	simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	solTestKey      = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
+	aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
 )
 
 func runSafely(ops ...func()) {
@@ -127,6 +123,16 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// set keys if testnet is enabled
+	if *userOverrides.TestnetConfig.Testnet {
+		simChainTestKey = *userOverrides.TestnetConfig.EVMPrivateKey
+		solTestKey = *userOverrides.TestnetConfig.SolanaPrivateKey
+		aptosTestKey = *userOverrides.TestnetConfig.AptosPrivateKey
+		ethFundingAmount = *userOverrides.TestnetConfig.FundingAmountEth
+		solFundingAmount = *userOverrides.TestnetConfig.FundingAmountSol
+		aptosFundingAmount = *userOverrides.TestnetConfig.FundingAmountApt
+	}
+
 	destinationChains := env.BlockChains.ListChainSelectors()[:*userOverrides.NumDestinationChains]
 	evmChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyEVM))
 	solChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilySolana))
@@ -160,7 +166,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 
 	// initialize additional accounts on EVM and Aptos (optional), we need more accounts to avoid nonce issues
 	// Solana doesn't have a nonce concept so we just use a single account for all chains
-	evmSenders, err := fundAdditionalKeys(lggr, *env, destinationChains)
+	evmSenders, err := fundAdditionalKeys(lggr, *env, destinationChains, ethFundingAmount)
 	require.NoError(t, err)
 
 	var aptosSenders map[uint64][]aptos.Account
@@ -172,10 +178,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 		pk, err := deployerAccount.PrivateKeyString()
 		lggr.Infow("Aptos deployer account created", "account", deployerAccount.Address, "privateKey", pk)
 		require.NoError(t, err)
-		// TMP for testnet
-		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 800_000_000)
-		// aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, 1_000_000_000)
-
+		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, aptosFundingAmount)
 		require.NoError(t, err)
 	}
 
@@ -368,7 +371,8 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
-					if *userOverrides.Testnet {
+					if *userOverrides.TestnetConfig.Testnet {
+						// Exit if no token transfer
 						if !hasTokenTransfer {
 							return nil
 						}
