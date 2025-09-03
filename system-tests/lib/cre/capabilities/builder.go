@@ -17,7 +17,7 @@ type Capability struct {
 	jobSpecFn                 cre.JobSpecFn
 	nodeConfigFn              cre.NodeConfigTransformerFn
 	gatewayJobHandlerConfigFn cre.GatewayHandlerConfigFn
-	registryConfigFns         registryConfigFns
+	registryConfigFns         *registryConfigFns
 	validateFn                func(*Capability) error
 }
 
@@ -86,7 +86,7 @@ func WithValidateFn(validateFn func(*Capability) error) Option {
 func New(flag cre.CapabilityFlag, opts ...Option) (*Capability, error) {
 	capability := &Capability{
 		flag: flag,
-		registryConfigFns: registryConfigFns{
+		registryConfigFns: &registryConfigFns{
 			V1: unimplmentedConfigFn,
 			V2: unimplmentedConfigFn,
 		},
