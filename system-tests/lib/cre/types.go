@@ -66,9 +66,11 @@ const (
 type CLIEnvironmentDependencies interface {
 	CapabilityFlagsProvider
 	ContractVersionsProvider
-	GetCLIFlags() CLIFlagsProvider
+	CLIFlagsProvider
 }
 
+// CLIFlagsProvider provides access to select command line flags passed to the
+// start command of the environment script.
 type CLIFlagsProvider interface {
 	// If true, then use V2 Capability and Workflow Registries.
 	WithV2Registries() bool
@@ -89,15 +91,15 @@ func (cfp *cliFlagsProvider) WithV2Registries() bool {
 }
 
 type ContractVersionsProvider interface {
-	// GetContractVersions returns a map of contract name to semver
-	GetContractVersions() map[string]string
+	// ContractVersions returns a map of contract name to semver
+	ContractVersions() map[string]string
 }
 
 type contractVersionsProvider struct {
 	contracts map[string]string
 }
 
-func (cvp *contractVersionsProvider) GetContractVersions() map[string]string {
+func (cvp *contractVersionsProvider) ContractVersions() map[string]string {
 	cv := make(map[string]string, 0)
 	maps.Copy(cv, cvp.contracts)
 	return cv
@@ -142,12 +144,12 @@ type envionmentDependencies struct {
 	cliFlagsProvider    CLIFlagsProvider
 }
 
-func (e *envionmentDependencies) GetCLIFlags() CLIFlagsProvider {
-	return e.cliFlagsProvider
+func (e *envionmentDependencies) WithV2Registries() bool {
+	return e.cliFlagsProvider.WithV2Registries()
 }
 
-func (e *envionmentDependencies) GetContractVersions() map[string]string {
-	return e.contractSetProvider.GetContractVersions()
+func (e *envionmentDependencies) ContractVersions() map[string]string {
+	return e.contractSetProvider.ContractVersions()
 }
 
 func (e *envionmentDependencies) SupportedCapabilityFlags() []CapabilityFlag {

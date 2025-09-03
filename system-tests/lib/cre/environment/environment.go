@@ -349,7 +349,7 @@ func SetupTestEnvironment(
 	evmOCR3CommonAddresses := make(map[uint64]common.Address)
 	if evmOCR3AddrFlag {
 		for chainID, selector := range chainsWithEVMCapability {
-			qualifier := ks_contracts_op.GetCapabilityContractIdentifier(uint64(chainID))
+			qualifier := ks_contracts_op.CapabilityContractIdentifier(uint64(chainID))
 			evmOCR3Addr := mustGetAddress(memoryDatastore, uint64(selector), keystone_changeset.OCR3Capability.String(), input.ContractVersions[keystone_changeset.OCR3Capability.String()], qualifier)
 			testLogger.Info().Msgf("Deployed EVM OCR3 %s contract on chain %d, selector: %d, at: %s", input.ContractVersions[keystone_changeset.OCR3Capability.String()], chainID, selector, evmOCR3Addr)
 			evmOCR3CommonAddresses[uint64(selector)] = common.HexToAddress(evmOCR3Addr)

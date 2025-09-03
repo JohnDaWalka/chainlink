@@ -57,8 +57,8 @@ func (c Config) Validate(envDependencies cre.CLIEnvironmentDependencies) error {
 }
 
 func validateContractVersions(envDependencies cre.CLIEnvironmentDependencies) error {
-	supportedSet := GetDefaultContractSet(envDependencies.GetCLIFlags().WithV2Registries())
-	cv := envDependencies.GetContractVersions()
+	supportedSet := DefaultContractSet(envDependencies.WithV2Registries())
+	cv := envDependencies.ContractVersions()
 	for k, v := range supportedSet {
 		version, ok := cv[k]
 		if !ok {
@@ -72,7 +72,7 @@ func validateContractVersions(envDependencies cre.CLIEnvironmentDependencies) er
 	return nil
 }
 
-func GetDefaultContractSet(withV2Registries bool) map[string]string {
+func DefaultContractSet(withV2Registries bool) map[string]string {
 	supportedSet := map[string]string{
 		keystone_changeset.OCR3Capability.String():       "1.0.0",
 		keystone_changeset.WorkflowRegistry.String():     "1.0.0",

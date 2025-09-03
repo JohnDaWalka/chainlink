@@ -28,10 +28,12 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr/chainlevel"
 )
 
-const flag = cre.EVMCapability
-const configTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","logTriggerPollInterval":{{.LogTriggerPollInterval}}, "creForwarderAddress":"{{.CreForwarderAddress}}","receiverGasMinimum":{{.ReceiverGasMinimum}},"nodeAddress":"{{.NodeAddress}}"}'`
-const registrationRefresh = 20 * time.Second
-const registrationExpiry = 60 * time.Second
+const (
+	flag                = cre.EVMCapability
+	configTemplate      = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","logTriggerPollInterval":{{.LogTriggerPollInterval}}, "creForwarderAddress":"{{.CreForwarderAddress}}","receiverGasMinimum":{{.ReceiverGasMinimum}},"nodeAddress":"{{.NodeAddress}}"}'`
+	registrationRefresh = 20 * time.Second
+	registrationExpiry  = 60 * time.Second
+)
 
 func New() (*capabilities.Capability, error) {
 	return capabilities.New(
@@ -99,7 +101,7 @@ func buildRuntimeValues(chainID uint64, networkFamily, creForwarderAddress, node
 }
 
 func jobSpec(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
-	var generateJobSpec = func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
+	generateJobSpec := func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
 		cs, ok := chainselectors.EvmChainIdToChainSelector()[chainID]
 		if !ok {
 			return "", fmt.Errorf("chain selector not found for chainID: %d", chainID)
@@ -150,7 +152,7 @@ func jobSpec(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		input.CapabilitiesAwareNodeSets,
 		input.InfraInput,
 		flag,
-		contracts.GetCapabilityContractIdentifier,
+		contracts.CapabilityContractIdentifier,
 		chainlevel.CapabilityEnabler,
 		chainlevel.EnabledChainsProvider,
 		generateJobSpec,

@@ -163,7 +163,7 @@ var DeployContractsSequence = operations.NewSequence(
 		if input.DeployEVMOCR3 {
 			for chainID, selector := range input.EVMChainIDs {
 				// EVM cap OCR3 Contract
-				qualifier := GetCapabilityContractIdentifier(uint64(chainID))
+				qualifier := CapabilityContractIdentifier(uint64(chainID))
 				evmOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: uint64(selector), Qualifier: qualifier})
 				if err != nil {
 					return DeployContractsSequenceOutput{}, err
@@ -193,7 +193,7 @@ var DeployContractsSequence = operations.NewSequence(
 	},
 )
 
-func GetCapabilityContractIdentifier(chainID uint64) string {
+func CapabilityContractIdentifier(chainID uint64) string {
 	return fmt.Sprintf("capability_evm_%d", chainID)
 }
 
@@ -202,9 +202,8 @@ type DeprecatedOutput struct {
 	AddressBook deployment.AddressBook
 }
 
-// toV1Output transforms a v2 output to a common v1 output format.
-// It accepts any v2 output type and returns a generic struct that handles
-// the deprecated address book.
+// toV1Output transforms a v2 output to a common output format that uses the deprecated
+// address book.
 func toV1Output(in any) (DeprecatedOutput, error) {
 	ab := deployment.NewMemoryAddressBook()
 	ds := datastore.NewMemoryDataStore()
@@ -237,7 +236,7 @@ func toV1Output(in any) (DeprecatedOutput, error) {
 			labels.Add(l)
 		}
 	default:
-		return DeprecatedOutput{}, fmt.Errorf("unsupported input type for toCommonV1Output: %T", in)
+		return DeprecatedOutput{}, fmt.Errorf("unsupported input type for transform: %T", in)
 	}
 
 	if err := ds.Addresses().Add(r); err != nil {
