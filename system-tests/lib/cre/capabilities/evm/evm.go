@@ -32,6 +32,7 @@ const flag = cre.EVMCapability
 const configTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","logTriggerPollInterval":{{.LogTriggerPollInterval}}, "creForwarderAddress":"{{.CreForwarderAddress}}","receiverGasMinimum":{{.ReceiverGasMinimum}},"nodeAddress":"{{.NodeAddress}}"}'`
 const registrationRefresh = 20 * time.Second
 const registrationExpiry = 60 * time.Second
+const deltaStage = 100 * time.Millisecond
 
 func New() (*capabilities.Capability, error) {
 	return capabilities.New(
@@ -68,18 +69,47 @@ func registerWithV1(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]k
 		}
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
-				LabelledName:   "evm" + ":ChainSelector:" + strconv.FormatUint(selector, 10),
-				Version:        "1.0.0",
+				LabelledName: "evm" + ":ChainSelector:" + strconv.FormatUint(selector, 10),
+				Version:      "1.0.0",
+				//TODO ask Bolek what to put here, is combined working with the new approach?
 				CapabilityType: 0, // TRIGGER
 			},
 			Config: &capabilitiespb.CapabilityConfig{
-				RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
-					RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
-						// needed for message_cache.go#Ready(), without these events from the capability will never be accepted
-						RegistrationRefresh:     durationpb.New(registrationRefresh),
-						RegistrationExpiry:      durationpb.New(registrationExpiry),
-						MinResponsesToAggregate: faultyNodes + 1,
+				//RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+				//	RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+				//		// needed for message_cache.go#Ready(), without these events from the capability will never be accepted
+				//		RegistrationRefresh:     durationpb.New(registrationRefresh),
+				//		RegistrationExpiry:      durationpb.New(registrationExpiry),
+				//		MinResponsesToAggregate: faultyNodes + 1,
+				//	},
+				//},
+				MethodConfigs: map[string]*capabilitiespb.CapabilityMethodConfig{
+					"LogTrigger": {
+						RemoteConfig: &capabilitiespb.CapabilityMethodConfig_RemoteTriggerConfig{
+							RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+								// needed for message_cache.go#Ready(), without these events from the capability will never be accepted
+								RegistrationRefresh:     durationpb.New(registrationRefresh),
+								RegistrationExpiry:      durationpb.New(registrationExpiry),
+								MinResponsesToAggregate: faultyNodes + 1,
+							},
+						},
 					},
+					"WriteReport": {
+						RemoteConfig: &capabilitiespb.CapabilityMethodConfig_RemoteExecutableConfig{
+							RemoteExecutableConfig: &capabilitiespb.RemoteExecutableConfig{
+								TransmissionSchedule: capabilitiespb.TransmissionSchedule_OneAtATime,
+								DeltaStage:           durationpb.New(deltaStage),
+							},
+						},
+					},
+					"GetTransactionByHash": {
+						RemoteConfig: &capabilitiespb.CapabilityMethodConfig_RemoteExecutableConfig{
+							RemoteExecutableConfig: &capabilitiespb.RemoteExecutableConfig{
+								TransmissionSchedule: capabilitiespb.TransmissionSchedule_AllAtOnce,
+							},
+						},
+					},
+					//add all other actions like the GetTransactionByHash
 				},
 			},
 		})
