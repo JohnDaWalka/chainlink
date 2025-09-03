@@ -92,6 +92,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/weth9"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/burn_mint_with_external_minter_fast_transfer_token_pool"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/hybrid_with_external_minter_fast_transfer_token_pool"
+	signer_registry "github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/signer-registry"
 )
 
 // CCIPOnChainState state always derivable from an address book.
@@ -1325,6 +1326,16 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			}
 			state.TokenGovernor[ccipshared.TokenSymbol(symbol)] = tokenGovernor
 			state.ABIByAddress[address] = token_governor.TokenGovernorABI
+		case cldf.NewTypeAndVersion(ccipshared.EVMSignerRegistry, deployment.Version1_0_0).String():
+			signerRegistry, err := signer_registry.NewSignerRegistry(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+
+			state.SignerRegistrySigners, err = signerRegistry.GetSigners(&bind.CallOpts{Context: ctx})
+			if err != nil {
+				return state, err
+			}
 		default:
 			// ManyChainMultiSig 1.0.0 can have any of these labels, it can have either 1,2 or 3 of these -
 			// bypasser, proposer and canceller
