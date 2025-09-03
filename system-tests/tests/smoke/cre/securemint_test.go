@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	texttmpl "text/template"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	df "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset"
 	df_sol "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
@@ -100,8 +100,12 @@ func executeSecureMintTest(t *testing.T, tenv *TestEnvironment) {
 
 	// trigger workflow
 	trigger := createFakeTrigger(t, &s, fullCldEnvOutput.DonTopology)
-	trigger.Call(t)
-
+	for i := range 5 {
+		time.Sleep(time.Second * 25)
+		trigger.Call(t)
+		fmt.Println(i)
+	}
+	trigger.run(t)
 	// wait for price update
 }
 
@@ -123,6 +127,9 @@ var (
 	wFName        = "testwf1234"
 	wFDescription = "securemint test"
 	wFOwner       = [20]byte{1, 2, 3}
+	SeqNr         = 0
+	Block         = 10
+	Mintable      = big.NewInt(15)
 )
 
 func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solChain *cre.WrappedBlockchainOutput) {
@@ -132,6 +139,8 @@ func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solCh
 	s.WFName = wFName
 	s.WFOwner = wFOwner
 	s.FeedID = new(big.Int).SetBytes(feedID[:]).String()
+	var wfname [10]byte
+	copy(wfname[:], []byte(s.WFName))
 	// deploy df cache
 	deployCS := commonchangeset.Configure(df_sol.DeployCache{}, &df_sol.DeployCacheRequest{
 		ChainSel:           solChain.SolChain.ChainSelector,
@@ -166,7 +175,7 @@ func deployAndConfigureCache(t *testing.T, s *setup, env cldf.Environment, solCh
 			FeedAdmin:            solChain.SolChain.PrivateKey.PublicKey(),
 			DataIDs:              []string{s.FeedID},
 			AllowedWorkflowOwner: [][20]byte{s.WFOwner},
-			AllowedWorkflowName:  [][10]byte{df.HashedWorkflowName(s.WFName)},
+			AllowedWorkflowName:  [][10]byte{wfname},
 			Descriptions:         s.Descriptions,
 		})
 	env, _, cacheErr := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployCS, initCS, configureCS})
@@ -217,10 +226,8 @@ consensus:
     ref: "secure-mint-consensus"
     inputs:
       observations:
-        - "$(solana_data_feeds_cache_accounts.outputs)"
-      solana:
-        remaining_accounts:
-          - "$(solana_data_feeds_cache_accounts.outputs.remaining_accounts)"
+        - event: $(trigger.outputs)
+          solana: $(solana_data_feeds_cache_accounts.outputs.remaining_accounts)
     config:
       report_id: "0003"  
       key_id: "solana"
@@ -228,7 +235,6 @@ consensus:
       aggregation_config:
         targetChainSelector: "{{.ChainSelector}}" # CHAIN_ID_FOR_WRITE_TARGET: NEW Param, to match write target
         dataID: "{{.DataID}}"
-        aggregation_config_field: "my field"
       encoder: "borsh"
       encoder_config:
         report_schema: |
@@ -329,6 +335,24 @@ type fakeTrigger struct {
 	setup      *setup
 	triggerID  string
 	keys       []ocr2key.KeyBundle
+}
+
+func (f *fakeTrigger) run(t *testing.T) {
+	go func() {
+		tt := time.NewTicker(time.Second * 25)
+		defer tt.Stop()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tt.C:
+				f.Call(t)
+			}
+		}
+
+	}()
 }
 
 func (f *fakeTrigger) Call(t *testing.T) {
@@ -433,7 +457,6 @@ func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
 				} else {
 					framework.L.Error().Msgf("Could not export OCR2 key: %s", err2)
 				}
-				fmt.Printf("actual ocr signer pubkey: %v \n", key.OnchainPublicKey)
 			}
 		}
 	}

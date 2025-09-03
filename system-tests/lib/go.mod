@@ -30,7 +30,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/smartcontractkit/chain-selectors v1.0.67
-	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250901094903-99c1fc59d32c
+	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250902132848-2f85357cd094
 	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0
 	github.com/smartcontractkit/chainlink-evm v0.3.2
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
@@ -450,7 +450,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250822025801-598d3d86f873 // indirect
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250902032153-9be99700f722 // indirect
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250902182030-cd69117b654d // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335 // indirect
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect

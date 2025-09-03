@@ -37,7 +37,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250825135846-84f0d5167f8f
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250805210128-7f8a0f403c3a
-	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250901094903-99c1fc59d32c
+	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250902132848-2f85357cd094
 	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0
 	github.com/smartcontractkit/chainlink-evm v0.3.2
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
@@ -45,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.8.1
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250902032153-9be99700f722
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250902182030-cd69117b654d
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e
 	github.com/smartcontractkit/libocr v0.0.0-20250707144819-babe0ec4e358
