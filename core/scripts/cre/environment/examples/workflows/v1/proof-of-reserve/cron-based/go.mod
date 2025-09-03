@@ -5,11 +5,11 @@ go 1.24.5
 toolchain go1.24.6
 
 require (
-	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250903164731-48b2338fa2ea
+	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250903170017-df6a84dac833
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d // indirect
+require github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250829155125-f4655b0b4605 // indirect
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
