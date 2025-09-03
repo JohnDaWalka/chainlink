@@ -253,8 +253,8 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 	for _, tonkey := range kr.TON {
 		rawKeys.TON = append(rawKeys.TON, internal.RawBytes(tonkey))
 	}
-	for _, suiKey := range kr.Sui {
-		rawKeys.Sui = append(suiIDs, suiKey.ID())
+	for _, suikey := range kr.Sui {
+		rawKeys.Sui = append(rawKeys.Sui, internal.RawBytes(suikey))
 	}
 	for _, vrfKey := range kr.VRF {
 		rawKeys.VRF = append(rawKeys.VRF, internal.RawBytes(vrfKey))
