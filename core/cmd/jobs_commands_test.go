@@ -304,7 +304,7 @@ func TestJob_ToRows(t *testing.T) {
 var directRequestSpecTemplate string
 
 func getDirectRequestSpec() string {
-	return fmt.Sprintf(directRequestSpecTemplate, uuid.New(), uuid.New())
+	return fmt.Sprintf(directRequestSpecTemplate, testutils.FixtureChainID.String(), uuid.New(), uuid.New())
 }
 
 func TestShell_ListFindJobs(t *testing.T) {
