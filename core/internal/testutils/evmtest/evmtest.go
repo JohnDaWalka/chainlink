@@ -120,7 +120,7 @@ func NewChainOpts(t testing.TB, testopts TestChainOpts) (logger.Logger, keystore
 	return lggr, testopts.KeyStore, opts
 }
 
-const NullClientChainID = 1399100
+const NullClientChainID = evmclient.NullClientChainID
 
 // Deprecated, this is a replacement function for tests for now removed default evmChainID logic
 func MustGetDefaultChainID(t testing.TB, evmCfgs configtoml.EVMConfigs) *big.Int {
