@@ -78,6 +78,6 @@ var DeployRegistryContractsSequence = operations.NewSequence[DeployRegistryContr
 	},
 )
 
-func GetCapabilityContractIdentifier(chainID uint64) string {
+func CapabilityContractIdentifier(chainID uint64) string {
 	return fmt.Sprintf("capability_evm_%d", chainID)
 }

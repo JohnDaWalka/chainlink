@@ -16,11 +16,12 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 require (
 	dario.cat/mergo v1.0.2
+	github.com/BurntSushi/toml v1.4.0
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/andybalholm/brotli v1.1.1
 	github.com/cockroachdb/errors v1.11.3
 	github.com/docker/docker v28.3.1+incompatible
-	github.com/ethereum/go-ethereum v1.15.11
+	github.com/ethereum/go-ethereum v1.16.2
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/goccy/go-yaml v1.18.0
 	github.com/google/uuid v1.6.0
@@ -32,11 +33,11 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.67
 	github.com/smartcontractkit/chainlink-common v0.9.4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.25.0
-	github.com/smartcontractkit/chainlink-evm v0.3.2
+	github.com/smartcontractkit/chainlink-evm v0.3.3-0.20250903140346-aacd485a7dea
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250819150450-95ef563f6e6d
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.12
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.17
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.13
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.4
@@ -69,7 +70,6 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.7 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
-	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/DataDog/zstd v1.5.6-0.20230824185856-869dae002e5e // indirect
 	github.com/DefangLabs/secret-detector v0.0.0-20250403165618-22662109213e // indirect
 	github.com/Khan/genqlient v0.7.0 // indirect
@@ -195,6 +195,7 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203 // indirect
+	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/esote/minmaxheap v1.0.0 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
@@ -206,6 +207,7 @@ require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/ferranbt/fastssz v0.1.4 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
