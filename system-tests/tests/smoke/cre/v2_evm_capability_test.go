@@ -16,7 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/config"
 
@@ -63,15 +63,13 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 		compileAndDeployWorkflow(t, testEnv, lggr, fmt.Sprintf("evmreadtest-%d", bcOutput.ChainID), &workflowConfig, workflowFileLocation)
 
 		wg.Add(1)
-		forwarderAddr := common.HexToAddress(testEnv.FullCldEnvOutput.Environment.DataStore.Addresses().Filter(
-			datastore.AddressRefByChainSelector(bcOutput.ChainSelector),
-			datastore.AddressRefByType(datastore.ContractType(keystonechangeset.KeystoneForwarder.String())),
-		)[0].Address)
+		forwarderAddress, err := crecontracts.FindAddressesForChain(testEnv.FullCldEnvOutput.Environment.ExistingAddresses, bcOutput.ChainSelector, keystonechangeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
+		require.NoError(t, err)
 
 		// validate workflow execution
 		go func(bcOutput *cre.WrappedBlockchainOutput) {
 			defer wg.Done()
-			err := validateWorkflowExecution(t, lggr, bcOutput, workflowName, forwarderAddr, workflowConfig)
+			err := validateWorkflowExecution(t, lggr, bcOutput, workflowName, forwarderAddress, workflowConfig)
 			if err != nil {
 				lggr.Error().Msgf("Workflow %s execution failed on chain %s: %v", workflowName, bcOutput.BlockchainOutput.ChainID, err)
 				return
