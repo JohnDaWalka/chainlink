@@ -118,32 +118,32 @@ func TestHealthController_Health_body(t *testing.T) {
 	bodyJSONTmplt, err := template.New("health.json").Parse(bodyJSON)
 	require.NoError(t, err)
 	bodyJSONRes := &bytes.Buffer{}
-	bodyJSONTmplt.Execute(bodyJSONRes, templateData)
+	require.NoError(t, bodyJSONTmplt.Execute(bodyJSONRes, templateData))
 
 	bodyHTMLTmplt, err := template.New("health.html").Parse(bodyHTML)
 	require.NoError(t, err)
 	bodyHTMLRes := &bytes.Buffer{}
-	bodyHTMLTmplt.Execute(bodyHTMLRes, templateData)
+	require.NoError(t, bodyHTMLTmplt.Execute(bodyHTMLRes, templateData))
 
 	bodyTXTmplt, err := template.New("health.txt").Parse(bodyTXT)
 	require.NoError(t, err)
 	bodyTXTRes := &bytes.Buffer{}
-	bodyTXTmplt.Execute(bodyTXTRes, templateData)
+	require.NoError(t, bodyTXTmplt.Execute(bodyTXTRes, templateData))
 
 	bodyJSONFailingTmplt, err := template.New("health.json").Parse(bodyJSONFailing)
 	require.NoError(t, err)
 	bodyJSONFailingRes := &bytes.Buffer{}
-	bodyJSONFailingTmplt.Execute(bodyJSONFailingRes, templateData)
+	require.NoError(t, bodyJSONFailingTmplt.Execute(bodyJSONFailingRes, templateData))
 
 	bodyHTMLFailingTmplt, err := template.New("health.html").Parse(bodyHTMLFailing)
 	require.NoError(t, err)
 	bodyHTMLFailingRes := &bytes.Buffer{}
-	bodyHTMLFailingTmplt.Execute(bodyHTMLFailingRes, templateData)
+	require.NoError(t, bodyHTMLFailingTmplt.Execute(bodyHTMLFailingRes, templateData))
 
 	bodyTXTFailingTmplt, err := template.New("health.txt").Parse(bodyTXTFailing)
 	require.NoError(t, err)
 	bodyTXTFailingRes := &bytes.Buffer{}
-	bodyTXTFailingTmplt.Execute(bodyTXTFailingRes, templateData)
+	require.NoError(t, bodyTXTFailingTmplt.Execute(bodyTXTFailingRes, templateData))
 
 	for _, tc := range []struct {
 		name    string
