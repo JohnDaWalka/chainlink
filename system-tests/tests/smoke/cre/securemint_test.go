@@ -3,6 +3,7 @@ package cre
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,7 +16,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
-	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
+	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain"
@@ -87,12 +88,12 @@ func executeSecureMintTest(t *testing.T, tenv *TestEnvironment) {
 	require.False(t, s.ForwarderProgramID.IsZero(), "failed to receive forwarder program id from blockchains output")
 	s.Selector = solChain.SolChain.ChainSelector
 
-	// configure contracts
+	// configure cache program
 	framework.L.Info().Msg("Deploy and configure data-feeds cache programs...")
 	deployAndConfigureCache(t, &s, *fullCldEnvOutput.Environment, solChain)
 	framework.L.Info().Msg("Successfully deployed and configured")
 
-	// configure workflow
+	// deploy workflow
 	framework.L.Info().Msg("Generate and propose secure mint job...")
 	jobSpec := createSecureMintWorkflowJobSpec(t, &s, solChain)
 	proposeSecureMintJob(t, fullCldEnvOutput.Environment.Offchain, jobSpec)
@@ -100,13 +101,103 @@ func executeSecureMintTest(t *testing.T, tenv *TestEnvironment) {
 
 	// trigger workflow
 	trigger := createFakeTrigger(t, &s, fullCldEnvOutput.DonTopology)
-	for i := range 5 {
-		time.Sleep(time.Second * 25)
-		trigger.Call(t)
-		fmt.Println(i)
-	}
 	trigger.run(t)
+
 	// wait for price update
+	waitForFeedUpdate(t, solChain.SolClient, &s)
+}
+
+func waitForFeedUpdate(t *testing.T, solclient *rpc.Client, s *setup) {
+	tt := time.NewTicker(time.Second * 5)
+	for {
+		defer tt.Stop()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tt.C:
+				reportAcc := getDecimalReportAccount(t, s)
+
+				decimalReportAccount, err := solclient.GetAccountInfoWithOpts(ctx, reportAcc, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+				if err == rpc.ErrNotFound {
+					continue
+				}
+				require.NoError(t, err, "failed to receive decimal report account")
+				// that's how report is stored on chain
+				type report struct {
+					timestamp uint32   // 4 byte
+					answer    *big.Int // 16 byte
+				}
+				var r report
+				data := decimalReportAccount.Value.Data.GetBinary()
+				descriminatorLen := 8
+				expectedLen := descriminatorLen + 4 + 16
+				require.GreaterOrEqual(t, len(data), expectedLen)
+				offset := descriminatorLen
+				r.timestamp = binary.LittleEndian.Uint32(data[offset : offset+4])
+				offset += 4
+				answerLE := data[offset : offset+16]
+				amount, _, _ := parsePackedU128([16]byte(answerLE))
+				r.answer = amount
+
+				if r.answer.Uint64() == 0 {
+					fmt.Println("feed hasn't been updated yet, waiting...")
+					continue
+				}
+				require.Equal(t, Mintable.String(), r.answer.String(), "onchain answer value is not equal to sent value")
+				require.Equal(t, uint32(SeqNr), r.timestamp)
+				return
+			}
+		}
+
+	}
+}
+
+// u128 layout (MSB..LSB): [1 unused][36 block][91 amount]
+func parsePackedU128(le [16]byte) (amount *big.Int, block uint64, unused uint8) {
+	// Convert LE -> big.Int (big-endian expected by SetBytes)
+	be := make([]byte, 16)
+	for i := 0; i < 16; i++ {
+		be[15-i] = le[i]
+	}
+	x := new(big.Int).SetBytes(be)
+
+	// Masks
+	amountMask := new(big.Int).Lsh(big.NewInt(1), 91)
+	amountMask.Sub(amountMask, big.NewInt(1)) // (1<<91)-1
+	blockMask := new(big.Int).Lsh(big.NewInt(1), 36)
+	blockMask.Sub(blockMask, big.NewInt(1)) // (1<<36)-1
+
+	// amount = x & ((1<<91)-1)
+	amount = new(big.Int).And(x, amountMask)
+
+	// block = (x >> 91) & ((1<<36)-1)
+	blockInt := new(big.Int).Rsh(new(big.Int).Set(x), 91)
+	blockInt.And(blockInt, blockMask)
+	block = blockInt.Uint64()
+
+	// unused = (x >> 127) & 1
+	top := new(big.Int).Rsh(x, 127)
+	if top.BitLen() > 0 && top.Bit(0) == 1 {
+		unused = 1
+	}
+	return
+}
+
+func getDecimalReportAccount(t *testing.T, s *setup) solana.PublicKey {
+	dataID, _ := new(big.Int).SetString(s.FeedID, 0)
+	var data [16]byte
+	copy(data[:], dataID.Bytes())
+	decimalReportSeeds := [][]byte{
+		[]byte("decimal_report"),
+		s.CacheState.Bytes(),
+		data[:],
+	}
+	decimalReportKey, _, err := solana.FindProgramAddress(decimalReportSeeds, s.CacheProgramID)
+	require.NoError(t, err, "failed to derive decimal report key")
+	return decimalReportKey
 }
 
 type setup struct {
@@ -127,7 +218,7 @@ var (
 	wFName        = "testwf1234"
 	wFDescription = "securemint test"
 	wFOwner       = [20]byte{1, 2, 3}
-	SeqNr         = 0
+	SeqNr         = 5
 	Block         = 10
 	Mintable      = big.NewInt(15)
 )
@@ -383,9 +474,9 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 	configDigest, _ := hex.DecodeString("000eb2d48aa4727bab3d60885ed3ab7be6e9d6b5855f706b4b01086797ac7730")
 	report := &secureMintReport{
 		ConfigDigest: ocr2types.ConfigDigest(configDigest),
-		SeqNr:        0,
-		Block:        10,
-		Mintable:     big.NewInt(15),
+		SeqNr:        uint64(SeqNr),
+		Block:        uint64(Block),
+		Mintable:     Mintable,
 	}
 
 	reportBytes, err := json.Marshal(report)
@@ -403,23 +494,10 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 		return nil, err
 	}
 
-	var sigs []capabilities.OCRAttributedOnchainSignature
-	for i, key := range f.keys {
-		sig, err2 := key.Sign3(ocr2types.ConfigDigest(configDigest), 0, reportBytes)
-		if err2 != nil {
-			return nil, err2
-		}
-		sigs = append(sigs, capabilities.OCRAttributedOnchainSignature{
-			Signer:    uint32(i), //nolint:gosec // G115 don't care in test code
-			Signature: sig,
-		})
-	}
-
 	event, err := values.NewMap(map[string]any{
 		"ConfigDigest": configDigest,
-		"SeqNr":        0,
+		"SeqNr":        SeqNr,
 		"Report":       jsonReport,
-		//"Sigs":         sigs,
 	})
 	if err != nil {
 		return nil, err
