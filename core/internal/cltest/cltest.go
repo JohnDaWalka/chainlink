@@ -566,6 +566,12 @@ func logPubKeys(t testing.TB, kr keystore.Master) {
 	for _, tonKey := range tons {
 		tonIDs = append(tonIDs, tonKey.ID())
 	}
+	suies, err := kr.Sui().GetAll()
+	require.NoError(t, err)
+	suiIDs := make([]string, len(suies))
+	for _, suiKey := range suies {
+		suiIDs = append(suiIDs, suiKey.ID())
+	}
 	vrfs, err := kr.VRF().GetAll()
 	require.NoError(t, err)
 	vrfIDs := make([]string, len(vrfs))
@@ -613,6 +619,9 @@ func logPubKeys(t testing.TB, kr keystore.Master) {
 	}
 	if len(tonIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d TON keys", len(tonIDs)), "keys", tonIDs)
+	}
+	if len(suiIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Sui keys", len(suiIDs)), "keys", suiIDs)
 	}
 	if len(vrfIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d VRF keys", len(vrfIDs)), "keys", vrfIDs)
