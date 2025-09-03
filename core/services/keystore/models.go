@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tonkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
@@ -164,6 +165,7 @@ type keyRing struct {
 	Aptos      map[string]aptoskey.Key
 	Tron       map[string]tronkey.Key
 	TON        map[string]tonkey.Key
+	Sui        map[string]suikey.Key
 	VRF        map[string]vrfkey.KeyV2
 	Workflow   map[string]workflowkey.Key
 	LegacyKeys LegacyKeyStorage
@@ -182,6 +184,7 @@ func newKeyRing() *keyRing {
 		Aptos:    make(map[string]aptoskey.Key),
 		Tron:     make(map[string]tronkey.Key),
 		TON:      make(map[string]tonkey.Key),
+		Sui:      make(map[string]suikey.Key),
 		VRF:      make(map[string]vrfkey.KeyV2),
 		Workflow: make(map[string]workflowkey.Key),
 	}
@@ -250,6 +253,9 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 	for _, tonkey := range kr.TON {
 		rawKeys.TON = append(rawKeys.TON, internal.RawBytes(tonkey))
 	}
+	for _, suiKey := range kr.Sui {
+		rawKeys.Sui = append(suiIDs, suiKey.ID())
+	}
 	for _, vrfKey := range kr.VRF {
 		rawKeys.VRF = append(rawKeys.VRF, internal.RawBytes(vrfKey))
 	}
@@ -305,6 +311,10 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	for _, tonKey := range kr.TON {
 		tonIDs = append(tonIDs, tonKey.ID())
 	}
+	var suiIDs []string
+	for _, suiKey := range kr.Sui {
+		suiIDs = append(suiIDs, suiKey.ID())
+	}
 	var vrfIDs []string
 	for _, VRFKey := range kr.VRF {
 		vrfIDs = append(vrfIDs, VRFKey.ID())
@@ -348,6 +358,9 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	if len(tonIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d TON keys", len(tonIDs)), "keys", tonIDs)
 	}
+	if len(suiIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Sui keys", len(suiIDs)), "keys", suiIDs)
+	}
 	if len(vrfIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d VRF keys", len(vrfIDs)), "keys", vrfIDs)
 	}
@@ -374,6 +387,7 @@ type rawKeyRing struct {
 	Aptos      [][]byte
 	Tron       [][]byte
 	TON        [][]byte
+	Sui        [][]byte
 	VRF        [][]byte
 	Workflow   [][]byte
 	LegacyKeys LegacyKeyStorage `json:"-"`
@@ -425,6 +439,10 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 	for _, rawTONKey := range rawKeys.TON {
 		tonKey := tonkey.KeyFor(internal.NewRaw(rawTONKey))
 		keyRing.TON[tonKey.ID()] = tonKey
+	}
+	for _, rawSuiKey := range rawKeys.Sui {
+		suiKey := suikey.KeyFor(internal.NewRaw(rawSuiKey))
+		keyRing.Sui[suiKey.ID()] = suiKey
 	}
 	for _, rawVRFKey := range rawKeys.VRF {
 		vrfKey := vrfkey.KeyFor(internal.NewRaw(rawVRFKey))

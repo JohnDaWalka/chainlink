@@ -40,6 +40,7 @@ var extraDataCodec = ccipcommon.ExtraDataCodec(map[string]ccipcommon.SourceChain
 	chainsel.FamilyAptos:  ccipaptos.ExtraDataDecoder{},
 	chainsel.FamilyEVM:    ExtraDataDecoder{},
 	chainsel.FamilySolana: ccipsolana.ExtraDataDecoder{},
+	chainsel.FamilySui:    ccipaptos.ExtraDataDecoder{},
 })
 
 // NOTE: these test cases are only EVM <-> EVM.

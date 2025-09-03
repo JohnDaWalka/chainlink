@@ -80,6 +80,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tonkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
@@ -138,6 +139,7 @@ var (
 	DefaultAptosKey    = aptoskey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultTronKey     = tronkey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultTONKey      = tonkey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
+	DefaultSuiKey      = suikey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultVRFKey      = vrfkey.MustNewV2XXXTestingOnly(big.NewInt(KeyBigIntSeed))
 )
 

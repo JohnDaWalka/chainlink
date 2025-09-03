@@ -33,6 +33,7 @@ import (
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipaptos"  // Register Aptos plugin config factories
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"    // Register EVM plugin config factories
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana" // Register Solana plugin config factories
+	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsui"    // Register Sui plugin config factories
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipton"    // Register Ton plugin config factories
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
@@ -550,6 +551,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			ChainSelector:   chainSelector,
 			ChainFamily:     relayChainFamily,
 			DestChainFamily: destChainFamily,
+			Transmitters:    i.transmitter,
 		})
 		if err1 != nil {
 			return nil, nil, nil, err1

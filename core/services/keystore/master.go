@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tonkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
@@ -49,6 +50,7 @@ type Master interface {
 	Aptos() Aptos
 	Tron() Tron
 	TON() TON
+	Sui() Sui
 	VRF() VRF
 	Workflow() Workflow
 	Unlock(ctx context.Context, password string) error
@@ -67,6 +69,7 @@ type master struct {
 	aptos    *aptos
 	tron     *tron
 	ton      *ton
+	sui      *sui
 	vrf      *vrf
 	workflow *workflow
 }
@@ -99,6 +102,7 @@ func newMaster(ds sqlutil.DataSource, scryptParams utils.ScryptParams, announce 
 		starknet:   newStarkNetKeyStore(km),
 		aptos:      newAptosKeyStore(km),
 		tron:       newTronKeyStore(km),
+		sui:        newSuiKeyStore(km),
 		ton:        newTONKeyStore(km),
 		vrf:        newVRFKeyStore(km),
 		workflow:   newWorkflowKeyStore(km),
@@ -147,6 +151,10 @@ func (ks *master) Tron() Tron {
 
 func (ks *master) TON() TON {
 	return ks.ton
+}
+
+func (ks *master) Sui() Sui {
+	return ks.sui
 }
 
 func (ks *master) VRF() VRF {
@@ -293,6 +301,8 @@ func GetFieldNameForKey(unknownKey Key) (string, error) {
 		return "Tron", nil
 	case tonkey.Key:
 		return "TON", nil
+	case suikey.Key:
+		return "Sui", nil
 	case vrfkey.KeyV2:
 		return "VRF", nil
 	case workflowkey.Key:
