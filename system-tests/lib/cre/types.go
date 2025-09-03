@@ -180,6 +180,10 @@ type (
 	DonsToJobSpecs = map[uint64]DonJobs
 )
 
+const (
+	CapabilityLabelKey = "capability"
+)
+
 type (
 	NodeIndexToConfigOverride  = map[int]string
 	NodeIndexToSecretsOverride = map[int]string
@@ -548,6 +552,14 @@ type DonTopology struct {
 	OCRPeeringData          OCRPeeringData          `toml:"ocr_peering_data" json:"ocr_peering_data"`
 	DonsWithMetadata        []*DonWithMetadata      `toml:"dons_with_metadata" json:"dons_with_metadata"`
 	GatewayConnectorOutput  *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
+}
+
+func (t *DonTopology) ToDonMetadata() []*DonMetadata {
+	metadata := []*DonMetadata{}
+	for _, don := range t.DonsWithMetadata {
+		metadata = append(metadata, don.DonMetadata)
+	}
+	return metadata
 }
 
 type CapabilitiesAwareNodeSet struct {
@@ -1076,4 +1088,9 @@ type InstallableCapability interface {
 	// CapabilityRegistryV2ConfigFn returns a function to generate capability registry
 	// configuration for the v2 registry format
 	CapabilityRegistryV2ConfigFn() CapabilityRegistryConfigFn
+}
+
+type PersistentConfig interface {
+	Load() error
+	Store() error
 }
