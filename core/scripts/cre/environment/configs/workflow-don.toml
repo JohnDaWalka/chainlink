@@ -43,12 +43,12 @@
   bootstrap_node_index = 0 # added for visibility, index of the node in the nodeset that will act as a bootstrap
   gateway_node_index = 0 # added for visibility, required when don_types include "gateway"
   env_vars = { CL_EVM_CMD = "" }
-  capabilities = ["ocr3", "custom-compute", "web-api-target", "web-api-trigger", "vault", "cron", "http-action", "http-trigger", "consensus", "evm"]
+  capabilities = ["ocr3", "custom-compute", "web-api-target", "web-api-trigger", "vault", "cron", "http-action", "http-trigger", "consensus"]
 
   # Enable capabilities per chain with optional per-chain overrides
   [nodesets.chain_capabilities]
     write-evm = ["1337", "2337"]
-    evm = ["1337", "2337"]
+    evm = ["1337"]
     read-contract = ["1337", "2337"]
 
   # See ./examples/workflow-don-overrides.toml to learn how to override capability configs

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -23,6 +22,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
+	"gopkg.in/yaml.v3"
 
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/config"
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/contracts"
@@ -31,7 +31,7 @@ import (
 func main() {
 	wasm.NewRunner(func(b []byte) (config.Config, error) {
 		cfg := config.Config{}
-		if err := json.Unmarshal(b, &cfg); err != nil {
+		if err := yaml.Unmarshal(b, &cfg); err != nil {
 			return config.Config{}, fmt.Errorf("error unmarshalling config: %w", err)
 		}
 		return cfg, nil

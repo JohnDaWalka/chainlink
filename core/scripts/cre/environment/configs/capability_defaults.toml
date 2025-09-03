@@ -33,6 +33,7 @@
   # Defaults for the EVM capability
   # These are merged with per-DON chain_overrides
   binary_path = "./binaries/evm"
+  chains = ["1337"]
 
 [capability_configs.evm.config]
   LogTriggerPollInterval = 1500000000  # 1.5s in nanoseconds

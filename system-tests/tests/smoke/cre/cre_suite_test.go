@@ -45,5 +45,8 @@ func Test_CRE_Suite(t *testing.T) {
 		t.Run("[v2] Consensus test", func(t *testing.T) {
 			executeConsensusTest(t, testEnv)
 		})
+		t.Run("[v2] EVM test", func(t *testing.T) {
+			executeEVMReadTest(t, testEnv)
+		})
 	})
 }
