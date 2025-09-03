@@ -390,7 +390,7 @@ func TestShell_CreateJobV2(t *testing.T) {
 	flagSetApplyFromAction(client.CreateJob, fs, "")
 
 	nameAndExternalJobID := uuid.New()
-	spec := fmt.Sprintf(ocrBootstrapSpec, nameAndExternalJobID, nameAndExternalJobID)
+	spec := fmt.Sprintf(ocrBootstrapSpec, nameAndExternalJobID, nameAndExternalJobID, testutils.FixtureChainID.String())
 	require.NoError(t, fs.Parse([]string{spec}))
 
 	err := client.CreateJob(cli.NewContext(nil, fs, nil))
