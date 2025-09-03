@@ -36,7 +36,7 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 	enabledChains := map[string]struct{}{}
 	for _, nodeSet := range testEnv.Config.NodeSets {
 		require.NoError(t, nodeSet.ParseChainCapabilities())
-		if nodeSet.ChainCapabilities == nil {
+		if nodeSet.ChainCapabilities == nil || nodeSet.ChainCapabilities[cre.EVMCapability] == nil {
 			continue
 		}
 
