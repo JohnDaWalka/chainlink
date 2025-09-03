@@ -2,4 +2,4 @@
 "chainlink": patch
 ---
 
-Revert LLO background observation loop changes
+#changed Revert LLO background cache warming loop changes as performance was not improved
