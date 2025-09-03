@@ -3,22 +3,15 @@ package environment
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"os"
-	"runtime/debug"
 	"slices"
-	"strconv"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
-	"github.com/jmoiron/sqlx"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/scylladb/go-reflectx"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -31,12 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/postgres"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
@@ -49,15 +40,15 @@ import (
 	ks_sol_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana/sequence/operation"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
+	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	libdevenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
-	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	libnix "github.com/smartcontractkit/chainlink/system-tests/lib/nix"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/worker"
 )
 
 const (
@@ -97,13 +88,6 @@ type SetupInput struct {
 	JobSpecFactoryFunctions []cre.JobSpecFn
 	// Deprecated: use Capabilities []cre.InstallableCapability instead
 	CapabilitiesContractFactoryFunctions []cre.CapabilityRegistryConfigFn
-}
-
-type backgroundStageResult struct {
-	err            error
-	successMessage string
-	panicValue     any
-	panicStack     []byte
 }
 
 func mustGetAddress(dataStore datastore.MutableDataStore, chainSel uint64, contractType string, version string, qualifier string) string {
@@ -416,90 +400,22 @@ func SetupTestEnvironment(
 
 	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("DONs configuration prepared in %.2f seconds", stageGen.Elapsed().Seconds())))
 
-	// start 3 tasks in the background
-	backgroundStagesCount := 3
-	backgroundStagesWaitGroup := &sync.WaitGroup{}
-	backgroundStagesCh := make(chan backgroundStageResult, backgroundStagesCount)
-	backgroundStagesWaitGroup.Add(1)
-
-	// configure workflow registry contract in the background, so that we can continue with the next stage
-	var workflowRegistryInput *cre.WorkflowRegistryInput
-	var startTime time.Time
-	go func() {
-		defer backgroundStagesWaitGroup.Done()
-		defer func() {
-			if p := recover(); p != nil {
-				backgroundStagesCh <- backgroundStageResult{
-					panicValue: p,
-					panicStack: debug.Stack(),
-				}
-			}
-		}()
-		startTime = time.Now()
-		fmt.Print(libformat.PurpleText("---> [BACKGROUND 1/3] Configuring Workflow Registry contract\n"))
-
-		allAddresses, addrErr := allChainsCLDEnvironment.ExistingAddresses.Addresses() //nolint:staticcheck // ignore SA1019 as ExistingAddresses is deprecated but still used
-		if addrErr != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr, "failed to get addresses from address book")}
-			return
+	backgroundWorker := worker.NewTypedBackgroundRunner()
+	workflowRegistrationResult := worker.Add(backgroundWorker, "Workflow Registry Configuration", func() (*cre.WorkflowRegistryOutput, error) {
+		workflowRegistryInput, inputErr := crecontracts.PrepareForWorkflowRegistryConfiguration(
+			ctx,
+			singleFileLogger,
+			allChainsCLDEnvironment,
+			topology.WorkflowDONID,
+			homeChainOutput.ChainSelector,
+			common.HexToAddress(wfRegAddr),
+			homeChainOutput.SethClient.MustGetRootKeyAddress(),
+		)
+		if inputErr != nil {
+			return nil, pkgerrors.Wrap(inputErr, "failed to prepare workflow registry configuration")
 		}
-
-		chainsWithContracts := make(map[uint64]bool)
-		for chainSelector, addresses := range allAddresses {
-			chainsWithContracts[chainSelector] = len(addresses) > 0
-		}
-
-		addresses, addrErr1 := allChainsCLDEnvironment.DataStore.Addresses().Fetch()
-		if addrErr1 != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(addrErr1, "failed to get addresses from datastore")}
-			return
-		}
-
-		for _, addr := range addresses {
-			chainsWithContracts[addr.ChainSelector] = true
-		}
-
-		nonEmptyBlockchains := make(map[uint64]cldf_chain.BlockChain, 0)
-		for chainSelector, chain := range allChainsCLDEnvironment.BlockChains.EVMChains() {
-			if chainsWithContracts[chain.Selector] {
-				nonEmptyBlockchains[chainSelector] = chain
-			}
-		}
-		for chainSelector, chain := range allChainsCLDEnvironment.BlockChains.SolanaChains() {
-			if chainsWithContracts[chain.Selector] {
-				nonEmptyBlockchains[chainSelector] = chain
-			}
-		}
-
-		nonEmptyChainsCLDEnvironment := &cldf.Environment{
-			Logger:            singleFileLogger,
-			ExistingAddresses: allChainsCLDEnvironment.ExistingAddresses, //nolint:staticcheck // ignore SA1019 as ExistingAddresses is deprecated but still used
-			GetContext: func() context.Context {
-				return ctx
-			},
-			DataStore:   allChainsCLDEnvironment.DataStore,
-			BlockChains: cldf_chain.NewBlockChains(nonEmptyBlockchains),
-		}
-		nonEmptyChainsCLDEnvironment.OperationsBundle = operations.NewBundle(nonEmptyChainsCLDEnvironment.GetContext, singleFileLogger, operations.NewMemoryReporter())
-
-		// Configure Workflow Registry contract
-		workflowRegistryInput = &cre.WorkflowRegistryInput{
-			ContractAddress: common.HexToAddress(wfRegAddr),
-			ChainSelector:   homeChainOutput.ChainSelector,
-			// TODO, here we might need to pass new environment that doesn't have chains that do not have forwarders deployed
-			CldEnv:         nonEmptyChainsCLDEnvironment,
-			AllowedDonIDs:  []uint64{topology.WorkflowDONID},
-			WorkflowOwners: []common.Address{homeChainOutput.SethClient.MustGetRootKeyAddress()},
-		}
-
-		_, workflowErr := libcontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
-		if workflowErr != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(workflowErr, "failed to configure workflow registry"), successMessage: libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds())}
-			return
-		}
-
-		backgroundStagesCh <- backgroundStageResult{successMessage: libformat.PurpleText("\n<--- [BACKGROUND 1/3] Workflow Registry configured in %.2f seconds\n", time.Since(startTime).Seconds())}
-	}()
+		return crecontracts.ConfigureWorkflowRegistry(testLogger, workflowRegistryInput)
+	})
 
 	// JOB DISTRIBUTOR + JOBS (creation and distribution to nodes)
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Starting Job Distributor, DONs and creating Jobs with Job Distributor")))
@@ -580,36 +496,16 @@ func SetupTestEnvironment(
 	// If the ConfigSet event is missed, OCR protocol will not start.
 	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Jobs created in %.2f seconds", stageGen.Elapsed().Seconds())))
 
-	// Fund nodes in the background, so that we can continue with the next stage
-	backgroundStagesWaitGroup.Add(1)
-	go func() {
-		defer backgroundStagesWaitGroup.Done()
-		defer func() {
-			if p := recover(); p != nil {
-				backgroundStagesCh <- backgroundStageResult{
-					panicValue: p,
-					panicStack: debug.Stack(),
-				}
-			}
-		}()
-
-		startTime = time.Now()
-		fmt.Print(libformat.PurpleText("---> [BACKGROUND 2/3] Funding Chainlink nodes\n\n"))
-
+	worker.AddVoid(backgroundWorker, "Funding Chainlink nodes", func() error {
 		_, fundErr := operations.ExecuteOperation(fullCldOutput.Environment.OperationsBundle, FundCLNodesOp, FundCLNodesOpDeps{
 			Env:               fullCldOutput.Environment,
 			BlockchainOutputs: blockchainOutputs,
 			DonTopology:       fullCldOutput.DonTopology,
 		}, FundCLNodesOpInput{FundAmount: 5000000000000000000})
-		if fundErr != nil {
-			backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(fundErr, "failed to fund CL nodes")}
-			return
-		}
 
-		backgroundStagesCh <- backgroundStageResult{successMessage: libformat.PurpleText("\n<--- [BACKGROUND 2/3] Chainlink nodes funded in %.2f seconds\033[0m\n", time.Since(startTime).Seconds())}
-	}()
+		return fundErr
+	})
 
-	startTime = time.Now()
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Waiting for Log Poller to start tracking OCR3 contract")))
 
 	for idx, nodeSetOut := range nodeSetOutput {
@@ -634,41 +530,9 @@ func SetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Log Poller started in %.2f seconds", stageGen.Elapsed().Seconds())))
 
 	// wait for log poller filters to be registered in the background, because we don't need it them at this stage yet
-	backgroundStagesWaitGroup.Add(1)
-	go func() {
-		defer backgroundStagesWaitGroup.Done()
-		defer func() {
-			if p := recover(); p != nil {
-				backgroundStagesCh <- backgroundStageResult{
-					panicValue: p,
-					panicStack: debug.Stack(),
-				}
-			}
-		}()
-
-		if input.InfraInput.Type != infra.CRIB {
-			hasGateway := false
-			for _, don := range fullCldOutput.DonTopology.DonsWithMetadata {
-				if flags.HasFlag(don.Flags, cre.GatewayDON) {
-					hasGateway = true
-					break
-				}
-			}
-
-			if hasGateway {
-				startTime = time.Now()
-				fmt.Print(libformat.PurpleText("---> [BACKGROUND 3/3] Waiting for all nodes to have expected LogPoller filters registered\n\n"))
-
-				testLogger.Info().Msg("Waiting for all nodes to have expected LogPoller filters registered...")
-				lpErr := waitForAllNodesToHaveExpectedFiltersRegistered(singleFileLogger, testLogger, homeChainOutput.ChainID, *fullCldOutput.DonTopology, updatedNodeSets)
-				if lpErr != nil {
-					backgroundStagesCh <- backgroundStageResult{err: pkgerrors.Wrap(lpErr, "failed to wait for all nodes to have expected LogPoller filters registered")}
-					return
-				}
-				backgroundStagesCh <- backgroundStageResult{successMessage: libformat.PurpleText("\n<--- [BACKGROUND 3/3] Waiting for all nodes to have expected LogPoller filters registered finished in %.2f seconds\n\n", time.Since(startTime).Seconds())}
-			}
-		}
-	}()
+	worker.AddVoid(backgroundWorker, "Waiting for all nodes to have expected LogPoller filters registered", func() error {
+		return crecontracts.WaitForWorkflowRegistryFiltersRegistration(testLogger, singleFileLogger, input.InfraInput.Type, homeChainOutput.ChainID, fullCldOutput.DonTopology, updatedNodeSets)
+	})
 
 	fmt.Print(libformat.PurpleText("%s", stageGen.Wrap("Configuring OCR3 and Keystone contracts")))
 
@@ -693,7 +557,7 @@ func SetupTestEnvironment(
 	if input.OCR3Config != nil {
 		configureKeystoneInput.OCR3Config = *input.OCR3Config
 	} else {
-		ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
+		ocr3Config, ocr3ConfigErr := crecontracts.DefaultOCR3Config(topology)
 		if ocr3ConfigErr != nil {
 			return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
 		}
@@ -703,7 +567,7 @@ func SetupTestEnvironment(
 	if input.DONTimeConfig != nil {
 		configureKeystoneInput.DONTimeConfig = *input.DONTimeConfig
 	} else {
-		donTimeConfig, donTimeConfigErr := libcontracts.DefaultOCR3Config(topology)
+		donTimeConfig, donTimeConfigErr := crecontracts.DefaultOCR3Config(topology)
 		donTimeConfig.DeltaRoundMillis = 0 // Fastest rounds possible
 		if donTimeConfigErr != nil {
 			return nil, pkgerrors.Wrap(donTimeConfigErr, "failed to generate default DON Time config")
@@ -711,13 +575,13 @@ func SetupTestEnvironment(
 		configureKeystoneInput.DONTimeConfig = *donTimeConfig
 	}
 
-	ocr3Config, ocr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
+	ocr3Config, ocr3ConfigErr := crecontracts.DefaultOCR3Config(topology)
 	if ocr3ConfigErr != nil {
 		return nil, pkgerrors.Wrap(ocr3ConfigErr, "failed to generate default OCR3 config")
 	}
 	configureKeystoneInput.VaultOCR3Config = *ocr3Config
 
-	defaultOcr3Config, defaultOcr3ConfigErr := libcontracts.DefaultOCR3Config(topology)
+	defaultOcr3Config, defaultOcr3ConfigErr := crecontracts.DefaultOCR3Config(topology)
 	if defaultOcr3ConfigErr != nil {
 		return nil, pkgerrors.Wrap(defaultOcr3ConfigErr, "failed to generate default OCR3 config for EVM")
 	}
@@ -732,7 +596,7 @@ func SetupTestEnvironment(
 	// Deprecated, use Capabilities instead
 	capabilitiesContractFactoryFunctions = append(capabilitiesContractFactoryFunctions, input.CapabilitiesContractFactoryFunctions...)
 
-	keystoneErr := libcontracts.ConfigureKeystone(configureKeystoneInput, capabilitiesContractFactoryFunctions)
+	keystoneErr := crecontracts.ConfigureKeystone(configureKeystoneInput, capabilitiesContractFactoryFunctions)
 	if keystoneErr != nil {
 		return nil, pkgerrors.Wrap(keystoneErr, "failed to configure keystone contracts")
 	}
@@ -758,26 +622,15 @@ func SetupTestEnvironment(
 		fmt.Print(libformat.PurpleText("%s", stageGen.WrapAndNext("Wrote bootstrapping data into disk in %.2f seconds", stageGen.Elapsed().Seconds())))
 	}
 
-	// block on background stages
-	backgroundStagesWaitGroup.Wait()
-	close(backgroundStagesCh)
-
-	for result := range backgroundStagesCh {
-		if result.err != nil {
-			return nil, pkgerrors.Wrap(result.err, "background stage failed")
-		}
-		if result.panicValue != nil {
-			// Print the original stack trace from the background goroutine
-			if result.panicStack != nil {
-				fmt.Fprintf(os.Stderr, "Original panic stack trace from background goroutine:\n%s\n", result.panicStack)
-			}
-			panic(result.panicValue)
-		}
-		fmt.Print(result.successMessage)
+	if err := backgroundWorker.Wait(); err != nil {
+		return nil, pkgerrors.Wrap(err, "background worker failed")
 	}
 
+	// we ignore the error, because if that task would have failed, backgroundWorker.Wait() would have returned that error already
+	workflowRegistryConfigurationOutput, _ := workflowRegistrationResult.Get()
+
 	return &SetupOutput{
-		WorkflowRegistryConfigurationOutput: workflowRegistryInput.Out, // pass to caller, so that it can be optionally attached to TestConfig and saved to disk
+		WorkflowRegistryConfigurationOutput: workflowRegistryConfigurationOutput, // pass to caller, so that it can be optionally attached to TestConfig and saved to disk
 		BlockchainOutput:                    blockchainOutputs,
 		DonTopology:                         fullCldOutput.DonTopology,
 		NodeOutput:                          nodeSetOutput,
@@ -843,101 +696,4 @@ func (c *ConcurrentNonceMap) Increment(chainID uint64) uint64 {
 	defer c.mu.Unlock()
 	c.nonceByChainID[chainID]++
 	return c.nonceByChainID[chainID]
-}
-
-// must match nubmer of events we track in core/services/workflows/syncer/handler.go
-const NumberOfTrackedWorkflowRegistryEvents = 6
-
-// waitForAllNodesToHaveExpectedFiltersRegistered manually checks if all WorkflowRegistry filters used by the LogPoller are registered for all nodes. We want to see if this will help with the flakiness.
-func waitForAllNodesToHaveExpectedFiltersRegistered(singeFileLogger logger.Logger, testLogger zerolog.Logger, homeChainID uint64, donTopology cre.DonTopology, nodeSetInput []*cre.CapabilitiesAwareNodeSet) error {
-	for donIdx, don := range donTopology.DonsWithMetadata {
-		if !flags.HasFlag(don.Flags, cre.WorkflowDON) {
-			continue
-		}
-
-		workderNodes, workersErr := crenode.FindManyWithLabel(don.NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.WorkerNode}, crenode.EqualLabels)
-		if workersErr != nil {
-			return pkgerrors.Wrap(workersErr, "failed to find worker nodes")
-		}
-
-		results := make(map[int]bool)
-		ticker := 5 * time.Second
-		timeout := 2 * time.Minute
-
-	INNER_LOOP:
-		for {
-			select {
-			case <-time.After(timeout):
-				return fmt.Errorf("timed out, when waiting for %.2f seconds, waiting for all nodes to have expected filters registered", timeout.Seconds())
-			case <-time.Tick(ticker):
-				if len(results) == len(workderNodes) {
-					testLogger.Info().Msgf("All %d nodes in DON %d have expected filters registered", len(workderNodes), don.ID)
-					break INNER_LOOP
-				}
-
-				for _, workerNode := range workderNodes {
-					nodeIndex, nodeIndexErr := crenode.FindLabelValue(workerNode, crenode.IndexKey)
-					if nodeIndexErr != nil {
-						return pkgerrors.Wrap(nodeIndexErr, "failed to find node index")
-					}
-
-					nodeIndexInt, nodeIdxErr := strconv.Atoi(nodeIndex)
-					if nodeIdxErr != nil {
-						return pkgerrors.Wrap(nodeIdxErr, "failed to convert node index to int")
-					}
-
-					if _, ok := results[nodeIndexInt]; ok {
-						continue
-					}
-
-					testLogger.Info().Msgf("Checking if all WorkflowRegistry filters are registered for worker node %d", nodeIndexInt)
-					allFilters, filtersErr := getAllFilters(context.Background(), singeFileLogger, big.NewInt(libc.MustSafeInt64(homeChainID)), nodeIndexInt, nodeSetInput[donIdx].DbInput.Port)
-					if filtersErr != nil {
-						return pkgerrors.Wrap(filtersErr, "failed to get filters")
-					}
-
-					for _, filter := range allFilters {
-						if strings.Contains(filter.Name, "WorkflowRegistry") {
-							if len(filter.EventSigs) == NumberOfTrackedWorkflowRegistryEvents {
-								testLogger.Debug().Msgf("Found all WorkflowRegistry filters for node %d", nodeIndexInt)
-								results[nodeIndexInt] = true
-								continue
-							}
-
-							testLogger.Debug().Msgf("Found only %d WorkflowRegistry filters for node %d", len(filter.EventSigs), nodeIndexInt)
-						}
-					}
-				}
-
-				// return if we have results for all nodes, don't wait for next tick
-				if len(results) == len(workderNodes) {
-					testLogger.Info().Msgf("All %d nodes in DON %d have expected filters registered", len(workderNodes), don.ID)
-					break INNER_LOOP
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func NewORM(logger logger.Logger, chainID *big.Int, nodeIndex, externalPort int) (logpoller.ORM, *sqlx.DB, error) {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", "127.0.0.1", externalPort, postgres.User, postgres.Password, fmt.Sprintf("db_%d", nodeIndex))
-	db, err := sqlx.Open("postgres", dsn)
-	if err != nil {
-		return nil, db, err
-	}
-
-	db.MapperFunc(reflectx.CamelToSnakeASCII)
-	return logpoller.NewORM(chainID, db, logger), db, nil
-}
-
-func getAllFilters(ctx context.Context, logger logger.Logger, chainID *big.Int, nodeIndex, externalPort int) (map[string]logpoller.Filter, error) {
-	orm, db, err := NewORM(logger, chainID, nodeIndex, externalPort)
-	if err != nil {
-		return nil, err
-	}
-
-	defer db.Close()
-	return orm.LoadFilters(ctx)
 }

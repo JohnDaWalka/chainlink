@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/data-feeds/generated/data_feeds_cache"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 
@@ -430,48 +429,6 @@ func MergeAllDataStores(fullCldEnvOutput *cre.FullCLDEnvironmentOutput, changese
 	}
 
 	fullCldEnvOutput.Environment.DataStore = baseDataStore.Seal()
-}
-
-func ConfigureWorkflowRegistry(testLogger zerolog.Logger, input *cre.WorkflowRegistryInput) (*cre.WorkflowRegistryOutput, error) {
-	if input == nil {
-		return nil, errors.New("input is nil")
-	}
-	if input.Out != nil && input.Out.UseCache {
-		return input.Out, nil
-	}
-
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
-	allowedDonIDs := make([]uint32, len(input.AllowedDonIDs))
-	for i, donID := range input.AllowedDonIDs {
-		allowedDonIDs[i] = libc.MustSafeUint32FromUint64(donID)
-	}
-
-	report, err := operations.ExecuteSequence(
-		input.CldEnv.OperationsBundle,
-		ks_contracts_op.ConfigWorkflowRegistrySeq,
-		ks_contracts_op.ConfigWorkflowRegistrySeqDeps{
-			Env: input.CldEnv,
-		},
-		ks_contracts_op.ConfigWorkflowRegistrySeqInput{
-			ContractAddress:       input.ContractAddress,
-			RegistryChainSelector: input.ChainSelector,
-			AllowedDonIDs:         allowedDonIDs,
-			WorkflowOwners:        input.WorkflowOwners,
-		},
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure workflow registry")
-	}
-
-	input.Out = &cre.WorkflowRegistryOutput{
-		ChainSelector:  report.Output.RegistryChainSelector,
-		AllowedDonIDs:  report.Output.AllowedDonIDs,
-		WorkflowOwners: report.Output.WorkflowOwners,
-	}
-	return input.Out, nil
 }
 
 func ConfigureDataFeedsCache(testLogger zerolog.Logger, input *cre.ConfigureDataFeedsCacheInput) (*cre.ConfigureDataFeedsCacheOutput, error) {
