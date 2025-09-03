@@ -7,6 +7,8 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
+replace github.com/smartcontractkit/chainlink-solana => github.com/smartcontractkit/chainlink-internal-solana v0.0.0-20250903184314-1f4721916a12
+
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require (
