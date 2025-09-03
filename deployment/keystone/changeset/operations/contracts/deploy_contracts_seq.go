@@ -80,7 +80,9 @@ var DeployContractsSequence = operations.NewSequence(
 				return DeployContractsSequenceOutput{}, err
 			}
 
-			err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook)
+			if err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook); err != nil {
+				return DeployContractsSequenceOutput{}, err
+			}
 		} else {
 			capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
 			if err != nil {
@@ -116,7 +118,9 @@ var DeployContractsSequence = operations.NewSequence(
 				return DeployContractsSequenceOutput{}, err
 			}
 
-			err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook)
+			if err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook); err != nil {
+				return DeployContractsSequenceOutput{}, err
+			}
 		} else {
 			workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
 			if err != nil {

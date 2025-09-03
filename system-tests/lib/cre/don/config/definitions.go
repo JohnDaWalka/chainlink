@@ -9,37 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 )
 
-const (
-	// Template for EVM workflow configuration
-	evmWorkflowConfigTemplate = `
-		[EVM.Workflow]
-		FromAddress = '{{.FromAddress}}'
-		ForwarderAddress = '{{.ForwarderAddress}}'
-		GasLimitDefault = {{.GasLimitDefault}}
-		TxAcceptanceState = {{.TxAcceptanceState}}
-		PollPeriod = '{{.PollPeriod}}'
-		AcceptanceTimeout = '{{.AcceptanceTimeout}}'
-
-		[EVM.Transactions]
-		ForwardersEnabled = true
-`
-
-	solWorkflowConfigTemplate = `
-		Enabled = true
-		TxRetentionTimeout = '{{.TxRetentionTimeout}}'
-
-		[Solana.Workflow]
-		Enabled = true
-		ForwarderAddress = '{{.ForwarderAddress}}'
-		FromAddress      = '{{.FromAddress}}'
-		ForwarderState   = '{{.ForwarderState}}'
-		PollPeriod = '{{.PollPeriod}}'
-		AcceptanceTimeout = '{{.AcceptanceTimeout}}'
-		TxAcceptanceState = {{.TxAcceptanceState}}
-		Local = {{.Local}}
-	`
-)
-
 type AddressTypeVersion struct {
 	Address common.Address
 	cldf.TypeAndVersion
