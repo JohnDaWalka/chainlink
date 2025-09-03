@@ -11,117 +11,117 @@
     },
     {
       "type": "checks",
-      "id": "EVM.0",
+      "id": "EVM.{{.chainID}}",
       "attributes": {
-        "name": "EVM.0",
+        "name": "EVM.{{.chainID}}",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.BalanceMonitor",
+      "id": "EVM.{{.chainID}}.BalanceMonitor",
       "attributes": {
-        "name": "EVM.0.BalanceMonitor",
+        "name": "EVM.{{.chainID}}.BalanceMonitor",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.HeadBroadcaster",
+      "id": "EVM.{{.chainID}}.HeadBroadcaster",
       "attributes": {
-        "name": "EVM.0.HeadBroadcaster",
+        "name": "EVM.{{.chainID}}.HeadBroadcaster",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.HeadTracker",
+      "id": "EVM.{{.chainID}}.HeadTracker",
       "attributes": {
-        "name": "EVM.0.HeadTracker",
+        "name": "EVM.{{.chainID}}.HeadTracker",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.HeadTracker.HeadListener",
+      "id": "EVM.{{.chainID}}.HeadTracker.HeadListener",
       "attributes": {
-        "name": "EVM.0.HeadTracker.HeadListener",
+        "name": "EVM.{{.chainID}}.HeadTracker.HeadListener",
         "status": "failing",
         "output": "Listener connected = false, receiving heads = false"
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.LogBroadcaster",
+      "id": "EVM.{{.chainID}}.LogBroadcaster",
       "attributes": {
-        "name": "EVM.0.LogBroadcaster",
+        "name": "EVM.{{.chainID}}.LogBroadcaster",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Relayer",
+      "id": "EVM.{{.chainID}}.Relayer",
       "attributes": {
-        "name": "EVM.0.Relayer",
+        "name": "EVM.{{.chainID}}.Relayer",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Txm",
+      "id": "EVM.{{.chainID}}.Txm",
       "attributes": {
-        "name": "EVM.0.Txm",
+        "name": "EVM.{{.chainID}}.Txm",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Txm.BlockHistoryEstimator",
+      "id": "EVM.{{.chainID}}.Txm.BlockHistoryEstimator",
       "attributes": {
-        "name": "EVM.0.Txm.BlockHistoryEstimator",
+        "name": "EVM.{{.chainID}}.Txm.BlockHistoryEstimator",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Txm.Broadcaster",
+      "id": "EVM.{{.chainID}}.Txm.Broadcaster",
       "attributes": {
-        "name": "EVM.0.Txm.Broadcaster",
+        "name": "EVM.{{.chainID}}.Txm.Broadcaster",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Txm.Confirmer",
+      "id": "EVM.{{.chainID}}.Txm.Confirmer",
       "attributes": {
-        "name": "EVM.0.Txm.Confirmer",
+        "name": "EVM.{{.chainID}}.Txm.Confirmer",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Txm.Finalizer",
+      "id": "EVM.{{.chainID}}.Txm.Finalizer",
       "attributes": {
-        "name": "EVM.0.Txm.Finalizer",
+        "name": "EVM.{{.chainID}}.Txm.Finalizer",
         "status": "passing",
         "output": ""
       }
     },
     {
       "type": "checks",
-      "id": "EVM.0.Txm.WrappedEvmEstimator",
+      "id": "EVM.{{.chainID}}.Txm.WrappedEvmEstimator",
       "attributes": {
-        "name": "EVM.0.Txm.WrappedEvmEstimator",
+        "name": "EVM.{{.chainID}}.Txm.WrappedEvmEstimator",
         "status": "passing",
         "output": ""
       }

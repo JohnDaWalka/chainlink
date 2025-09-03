@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -110,23 +111,57 @@ var (
 )
 
 func TestHealthController_Health_body(t *testing.T) {
+	templateData := map[string]interface{}{
+		"chainID": testutils.FixtureChainID.String(),
+	}
+
+	bodyJSONTmplt, err := template.New("health.json").Parse(bodyJSON)
+	require.NoError(t, err)
+	bodyJSONRes := &bytes.Buffer{}
+	bodyJSONTmplt.Execute(bodyJSONRes, templateData)
+
+	bodyHTMLTmplt, err := template.New("health.html").Parse(bodyHTML)
+	require.NoError(t, err)
+	bodyHTMLRes := &bytes.Buffer{}
+	bodyHTMLTmplt.Execute(bodyHTMLRes, templateData)
+
+	bodyTXTmplt, err := template.New("health.txt").Parse(bodyTXT)
+	require.NoError(t, err)
+	bodyTXTRes := &bytes.Buffer{}
+	bodyTXTmplt.Execute(bodyTXTRes, templateData)
+
+	bodyJSONFailingTmplt, err := template.New("health.json").Parse(bodyJSONFailing)
+	require.NoError(t, err)
+	bodyJSONFailingRes := &bytes.Buffer{}
+	bodyJSONFailingTmplt.Execute(bodyJSONFailingRes, templateData)
+
+	bodyHTMLFailingTmplt, err := template.New("health.html").Parse(bodyHTMLFailing)
+	require.NoError(t, err)
+	bodyHTMLFailingRes := &bytes.Buffer{}
+	bodyHTMLFailingTmplt.Execute(bodyHTMLFailingRes, templateData)
+
+	bodyTXTFailingTmplt, err := template.New("health.txt").Parse(bodyTXTFailing)
+	require.NoError(t, err)
+	bodyTXTFailingRes := &bytes.Buffer{}
+	bodyTXTFailingTmplt.Execute(bodyTXTFailingRes, templateData)
+
 	for _, tc := range []struct {
 		name    string
 		path    string
 		headers map[string]string
 		expBody string
 	}{
-		{"default", "/health", nil, bodyJSON},
-		{"json", "/health", map[string]string{"Accept": gin.MIMEJSON}, bodyJSON},
-		{"html", "/health", map[string]string{"Accept": gin.MIMEHTML}, bodyHTML},
-		{"text", "/health", map[string]string{"Accept": gin.MIMEPlain}, bodyTXT},
-		{".txt", "/health.txt", nil, bodyTXT},
+		{"default", "/health", nil, bodyJSONRes.String()},
+		{"json", "/health", map[string]string{"Accept": gin.MIMEJSON}, bodyJSONRes.String()},
+		{"html", "/health", map[string]string{"Accept": gin.MIMEHTML}, bodyHTMLRes.String()},
+		{"text", "/health", map[string]string{"Accept": gin.MIMEPlain}, bodyTXTRes.String()},
+		{".txt", "/health.txt", nil, bodyTXTRes.String()},
 
-		{"default-failing", "/health?failing", nil, bodyJSONFailing},
-		{"json-failing", "/health?failing", map[string]string{"Accept": gin.MIMEJSON}, bodyJSONFailing},
-		{"html-failing", "/health?failing", map[string]string{"Accept": gin.MIMEHTML}, bodyHTMLFailing},
-		{"text-failing", "/health?failing", map[string]string{"Accept": gin.MIMEPlain}, bodyTXTFailing},
-		{".txt-failing", "/health.txt?failing", nil, bodyTXTFailing},
+		{"default-failing", "/health?failing", nil, bodyJSONFailingRes.String()},
+		{"json-failing", "/health?failing", map[string]string{"Accept": gin.MIMEJSON}, bodyJSONFailingRes.String()},
+		{"html-failing", "/health?failing", map[string]string{"Accept": gin.MIMEHTML}, bodyHTMLFailingRes.String()},
+		{"text-failing", "/health?failing", map[string]string{"Accept": gin.MIMEPlain}, bodyTXTFailingRes.String()},
+		{".txt-failing", "/health.txt?failing", nil, bodyTXTFailingRes.String()},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := configtest.NewGeneralConfig(t, func(cfg *chainlink.Config, secrets *chainlink.Secrets) {
@@ -147,7 +182,7 @@ func TestHealthController_Health_body(t *testing.T) {
 			assert.Equal(t, http.StatusMultiStatus, resp.StatusCode)
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			if tc.expBody == bodyJSON {
+			if tc.expBody == bodyJSONRes.String() {
 				// pretty print for comparison
 				var b bytes.Buffer
 				require.NoError(t, json.Indent(&b, body, "", "  "))
