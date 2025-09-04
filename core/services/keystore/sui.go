@@ -78,7 +78,7 @@ func (ks *sui) Add(ctx context.Context, key suikey.Key) error {
 	if _, found := ks.keyRing.Sui[key.ID()]; found {
 		return fmt.Errorf("key with ID %s already exists", key.ID())
 	}
-	return ks.safeAddKey(ctx, &key)
+	return ks.safeAddKey(ctx, key)
 }
 
 func (ks *sui) Delete(ctx context.Context, id string) (suikey.Key, error) {
@@ -91,7 +91,7 @@ func (ks *sui) Delete(ctx context.Context, id string) (suikey.Key, error) {
 	if err != nil {
 		return suikey.Key{}, err
 	}
-	err = ks.safeRemoveKey(ctx, &key)
+	err = ks.safeRemoveKey(ctx, key)
 	return key, err
 }
 
