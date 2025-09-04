@@ -71,6 +71,7 @@ linters:
 #              desc: Tron only runs as a LOOPP
             - pkg: github.com/consul/sdk/freeport
               desc: Use github.com/smartcontractkit/freeport instead
+            - pkg: k8s.io/utils
         keystore:
           list-mode: lax
           files:

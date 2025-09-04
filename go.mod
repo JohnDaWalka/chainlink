@@ -140,7 +140,6 @@ require (
 	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
 )
 
 require (

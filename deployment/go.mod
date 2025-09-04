@@ -68,7 +68,6 @@ require (
 	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
-	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
 )
 
 require (
@@ -492,6 +491,7 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240709000822-3c01b740850f // indirect
 	k8s.io/kubectl v0.31.2 // indirect
+	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
 	sigs.k8s.io/controller-runtime v0.19.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

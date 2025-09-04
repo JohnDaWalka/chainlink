@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"k8s.io/utils/pointer" //nolint:staticcheck // tests
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -396,7 +395,8 @@ func setupNodeCCIP(
 		c.Feature.UICSAKeys = &trueRef
 		c.Feature.FeedsManager = &trueRef
 		c.OCR.Enabled = &falseRef
-		c.OCR.DefaultTransactionQueueDepth = pointer.Uint32(200)
+		var txQueueDepth uint32 = 200
+		c.OCR.DefaultTransactionQueueDepth = &txQueueDepth
 		c.OCR2.Enabled = &trueRef
 		c.Feature.LogPoller = &trueRef
 		c.P2P.V2.Enabled = &trueRef

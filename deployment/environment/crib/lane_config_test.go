@@ -3,8 +3,6 @@ package crib
 import (
 	"testing"
 
-	"k8s.io/utils/ptr"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -207,8 +205,8 @@ func TestLaneConfiguration_GenerateLanes_BidirectionalMode(t *testing.T) {
 		{
 			name: "Random lanes with bidirectional",
 			lc: &LaneConfiguration{
-				Mode:     ptr.To(LaneModeRandomLanes),
-				NumLanes: ptr.To(6),
+				Mode:     ptr(LaneModeRandomLanes),
+				NumLanes: ptr(6),
 			},
 			chains:   []uint64{1, 2, 3},
 			expected: 6,
@@ -216,7 +214,7 @@ func TestLaneConfiguration_GenerateLanes_BidirectionalMode(t *testing.T) {
 		{
 			name: "Nil mode",
 			lc: &LaneConfiguration{
-				NumLanes: ptr.To(5),
+				NumLanes: ptr(5),
 			},
 			chains:          []uint64{1, 2, 3, 4},
 			validationError: true,
@@ -224,8 +222,8 @@ func TestLaneConfiguration_GenerateLanes_BidirectionalMode(t *testing.T) {
 		{
 			name: "Random lanes with bidirectional - wrong lane count",
 			lc: &LaneConfiguration{
-				Mode:     ptr.To(LaneModeRandomLanes),
-				NumLanes: ptr.To(5),
+				Mode:     ptr(LaneModeRandomLanes),
+				NumLanes: ptr(5),
 			},
 			chains:          []uint64{1, 2, 3, 4},
 			validationError: true,
@@ -233,8 +231,8 @@ func TestLaneConfiguration_GenerateLanes_BidirectionalMode(t *testing.T) {
 		{
 			name: "Random lanes with bidirectional - odd lane count",
 			lc: &LaneConfiguration{
-				Mode:     ptr.To(LaneModeRandomLanes),
-				NumLanes: ptr.To(9),
+				Mode:     ptr(LaneModeRandomLanes),
+				NumLanes: ptr(9),
 			},
 			chains:   []uint64{1, 2, 3, 4},
 			expected: 10, // requested 9, but should generate 10 to ensure all lanes are bidirectional
@@ -242,7 +240,7 @@ func TestLaneConfiguration_GenerateLanes_BidirectionalMode(t *testing.T) {
 		{
 			name: "Any-to-any mode",
 			lc: &LaneConfiguration{
-				Mode: ptr.To(LaneModeAnyToAny),
+				Mode: ptr(LaneModeAnyToAny),
 			},
 			chains:   []uint64{1, 2, 3},
 			expected: 6, // 3*2 = 6 total lanes
@@ -315,3 +313,4 @@ func Test_generateChainTierLanes(t *testing.T) {
 		require.Empty(t, lanes)
 	})
 }
+func ptr[T any](t T) *T { return &t }

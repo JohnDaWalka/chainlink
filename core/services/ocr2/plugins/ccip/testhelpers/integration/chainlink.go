@@ -21,7 +21,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	"k8s.io/utils/ptr"
 
 	"github.com/smartcontractkit/freeport"
 
@@ -395,7 +394,8 @@ func setupNodeCCIP(
 		c.Feature.UICSAKeys = &trueRef
 		c.Feature.FeedsManager = &trueRef
 		c.OCR.Enabled = &falseRef
-		c.OCR.DefaultTransactionQueueDepth = ptr.To[uint32](200)
+		var txQueueDepth uint32 = 200
+		c.OCR.DefaultTransactionQueueDepth = &txQueueDepth
 		c.OCR2.Enabled = &trueRef
 		c.Feature.LogPoller = &trueRef
 		c.P2P.V2.Enabled = &trueRef
