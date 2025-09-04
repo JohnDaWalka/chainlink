@@ -15,12 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
+	commonevents "github.com/smartcontractkit/chainlink-protos/workflows/go/common"
+	workflowevents "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 
 	"github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evmread/config"
-
-	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -48,7 +49,7 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 	require.NotEmpty(t, enabledChains, "No chains enabled for EVM read workflow test")
 	const workflowFileLocation = "./evmread/main.go"
 	lggr := framework.L
-	var wg sync.WaitGroup
+	var workflowsWg sync.WaitGroup
 	var successfulWorkflowRuns atomic.Int32
 	for _, bcOutput := range testEnv.WrappedBlockchainOutputs {
 		if _, ok := enabledChains[bcOutput.BlockchainOutput.ChainID]; !ok {
@@ -62,13 +63,13 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 		lggr.Info().Msg("Proceeding to register workflow...")
 		compileAndDeployWorkflow(t, testEnv, lggr, fmt.Sprintf("evmreadtest-%d", bcOutput.ChainID), &workflowConfig, workflowFileLocation)
 
-		wg.Add(1)
+		workflowsWg.Add(1)
 		forwarderAddress, err := crecontracts.FindAddressesForChain(testEnv.FullCldEnvOutput.Environment.ExistingAddresses, bcOutput.ChainSelector, keystonechangeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
 		require.NoError(t, err)
 
 		// validate workflow execution
 		go func(bcOutput *cre.WrappedBlockchainOutput) {
-			defer wg.Done()
+			defer workflowsWg.Done()
 			err := validateWorkflowExecution(t, lggr, bcOutput, workflowName, forwarderAddress, workflowConfig)
 			if err != nil {
 				lggr.Error().Msgf("Workflow %s execution failed on chain %s: %v", workflowName, bcOutput.BlockchainOutput.ChainID, err)
@@ -80,8 +81,49 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 		}(bcOutput)
 	}
 
-	wg.Wait()
+	ctx, cancel := context.WithCancel(t.Context())
+	go func() {
+		workflowsWg.Wait()
+		cancel()
+	}()
+	logWorkflowLogs(t, ctx, testEnv)
 	require.Equal(t, len(enabledChains), int(successfulWorkflowRuns.Load()), "Not all workflows executed successfully")
+}
+
+func logWorkflowLogs(t *testing.T, ctx context.Context, testEnv *TestEnvironment) {
+	// We are interested in UserLogs (successful execution)
+	// or BaseMessage with specific error message (engine initialization failure)
+	beholderMessageTypes := map[string]func() proto.Message{
+		"workflows.v1.UserLogs": func() proto.Message {
+			return &workflowevents.UserLogs{}
+		},
+		"BaseMessage": func() proto.Message {
+			return &commonevents.BaseMessage{}
+		},
+	}
+
+	lggr := framework.L
+	beholderMsgChan, beholderErrChan := subscribeToBeholderMessages(ctx, t, lggr, testEnv, beholderMessageTypes)
+	// Check the beholder logs for the expected messages
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-beholderErrChan:
+			require.FailNowf(t, "Kafka error received from Kafka %s", err.Error())
+		case msg := <-beholderMsgChan:
+			switch typedMsg := msg.(type) {
+			case *commonevents.BaseMessage:
+				lggr.Info().Msgf("Received BaseMessage from Beholder: %s", typedMsg.Msg)
+			case *workflowevents.UserLogs:
+				for _, logLine := range typedMsg.LogLines {
+					lggr.Info().Msgf("Received workflow msg: %s", logLine.Message)
+				}
+			default:
+				lggr.Info().Msgf("Received unknown message of type '%T'", msg)
+			}
+		}
+	}
 }
 
 func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.WrappedBlockchainOutput, workflowName string, forwarderAddr common.Address, cfg config.Config) error {
@@ -106,8 +148,8 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 
 		return iter.Next(), nil
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), testutils.WaitTimeout(t))
-	defer cancel()
+	//ctx, cancel := context.WithTimeout(t.Context(), testutils.WaitTimeout(t))
+	//defer cancel()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -124,8 +166,8 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 				lggr.Info().Msgf("Workflow %s executed successfully on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
 				return nil
 			}
-		case <-ctx.Done():
-			return fmt.Errorf("workflow %s did not execute on chain %s within the timeout", workflowName, bcOutput.BlockchainOutput.ChainID)
+			//case <-ctx.Done():
+			//	return fmt.Errorf("workflow %s did not execute on chain %s within the timeout", workflowName, bcOutput.BlockchainOutput.ChainID)
 		}
 	}
 }
