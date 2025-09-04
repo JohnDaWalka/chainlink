@@ -54,6 +54,8 @@ var DeployRegistryContractsSequence = operations.NewSequence(
 	semver.MustParse("1.0.0"),
 	"Deploy registry Contracts (Capabilities Registry, Workflow Registry)",
 	func(b operations.Bundle, deps DeployContractsSequenceDeps, input DeployRegistryContractsSequenceInput) (output DeployContractSequenceOutput, err error) {
+	"Deploy registry Contracts (Capabilities Registry, Workflow Registry)",
+	func(b operations.Bundle, deps DeployContractsSequenceDeps, input DeployRegistryContractsSequenceInput) (output DeployContractSequenceOutput, err error) {
 		ab := deployment.NewMemoryAddressBook()
 		as := datastore.NewMemoryDataStore()
 
@@ -61,18 +63,22 @@ var DeployRegistryContractsSequence = operations.NewSequence(
 		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
 			return DeployContractSequenceOutput{}, err
+			return DeployContractSequenceOutput{}, err
 		}
 		err = updateAddresses(as.Addresses(), capabilitiesRegistryDeployReport.Output.Addresses, ab, capabilitiesRegistryDeployReport.Output.AddressBook)
 		if err != nil {
+			return DeployContractSequenceOutput{}, err
 			return DeployContractSequenceOutput{}, err
 		}
 		// Workflow Registry contract
 		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
 			return DeployContractSequenceOutput{}, err
+			return DeployContractSequenceOutput{}, err
 		}
 		err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
 		if err != nil {
+			return DeployContractSequenceOutput{}, err
 			return DeployContractSequenceOutput{}, err
 		}
 		return DeployContractSequenceOutput{
@@ -126,6 +132,7 @@ var DeployV2RegistryContractsSequence = operations.NewSequence(
 			AddressBook: ab,
 			Datastore:   as.Seal(),
 		}, nil
+
 	},
 )
 

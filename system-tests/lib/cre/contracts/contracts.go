@@ -120,11 +120,102 @@ func (d *dons) allDonCapabilities() []keystone_changeset.DonCapabilities {
 	return out
 }
 
+type donConfig struct {
+	keystone_changeset.DonCapabilities
+	flags []cre.CapabilityFlag
+}
+
+func (d *donConfig) resolveOcr3Config(c keystone_changeset.OracleConfig) *keystone_changeset.OracleConfig {
+	c.TransmissionSchedule = []int{d.N()}
+	return &c
+}
+
+func (d *donConfig) keystoneDonConfig() ks_contracts_op.ConfigureKeystoneDON {
+	don := ks_contracts_op.ConfigureKeystoneDON{
+		Name: d.Name,
+	}
+	for _, nop := range d.Nops {
+		don.NodeIDs = append(don.NodeIDs, nop.Nodes...)
+	}
+	return don
+}
+
+type dons struct {
+	c map[string]donConfig
+}
+
+func (d *dons) GetByName(name string) (donConfig, error) {
+	c, ok := d.c[name]
+	if !ok {
+		return donConfig{}, fmt.Errorf("don with name %s not found", name)
+	}
+	return c, nil
+}
+
+func (d *dons) ListByFlag(flag cre.CapabilityFlag) ([]donConfig, error) {
+	out := make([]donConfig, 0)
+	for _, don := range d.c {
+		if flags.HasFlag(don.flags, flag) {
+			out = append(out, don)
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("don with flag %s not found", flag)
+	}
+	return out, nil
+}
+
+func (d *dons) ListByCapability(capName, capVersion string) ([]donConfig, error) {
+	out := make([]donConfig, 0)
+	for _, don := range d.c {
+		for _, cap := range don.Capabilities {
+			if strings.EqualFold(cap.Capability.LabelledName, capName) && strings.EqualFold(cap.Capability.Version, capVersion) {
+				out = append(out, don)
+				break
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("don with capability %s v%s not found", capName, capVersion)
+	}
+	return out, nil
+}
+
+func (d *dons) shouldBeOneDon(flag cre.CapabilityFlag) (donConfig, error) {
+	dons, err := d.ListByFlag(flag)
+	if err != nil {
+		return donConfig{}, err
+	}
+	if len(dons) != 1 {
+		return donConfig{}, fmt.Errorf("expected exactly one DON with flag %s, found %d", flag, len(dons))
+	}
+	return dons[0], nil
+}
+
+func (d *dons) donNodesets() []ks_contracts_op.ConfigureKeystoneDON {
+	out := make([]ks_contracts_op.ConfigureKeystoneDON, 0, len(d.c))
+	for _, don := range d.c {
+		out = append(out, don.keystoneDonConfig())
+	}
+	return out
+}
+
+func (d *dons) allDonCapabilities() []keystone_changeset.DonCapabilities {
+	out := make([]keystone_changeset.DonCapabilities, 0, len(d.c))
+	for _, don := range d.c {
+		out = append(out, don.DonCapabilities)
+	}
+	return out
+}
+
 func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfigFns []cre.CapabilityRegistryConfigFn) error {
 	if err := input.Validate(); err != nil {
 		return errors.Wrap(err, "input validation failed")
 	}
 
+	dons := &dons{
+		c: make(map[string]donConfig),
+	}
 	dons := &dons{
 		c: make(map[string]donConfig),
 	}
@@ -147,8 +238,12 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			enabledCapabilities, err2 := configFn(donMetadata.Flags, input.NodeSets[donIdx])
 			if err2 != nil {
 				return errors.Wrap(err2, "failed to get capabilities from config function")
+			enabledCapabilities, err2 := configFn(donMetadata.Flags, input.NodeSets[donIdx])
+			if err2 != nil {
+				return errors.Wrap(err2, "failed to get capabilities from config function")
 			}
 
+			capabilities = append(capabilities, enabledCapabilities...)
 			capabilities = append(capabilities, enabledCapabilities...)
 		}
 
@@ -186,12 +281,25 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			Name:  fmt.Sprintf("NOP for %s DON", donMetadata.Name),
 			Nodes: donPeerIDs,
 		}
+		// we only need to assign P2P IDs to NOPs, since `ConfigureInitialContractsChangeset` method
+		// will take care of creating DON to Nodes mapping
+		nop := keystone_changeset.NOP{
+			Name:  fmt.Sprintf("NOP for %s DON", donMetadata.Name),
+			Nodes: donPeerIDs,
+		}
 		donName := donMetadata.Name + "-don"
+		c := keystone_changeset.DonCapabilities{
 		c := keystone_changeset.DonCapabilities{
 			Name:         donName,
 			F:            libc.MustSafeUint8(forwarderF),
 			Nops:         []keystone_changeset.NOP{nop},
 			Capabilities: capabilities,
+		}
+
+		dons.c[donName] = donConfig{
+			DonCapabilities: c,
+			flags:           donMetadata.Flags,
+		}
 		}
 
 		dons.c[donName] = donConfig{
@@ -205,6 +313,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeq,
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeqDeps{
 			Env:  input.CldEnv,
+			Dons: dons.allDonCapabilities(),
 			Dons: dons.allDonCapabilities(),
 		},
 		ks_contracts_op.ConfigureCapabilitiesRegistrySeqInput{
@@ -250,6 +359,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 	// configure Solana forwarder only if we have some
 	if len(solChainsWithForwarder) > 0 {
 		for _, don := range dons.donNodesets() {
+		for _, don := range dons.donNodesets() {
 			cs := commonchangeset.Configure(ks_solana.ConfigureForwarders{},
 				&ks_solana.ConfigureForwarderRequest{
 					WFDonName:        don.Name,
@@ -280,6 +390,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			ks_contracts_op.ConfigureForwardersSeqInput{
 				RegistryChainSel: input.ChainSelector,
 				DONs:             dons.donNodesets(),
+				DONs:             dons.donNodesets(),
 				Chains:           evmChainsWithForwarders,
 			},
 		)
@@ -288,6 +399,10 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		}
 	}
 
+	consensusV1DON, err := dons.shouldBeOneDon(cre.ConsensusCapability)
+	if err != nil {
+		return fmt.Errorf("failed to get consensus v1 DON: %w", err)
+	}
 	consensusV1DON, err := dons.shouldBeOneDon(cre.ConsensusCapability)
 	if err != nil {
 		return fmt.Errorf("failed to get consensus v1 DON: %w", err)
@@ -304,6 +419,8 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			RegistryChainSel: input.ChainSelector,
 			DON:              consensusV1DON.keystoneDonConfig(),
 			Config:           consensusV1DON.resolveOcr3Config(input.OCR3Config),
+			DON:              consensusV1DON.keystoneDonConfig(),
+			Config:           consensusV1DON.resolveOcr3Config(input.OCR3Config),
 			DryRun:           false,
 		},
 	)
@@ -311,6 +428,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		return errors.Wrap(err, "failed to configure OCR3 contract")
 	}
 
+	// don time happens to be the same as consensus v1 DON, but it doesn't have to be
 	// don time happens to be the same as consensus v1 DON, but it doesn't have to be
 	_, err = operations.ExecuteOperation(
 		input.CldEnv.OperationsBundle,
@@ -324,6 +442,8 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			RegistryChainSel: input.ChainSelector,
 			DON:              consensusV1DON.keystoneDonConfig(),
 			Config:           consensusV1DON.resolveOcr3Config(input.DONTimeConfig),
+			DON:              consensusV1DON.keystoneDonConfig(),
+			Config:           consensusV1DON.resolveOcr3Config(input.DONTimeConfig),
 			DryRun:           false,
 		},
 	)
@@ -332,6 +452,11 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 	}
 
 	if input.VaultOCR3Address.Cmp(common.Address{}) != 0 {
+		vaultDON, err := dons.shouldBeOneDon(cre.VaultCapability)
+		if err != nil {
+			return fmt.Errorf("failed to get vault DON: %w", err)
+		}
+
 		vaultDON, err := dons.shouldBeOneDon(cre.VaultCapability)
 		if err != nil {
 			return fmt.Errorf("failed to get vault DON: %w", err)
@@ -349,6 +474,8 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 				RegistryChainSel: input.ChainSelector,
 				DON:              vaultDON.keystoneDonConfig(),
 				Config:           vaultDON.resolveOcr3Config(input.VaultOCR3Config),
+				DON:              vaultDON.keystoneDonConfig(),
+				Config:           vaultDON.resolveOcr3Config(input.VaultOCR3Config),
 				DryRun:           false,
 			},
 		)
@@ -358,6 +485,12 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 	}
 
 	for chainSelector, evmOCR3Address := range *input.EVMOCR3Addresses {
+		// not sure how to map EVM chains to DONs, so for now we assume that there's only one DON that supports EVM chains
+		evmDON, err := dons.shouldBeOneDon(cre.EVMCapability)
+		if err != nil {
+			return fmt.Errorf("failed to get EVM DON: %w", err)
+		}
+
 		// not sure how to map EVM chains to DONs, so for now we assume that there's only one DON that supports EVM chains
 		evmDON, err := dons.shouldBeOneDon(cre.EVMCapability)
 		if err != nil {
@@ -377,6 +510,8 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 					RegistryChainSel: chainSelector,
 					DON:              evmDON.keystoneDonConfig(),
 					Config:           evmDON.resolveOcr3Config(input.EVMOCR3Config),
+					DON:              evmDON.keystoneDonConfig(),
+					Config:           evmDON.resolveOcr3Config(input.EVMOCR3Config),
 					DryRun:           false,
 				},
 			)
@@ -391,6 +526,10 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		if err != nil {
 			return fmt.Errorf("failed to get consensus v2 DON: %w", err)
 		}
+		v2ConsensusDON, err := dons.shouldBeOneDon(cre.ConsensusCapabilityV2)
+		if err != nil {
+			return fmt.Errorf("failed to get consensus v2 DON: %w", err)
+		}
 		_, err = operations.ExecuteOperation(
 			input.CldEnv.OperationsBundle,
 			ks_contracts_op.ConfigureOCR3Op,
@@ -401,6 +540,8 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 			ks_contracts_op.ConfigureOCR3OpInput{
 				ContractAddress:  input.ConsensusV2OCR3Address,
 				RegistryChainSel: input.ChainSelector,
+				DON:              v2ConsensusDON.keystoneDonConfig(),
+				Config:           v2ConsensusDON.resolveOcr3Config(input.ConsensusV2OCR3Config),
 				DON:              v2ConsensusDON.keystoneDonConfig(),
 				Config:           v2ConsensusDON.resolveOcr3Config(input.ConsensusV2OCR3Config),
 				DryRun:           false,
@@ -481,6 +622,7 @@ func FindAddressesForChain(addressBook cldf.AddressBook, chainSelector uint64, c
 	return common.Address{}, cldf.TypeAndVersion{}, fmt.Errorf("failed to find %s address in the address book for chain %d", contractName, chainSelector)
 }
 
+// TODO: CRE-742 use datastore
 // TODO: CRE-742 use datastore
 func MustFindAddressesForChain(addressBook cldf.AddressBook, chainSelector uint64, contractName string) common.Address {
 	addr, _, err := FindAddressesForChain(addressBook, chainSelector, contractName)

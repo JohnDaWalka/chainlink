@@ -67,6 +67,7 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capRegistry
 }
 
 // BoostrapDon2DonPeering creates TOML-literal for the Capabilities Peering section of the node configuration for a bootstrap node
+// BoostrapDon2DonPeering creates TOML-literal for the Capabilities Peering section of the node configuration for a bootstrap node
 func BoostrapDon2DonPeering(peeringData cre.CapabilitiesPeeringData) string {
 	return fmt.Sprintf(`
 	[Capabilities.Peering.V2]
