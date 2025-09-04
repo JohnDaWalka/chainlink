@@ -227,6 +227,82 @@ func MaybeLoadMCMSWithTimelockChainState(chain cldf_evm.Chain, addresses map[str
 	return &state, nil
 }
 
+// MaybeLoadMCMSWithTimelockChainStateV2 loads MCMS timelock state from datastore AddressRefs instead of AddressBook
+func MaybeLoadMCMSWithTimelockChainStateFromDatastore(chain cldf_evm.Chain, refs []datastore.AddressRef) (*MCMSWithTimelockState, error) {
+	state := MCMSWithTimelockState{}
+
+	// Define the contract types we're looking for
+	timelockType := datastore.ContractType(types.RBACTimelock)
+	callProxyType := datastore.ContractType(types.CallProxy)
+	proposerType := datastore.ContractType(types.ProposerManyChainMultisig)
+	cancellerType := datastore.ContractType(types.CancellerManyChainMultisig)
+	bypasserType := datastore.ContractType(types.BypasserManyChainMultisig)
+	multichainType := datastore.ContractType(types.ManyChainMultisig)
+
+	for _, ref := range refs {
+		address := common.HexToAddress(ref.Address)
+
+		switch ref.Type {
+		case timelockType:
+			tl, err := bindings.NewRBACTimelock(address, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create timelock binding: %w", err)
+			}
+			state.Timelock = tl
+
+		case callProxyType:
+			cp, err := bindings.NewCallProxy(address, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create call proxy binding: %w", err)
+			}
+			state.CallProxy = cp
+
+		case proposerType:
+			mcms, err := bindings.NewManyChainMultiSig(address, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create proposer MCMS binding: %w", err)
+			}
+			state.ProposerMcm = mcms
+
+		case bypasserType:
+			mcms, err := bindings.NewManyChainMultiSig(address, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create bypasser MCMS binding: %w", err)
+			}
+			state.BypasserMcm = mcms
+
+		case cancellerType:
+			mcms, err := bindings.NewManyChainMultiSig(address, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create canceller MCMS binding: %w", err)
+			}
+			state.CancellerMcm = mcms
+
+		case multichainType:
+			// For generic ManyChainMultisig contracts, use labels to determine role
+			mcms, err := bindings.NewManyChainMultiSig(address, chain.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create multichain MCMS binding: %w", err)
+			}
+
+			// Check labels to assign to the appropriate role
+			if !ref.Labels.IsEmpty() {
+				if ref.Labels.Contains(types.ProposerRole.String()) && state.ProposerMcm == nil {
+					state.ProposerMcm = mcms
+				}
+				if ref.Labels.Contains(types.BypasserRole.String()) && state.BypasserMcm == nil {
+					state.BypasserMcm = mcms
+				}
+				if ref.Labels.Contains(types.CancellerRole.String()) && state.CancellerMcm == nil {
+					state.CancellerMcm = mcms
+				}
+			}
+		}
+	}
+
+	return &state, nil
+}
+
 type LinkTokenState struct {
 	LinkToken *link_token.LinkToken
 }

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	evminternal "github.com/smartcontractkit/chainlink/deployment/common/changeset/evm/mcms"
@@ -60,18 +61,17 @@ func TestDeployMCMSWithTimelockContracts(t *testing.T) {
 		memory.NewMemoryChainsEVMWithChainIDs(t, []uint64{chainsel.TEST_90000001.EvmChainID}, 1),
 	).EVMChains()
 
-	ab := cldf.NewMemoryAddressBook()
+	ds := datastore.NewMemoryDataStore()
 	tenv := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Chains: 1,
 	})
 	_, err := evminternal.DeployMCMSWithTimelockContractsEVM(tenv,
 		chains[chainsel.TEST_90000001.Selector],
-		ab, proposalutils.SingleGroupTimelockConfigV2(t), nil)
+		ds, proposalutils.SingleGroupTimelockConfigV2(t), nil)
 	require.NoError(t, err)
-	addresses, err := ab.AddressesForChain(chainsel.TEST_90000001.Selector)
-	require.NoError(t, err)
+	addresses := ds.Addresses().Filter(datastore.AddressRefByChainSelector(chainsel.TEST_90000001.Selector))
 	require.Len(t, addresses, 5)
-	mcmsState, err := state.MaybeLoadMCMSWithTimelockChainState(chains[chainsel.TEST_90000001.Selector], addresses)
+	mcmsState, err := state.MaybeLoadMCMSWithTimelockChainStateFromDatastore(chains[chainsel.TEST_90000001.Selector], addresses)
 	require.NoError(t, err)
 	v, err := mcmsState.GenerateMCMSWithTimelockView()
 	require.NoError(t, err)

@@ -107,6 +107,7 @@ func DeployMCMSWithTimelockV2(
 	env cldf.Environment, cfgByChain map[uint64]types.MCMSWithTimelockConfigV2,
 ) (cldf.ChangesetOutput, error) {
 	newAddresses := cldf.NewMemoryAddressBook()
+	ds := datastore.NewMemoryDataStore()
 
 	eg := xerrgroup.Group{}
 	mu := sync.Mutex{}
@@ -143,7 +144,7 @@ func DeployMCMSWithTimelockV2(
 				if s != nil {
 					chainstate = s[chainSel]
 				}
-				reports, err := evminternal.DeployMCMSWithTimelockContractsEVM(env, env.BlockChains.EVMChains()[chainSel], newAddresses, cfg, chainstate)
+				reports, err := evminternal.DeployMCMSWithTimelockContractsEVM(env, env.BlockChains.EVMChains()[chainSel], ds, cfg, chainstate)
 				mu.Lock()
 				allReports = append(allReports, reports...)
 				mu.Unlock()
@@ -164,12 +165,9 @@ func DeployMCMSWithTimelockV2(
 	}
 	err := eg.Wait()
 	if err != nil {
-		return cldf.ChangesetOutput{Reports: allReports, AddressBook: newAddresses}, err
+		return cldf.ChangesetOutput{Reports: allReports, AddressBook: newAddresses, DataStore: ds}, err
 	}
-	ds, err := migrateAddressBookWithQualifiers(newAddresses, cfgByChain)
-	if err != nil {
-		return cldf.ChangesetOutput{Reports: allReports, AddressBook: newAddresses}, fmt.Errorf("failed to migrate address book to data store: %w", err)
-	}
+
 	return cldf.ChangesetOutput{Reports: allReports, AddressBook: newAddresses, DataStore: ds}, nil
 }
 

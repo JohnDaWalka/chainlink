@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -127,11 +128,17 @@ func DeployMCMSWithConfigEVM(
 func DeployMCMSWithTimelockContractsEVM(
 	env cldf.Environment,
 	chain cldf_evm.Chain,
-	ab cldf.AddressBook,
+	ds datastore.MutableDataStore,
 	config commontypes.MCMSWithTimelockConfigV2,
 	state *state.MCMSWithTimelockState,
 ) ([]operations.Report[any, any], error) {
 	execReports := make([]operations.Report[any, any], 0)
+
+	// Extract qualifier from config for applying to all MCMS-related contracts
+	qualifier := ""
+	if config.Qualifier != nil && *config.Qualifier != "" {
+		qualifier = *config.Qualifier
+	}
 	lggr := env.Logger
 	opts := []func(*cldf.TypeAndVersion){}
 	if config.Label != nil {
@@ -170,10 +177,16 @@ func DeployMCMSWithTimelockContractsEVM(
 		for _, option := range opts {
 			option(&typeAndVersion)
 		}
-		err = ab.Save(chain.Selector, report.Output.Address.Hex(), typeAndVersion)
-		if err != nil {
-			lggr.Errorw("Failed to save bypasser MCMS address in address book", "chain", chain.String(), "err", err)
-			return execReports, err
+
+		ref := datastore.AddressRef{
+			ChainSelector: chain.Selector,
+			Address:       report.Output.Address.Hex(),
+			Type:          datastore.ContractType(typeAndVersion.Type),
+			Version:       &typeAndVersion.Version,
+			Qualifier:     qualifier,
+		}
+		if err = ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add bypasser MCMS address %s to the datastore: %w", report.Output.Address.Hex(), err)
 		}
 
 		bypasser, err = bindings.NewManyChainMultiSig(report.Output.Address, chain.Client)
@@ -209,10 +222,16 @@ func DeployMCMSWithTimelockContractsEVM(
 		for _, option := range opts {
 			option(&typeAndVersion)
 		}
-		err = ab.Save(chain.Selector, report.Output.Address.Hex(), typeAndVersion)
-		if err != nil {
-			lggr.Errorw("Failed to save canceller MCMS address in address book", "chain", chain.String(), "err", err)
-			return execReports, err
+
+		ref := datastore.AddressRef{
+			ChainSelector: chain.Selector,
+			Address:       report.Output.Address.Hex(),
+			Type:          datastore.ContractType(typeAndVersion.Type),
+			Version:       &typeAndVersion.Version,
+			Qualifier:     qualifier,
+		}
+		if err = ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add canceller MCMS address %s to the datastore: %w", report.Output.Address.Hex(), err)
 		}
 
 		canceller, err = bindings.NewManyChainMultiSig(report.Output.Address, chain.Client)
@@ -248,10 +267,16 @@ func DeployMCMSWithTimelockContractsEVM(
 		for _, option := range opts {
 			option(&typeAndVersion)
 		}
-		err = ab.Save(chain.Selector, report.Output.Address.Hex(), typeAndVersion)
-		if err != nil {
-			lggr.Errorw("Failed to save proposer MCMS address in address book", "chain", chain.String(), "err", err)
-			return execReports, err
+
+		ref := datastore.AddressRef{
+			ChainSelector: chain.Selector,
+			Address:       report.Output.Address.Hex(),
+			Type:          datastore.ContractType(typeAndVersion.Type),
+			Version:       &typeAndVersion.Version,
+			Qualifier:     qualifier,
+		}
+		if err = ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add proposer MCMS address %s to the datastore: %w", report.Output.Address.Hex(), err)
 		}
 
 		proposer, err = bindings.NewManyChainMultiSig(report.Output.Address, chain.Client)
@@ -298,10 +323,16 @@ func DeployMCMSWithTimelockContractsEVM(
 		for _, option := range opts {
 			option(&typeAndVersion)
 		}
-		err = ab.Save(chain.Selector, report.Output.Address.Hex(), typeAndVersion)
-		if err != nil {
-			lggr.Errorw("Failed to save timelock address in address book", "chain", chain.String(), "err", err)
-			return execReports, err
+
+		ref := datastore.AddressRef{
+			ChainSelector: chain.Selector,
+			Address:       report.Output.Address.Hex(),
+			Type:          datastore.ContractType(typeAndVersion.Type),
+			Version:       &typeAndVersion.Version,
+			Qualifier:     qualifier,
+		}
+		if err = ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add timelock address %s to the datastore: %w", report.Output.Address.Hex(), err)
 		}
 
 		timelock, err = bindings.NewRBACTimelock(report.Output.Address, chain.Client)
@@ -339,9 +370,16 @@ func DeployMCMSWithTimelockContractsEVM(
 		for _, option := range opts {
 			option(&typeAndVersion)
 		}
-		err = ab.Save(chain.Selector, report.Output.Address.Hex(), typeAndVersion)
-		if err != nil {
-			lggr.Errorw("Failed to save CallProxy address in address book", "chain", chain.String(), "err", err)
+
+		ref := datastore.AddressRef{
+			ChainSelector: chain.Selector,
+			Address:       report.Output.Address.Hex(),
+			Type:          datastore.ContractType(typeAndVersion.Type),
+			Version:       &typeAndVersion.Version,
+			Qualifier:     qualifier,
+		}
+		if err = ds.Addresses().Add(ref); err != nil {
+			return nil, fmt.Errorf("failed to add CallProxy address %s to the datastore: %w", report.Output.Address.Hex(), err)
 		}
 
 		callProxy, err = bindings.NewCallProxy(report.Output.Address, chain.Client)
