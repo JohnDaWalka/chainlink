@@ -33,7 +33,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250829155125-f4655b0b4605
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250822025801-598d3d86f873
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250902182030-cd69117b654d
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250904032312-9594a1d90d21
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.12
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.7
