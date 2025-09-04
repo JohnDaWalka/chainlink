@@ -515,7 +515,6 @@ func (_m *Master) Sui() keystore.Sui {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(keystore.Sui)
-			r0 = rf()
 		}
 	}  
 	return r0

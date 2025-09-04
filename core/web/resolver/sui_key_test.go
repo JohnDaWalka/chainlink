@@ -39,7 +39,7 @@ func TestResolver_SuiKeys(t *testing.T) {
 	gError := errors.New("error")
 
 	testCases := []GQLTestCase{
-		unauthorizedTestCase(GQLTestCase{query: query}, "aptosKeys"),
+		unauthorizedTestCase(GQLTestCase{query: query}, "suiKeys"),
 		{
 			name:          "success",
 			authenticated: true,
