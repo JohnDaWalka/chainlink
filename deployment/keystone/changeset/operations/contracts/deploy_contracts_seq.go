@@ -13,30 +13,20 @@ import (
 	wf_reg_v2 "github.com/smartcontractkit/chainlink/deployment/cre/workflow_registry/v2/changeset/operations/contracts"
 )
 
-type DeployContractsSequenceDeps struct {
-	Env *deployment.Environment
-}
-
 type (
 	EVMChainID uint64
 	Selector   uint64
 )
 
 // inputs and outputs have to be serializable, and must not contain sensitive data
-
-type DeployContractsSequenceInput struct {
-	RegistryChainSelector uint64
-	ForwardersSelectors   []uint64
-	DeployVaultOCR3       bool
-	DeployEVMOCR3         bool
-	EVMChainIDs           map[EVMChainID]Selector
-	DeployConsensusOCR3   bool
-
-	// WithV2Contracts if true will deploy Capability Registry and Workflow Registry V2
-	WithV2Contracts bool
+type DeployContractsSequenceDeps struct {
+	Env *deployment.Environment
 }
 
-type DeployContractsSequenceOutput struct {
+type DeployRegistryContractsSequenceInput struct {
+	RegistryChainSelector uint64
+}
+type DeployContractSequenceOutput struct {
 	// Not sure if we can serialize the address book without modifications, but whatever is returned needs to be serializable.
 	// This could also be the address datastore instead.
 	AddressBook deployment.AddressBook
@@ -57,143 +47,35 @@ func updateAddresses(addr datastore.MutableAddressRefStore, as datastore.Address
 	return sourceAB.Merge(ab)
 }
 
-// DeployContractsSequence is a sequence that deploys the Keystone contracts (OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder).
-var DeployContractsSequence = operations.NewSequence(
-	"deploy-keystone-contracts-seq",
+// DeployRegistryContractsSequence is a sequence that deploys the the required registry contracts (Capabilities Registry, Workflow Registry).
+var DeployRegistryContractsSequence = operations.NewSequence[DeployRegistryContractsSequenceInput, DeployContractSequenceOutput, DeployContractsSequenceDeps](
+	// do not add optional contracts here (ocr, forwarder...), as this sequence is used to deploy the registry contracts that other sequences depend on
+	"deploy-registry-contracts-seq",
 	semver.MustParse("1.0.0"),
-	"Deploy Keystone Contracts (BalanceReader, OCR3, DON Time, Vault-OCR3, EVM-OCR3, Capabilities Registry, Workflow Registry, Keystone Forwarder)",
-	func(b operations.Bundle, deps DeployContractsSequenceDeps, input DeployContractsSequenceInput) (output DeployContractsSequenceOutput, err error) {
+	"Deploy registry Contracts (Capabilities Registry, Workflow Registry)",
+	func(b operations.Bundle, deps DeployContractsSequenceDeps, input DeployRegistryContractsSequenceInput) (output DeployContractSequenceOutput, err error) {
 		ab := deployment.NewMemoryAddressBook()
 		as := datastore.NewMemoryDataStore()
 
 		// Capabilities Registry contract
-		if input.WithV2Contracts {
-			v2Report, err := operations.ExecuteOperation(b, cap_reg_v2.DeployCapabilitiesRegistry, cap_reg_v2.DeployCapabilitiesRegistryDeps(deps), cap_reg_v2.DeployCapabilitiesRegistryInput{
-				ChainSelector: input.RegistryChainSelector,
-			})
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-
-			out, err := toV1Output(v2Report.Output)
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-
-			if err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook); err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-		} else {
-			capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-			err = updateAddresses(as.Addresses(), capabilitiesRegistryDeployReport.Output.Addresses, ab, capabilitiesRegistryDeployReport.Output.AddressBook)
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-		}
-
-		// OCR3 Contract
-		ocr3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_ocr3"})
+		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, DeployCapabilityRegistryOp, DeployCapabilityRegistryOpDeps(deps), DeployCapabilityRegistryInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
-			return DeployContractsSequenceOutput{}, err
+			return DeployContractSequenceOutput{}, err
 		}
-		err = updateAddresses(as.Addresses(), ocr3DeployReport.Output.Addresses, ab, ocr3DeployReport.Output.AddressBook)
+		err = updateAddresses(as.Addresses(), capabilitiesRegistryDeployReport.Output.Addresses, ab, capabilitiesRegistryDeployReport.Output.AddressBook)
 		if err != nil {
-			return DeployContractsSequenceOutput{}, err
+			return DeployContractSequenceOutput{}, err
 		}
-
 		// Workflow Registry contract
-		if input.WithV2Contracts {
-			v2Report, err := operations.ExecuteOperation(b, wf_reg_v2.DeployWorkflowRegistryOp, wf_reg_v2.DeployWorkflowRegistryOpDeps(deps), wf_reg_v2.DeployWorkflowRegistryOpInput{
-				ChainSelector: input.RegistryChainSelector,
-			})
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-
-			out, err := toV1Output(v2Report.Output)
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-
-			if err = updateAddresses(as.Addresses(), out.Addresses, ab, out.AddressBook); err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-		} else {
-			workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-			err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-		}
-
-		// Keystone Forwarder contract
-		keystoneForwarderDeployReport, err := operations.ExecuteSequence(b, DeployKeystoneForwardersSequence, DeployKeystoneForwardersSequenceDeps(deps), DeployKeystoneForwardersInput{Targets: input.ForwardersSelectors})
+		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, DeployWorkflowRegistryOp, DeployWorkflowRegistryOpDeps(deps), DeployWorkflowRegistryInput{ChainSelector: input.RegistryChainSelector})
 		if err != nil {
-			return DeployContractsSequenceOutput{}, err
+			return DeployContractSequenceOutput{}, err
 		}
-		err = updateAddresses(as.Addresses(), keystoneForwarderDeployReport.Output.Addresses, ab, keystoneForwarderDeployReport.Output.AddressBook)
+		err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
 		if err != nil {
-			return DeployContractsSequenceOutput{}, err
+			return DeployContractSequenceOutput{}, err
 		}
-
-		// DON Time Contract - Copy of OCR3Capability
-		donTimeDeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "DONTime"})
-		if err != nil {
-			return DeployContractsSequenceOutput{}, err
-		}
-		err = updateAddresses(as.Addresses(), donTimeDeployReport.Output.Addresses, ab, donTimeDeployReport.Output.AddressBook)
-		if err != nil {
-			return DeployContractsSequenceOutput{}, err
-		}
-
-		if input.DeployVaultOCR3 {
-			// Vault OCR3 Contract
-			vaultOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_vault"})
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-			err = updateAddresses(as.Addresses(), vaultOCR3DeployReport.Output.Addresses, ab, vaultOCR3DeployReport.Output.AddressBook)
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-		}
-
-		if input.DeployEVMOCR3 {
-			for chainID := range input.EVMChainIDs {
-				// EVM cap OCR3 Contract
-				qualifier := CapabilityContractIdentifier(uint64(chainID))
-				// deploy OCR3 contract for each EVM chain on the registry chain to avoid a situation when more than 1 OCR contract (of any type) has the same address
-				// because that violates a DB constraint for offchain reporting jobs
-				// this can be removed once https://smartcontract-it.atlassian.net/browse/PRODCRE-804 is done and we can deploy OCR3 contract for each EVM chain on that chain
-				evmOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: qualifier})
-				if err != nil {
-					return DeployContractsSequenceOutput{}, err
-				}
-				err = updateAddresses(as.Addresses(), evmOCR3DeployReport.Output.Addresses, ab, evmOCR3DeployReport.Output.AddressBook)
-				if err != nil {
-					return DeployContractsSequenceOutput{}, err
-				}
-			}
-		}
-
-		if input.DeployConsensusOCR3 {
-			evmOCR3DeployReport, err := operations.ExecuteOperation(b, DeployOCR3Op, DeployOCR3OpDeps(deps), DeployOCR3OpInput{ChainSelector: input.RegistryChainSelector, Qualifier: "capability_consensus"})
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-			err = updateAddresses(as.Addresses(), evmOCR3DeployReport.Output.Addresses, ab, evmOCR3DeployReport.Output.AddressBook)
-			if err != nil {
-				return DeployContractsSequenceOutput{}, err
-			}
-		}
-
-		return DeployContractsSequenceOutput{
+		return DeployContractSequenceOutput{
 			AddressBook: ab,
 			Datastore:   as.Seal(),
 		}, nil

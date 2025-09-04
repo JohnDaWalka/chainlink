@@ -66,6 +66,7 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capRegistry
 	)
 }
 
+// BoostrapDon2DonPeering creates TOML-literal for the Capabilities Peering section of the node configuration for a bootstrap node
 func BoostrapDon2DonPeering(peeringData cre.CapabilitiesPeeringData) string {
 	return fmt.Sprintf(`
 	[Capabilities.Peering.V2]
@@ -162,6 +163,7 @@ type SolanaChain struct {
 	NodeURL string
 }
 
+// WorkerSolana creates TOML-literal for the Solana section of the node configuration for a non-bootstrap node
 func WorkerSolana(chain *SolanaChain) string {
 	if chain == nil {
 		return ""
