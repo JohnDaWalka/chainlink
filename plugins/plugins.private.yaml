@@ -10,36 +10,36 @@ defaults:
 plugins:
   cron:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/cron"
       flags: "-tags timetzdata"
   kvstore:
     - enabled: false
       moduleURI: "github.com/smartcontractkit/capabilities/kvstore"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/kvstore"
   readcontract:
     - moduleURI: "github.com/smartcontractkit/capabilities/readcontract"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/readcontract"
   consensus:
     - moduleURI: "github.com/smartcontractkit/capabilities/consensus"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/consensus"
   workflowevent:
     - enabled: false
       moduleURI: "github.com/smartcontractkit/capabilities/workflowevent"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/workflowevent"
   httpaction:
     - moduleURI: "github.com/smartcontractkit/capabilities/http_action"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/http_action"
   httptrigger:
     - moduleURI: "github.com/smartcontractkit/capabilities/http_trigger"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/http_trigger"
   evm:
     - moduleURI: "github.com/smartcontractkit/capabilities/chain_capabilities/evm"
-      gitRef: "28fd635adf1fd95df8d453f9d2aae5aafc8f0d9b"
+      gitRef: "7e0abe76f7933de75b5bff1054bb5be7b7450e68"
       installPath: "github.com/smartcontractkit/capabilities/chain_capabilities/evm"

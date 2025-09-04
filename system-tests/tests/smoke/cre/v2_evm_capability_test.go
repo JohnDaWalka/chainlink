@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 	commonevents "github.com/smartcontractkit/chainlink-protos/workflows/go/common"
 	workflowevents "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
@@ -86,11 +87,11 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 		workflowsWg.Wait()
 		cancel()
 	}()
-	logWorkflowLogs(t, ctx, testEnv)
+	logWorkflowLogs(ctx, t, testEnv)
 	require.Equal(t, len(enabledChains), int(successfulWorkflowRuns.Load()), "Not all workflows executed successfully")
 }
 
-func logWorkflowLogs(t *testing.T, ctx context.Context, testEnv *TestEnvironment) {
+func logWorkflowLogs(ctx context.Context, t *testing.T, testEnv *TestEnvironment) {
 	// We are interested in UserLogs (successful execution)
 	// or BaseMessage with specific error message (engine initialization failure)
 	beholderMessageTypes := map[string]func() proto.Message{
@@ -148,8 +149,8 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 
 		return iter.Next(), nil
 	}
-	//ctx, cancel := context.WithTimeout(t.Context(), testutils.WaitTimeout(t))
-	//defer cancel()
+	ctx, cancel := context.WithTimeout(t.Context(), testutils.WaitTimeout(t))
+	defer cancel()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -166,8 +167,8 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 				lggr.Info().Msgf("Workflow %s executed successfully on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
 				return nil
 			}
-			//case <-ctx.Done():
-			//	return fmt.Errorf("workflow %s did not execute on chain %s within the timeout", workflowName, bcOutput.BlockchainOutput.ChainID)
+		case <-ctx.Done():
+			return fmt.Errorf("workflow %s did not execute on chain %s within the timeout", workflowName, bcOutput.BlockchainOutput.ChainID)
 		}
 	}
 }
