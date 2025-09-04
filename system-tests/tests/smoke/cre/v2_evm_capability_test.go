@@ -47,7 +47,10 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 			enabledChains[strChainID] = struct{}{}
 		}
 	}
-	require.NotEmpty(t, enabledChains, "No chains enabled for EVM read workflow test")
+	if len(enabledChains) == 0 {
+		t.Skip("Skipping EVM read workflow test as no DON has EVM capability enabled")
+		return
+	}
 	const workflowFileLocation = "./evmread/main.go"
 	lggr := framework.L
 	var workflowsWg sync.WaitGroup
