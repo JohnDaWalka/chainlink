@@ -48,7 +48,7 @@ func updateAddresses(addr datastore.MutableAddressRefStore, as datastore.Address
 }
 
 // DeployRegistryContractsSequence is a sequence that deploys the the required registry contracts (Capabilities Registry, Workflow Registry).
-var DeployRegistryContractsSequence = operations.NewSequence[DeployRegistryContractsSequenceInput, DeployContractSequenceOutput, DeployContractsSequenceDeps](
+var DeployRegistryContractsSequence = operations.NewSequence(
 	// do not add optional contracts here (ocr, forwarder...), as this sequence is used to deploy the registry contracts that other sequences depend on
 	"deploy-registry-contracts-seq",
 	semver.MustParse("1.0.0"),
@@ -72,6 +72,53 @@ var DeployRegistryContractsSequence = operations.NewSequence[DeployRegistryContr
 			return DeployContractSequenceOutput{}, err
 		}
 		err = updateAddresses(as.Addresses(), workflowRegistryDeployReport.Output.Addresses, ab, workflowRegistryDeployReport.Output.AddressBook)
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+		return DeployContractSequenceOutput{
+			AddressBook: ab,
+			Datastore:   as.Seal(),
+		}, nil
+	},
+)
+
+// DeployV2RegistryContractsSequence is a sequence that deploys the the required registry contracts (Capabilities Registry, Workflow Registry).
+var DeployV2RegistryContractsSequence = operations.NewSequence(
+	// do not add optional contracts here (ocr, forwarder...), as this sequence is used to deploy the registry contracts that other sequences depend on
+	"deploy-v2-registry-contracts-seq",
+	semver.MustParse("1.0.0"),
+	"Deploy V2 registry Contracts (Capabilities Registry, Workflow Registry)",
+	func(b operations.Bundle, deps DeployContractsSequenceDeps, input DeployRegistryContractsSequenceInput) (output DeployContractSequenceOutput, err error) {
+		ab := deployment.NewMemoryAddressBook()
+		as := datastore.NewMemoryDataStore()
+
+		// Capabilities Registry contract
+		capabilitiesRegistryDeployReport, err := operations.ExecuteOperation(b, cap_reg_v2.DeployCapabilitiesRegistry, cap_reg_v2.DeployCapabilitiesRegistryDeps(deps), cap_reg_v2.DeployCapabilitiesRegistryInput{ChainSelector: input.RegistryChainSelector})
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+
+		v1Output, err := toV1Output(capabilitiesRegistryDeployReport.Output)
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+
+		if err = updateAddresses(as.Addresses(), v1Output.Addresses, ab, v1Output.AddressBook); err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+
+		// Workflow Registry contract
+		workflowRegistryDeployReport, err := operations.ExecuteOperation(b, wf_reg_v2.DeployWorkflowRegistryOp, wf_reg_v2.DeployWorkflowRegistryOpDeps(deps), wf_reg_v2.DeployWorkflowRegistryOpInput{ChainSelector: input.RegistryChainSelector})
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+
+		v1Output, err = toV1Output(workflowRegistryDeployReport.Output)
+		if err != nil {
+			return DeployContractSequenceOutput{}, err
+		}
+
+		err = updateAddresses(as.Addresses(), v1Output.Addresses, ab, v1Output.AddressBook)
 		if err != nil {
 			return DeployContractSequenceOutput{}, err
 		}

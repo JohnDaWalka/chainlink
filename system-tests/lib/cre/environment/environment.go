@@ -255,9 +255,14 @@ func SetupTestEnvironment(
 
 	// use CLD to deploy the registry contracts, which are required before constructing the node TOML configs
 	homeChainSelector := homeChainOutput.ChainSelector
+	deployRegistrySeq := ks_contracts_op.DeployRegistryContractsSequence
+	if input.WithV2Registries {
+		deployRegistrySeq = ks_contracts_op.DeployV2RegistryContractsSequence
+	}
+
 	registryContractsReport, seqErr := operations.ExecuteSequence(
 		allChainsCLDEnvironment.OperationsBundle,
-		ks_contracts_op.DeployRegistryContractsSequence,
+		deployRegistrySeq,
 		ks_contracts_op.DeployContractsSequenceDeps{
 			Env: allChainsCLDEnvironment,
 		},
