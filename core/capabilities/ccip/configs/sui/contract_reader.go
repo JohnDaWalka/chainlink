@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/crypto/blake2b"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	chainreaderConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
 	"github.com/smartcontractkit/chainlink-sui/relayer/client"
 	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
-	"golang.org/x/crypto/blake2b"
 )
 
 func PublicKeyToAddress(pubKeyHex string) (string, error) {

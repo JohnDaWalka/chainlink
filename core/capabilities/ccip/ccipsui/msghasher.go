@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -55,7 +56,7 @@ func NewMessageHasherV1(lggr logger.Logger, extraDataCodec ccipcommon.ExtraDataC
 // The main structure of the hash is as follows:
 // Fixed-size message fields are included in nested hash to reduce stack pressure.
 // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
-func (h *MessageHasherV1) Hash(ctx context.Context, msg cciptypes.Message) (cciptypes.Bytes32, error) {
+func (h *MessageHasherV1) Hash(ctx context.Context, msg ccipocr3common.Message) (cciptypes.Bytes32, error) {
 	lggr := logutil.WithContextValues(ctx, h.lggr)
 	lggr = logger.With(
 		lggr,
@@ -309,24 +310,6 @@ func parseExtraDataMap(input map[string]any) (*big.Int, error) {
 	return outputGas, errors.New("gas limit not found in extra data map")
 }
 
-func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
-	// Iterate through the expected fields in the struct
-	for fieldName, fieldValue := range input {
-		lowercase := strings.ToLower(fieldName)
-		switch lowercase {
-		case "destgasamount":
-			// Expect uint32
-			if val, ok := fieldValue.(uint32); ok {
-				return val, nil
-			}
-			return 0, errors.New("invalid type for destgasamount, expected uint32")
-		default:
-		}
-	}
-
-	return 0, errors.New("invalid token message, dest gas amount not found in the DestExecDataDecoded map")
-}
-
 func addressBytesToBytes32(addr []byte) ([32]byte, error) {
 	if len(addr) > 32 {
 		return [32]byte{}, fmt.Errorf("invalid Aptos address length, expected 32, got %d", len(addr))
@@ -338,4 +321,4 @@ func addressBytesToBytes32(addr []byte) ([32]byte, error) {
 }
 
 // Interface compliance check
-var _ cciptypes.MessageHasher = (*MessageHasherV1)(nil)
+var _ ccipocr3common.MessageHasher = (*MessageHasherV1)(nil)

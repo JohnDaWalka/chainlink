@@ -101,8 +101,8 @@ func (s Key) PublicKeyStr() string {
 func (s Key) Raw() internal.Raw { return s.raw }
 
 // Sign is used to sign a message
-func (key Key) Sign(msg []byte) ([]byte, error) {
+func (s Key) Sign(msg []byte) ([]byte, error) {
 	fmt.Printf("About to sign Sui MSG: %s\n", msg)
 	var noHash crypto.Hash
-	return key.signFn(cryptorand.Reader, msg, noHash) // no specific hash function used
+	return s.signFn(cryptorand.Reader, msg, noHash) // no specific hash function used
 }

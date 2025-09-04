@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 )
 
@@ -23,10 +24,10 @@ type SuiCommitCallArgs struct {
 
 // SuiExecCallArgs defines the calldata structure for an Sui execute transaction.
 type SuiExecCallArgs struct {
-	ReportContext [2][32]byte                 `mapstructure:"ReportContext"`
-	Report        []byte                      `mapstructure:"Report"`
-	Info          ccipocr3.ExecuteReportInfo  `mapstructure:"Info"`
-	ExtraData     ccipcommon.ExtraDataDecoded `mapstructure:"ExtraData"`
+	ReportContext [2][32]byte                      `mapstructure:"ReportContext"`
+	Report        []byte                           `mapstructure:"Report"`
+	Info          ccipocr3common.ExecuteReportInfo `mapstructure:"Info"`
+	ExtraData     ccipcommon.ExtraDataDecoded      `mapstructure:"ExtraData"`
 }
 
 // SuiContractTransmitterFactory implements the transmitter factory for Sui chains.
@@ -84,10 +85,10 @@ var SuiExecCallDataFunc = func(
 	signatures [][96]byte,
 	extraDataCodec ccipcommon.ExtraDataCodec,
 ) (contract string, method string, args any, err error) {
-	var info ccipocr3.ExecuteReportInfo
+	var info ccipocr3common.ExecuteReportInfo
 	var extraDataDecoded ccipcommon.ExtraDataDecoded
 	if len(report.Info) != 0 {
-		info, err = ccipocr3.DecodeExecuteReportInfo(report.Info)
+		info, err = ccipocr3common.DecodeExecuteReportInfo(report.Info)
 		if err != nil {
 			return "", "", nil, fmt.Errorf("failed to decode execute report info: %w", err)
 		}

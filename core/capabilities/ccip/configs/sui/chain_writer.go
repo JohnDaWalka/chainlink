@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	_ "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
-	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	chainwriter "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 )
@@ -31,7 +31,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 						Name:      "commit",
 						PublicKey: pubKeyBytes,
 						Params:    []codec.SuiFunctionParam{},
-						PTBCommands: []config.ChainWriterPTBCommand{
+						PTBCommands: []chainwriter.ChainWriterPTBCommand{
 							{
 								Type:     codec.SuiPTBCommandMoveCall,
 								ModuleId: strPtr("offramp"),
@@ -76,7 +76,7 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 						Name:      "execute",
 						PublicKey: pubKeyBytes,
 						Params:    []codec.SuiFunctionParam{},
-						PTBCommands: []config.ChainWriterPTBCommand{
+						PTBCommands: []chainwriter.ChainWriterPTBCommand{
 							{
 								Type:     codec.SuiPTBCommandMoveCall,
 								ModuleId: strPtr("offramp"),
@@ -144,7 +144,6 @@ func GetChainWriterConfig(publicKeyStr string) (chainwriter.ChainWriterConfig, e
 		// TODO: come back to it
 		// FeeStrategy: chainwriter.DefaultFeeStrategy,
 	}, nil
-
 }
 
 // Helper function to convert a string to a string pointer
