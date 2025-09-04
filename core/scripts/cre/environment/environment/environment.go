@@ -969,16 +969,9 @@ func removeCtfConfigsCacheFiles(shouldRemove shouldRemove) error {
 	return nil
 }
 
-func globalPreRunFunc(_ *cobra.Command, args []string) {
-	if err := assertNoCommandLineArgs(args); err != nil {
-		fmt.Fprint(os.Stderr, libformat.RedText("\n%v\n\n", err))
+func globalPreRunFunc(cmd *cobra.Command, args []string) {
+	if err := cobra.NoArgs(cmd, args); err != nil {
+		fmt.Fprint(os.Stderr, libformat.RedText("\n%v. Please use flags to parameterise the command\n\n", err))
 		os.Exit(1)
 	}
-}
-
-func assertNoCommandLineArgs(args []string) error {
-	if len(args) > 0 {
-		return errors.New("command line arguments are not supported. Please use flags to parameterise the command")
-	}
-	return nil
 }
