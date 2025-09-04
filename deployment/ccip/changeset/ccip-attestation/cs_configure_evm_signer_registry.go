@@ -1,14 +1,16 @@
 package ccip_attestation
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/smartcontractkit/mcms"
 	mcmssdk "github.com/smartcontractkit/mcms/sdk"
 	mcmstypes "github.com/smartcontractkit/mcms/types"
+
+	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -32,7 +34,7 @@ type SetNewSignerAddressesConfig struct {
 
 func signerRegistrySetNewSignerAddressesPrecondition(env cldf.Environment, config SetNewSignerAddressesConfig) error {
 	if len(config.UpdatesByChain) == 0 {
-		return fmt.Errorf("no signer updates provided")
+		return errors.New("no signer updates provided")
 	}
 
 	// Per-chain basic validation and duplicate checks
@@ -43,7 +45,7 @@ func signerRegistrySetNewSignerAddressesPrecondition(env cldf.Environment, confi
 		seenNew := make(map[common.Address]common.Address)
 		for existingAddr, newAddr := range updates {
 			if existingAddr == utils.ZeroAddress {
-				return fmt.Errorf("existing signer address cannot be zero address")
+				return errors.New("existing signer address cannot be zero address")
 			}
 			if newAddr == utils.ZeroAddress {
 				return fmt.Errorf("new signer address for %s cannot be zero address", existingAddr.Hex())
@@ -165,17 +167,18 @@ func signerRegistrySetNewSignerAddressesLogic(env cldf.Environment, config SetNe
 		tx, err := signerRegistry.SetNewSignerAddresses(txOpts, existingAddresses, newAddresses)
 
 		// Handle based on MCMS configuration
-		if config.MCMS == nil {
+		switch {
+		case err != nil:
+			// Error preparing transaction
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to prepare transaction for %s: %w", chain.String(), err)
+		case config.MCMS == nil:
 			// Direct execution - confirm transaction
 			_, err = cldf.ConfirmIfNoErrorWithABI(chain, tx, signer_registry.SignerRegistryABI, err)
 			if err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to set new signer addresses on %s: %w", chain.String(), err)
 			}
 			env.Logger.Infof("Successfully set new signer addresses on %s (tx: %s)", chain.String(), tx.Hash().Hex())
-		} else if err != nil {
-			// MCMS mode - if there's an error preparing the tx, return it
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to prepare transaction for %s: %w", chain.String(), err)
-		} else {
+		default:
 			// MCMS mode - prepare batch operation
 			if err := stateview.ValidateChain(env, state, chain.ChainSelector(), config.MCMS); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to validate chain %s for MCMS: %w", chain.String(), err)

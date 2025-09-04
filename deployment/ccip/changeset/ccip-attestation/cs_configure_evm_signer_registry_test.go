@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -216,7 +217,7 @@ func TestEVMSignerRegistryConfiguration_DirectExecution(t *testing.T) {
 	require.Len(t, outputs, 1)
 
 	// Verify no MCMS proposal (direct execution)
-	require.Len(t, outputs[0].MCMSTimelockProposals, 0)
+	require.Empty(t, outputs[0].MCMSTimelockProposals)
 
 	// Verify registry exists and was updated
 	chain := e.BlockChains.EVMChains()[selector]
@@ -291,5 +292,5 @@ func TestEVMSignerRegistryConfiguration_NoRegistries(t *testing.T) {
 		})
 	require.NoError(t, err)
 	require.Len(t, outputs, 1)
-	require.Len(t, outputs[0].MCMSTimelockProposals, 0)
+	require.Empty(t, outputs[0].MCMSTimelockProposals)
 }
