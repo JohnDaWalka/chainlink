@@ -683,7 +683,8 @@ func (s *WriterGun) executeRequest(metadata *pb2.Metadata, encodedReport []byte,
 		Inputs:          validInputs,
 	}
 
-	return s.capProxy.Execute(context.TODO(), req)
+	_, err = s.capProxy.Execute(context.TODO(), req)
+	return err
 }
 func (s *WriterGun) createEVMEncoder() (consensustypes.Encoder, error) {
 	evmEncoderConfig := map[string]any{

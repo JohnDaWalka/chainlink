@@ -100,14 +100,16 @@ func (c *Controller) RegisterToWorkflow(ctx context.Context, info *pb2.RegisterT
 	return nil
 }
 
-func (c *Controller) Execute(ctx context.Context, info *pb2.ExecutableRequest) error {
+func (c *Controller) Execute(ctx context.Context, info *pb2.ExecutableRequest) ([]*pb2.CapabilityResponse, error) {
+	responses := make([]*pb2.CapabilityResponse, 0)
 	for _, client := range c.Nodes {
-		_, err := client.API.Execute(ctx, info)
+		r, err := client.API.Execute(ctx, info)
 		if err != nil {
-			return err
+			return nil,err
 		}
+		responses = append(responses, r)
 	}
-	return nil
+	return responses, nil
 }
 
 func (c *Controller) CreateCapability(ctx context.Context, info *pb2.CapabilityInfo) error {

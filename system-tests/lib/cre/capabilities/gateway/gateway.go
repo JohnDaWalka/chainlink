@@ -137,7 +137,7 @@ func generateConfig(input cre.GenerateConfigsInput) (cre.NodeIndexToConfigOverri
 	configOverrides := make(cre.NodeIndexToConfigOverride)
 
 	if input.GatewayConnectorOutput == nil || len(input.GatewayConnectorOutput.Configurations) == 0 {
-		return configOverrides, errors.New("gateway connector output or configurations are empty")
+		return configOverrides, nil
 	}
 
 	// find worker nodes
