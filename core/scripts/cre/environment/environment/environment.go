@@ -978,7 +978,7 @@ func globalPreRunFunc(_ *cobra.Command, args []string) {
 
 func assertNoCommandLineArgs(args []string) error {
 	if len(args) > 0 {
-		return fmt.Errorf("command line arguments are not supported. Please use flags to parameterise the command")
+		return errors.New("command line arguments are not supported. Please use flags to parameterise the command")
 	}
 	return nil
 }
