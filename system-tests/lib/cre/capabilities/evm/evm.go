@@ -11,8 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	"google.golang.org/protobuf/types/known/durationpb"
-
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -68,11 +66,13 @@ func registerWithV1(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]k
 		if selectorErr != nil {
 			return nil, errors.Wrapf(selectorErr, "failed to get selector from chainID: %d", chainID)
 		}
-
-		faultyNodes, faultyErr := nodeSetInput.MaxFaultyNodes()
-		if faultyErr != nil {
-			return nil, errors.Wrap(faultyErr, "failed to get faulty nodes")
-		}
+		/*
+			TODO: uncomment once unmarshalling of RemoteConfig is supported
+			faultyNodes, faultyErr := nodeSetInput.MaxFaultyNodes()
+			if faultyErr != nil {
+				return nil, errors.Wrap(faultyErr, "failed to get faulty nodes")
+			}
+		*/
 		capabilities = append(capabilities, keystone_changeset.DONCapabilityWithConfig{
 			Capability: kcr.CapabilitiesRegistryCapability{
 				LabelledName:   "evm" + ":ChainSelector:" + strconv.FormatUint(selector, 10),
@@ -80,14 +80,17 @@ func registerWithV1(_ []string, nodeSetInput *cre.CapabilitiesAwareNodeSet) ([]k
 				CapabilityType: 0, // TRIGGER
 			},
 			Config: &capabilitiespb.CapabilityConfig{
-				RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
-					RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
-						// needed for message_cache.go#Ready(), without these events from the capability will never be accepted
-						RegistrationRefresh:     durationpb.New(registrationRefresh),
-						RegistrationExpiry:      durationpb.New(registrationExpiry),
-						MinResponsesToAggregate: faultyNodes + 1,
+				/*
+					TODO: uncomment once unmarshalling of RemoteConfig is supported
+					RemoteConfig: &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+						RemoteTriggerConfig: &capabilitiespb.RemoteTriggerConfig{
+							// needed for message_cache.go#Ready(), without these events from the capability will never be accepted
+							RegistrationRefresh:     durationpb.New(registrationRefresh),
+							RegistrationExpiry:      durationpb.New(registrationExpiry),
+							MinResponsesToAggregate: faultyNodes + 1,
+						},
 					},
-				},
+				*/
 			},
 		})
 	}
