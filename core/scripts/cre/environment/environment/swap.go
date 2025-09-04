@@ -51,10 +51,11 @@ func capabilitySwapCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:     "capability",
-		Short:   "Swaps the capability binary of the Chainlink nodes in the environment",
-		Long:    "Swaps the capability binary of the Chainlink nodes in the environment. Capability flag is used to find jobs with names containing the capability name, which are cancelled and approved, so that capability binary is reloaded. Only DONs that have the capability are impacted.",
-		Aliases: []string{"c", "cap"},
+		Use:              "capability",
+		Short:            "Swaps the capability binary of the Chainlink nodes in the environment",
+		Long:             "Swaps the capability binary of the Chainlink nodes in the environment. Capability flag is used to find jobs with names containing the capability name, which are cancelled and approved, so that capability binary is reloaded. Only DONs that have the capability are impacted.",
+		Aliases:          []string{"c", "cap"},
+		PersistentPreRun: globalPreRunFunc,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			initDxTracker()
 			var swapErr error
@@ -313,10 +314,11 @@ func nodesSwapCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:     "nodes",
-		Short:   "Swaps the Docker images of the Chainlink nodes in the environment",
-		Long:    "Swaps the Docker images of the Chainlink nodes in the environment. If environment is configured to build the Docker image, it will be rebuilt if any change is detected in the source code.",
-		Aliases: []string{"n", "node"},
+		Use:              "nodes",
+		Short:            "Swaps the Docker images of the Chainlink nodes in the environment",
+		Long:             "Swaps the Docker images of the Chainlink nodes in the environment. If environment is configured to build the Docker image, it will be rebuilt if any change is detected in the source code.",
+		Aliases:          []string{"n", "node"},
+		PersistentPreRun: globalPreRunFunc,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			initDxTracker()
 			var swapErr error

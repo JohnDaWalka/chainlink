@@ -105,6 +105,7 @@ func waitToCleanUp(d time.Duration) {
 }
 
 var StartCmdPreRunFunc = func(cmd *cobra.Command, args []string) {
+	globalPreRunFunc(cmd, args)
 	provisioningStartTime = time.Now()
 
 	// ensure non-nil dxTracker by default
@@ -575,9 +576,10 @@ func trackStartup(success, hasBuiltDockerImage bool, infraType string, errorMess
 func stopCmd() *cobra.Command {
 	var allFlag bool
 	cmd := &cobra.Command{
-		Use:   "stop",
-		Short: "Stops the environment",
-		Long:  `Stops the local CRE environment (if it's not running, it just fallsthrough)`,
+		Use:              "stop",
+		Short:            "Stops the environment",
+		Long:             `Stops the local CRE environment (if it's not running, it just fallsthrough)`,
+		PersistentPreRun: globalPreRunFunc,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			removeErr := framework.RemoveTestContainers()
 			if removeErr != nil {
@@ -964,5 +966,19 @@ func removeCtfConfigsCacheFiles(shouldRemove shouldRemove) error {
 		}
 	}
 
+	return nil
+}
+
+func globalPreRunFunc(_ *cobra.Command, args []string) {
+	if err := assertNoCommandLineArgs(args); err != nil {
+		fmt.Fprint(os.Stderr, libformat.RedText("\n%v\n\n", err))
+		os.Exit(1)
+	}
+}
+
+func assertNoCommandLineArgs(args []string) error {
+	if len(args) > 0 {
+		return fmt.Errorf("command line arguments are not supported. Please use flags to parameterise the command")
+	}
 	return nil
 }

@@ -44,9 +44,10 @@ func startBeholderCmd() *cobra.Command {
 		timeout      time.Duration
 	)
 	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Start the Beholder",
-		Long:  `Start the Beholder`,
+		Use:              "start",
+		Short:            "Start the Beholder",
+		Long:             `Start the Beholder`,
+		PersistentPreRun: globalPreRunFunc,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			initDxTracker()
 			var startBeholderErr error
@@ -95,9 +96,10 @@ func startBeholderCmd() *cobra.Command {
 }
 
 var stopBeholderCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stop the Beholder",
-	Long:  `Stop the Beholder`,
+	Use:              "stop",
+	Short:            "Stop the Beholder",
+	Long:             "Stop the Beholder",
+	PersistentPreRun: globalPreRunFunc,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return stopBeholder()
 	},
@@ -263,9 +265,10 @@ func createKafkaTopicsCmd() *cobra.Command {
 		purge  bool
 	)
 	cmd := &cobra.Command{
-		Use:   "create-topics",
-		Short: "Create Kafka topics",
-		Long:  `Create Kafka topics (with or without removing existing topics)`,
+		Use:              "create-topics",
+		Short:            "Create Kafka topics",
+		Long:             `Create Kafka topics (with or without removing existing topics)`,
+		PersistentPreRun: globalPreRunFunc,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if url == "" {
 				return errors.New("red-panda-kafka-url cannot be empty")
@@ -305,9 +308,10 @@ func fetchAndRegisterProtosCmd() *cobra.Command {
 		protoConfigs []string
 	)
 	cmd := &cobra.Command{
-		Use:   "register-protos",
-		Short: "Fetch and register protos",
-		Long:  `Fetch and register protos`,
+		Use:              "register-protos",
+		Short:            "Fetch and register protos",
+		Long:             `Fetch and register protos`,
+		PersistentPreRun: globalPreRunFunc,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Use default values if not provided
 			if schemaURL == "" {
