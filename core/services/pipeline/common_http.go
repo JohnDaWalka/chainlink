@@ -9,10 +9,56 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/google/uuid"
 
 	clhttp "github.com/smartcontractkit/chainlink-common/pkg/http"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
+
+// Add batch middleware as an optional parameter
+func makeHTTPRequestWithBatching(
+    ctx context.Context,
+    lggr logger.Logger,
+    method StringParam,
+    url URLParam,
+    reqHeaders []string,
+    requestData MapParam,
+    client *http.Client,
+    httpLimit int64,
+    batchMiddleware *BatchMiddleware,
+) (responseBytes []byte, statusCode int, respHeaders http.Header, start, finish time.Time, err error) {
+    
+    // If batch middleware is provided and this looks like a batchable request
+    if batchMiddleware != nil && isBatchableRequest(string(method), url.String()) {
+        start = time.Now()
+        
+        req := HTTPRequest{
+            Method: method,
+            URL:    url,
+            ReqHeaders: reqHeaders,
+            RequestData: requestData,
+        }
+        
+		// todo: pass other params like reqHeaders, httpLimit, etc. if needed
+        response, err := batchMiddleware.AddRequest(ctx, req)
+        finish = time.Now()
+        
+        if err != nil {
+            return nil, 0, nil, start, finish, err
+        }
+        
+        return response.Body, response.StatusCode, response.RespHeaders, start, finish, nil
+    }
+    
+    // Fall back to original implementation
+    return makeHTTPRequest(ctx, lggr, method, url, reqHeaders, requestData, client, httpLimit)
+}
+
+func isBatchableRequest(method, url string) bool {
+    // todo: define any arbitrary logic to determine if the request should be batched
+	// e.g. EA allowlists/blocklists, specific endpoints, etc.
+    return method == "POST"
+}
 
 func makeHTTPRequest(
 	ctx context.Context,

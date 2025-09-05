@@ -70,6 +70,7 @@ type BridgeTask struct {
 	config       Config
 	bridgeConfig BridgeConfig
 	httpClient   *http.Client
+	batchMiddleware *BatchMiddleware
 }
 
 type BridgeTelemetry struct {
@@ -176,7 +177,7 @@ func (t *BridgeTask) Run(ctx context.Context, lggr logger.Logger, vars Vars, inp
 	defer cancel()
 
 	var cachedResponse bool
-	responseBytes, statusCode, headers, start, finish, err := makeHTTPRequest(requestCtx, lggr, "POST", url, reqHeaders, requestData, t.httpClient, t.config.DefaultHTTPLimit())
+	responseBytes, statusCode, headers, start, finish, err := makeBatchedHTTPRequest(requestCtx, lggr, "POST", url, reqHeaders, requestData, t.httpClient, t.config.DefaultHTTPLimit(), t.batchMiddleware)
 	elapsed := finish.Sub(start)
 	promBridgeLatency.WithLabelValues(t.Name, statusCodeGroup(statusCode)).Set(elapsed.Seconds())
 

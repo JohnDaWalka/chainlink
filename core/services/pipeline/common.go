@@ -78,6 +78,11 @@ type (
 		BridgeResponseURL() *url.URL
 		BridgeCacheTTL() time.Duration
 	}
+
+	BatchMiddlewareConfig interface {
+		BatchSize() int
+		BatchMaxWait() time.Duration
+	}
 )
 
 // Wraps the input Task for the given dependent task along with a bool variable PropagateResult,

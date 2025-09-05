@@ -70,6 +70,7 @@ type runner struct {
 	lggr                   logger.Logger
 	httpClient             *http.Client
 	unrestrictedHTTPClient *http.Client
+	batchMiddleware        *BatchMiddleware
 
 	// test helper
 	runFinished func(*Run)
@@ -113,6 +114,7 @@ func NewRunner(
 	btORM bridges.ORM,
 	cfg Config,
 	bridgeCfg BridgeConfig,
+	batchCfg BatchMiddlewareConfig,
 	legacyChains legacyevm.LegacyChainContainer,
 	ethks ETHKeyStore,
 	vrfks VRFKeyStore,
@@ -135,6 +137,7 @@ func NewRunner(
 		lggr:                   lggr,
 		httpClient:             httpClient,
 		unrestrictedHTTPClient: unrestrictedHTTPClient,
+		batchMiddleware:        NewBatchMiddleware(batchCfg.BatchSize(), batchCfg.BatchMaxWait(), lggr),
 	}
 
 	r.runReaperWorker = commonutils.NewSleeperTask(
@@ -349,6 +352,7 @@ func (r *runner) InitializePipeline(spec Spec) (pipeline *Pipeline, err error) {
 			// must use the unrestrictedHTTPClient because some node operators
 			// may run external adapters on their own hardware
 			task.(*BridgeTask).httpClient = r.unrestrictedHTTPClient
+			task.(*BridgeTask).batchMiddleware = r.batchMiddleware
 		case TaskTypeETHCall:
 			task.(*ETHCallTask).legacyChains = r.legacyEVMChains
 			task.(*ETHCallTask).config = r.config
