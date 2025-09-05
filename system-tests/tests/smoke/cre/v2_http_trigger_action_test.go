@@ -23,8 +23,6 @@ import (
 
 	jsonrpc "github.com/smartcontractkit/chainlink-common/pkg/jsonrpc2"
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake"
 
@@ -141,7 +139,7 @@ func validateHTTPWorkflowRequest(t *testing.T, testEnv *TestEnvironment) {
 	require.Eventually(t, func() bool {
 		records, err := fake.R.Get("POST", "/orders")
 		return err == nil && len(records) > 0
-	}, tests.WaitTimeout(t), tick, "workflow should have made at least one HTTP request to mock server")
+	}, 5*time.Minute, tick, "workflow should have made at least one HTTP request to mock server")
 
 	records, err := fake.R.Get("POST", "/orders")
 	require.NoError(t, err, "failed to get recorded requests")
