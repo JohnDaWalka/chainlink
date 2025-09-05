@@ -106,6 +106,11 @@ const (
 	WCROSymbol  TokenSymbol = "WCRO"
 	WA0GISymbol TokenSymbol = "WA0GI"
 	XTZSymbol   TokenSymbol = "XTZ"
+	HypeSymbol  TokenSymbol = "HYPE"
+	PolSymbol   TokenSymbol = "POL"
+	SeiSymbol   TokenSymbol = "SEI"
+	BeraSymbol  TokenSymbol = "BERA"
+	AthSymbol   TokenSymbol = "ATH"
 
 	LBTCSymbol                 TokenSymbol = "LBTC"
 	FactoryBurnMintERC20Symbol TokenSymbol = "Factory-BnM-ERC20"
@@ -135,6 +140,11 @@ const (
 	ARBUSD   = "ARB / USD"
 	APTUSD   = "APT / USD"
 	XTZUSD   = "XTZ / USD"
+	HYPEUSD  = "HYPE / USD"
+	POLUSD   = "POL / USD"
+	SEIUSD   = "SEI / USD"
+	BERAUSD  = "BERA / USD"
+	ATHUSD   = "ATH / USD"
 
 	// MockLinkAggregatorDescription is the description of the MockV3Aggregator.sol contract
 	// https://github.com/smartcontractkit/chainlink/blob/a348b98e90527520049c580000a86fb8ceff7fa7/contracts/src/v0.8/tests/MockV3Aggregator.sol#L76-L76
@@ -162,6 +172,12 @@ var (
 		USDCUSD:                       {WAPESymbol, WHSKSymbol, WSBYSymbol, WCROSymbol},
 		ARBUSD:                        {WCoreSymbol},
 		XTZUSD:                        {XTZSymbol},
+		HYPEUSD:                       {HypeSymbol},
+		POLUSD:                        {PolSymbol},
+		SEIUSD:                        {SeiSymbol},
+		BERAUSD:                       {BeraSymbol},
+		ATHUSD:                        {AthSymbol},
+		APTUSD:                        {APTSymbol},
 	}
 	MockSymbolToDescription = map[TokenSymbol]string{
 		LinkSymbol: MockLinkAggregatorDescription,
