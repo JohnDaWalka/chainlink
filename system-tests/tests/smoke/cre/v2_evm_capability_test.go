@@ -67,7 +67,7 @@ func executeEVMReadTest(t *testing.T, testEnv *TestEnvironment) {
 		compileAndDeployWorkflow(t, testEnv, lggr, fmt.Sprintf("evmreadtest-%d", bcOutput.ChainID), &workflowConfig, workflowFileLocation)
 
 		workflowsWg.Add(1)
-		forwarderAddress, err := crecontracts.FindAddressesForChain(testEnv.FullCldEnvOutput.Environment.ExistingAddresses, bcOutput.ChainSelector, keystonechangeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
+		forwarderAddress, _, err := crecontracts.FindAddressesForChain(testEnv.FullCldEnvOutput.Environment.ExistingAddresses, bcOutput.ChainSelector, keystonechangeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
 		require.NoError(t, err)
 
 		// validate workflow execution
