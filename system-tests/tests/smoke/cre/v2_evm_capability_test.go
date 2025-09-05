@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 	commonevents "github.com/smartcontractkit/chainlink-protos/workflows/go/common"
 	workflowevents "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
@@ -152,7 +151,7 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 
 		return iter.Next(), nil
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), testutils.WaitTimeout(t))
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -160,7 +159,7 @@ func validateWorkflowExecution(t *testing.T, lggr zerolog.Logger, bcOutput *cre.
 		select {
 		case <-ticker.C:
 			lggr.Info().Msgf("Checking if workflow %s executed on chain %s", workflowName, bcOutput.BlockchainOutput.ChainID)
-			ok, err := isWorkflowFinished(t.Context())
+			ok, err := isWorkflowFinished(ctx)
 			if err != nil {
 				lggr.Error().Msgf("Error checking workflow execution: %v", err)
 				continue
