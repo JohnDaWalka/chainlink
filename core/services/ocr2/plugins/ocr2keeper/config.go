@@ -7,6 +7,7 @@ import (
 )
 
 type Duration time.Duration
+ // kick CI
 
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var raw string
