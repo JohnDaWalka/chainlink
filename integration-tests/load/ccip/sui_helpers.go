@@ -25,6 +25,8 @@ import (
 	chainreader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/client"
 
+	"github.com/block-vision/sui-go-sdk/models"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
@@ -654,14 +656,11 @@ func createSuiChainReader(ctx context.Context, lggr logger.Logger, suiChain cldf
 
 	db.MapperFunc(reflectx.CamelToSnakeASCII)
 
-	// Test the connection
 	_, err = db.Connx(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Create PTB client for SUI operations
-	// Note: Using nil for testing.T since this is for load testing, not unit testing
 	var t *testing.T = nil
 	keystoreInstance := suitestutils.NewTestKeystore(t)
 	priv, err := cldf_sui.PrivateKey(suiChain.Signer)
@@ -704,4 +703,66 @@ func createSuiChainReader(ctx context.Context, lggr logger.Logger, suiChain cldf
 	}
 
 	return chainReader, indexerInstance, nil
+}
+
+// FundSuiAccount transfers SUI tokens from a signer account to a destination account
+func FundSuiAccount(t *testing.T, suiChain cldf_sui.Chain, toAddress string, amount uint64) error {
+	ctx := testhelpers.Context(t)
+
+	signerAddress, err := suiChain.Signer.GetAddress()
+	if err != nil {
+		return fmt.Errorf("failed to get signer address: %w", err)
+	}
+
+	coinObjects, err := suiChain.Client.SuiXGetCoins(ctx, models.SuiXGetCoinsRequest{
+		Owner:    signerAddress,
+		CoinType: "0x2::sui::SUI",
+		Limit:    1,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get coins for signer: %w", err)
+	}
+
+	if len(coinObjects.Data) == 0 {
+		return fmt.Errorf("no SUI coins available for transfer from signer %s", signerAddress)
+	}
+
+	coinObjectId := coinObjects.Data[0].CoinObjectId
+
+	transferReq := models.TransferSuiRequest{
+		Signer:      signerAddress,
+		SuiObjectId: coinObjectId,
+		GasBudget:   "10000000", // 0.01 SUI for gas budget
+		Recipient:   toAddress,
+		Amount:      fmt.Sprintf("%d", amount),
+	}
+
+	txnMetadata, err := suiChain.Client.TransferSui(ctx, transferReq)
+	if err != nil {
+		return fmt.Errorf("failed to create SUI transfer transaction: %w", err)
+	}
+
+	signAndExecuteReq := models.SignAndExecuteTransactionBlockRequest{
+		TxnMetaData: txnMetadata,
+		Options: models.SuiTransactionBlockOptions{
+			ShowInput:    true,
+			ShowRawInput: true,
+			ShowEffects:  true,
+		},
+		RequestType: "WaitForEffectsCert", // Wait for transaction to be finalized
+	}
+
+	response, err := suiChain.Client.SignAndExecuteTransactionBlock(ctx, signAndExecuteReq)
+	if err != nil {
+		return fmt.Errorf("failed to sign and execute SUI transfer transaction: %w", err)
+	}
+
+	if response.Effects.Status.Status != "success" {
+		return fmt.Errorf("SUI transfer transaction failed with status: %s", response.Effects.Status.Status)
+	}
+
+	t.Logf("Funded SUI account %s from %s with %d MIST (SUI smallest unit)",
+		toAddress, signerAddress, amount)
+
+	return nil
 }

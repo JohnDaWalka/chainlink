@@ -19,16 +19,16 @@ import (
 	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	ccipSolState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
-	sui_onramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_onramp/onramp"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_onramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_onramp/onramp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	aptosState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 	solState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
-y
+	suiState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/sui"
 )
 
 // LaneConfig represents a unidirectional lane from source to destination
@@ -553,29 +553,29 @@ func (lc *LaneConfiguration) isDestinationEnabledOnAptosRouter(env cldf.Environm
 
 // isDestinationEnabledOnSuiRouter checks if a destination is enabled on the SUI Router
 func (lc *LaneConfiguration) isDestinationEnabledOnSuiRouter(env cldf.Environment, suiChainSelector uint64, chainState suiState.CCIPChainState, destinationChain uint64) (bool, error) {
-	
+
 	suiChain := env.BlockChains.SuiChains()[suiChainSelector]
-	
-	onrampContract, err := sui_onramp.NewOnrampContract(suiChain.Client, chainState.OnRampAddress)
+
+	onrampContract, err := sui_onramp.NewOnramp(chainState.OnRampAddress, suiChain.Client)
 	if err != nil {
 		return false, fmt.Errorf("failed to create SUI onramp contract binding: %w", err)
 	}
-	
+
 	callOpts := &suiBind.CallOpts{
 		WaitForExecution: false,
 	}
-	
+
 	isSupported, err := onrampContract.DevInspect().IsChainSupported(
 		env.GetContext(),
 		callOpts,
-		suiBind.Object{ObjectID: chainState.OnRampStateObjectId},
+		suiBind.Object{Id: chainState.OnRampStateObjectId},
 		destinationChain,
 	)
 	if err != nil {
 		// If we can't check the destination, assume it's not supported
 		return false, fmt.Errorf("failed to check if destination chain %d is supported on SUI onramp: %w", destinationChain, err)
 	}
-	
+
 	return isSupported, nil
 }
 
