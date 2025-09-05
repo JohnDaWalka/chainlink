@@ -128,7 +128,7 @@ func executeHTTPTriggerRequest(t *testing.T, testEnv *TestEnvironment, gatewayUR
 
 		testEnv.Logger.Info().Msg("Successfully received 200 OK response from gateway")
 		return true
-	}, tests.WaitTimeout(t), tick, "gateway should respond with 200 OK and valid response once workflow is loaded (ensure the workflow is loaded)")
+	}, 5*time.Minute, tick, "gateway should respond with 200 OK and valid response once workflow is loaded (ensure the workflow is loaded)")
 
 	require.Equal(t, jsonrpc.JsonRpcVersion, finalResponse.Version, "expected JSON-RPC version %s, got %s", jsonrpc.JsonRpcVersion, finalResponse.Version)
 	require.Equal(t, triggerRequest.ID, finalResponse.ID, "expected response ID %s, got %s", triggerRequest.ID, finalResponse.ID)
