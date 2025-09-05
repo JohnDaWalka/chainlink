@@ -5,11 +5,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 )
 
+type AddressTypeVersion struct {
+	Address common.Address
+	cldf.TypeAndVersion
+}
+
 // BootstrapEVM creates TOML-literal for the EVM section of the node configuration for a bootstrap node
-func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitiesRegistryAddress common.Address, chains []*EVMChain) string {
+func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capRegistry AddressTypeVersion, chains []*EVMChain) string {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -28,6 +34,7 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitie
 			chain.HTTPRPC,
 		)
 	}
+
 	return fmt.Sprintf(`
 	[Feature]
 	LogPoller = true
@@ -50,11 +57,13 @@ func BootstrapEVM(donBootstrapNodePeerID string, homeChainID uint64, capabilitie
 	Address = '%s'
 	NetworkID = 'evm'
 	ChainID = '%d'
+	ContractVersion = '%s'
 `,
 		donBootstrapNodePeerID,
 		evmChainsConfig,
-		capabilitiesRegistryAddress,
+		capRegistry.Address,
 		homeChainID,
+		capRegistry.Version,
 	)
 }
 
@@ -82,7 +91,10 @@ type EVMChain struct {
 
 // WorkerEVM creates TOML-literal for the EVM section of the node configuration for a non-bootstrap node
 // TODO: decomposition into p2p, capabilities, evm, workflow, ...
-func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData, capabilitiesPeeringData cre.CapabilitiesPeeringData, capabilitiesRegistryAddress common.Address, homeChainID uint64, chains []*EVMChain) (string, error) {
+func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringData cre.OCRPeeringData,
+	capabilitiesPeeringData cre.CapabilitiesPeeringData,
+	capRegistry AddressTypeVersion, homeChainID uint64, chains []*EVMChain,
+) (string, error) {
 	evmChainsConfig := ""
 	for _, chain := range chains {
 		evmChainsConfig += fmt.Sprintf(`
@@ -131,6 +143,7 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 	Address = '%s'
 	NetworkID = 'evm'
 	ChainID = '%d'
+	ContractVersion = '%s'
 `,
 		ocrPeeringData.Port,
 		donBootstrapNodePeerID,
@@ -141,8 +154,9 @@ func WorkerEVM(donBootstrapNodePeerID, donBootstrapNodeHost string, ocrPeeringDa
 		capabilitiesPeeringData.GlobalBootstraperHost,
 		capabilitiesPeeringData.Port,
 		evmChainsConfig,
-		capabilitiesRegistryAddress,
+		capRegistry.Address,
 		homeChainID,
+		capRegistry.Version,
 	), nil
 }
 
