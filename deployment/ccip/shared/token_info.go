@@ -111,6 +111,7 @@ const (
 	SeiSymbol   TokenSymbol = "SEI"
 	BeraSymbol  TokenSymbol = "BERA"
 	AthSymbol   TokenSymbol = "ATH"
+	BoneSymbol  TokenSymbol = "BONE"
 
 	LBTCSymbol                 TokenSymbol = "LBTC"
 	FactoryBurnMintERC20Symbol TokenSymbol = "Factory-BnM-ERC20"
@@ -145,6 +146,7 @@ const (
 	SEIUSD   = "SEI / USD"
 	BERAUSD  = "BERA / USD"
 	ATHUSD   = "ATH / USD"
+	BONEUSD  = "BONE / USD"
 
 	// MockLinkAggregatorDescription is the description of the MockV3Aggregator.sol contract
 	// https://github.com/smartcontractkit/chainlink/blob/a348b98e90527520049c580000a86fb8ceff7fa7/contracts/src/v0.8/tests/MockV3Aggregator.sol#L76-L76
@@ -178,6 +180,7 @@ var (
 		BERAUSD:                       {BeraSymbol},
 		ATHUSD:                        {AthSymbol},
 		APTUSD:                        {APTSymbol},
+		BONEUSD:                       {BoneSymbol},
 	}
 	MockSymbolToDescription = map[TokenSymbol]string{
 		LinkSymbol: MockLinkAggregatorDescription,
