@@ -637,9 +637,6 @@ func createSuiChainReader(ctx context.Context, lggr logger.Logger, suiChain cldf
 		},
 	}
 
-	// Create in-memory database for indexer (following the pattern from other ChainReader tests)
-	// This uses the same pattern as core/services/relay/evm/capabilities/testutils/backend.go
-	// and integration-tests/smoke/ccip/ccip_reader_test.go
 	dbURL := os.Getenv("CL_DATABASE_URL")
 	if dbURL == "" {
 		return nil, nil, fmt.Errorf("CL_DATABASE_URL environment variable is required")
