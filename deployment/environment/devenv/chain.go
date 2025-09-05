@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -23,6 +24,18 @@ import (
 
 	aptosCrypto "github.com/aptos-labs/aptos-go-sdk/crypto"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
+
+	solCommonUtil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
 
@@ -61,10 +74,10 @@ type ChainConfig struct {
 	ClientZkSyncVM      *clients.Client
 	DeployerKeyZkSyncVM *accounts.Wallet
 	SolDeployerKey      solana.PrivateKey
-	SolArtifactDir      string                                 // directory of pre-built solana artifacts, if any
-	Users               []*bind.TransactOpts                   // map of addresses to their transact opts to interact with the chain as users
-	MultiClientOpts     []func(c *cldf_evm_client.MultiClient) // options to configure the multi client
-	AptosDeployerKey    aptos.Account
+	SolArtifactDir      string                      // directory of pre-built solana artifacts, if any
+	SuiDeployerKey      cldf_sui.SuiSigner          // SUI deployer key signer
+	Users               []*bind.TransactOpts        // map of addresses to their transact opts to interact with the chain as users
+	MultiClientOpts     []func(c *cldf.MultiClient) // options to configure the multi client
 }
 
 func (c *ChainConfig) SetUsers(pvtkeys []string) error {
@@ -152,6 +165,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 	var evmSyncMap sync.Map
 	var solSyncMap sync.Map
 	var aptosSyncMap sync.Map
+	var suiSyncMap sync.Map
 
 	g := new(errgroup.Group)
 	for _, chainCfg := range configs {
@@ -284,6 +298,19 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 					},
 				})
 				return nil
+			case SuiChainType:
+				suiClient := sui.NewSuiClient(chainCfg.HTTPRPCs[0].External)
+
+				suiSyncMap.Store(chainDetails.ChainSelector, cldf_sui.Chain{
+					ChainMetadata: cldf_sui.ChainMetadata{
+						Selector: chainDetails.ChainSelector,
+					},
+					Client: suiClient,
+					Signer: chainCfg.SuiDeployerKey,
+					URL:    chainCfg.HTTPRPCs[0].External,
+				})
+				return nil
+
 			default:
 				return fmt.Errorf("chain type %s is not supported", chainCfg.ChainType)
 			}
@@ -308,6 +335,8 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 
 	aptosSyncMap.Range(func(sel, value interface{}) bool {
 		blockChains = append(blockChains, value.(cldf_aptos.Chain))
+	suiSyncMap.Range(func(sel, value interface{}) bool {
+		blockChains = append(blockChains, value.(cldf_sui.Chain))
 		return true
 	})
 
@@ -325,6 +354,20 @@ func (c *ChainConfig) SetSolDeployerKey(keyString *string) error {
 	}
 
 	c.SolDeployerKey = solKey
+	return nil
+}
+
+func (c *ChainConfig) SetSuiDeployerKey(keyString *string) error {
+	if keyString == nil || *keyString == "" {
+		return errors.New("no SUI private key provided")
+	}
+
+	suiSigner, err := cldf_sui.NewSignerFromHexPrivateKey(*keyString)
+	if err != nil {
+		return fmt.Errorf("invalid SUI private key: %w", err)
+	}
+
+	c.SuiDeployerKey = suiSigner
 	return nil
 }
 
