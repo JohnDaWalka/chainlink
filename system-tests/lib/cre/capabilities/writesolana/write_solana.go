@@ -15,6 +15,7 @@ import (
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
+	solcfg "github.com/smartcontractkit/chainlink-solana/pkg/solana/config"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -165,42 +166,9 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			return nil, errors.Wrapf(err, "Solana chainID is nil for node at index %d", nodeIndex)
 		}
 
-		// TODO @Unheilbar: use typed config once https://github.com/smartcontractkit/chainlink/pull/19091 is merged
-		// use it the same way as write_evm.go does, i.e. unmarshall config to struct and use it to set [Solana.Workflow]
-		// and any other settings that might be required
-		// once we have final config, marshall it back to string and replace existing config: existingConfigs[nodeIndex] = string(marshalledConfig)
-		// ---------
-		// var solCfg solcfg.Config
+		var solCfg *solcfg.WorkflowConfig
 
-		// // Execute template with chain's workflow configuration
-		// tmpl, err := template.New("solanaWorkflowConfig").Parse(solWorkflowConfigTemplate)
-		// if err != nil {
-		// 	return nil, errors.Wrap(err, "failed to parse Solana workflow config template")
-		// }
-		// var configBuffer bytes.Buffer
-		// if executeErr := tmpl.Execute(&configBuffer, data.WorkflowConfig); executeErr != nil {
-		// 	return nil, errors.Wrap(executeErr, "failed to execute Solana workflow config template")
-		// }
-
-		// configStr := configBuffer.String()
-
-		// if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
-		// 	return nil, errors.Wrapf(err, "%s template validation failed", flag)
-		// }
-
-		// unmarshallErr = toml.Unmarshal([]byte(configStr), &solCfg)
-		// if unmarshallErr != nil {
-		// 	return nil, errors.Wrap(unmarshallErr, "failed to unmarshal Solana.Workflow config")
-		// }
-
-		// typedConfig.Solana[0].Workflow = solCfg
-
-		marshalledConfig, mErr := toml.Marshal(typedConfig)
-		if mErr != nil {
-			return nil, errors.Wrapf(mErr, "failed to marshal config for node index %d", nodeIndex)
-		}
-
-		// TODO remove once typed config is used
+		// Execute template with chain's workflow configuration
 		tmpl, err := template.New("solanaWorkflowConfig").Parse(solWorkflowConfigTemplate)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse Solana workflow config template")
@@ -211,13 +179,23 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		}
 
 		configStr := configBuffer.String()
+
 		if err := don.ValidateTemplateSubstitution(configStr, flag); err != nil {
 			return nil, errors.Wrapf(err, "%s template validation failed", flag)
 		}
 
-		marshalledConfig = append(marshalledConfig, []byte(configStr)...)
+		unmarshallErr = toml.Unmarshal([]byte(configStr), &solCfg)
+		if unmarshallErr != nil {
+			return nil, errors.Wrap(unmarshallErr, "failed to unmarshal Solana.Workflow config")
+		}
 
-		// leave this part after removing ^^
+		typedConfig.Solana[0].Workflow = solCfg
+
+		marshalledConfig, mErr := toml.Marshal(typedConfig)
+		if mErr != nil {
+			return nil, errors.Wrapf(mErr, "failed to marshal config for node index %d", nodeIndex)
+		}
+
 		existingConfigs[nodeIndex] = string(marshalledConfig)
 	}
 
@@ -234,7 +212,6 @@ type solanaInput struct {
 }
 
 const solWorkflowConfigTemplate = `
-		[Solana.Workflow]
 		ForwarderAddress = '{{.ForwarderAddress}}'
 		FromAddress      = '{{.FromAddress}}'
 		ForwarderState   = '{{.ForwarderState}}'
