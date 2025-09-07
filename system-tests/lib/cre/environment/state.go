@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/cockroachdb/errors"
 	"github.com/gagliardetto/solana-go"
@@ -75,9 +74,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 
 	allNodeInfo := make([]deployment_devenv.NodeInfo, 0)
 	allNodeIDs := make([]string, 0)
-	for idx, don := range envArtifact.DONs {
-		fmt.Println(idx, don.DonName)
-	}
 
 	for idx, don := range envArtifact.DONs {
 		_, ok := envArtifact.Nodes[don.DonName]
@@ -111,7 +107,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
 		}
-		fmt.Println("attempt to create client for don", idx)
 		offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
 			WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
 			GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
@@ -121,8 +116,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		if offChainErr != nil {
 			return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", don.DonName)
 		}
-		fmt.Println("succesfully created client for don ", idx)
-		time.Sleep(time.Second * 3)
 
 		jd, ok := offChain.(*deployment_devenv.JobDistributor)
 		if !ok {
