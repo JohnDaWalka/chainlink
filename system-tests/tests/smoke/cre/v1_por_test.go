@@ -26,11 +26,9 @@ import (
 
 	corevm "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 
+	portypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/types"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	creworkflow "github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
-
-	portypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/types"
 )
 
 type WorkflowTestConfig struct {
@@ -48,7 +46,6 @@ func ExecutePoRTest(t *testing.T, testEnv *TestEnvironment) {
 	AuthorizationKey := "" // required by FakePriceProvider
 	PoRWorkflowFileLocation := "../../../../core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/main.go"
 	blockchainOutputs := testEnv.WrappedBlockchainOutputs
-	homeChainSelector := blockchainOutputs[0].ChainSelector
 	baseWorkflowName := "por-workflow"
 	feedIDs := []string{"018e16c39e000320000000000000000000000000000000000000000000000000", "018e16c38e000320000000000000000000000000000000000000000000000000"}
 	baseWorkflowTestConfig := &WorkflowTestConfig{
@@ -95,7 +92,7 @@ func ExecutePoRTest(t *testing.T, testEnv *TestEnvironment) {
 		crecontracts.MergeAllDataStores(fullCldEnvOutput, dfOutput, rbOutput)
 
 		testLogger.Info().Msgf("Configuring Data Feeds Cache contract...")
-		forwarderAddress, forwarderErr := crecontracts.FindAddressesForChain(fullCldEnvOutput.Environment.ExistingAddresses, chainSelector, keystone_changeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
+		forwarderAddress, _, forwarderErr := crecontracts.FindAddressesForChain(fullCldEnvOutput.Environment.ExistingAddresses, chainSelector, keystone_changeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
 		require.NoError(t, forwarderErr, "failed to find Forwarder address for chain %d", chainSelector)
 
 		uniqueWorkflowName := baseWorkflowTestConfig.WorkflowName + "-" + bcOutput.BlockchainOutput.ChainID + "-" + uuid.New().String()[0:4] // e.g. 'por-workflow-1337-5f37_config'
@@ -129,32 +126,7 @@ func ExecutePoRTest(t *testing.T, testEnv *TestEnvironment) {
 			},
 		}
 		workflowFileLocation := baseWorkflowTestConfig.WorkflowFileLocation
-		compressedWorkflowWasmPath, workflowConfigFilePath := createWorkflowArtifacts(t, testLogger, uniqueWorkflowName, &workflowConfig, workflowFileLocation)
-
-		testLogger.Info().Msgf("Registering PoR workflow on chain %d (%d)", chainID, chainSelector)
-		workflowRegistryAddress, workflowRegistryErr := crecontracts.FindAddressesForChain(
-			fullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
-			homeChainSelector, // it should live only on one chain, it is not deployed to all chains
-			keystone_changeset.WorkflowRegistry.String(),
-		)
-		require.NoError(t, workflowRegistryErr, "failed to find Workflow Registry address.")
-		testLogger.Info().Msgf("Workflow Registry contract found at chain selector %d at %s", homeChainSelector, workflowRegistryAddress)
-
-		workflowRegConfig := &WorkflowRegistrationConfig{
-			WorkflowName:         uniqueWorkflowName,
-			WorkflowLocation:     workflowFileLocation,
-			ConfigFilePath:       workflowConfigFilePath,
-			CompressedWasmPath:   compressedWorkflowWasmPath,
-			WorkflowRegistryAddr: workflowRegistryAddress,
-			DonID:                testEnv.FullCldEnvOutput.DonTopology.DonsWithMetadata[0].ID,
-			ContainerTargetDir:   creworkflow.DefaultWorkflowTargetDir,
-		}
-		registerWorkflow(t.Context(), t, workflowRegConfig, testEnv.WrappedBlockchainOutputs[0].SethClient, testLogger)
-
-		// AFTER TEST
-		t.Cleanup(func() {
-			deleteWorkflows(t, uniqueWorkflowName, workflowConfigFilePath, compressedWorkflowWasmPath, blockchainOutputs, workflowRegistryAddress)
-		})
+		compileAndDeployWorkflow(t, testEnv, testLogger, uniqueWorkflowName, &workflowConfig, workflowFileLocation)
 	}
 	/*
 		START THE VALIDATION PHASE
@@ -194,7 +166,7 @@ func createPoRWorkflowConfigFile(workflowName string, workflowConfig *portypes.W
 		}
 	}
 
-	if err := os.WriteFile(workflowConfigOutputFile, configMarshalled, 0644); err != nil { //nolint:gosec // G306: we want it to be readable by everyone
+	if err := os.WriteFile(workflowConfigOutputFile, configMarshalled, 0o644); err != nil { //nolint:gosec // G306: we want it to be readable by everyone
 		return "", errors.Wrap(err, "failed to write output file")
 	}
 
@@ -238,7 +210,7 @@ func validatePoRPrices(t *testing.T, testEnv *TestEnvironment, priceProvider Pri
 			feedID := config.FeedIDs[idx]
 			testEnv.Logger.Info().Msgf("Waiting for feed %s to update...", feedID)
 
-			dataFeedsCacheAddresses, dataFeedsCacheErr := crecontracts.FindAddressesForChain(
+			dataFeedsCacheAddresses, _, dataFeedsCacheErr := crecontracts.FindAddressesForChain(
 				testEnv.FullCldEnvOutput.Environment.ExistingAddresses, //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
 				bcOutput.ChainSelector,
 				df_changeset.DataFeedsCache.String(),

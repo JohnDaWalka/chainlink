@@ -341,7 +341,7 @@ func createPermissionFlagAccounts(programID, state solana.PublicKey, dataIDs [][
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive permission_flag PDA: %w", err)
 		}
-		fmt.Printf("cld rem repHash: %x cacheState:%v", repHash[:], state.String())
+
 		ret = append(ret, *solana.Meta(flagPDA).WRITE())
 	}
 	return ret, nil
@@ -356,7 +356,6 @@ func createReportHash(dataID [16]byte, sender solana.PublicKey, owner [20]byte, 
 		owner[:],
 		name[:],
 	}, nil)
-	fmt.Printf("cld dataID:%x authority:%v wfOwner:%x wfName:%x", dataID[:], sender.String(), owner[:], name[:])
 	return sha256.Sum256(buf)
 }
 
