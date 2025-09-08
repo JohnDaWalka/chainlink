@@ -27,7 +27,7 @@ func TestSuiKeysController_Index_HappyPath(t *testing.T) {
 
 	resources := []presenters.SuiKeyResource{}
 	err := web.ParseJSONAPIResponse(cltest.ParseResponseBody(t, response), &resources)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	require.Len(t, resources, len(keys))
 
@@ -52,7 +52,7 @@ func TestSuiKeysController_Create_HappyPath(t *testing.T) {
 
 	resource := presenters.SuiKeyResource{}
 	err := web.ParseJSONAPIResponse(cltest.ParseResponseBody(t, response), &resource)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, keys[0].ID(), resource.ID)
 	assert.Equal(t, keys[0].PublicKeyStr(), resource.PubKey)
@@ -85,7 +85,7 @@ func TestSuiKeysController_Delete_HappyPath(t *testing.T) {
 	response, cleanup := client.Delete("/v2/keys/sui/" + key.ID())
 	t.Cleanup(cleanup)
 	assert.Equal(t, http.StatusOK, response.StatusCode)
-	assert.Error(t, utils.JustError(keyStore.Sui().Get(key.ID())))
+	require.Error(t, utils.JustError(keyStore.Sui().Get(key.ID())))
 
 	keys, _ = keyStore.Sui().GetAll()
 	assert.Len(t, keys, initialLength)

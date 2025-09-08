@@ -25,7 +25,7 @@ func NewSuiKeyResource(key suikey.Key) *SuiKeyResource {
 }
 
 func NewSuiKeyResources(keys []suikey.Key) []SuiKeyResource {
-	var rs []SuiKeyResource
+	rs := []SuiKeyResource{}
 	for _, key := range keys {
 		rs = append(rs, *NewSuiKeyResource(key))
 	}

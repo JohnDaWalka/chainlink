@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/pkg/errors"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 )
@@ -91,7 +92,7 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 			ReceiverObjectIds        [][32]byte `json:"receiverObjectIds"`
 		})
 		if !ok {
-			return nil, fmt.Errorf("sui extra args struct is not the equivalent of message_hasher.ClientSuiExtraArgsV1")
+			return nil, errors.New("sui extra args struct is not the equivalent of message_hasher.ClientSuiExtraArgsV1")
 		}
 		output["gasLimit"] = extraArgsStruct.GasLimit
 		output["allowOutOfOrderExecution"] = extraArgsStruct.AllowOutOfOrderExecution

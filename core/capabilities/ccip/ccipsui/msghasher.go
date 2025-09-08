@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
@@ -56,7 +55,7 @@ func NewMessageHasherV1(lggr logger.Logger, extraDataCodec ccipcommon.ExtraDataC
 // The main structure of the hash is as follows:
 // Fixed-size message fields are included in nested hash to reduce stack pressure.
 // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
-func (h *MessageHasherV1) Hash(ctx context.Context, msg ccipocr3common.Message) (cciptypes.Bytes32, error) {
+func (h *MessageHasherV1) Hash(ctx context.Context, msg ccipocr3common.Message) (ccipocr3common.Bytes32, error) {
 	lggr := logutil.WithContextValues(ctx, h.lggr)
 	lggr = logger.With(
 		lggr,

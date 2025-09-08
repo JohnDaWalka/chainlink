@@ -15,7 +15,7 @@ func NewSuiKey(key suikey.Key) *SuiKeyResolver {
 }
 
 func NewSuiKeys(keys []suikey.Key) []*SuiKeyResolver {
-	var resolvers []*SuiKeyResolver
+	resolvers := []*SuiKeyResolver{}
 
 	for _, k := range keys {
 		resolvers = append(resolvers, NewSuiKey(k))

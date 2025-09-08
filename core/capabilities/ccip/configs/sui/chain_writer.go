@@ -7,7 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
-	_ "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
+	_ "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter" // Register Sui chainwriter
 	chainwriter "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	"github.com/smartcontractkit/chainlink-sui/relayer/codec"
 )

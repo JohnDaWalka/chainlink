@@ -49,7 +49,7 @@ func (ks *sui) GetAll() ([]suikey.Key, error) {
 	if ks.isLocked() {
 		return nil, ErrLocked
 	}
-	var accounts []suikey.Key
+	accounts := []suikey.Key{}
 	for _, key := range ks.keyRing.Sui {
 		accounts = append(accounts, key)
 	}

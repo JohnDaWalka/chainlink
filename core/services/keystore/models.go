@@ -317,7 +317,7 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	for _, tonKey := range kr.TON {
 		tonIDs = append(tonIDs, tonKey.ID())
 	}
-	var suiIDs []string
+	suiIDs := []string{}
 	for _, suiKey := range kr.Sui {
 		suiIDs = append(suiIDs, suiKey.ID())
 	}

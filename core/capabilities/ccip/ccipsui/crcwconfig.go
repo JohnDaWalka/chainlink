@@ -20,7 +20,7 @@ func (g ChainCWProvider) GetChainReader(ctx context.Context, params ccipcommon.C
 
 	cfg, err := suiconfig.GetChainReaderConfig(transmitter[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get SUI config")
+		return nil, fmt.Errorf("failed to get SUI config: %w", err)
 	}
 
 	marshaledConfig, err := json.Marshal(cfg)

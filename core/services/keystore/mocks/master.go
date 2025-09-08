@@ -563,25 +563,6 @@ func (_m *Master) Sui() keystore.Sui {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(keystore.Sui)
 		}
-	}  
-	return r0
-}
-
-// TON provides a mock function with no fields
-func (_m *Master) TON() keystore.TON {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for TON")
-	}
-
-	var r0 keystore.TON
-	if rf, ok := ret.Get(0).(func() keystore.TON); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(keystore.TON)
-		}
 	}
 
 	return r0
@@ -602,6 +583,36 @@ func (_c *Master_Sui_Call) Run(run func()) *Master_Sui_Call {
 		run()
 	})
 	return _c
+}
+
+func (_c *Master_Sui_Call) Return(_a0 keystore.Sui) *Master_Sui_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Master_Sui_Call) RunAndReturn(run func() keystore.Sui) *Master_Sui_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TON provides a mock function with no fields
+func (_m *Master) TON() keystore.TON {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for TON")
+	}
+
+	var r0 keystore.TON
+	if rf, ok := ret.Get(0).(func() keystore.TON); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(keystore.TON)
+		}
+	}
+
+	return r0
 }
 
 // Master_TON_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TON'
