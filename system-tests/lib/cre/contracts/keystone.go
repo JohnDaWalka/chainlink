@@ -91,18 +91,6 @@ func DeployKeystoneContracts(
 	consensusV2AddrFlag := flags.HasFlag(allNodeFlags, cre.ConsensusCapabilityV2)
 
 	chainsWithEVMCapability := ChainsWithEVMCapability(input.CtfBlockchains, input.CapabilitiesAwareNodeSets)
-	// chainsWithEVMCapability := make(map[ks_contracts_op.EVMChainID]ks_contracts_op.Selector)
-	// for _, chain := range input.CtfBlockchains {
-	// 	for _, donMetadata := range input.CapabilitiesAwareNodeSets {
-	// 		if flags.HasFlagForChain(donMetadata.ComputedCapabilities, cre.EVMCapability, chain.ChainID) {
-	// 			if chainsWithEVMCapability[ks_contracts_op.EVMChainID(chain.ChainID)] != 0 {
-	// 				continue
-	// 			}
-	// 			chainsWithEVMCapability[ks_contracts_op.EVMChainID(chain.ChainID)] = ks_contracts_op.Selector(chain.ChainSelector)
-	// 		}
-	// 	}
-	// }
-
 	homeChainOutput := input.CtfBlockchains[0]
 
 	// use CLD to deploy the registry contracts, which are required before constructing the node TOML configs
@@ -216,7 +204,6 @@ func DeployKeystoneContracts(
 	// TODO move this deeper into the stack when we have all the p2p ids and can deploy and configure in one sequence
 	// deploy OCR3 contract
 	// we deploy OCR3 contract with a qualifier, so that we can distinguish it from other OCR3 contracts (Vault, EVM, ConsensusV2)
-	// TODO track the qualifiers in vars/consts rather than raw strings
 	_, seqErr = deployOCR3Contract(OCR3ContractQualifier, homeChainSelector, allChainsCLDEnvironment, memoryDatastore)
 	if seqErr != nil {
 		return nil, fmt.Errorf("failed to deploy OCR3 contract %w", seqErr)
@@ -265,7 +252,6 @@ func DeployKeystoneContracts(
 		}
 		consensusV2OCR3Addr := MustGetAddressFromMemoryDataStore(memoryDatastore, homeChainSelector, keystone_changeset.OCR3Capability.String(), input.ContractVersions[keystone_changeset.OCR3Capability.String()], ConsensusV2ContractQualifier)
 		testLogger.Info().Msgf("Deployed Consensus V2 OCR3 %s contract on chain %d at %s", input.ContractVersions[keystone_changeset.OCR3Capability.String()], homeChainSelector, consensusV2OCR3Addr)
-
 	}
 	allChainsCLDEnvironment.DataStore = memoryDatastore.Seal()
 
