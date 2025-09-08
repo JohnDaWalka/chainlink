@@ -56,8 +56,8 @@ type SetupOutput struct {
 type SetupInput struct {
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
 	BlockchainsInput          []blockchain.Input
-	JdInput                   jd.Input
-	InfraInput                infra.Input
+	JdInput                   *jd.Input
+	InfraInput                *infra.Input
 	ContractVersions          map[string]string
 	WithV2Registries          bool
 	OCR3Config                *keystone_changeset.OracleConfig
@@ -91,6 +91,14 @@ func (s *SetupInput) Validate() error {
 		return pkgerrors.New("at least one blockchain is required")
 	}
 
+	if s.JdInput == nil {
+		return pkgerrors.New("jd input is nil")
+	}
+
+	if s.InfraInput == nil {
+		return pkgerrors.New("infra input is nil")
+	}
+
 	return nil
 }
 
@@ -114,7 +122,7 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(topologyErr, "failed to validate topology")
 	}
 
-	cribErr := crib.Bootstrap(&input.InfraInput)
+	cribErr := crib.Bootstrap(input.InfraInput)
 	if cribErr != nil {
 		return nil, pkgerrors.Wrap(cribErr, "failed to bootstrap CRIB")
 	}
@@ -132,7 +140,7 @@ func SetupTestEnvironment(
 		lggr:       testLogger,
 		singleFile: singleFileLogger,
 	}, BlockchainsInput{
-		infra:            &input.InfraInput,
+		infra:            input.InfraInput,
 		blockchainsInput: input.BlockchainsInput,
 	})
 	if bcOutErr != nil {
@@ -244,6 +252,7 @@ func SetupTestEnvironment(
 
 	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, input.JobSpecFactoryFunctions...) // Deprecated, use Capabilities instead
 
+	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
 	createJobsDeps := CreateJobsWithJdOpDeps{
 		Logger:                    testLogger,
 		SingleFileLogger:          singleFileLogger,
@@ -252,7 +261,7 @@ func SetupTestEnvironment(
 		JobSpecFactoryFunctions:   jobSpecFactoryFunctions,
 		FullCLDEnvOutput:          fullCldOutput,
 		CapabilitiesAwareNodeSets: input.CapabilitiesAwareNodeSets,
-		InfraInput:                &input.InfraInput,
+		InfraInput:                input.InfraInput,
 		CapabilitiesConfigs:       input.CapabilityConfigs,
 		Capabilities:              input.Capabilities,
 	}
@@ -261,13 +270,10 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(createJobsErr, "failed to create jobs with Job Distributor")
 	}
 
-	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the workflow contracts.
-	// Wait for OCR listeners to be ready before setting the configuration.
-	// If the ConfigSet event is missed, OCR protocol will not start.
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Jobs created in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 
 	// Prepare stage for funding the nodes
-	// This operation cannot execute in the background, because it uses master private keys and we want to avoid nonce issues
+	// This operation cannot execute in the background, because it uses master private key and we want to avoid nonce issues
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Preparing Chainlink Node funding")))
 	preFundingOutput, prefundErr := operations.ExecuteOperation(fullCldOutput.Environment.OperationsBundle, PrepareCLNodesFundingOp, PrepareFundCLNodesOpDeps{
 		TestLogger:        testLogger,
@@ -302,7 +308,8 @@ func SetupTestEnvironment(
 		return fundErr
 	})
 
-	// Wait for Log Poller to be healthy
+	// Wait for Log Poller to be up and running. If it misses the ConfigSet event, OCR protocol will not start.
+	// TODO: we might want to add similar checks for other OCR3 contracts.
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Waiting for Log Poller to start tracking OCR3 contract")))
 
 	if err := waitForLogPollerToBeHealthy(updatedNodeSets, nodeSetOutput); err != nil {
@@ -311,7 +318,8 @@ func SetupTestEnvironment(
 
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Log Poller started in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 
-	// Wait for Log Poller filters to be registered in the background
+	// Wait for Workflow Registry filters to be registered in the Log Poller in the background
+	// Without it we might miss workflow-related events
 	filterRegErr := bkgErrPool.SubmitErr(func() error {
 		fmt.Print(libformat.PurpleText("\n---> [BACKGROUND] Waiting for all nodes to have expected LogPoller filters registered\n\n"))
 		defer fmt.Print(libformat.PurpleText("\n---> [BACKGROUND] All nodes have expected LogPoller filters registered\n\n"))
@@ -335,24 +343,6 @@ func SetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("OCR3 and Keystone contracts configured in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Writing bootstrapping data into disk (address book, data store, etc...)")))
 
-	// Dump environment artifact to disk
-	artifactPath, artifactErr := DumpArtifact(
-		deployKeystoneContractsOutput.MemoryDataStore.AddressRefStore,
-		deployKeystoneContractsOutput.Env.ExistingAddresses, //nolint:staticcheck // won't migrate now
-		*jdOutput,
-		*fullCldOutput.DonTopology,
-		fullCldOutput.Environment.Offchain,
-		configureKeystoneInput.CapabilityRegistryConfigFns,
-		input.CapabilitiesAwareNodeSets,
-	)
-	if artifactErr != nil {
-		testLogger.Error().Err(artifactErr).Msg("failed to generate artifact")
-		fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Failed to write bootstrapping data into disk in %.2f seconds", input.StageGen.Elapsed().Seconds())))
-	} else {
-		testLogger.Info().Msgf("Environment artifact saved to %s", artifactPath)
-		fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Wrote bootstrapping data into disk in %.2f seconds", input.StageGen.Elapsed().Seconds())))
-	}
-
 	wfPool.StopAndWait()
 	workflowRegistryConfigurationOutput, wfRegistrationErr := wfTask.Wait()
 	if wfRegistrationErr != nil {
@@ -364,7 +354,7 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(err, "failed to fund chainlink nodes")
 	}
 	if err := filterRegErr.Wait(); err != nil {
-		return nil, pkgerrors.Wrap(err, "failed while waiting for log poller filters to be registered")
+		return nil, pkgerrors.Wrap(err, "failed while waiting for Workflow Registry filters to be registered")
 	}
 
 	appendOutputsToInput(input, nodeSetOutput, startBlockchainsOutput, jdOutput)

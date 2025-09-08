@@ -20,14 +20,14 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
-func StartJD(lggr zerolog.Logger, jdInput jd.Input, infraInput infra.Input) (*jd.Output, error) {
+func StartJD(lggr zerolog.Logger, jdInput *jd.Input, infraInput *infra.Input) (*jd.Output, error) {
 	startTime := time.Now()
 	lggr.Info().Msg("Starting Job Distributor")
 
 	var jdOutput *jd.Output
 	if infraInput.Type == infra.CRIB {
 		deployCribJdInput := &cre.DeployCribJdInput{
-			JDInput:        &jdInput,
+			JDInput:        jdInput,
 			CribConfigsDir: cribConfigsDir,
 			Namespace:      infraInput.CRIB.Namespace,
 		}
@@ -40,7 +40,7 @@ func StartJD(lggr zerolog.Logger, jdInput jd.Input, infraInput infra.Input) (*jd
 	}
 
 	var jdErr error
-	jdOutput, jdErr = CreateJobDistributor(&jdInput)
+	jdOutput, jdErr = CreateJobDistributor(jdInput)
 	if jdErr != nil {
 		jdErr = fmt.Errorf("failed to start JD container for image %s: %w", jdInput.Image, jdErr)
 
@@ -72,7 +72,22 @@ func CreateJobDistributor(input *jd.Input) (*jd.Output, error) {
 }
 
 // TODO: use background worker and wait for results?
-func StartDONsAndJD(lggr zerolog.Logger, jdInput jd.Input, registryChainBlockchainOutput *blockchain.Output, topology *cre.Topology, infraInput infra.Input, capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet) (*jd.Output, []*cre.WrappedNodeOutput, error) {
+func StartDONsAndJD(lggr zerolog.Logger, jdInput *jd.Input, registryChainBlockchainOutput *blockchain.Output, topology *cre.Topology, infraInput *infra.Input, capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet) (*jd.Output, []*cre.WrappedNodeOutput, error) {
+	if jdInput == nil {
+		return nil, nil, errors.New("jd input is nil")
+	}
+	if infraInput == nil {
+		return nil, nil, errors.New("infra input is nil")
+	}
+	if registryChainBlockchainOutput == nil {
+		return nil, nil, errors.New("registry chain blockchain output is nil")
+	}
+	if topology == nil {
+		return nil, nil, errors.New("topology is nil")
+	}
+	if len(capabilitiesAwareNodeSets) == 0 {
+		return nil, nil, errors.New("no capabilities aware node sets provided")
+	}
 	var jdOutput *jd.Output
 	jdAndDonsErrGroup := &errgroup.Group{}
 
