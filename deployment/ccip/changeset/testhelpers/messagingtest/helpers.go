@@ -176,6 +176,14 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 			FeeToken:     feeToken,
 			ExtraArgs:    tc.ExtraArgs,
 		}
+
+	case chain_selectors.FamilySui:
+		msg = testhelpers.SuiSendRequest{
+			Data:      tc.MsgData,
+			Receiver:  common.LeftPadBytes(tc.Receiver, 32),
+			ExtraArgs: tc.ExtraArgs,
+			FeeToken:  tc.FeeToken,
+		}
 	case chain_selectors.FamilyAptos:
 		feeToken := aptos.AccountAddress{}
 		if len(tc.FeeToken) > 0 {

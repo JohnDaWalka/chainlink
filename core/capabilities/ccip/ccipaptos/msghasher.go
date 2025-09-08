@@ -24,8 +24,8 @@ var (
 	// const LEAF_DOMAIN_SEPARATOR: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
 	leafDomainSeparator = [32]byte{}
 
-	// see aptos_hash::keccak256(b"Any2AptosMessageHashV1") in calculate_metadata_hash
-	any2AptosMessageHash = utils.Keccak256Fixed([]byte("Any2AptosMessageHashV1"))
+	// see aptos_hash::keccak256(b"Any2SuiMessageHashV1") in calculate_metadata_hash
+	any2AptosMessageHash = utils.Keccak256Fixed([]byte("Any2SuiMessageHashV1"))
 )
 
 // MessageHasherV1 implements the MessageHasher interface.
@@ -60,7 +60,7 @@ func (h *MessageHasherV1) Hash(ctx context.Context, msg cciptypes.Message) (ccip
 	lggr = logger.With(
 		lggr,
 		"msgID", msg.Header.MessageID.String(),
-		"ANY_2_APTOS_MESSAGE_HASH", hexutil.Encode(any2AptosMessageHash[:]),
+		"ANY_2_SUI_MESSAGE_HASH", hexutil.Encode(any2AptosMessageHash[:]),
 		"onrampAddress", msg.Header.OnRamp,
 	)
 	lggr.Debugw("hashing message", "msg", msg)

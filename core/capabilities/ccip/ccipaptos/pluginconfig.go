@@ -49,3 +49,19 @@ func init() {
 	ccipcommon.RegisterPluginConfig(chainsel.FamilyAptos, initializePluginConfigFunc(chainsel.FamilyAptos))
 	ccipcommon.RegisterPluginConfig(chainsel.FamilySui, initializePluginConfigFunc(chainsel.FamilySui))
 }
+
+// public entry fun commit(
+// 	caller: &signer,
+// 	report_context: vector<vector<u8>>,
+// 	report: vector<u8>,
+// 	signatures: vector<vector<u8>>
+
+// public fun commit(
+// 	ref: &mut CCIPObjectRef,
+// 	state: &mut OffRampState,
+// 	clock: &clock::Clock,
+// 	report_context: vector<vector<u8>>,
+// 	report: vector<u8>,
+// 	signatures: vector<vector<u8>>,
+// 	ctx: &mut TxContext
+// )

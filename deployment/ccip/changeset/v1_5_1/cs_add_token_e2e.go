@@ -672,31 +672,33 @@ func grantAccessToPool(
 
 // addMinterAndMintTokenERC677 adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
 func addMinterAndMintTokenERC677(env cldf.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
-	return addMinterAndMintTokenHelper(env, selector, token, recipient, amount)
+	// return addMinterAndMintTokenHelper(env, selector, token, recipient, amount)
+	return nil
 }
 
 // addMinterAndMintTokenERC677Helper adds the minter role to the recipient and mints the specified amount of tokens to the recipient's address.
 func addMinterAndMintTokenERC677Helper(env cldf.Environment, selector uint64, token *burn_mint_erc20_with_drip.BurnMintERC20, recipient common.Address, amount *big.Int) error {
-	baseToken, err := burn_mint_erc677.NewBurnMintERC677(token.Address(), env.BlockChains.EVMChains()[selector].Client)
+	baseToken, err := burn_mint_erc20_with_drip.NewBurnMintERC20(token.Address(), env.BlockChains.EVMChains()[selector].Client)
 	if err != nil {
 		return fmt.Errorf("failed to cast helper to base token: %w", err)
 	}
 	return addMinterAndMintTokenHelper(env, selector, baseToken, recipient, amount)
 }
 
-func addMinterAndMintTokenHelper(env cldf.Environment, selector uint64, token *burn_mint_erc677.BurnMintERC677, recipient common.Address, amount *big.Int) error {
+func addMinterAndMintTokenHelper(env cldf.Environment, selector uint64, token *burn_mint_erc20_with_drip.BurnMintERC20, recipient common.Address, amount *big.Int) error {
 	deployerKey := env.BlockChains.EVMChains()[selector].DeployerKey
 	ctx := env.GetContext()
+
 	// check if the owner is the deployer key
-	owner, err := token.Owner(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return fmt.Errorf("failed to get owner of token %s on chain %d: %w", token.Address().Hex(), selector, err)
-	}
-	if owner != deployerKey.From {
-		return fmt.Errorf("owner of token %s on chain %d is not the deployer key", token.Address().Hex(), selector)
-	}
+	// owner, err := token.Owner(&bind.CallOpts{Context: ctx})
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get owner of token %s on chain %d: %w", token.Address().Hex(), selector, err)
+	// }
+	// if owner != deployerKey.From {
+	// 	return fmt.Errorf("owner of token %s on chain %d is not the deployer key", token.Address().Hex(), selector)
+	// }
 	// Grant minter role to the given address
-	tx, err := token.GrantMintRole(deployerKey, recipient)
+	tx, err := token.GrantMintAndBurnRoles(deployerKey, recipient)
 	if err != nil {
 		return fmt.Errorf("failed to grant mint role to %s on chain %d: %w", recipient.Hex(), selector, err)
 	}

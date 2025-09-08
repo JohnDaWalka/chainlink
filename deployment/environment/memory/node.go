@@ -22,6 +22,8 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
+	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
@@ -94,6 +96,10 @@ func (n Node) ReplayLogs(ctx context.Context, chains map[uint64]uint64) error {
 		family, _ := chainsel.GetSelectorFamily(sel)
 		chainID, _ := chainsel.GetChainIDFromSelector(sel)
 		if family == "aptos" {
+			fmt.Printf("ReplayFromBlock: family: %q chainID: %q\n", family, chainID)
+			continue
+		}
+		if family == "sui" {
 			fmt.Printf("ReplayFromBlock: family: %q chainID: %q\n", family, chainID)
 			continue
 		}
@@ -187,6 +193,8 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			ocrtype = chaintype.Cosmos
 		case chainsel.FamilyAptos:
 			ocrtype = chaintype.Aptos
+		case chainsel.FamilySui:
+			ocrtype = chaintype.Sui
 		case chainsel.FamilyTon:
 			ocrtype = chaintype.TON
 		case chainsel.FamilyTron:
@@ -216,6 +224,8 @@ func (n Node) JDChainConfigs() ([]*nodev1.ChainConfig, error) {
 			ctype = nodev1.ChainType_CHAIN_TYPE_STARKNET
 		case chainsel.FamilyAptos:
 			ctype = nodev1.ChainType_CHAIN_TYPE_APTOS
+		case chainsel.FamilySui:
+			ctype = nodev1.ChainType_CHAIN_TYPE_SUI
 		case chainsel.FamilyTon:
 			ctype = nodev1.ChainType_CHAIN_TYPE_TON
 		case chainsel.FamilyTron:
@@ -360,6 +370,16 @@ func NewNode(
 		}
 		c.Aptos = aptosConfigs
 
+		var suiConfigs chainlink.RawConfigs
+		for chainID, chain := range nodecfg.BlockChains.SuiChains() {
+			suiChainID, err := chainsel.GetChainIDFromSelector(chainID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			suiConfigs = append(suiConfigs, createSuiChainConfig(suiChainID, chain))
+		}
+		c.Sui = suiConfigs
+
 		var tonConfigs chainlink.RawConfigs
 		for chainID, chain := range nodecfg.BlockChains.TonChains() {
 			tonChainID, err := chainsel.GetChainIDFromSelector(chainID)
@@ -446,6 +466,7 @@ func NewNode(
 		nodecfg.BlockChains.EVMChains(),
 		nodecfg.BlockChains.SolanaChains(),
 		nodecfg.BlockChains.AptosChains(),
+		nodecfg.BlockChains.SuiChains(),
 		nodecfg.BlockChains.TonChains(),
 		nodecfg.BlockChains.TronChains(),
 	)
@@ -491,6 +512,7 @@ func CreateKeys(t *testing.T,
 	chains map[uint64]cldf_evm.Chain,
 	solchains map[uint64]cldf_solana.Chain,
 	aptoschains map[uint64]cldf_aptos.Chain,
+	suichains map[uint64]suichain.Chain,
 	tonchains map[uint64]cldf_ton.Chain,
 	tronchains map[uint64]cldf_tron.Chain,
 ) Keys {
@@ -526,6 +548,8 @@ func CreateKeys(t *testing.T,
 			ctype = chaintype.Cosmos
 		case chainsel.FamilyAptos:
 			ctype = chaintype.Aptos
+		case chainsel.FamilySui:
+			ctype = chaintype.Sui
 		case chainsel.FamilyTon:
 			ctype = chaintype.TON
 		case chainsel.FamilyTron:
@@ -586,6 +610,18 @@ func CreateKeys(t *testing.T,
 			transmitters[chain.Selector] = transmitter.ID()
 			t.Logf("Created Aptos Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 			// TODO: funding
+		case chainsel.FamilySui:
+			keystore := app.GetKeyStore().Sui()
+			err = keystore.EnsureKey(ctx)
+			require.NoError(t, err, "failed to create key for sui")
+
+			keys, err := keystore.GetAll()
+			require.NoError(t, err)
+			require.Len(t, keys, 1)
+
+			transmitter := keys[0]
+			transmitters[chain.Selector] = transmitter.ID()
+			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 		case chainsel.FamilyTron:
 			keystore := app.GetKeyStore().Tron()
 			err = keystore.EnsureKey(ctx)
@@ -611,6 +647,38 @@ func CreateKeys(t *testing.T,
 			transmitters[chain.Selector] = transmitter.ID()
 		default:
 			// TODO: other transmission keys unsupported for now
+		}
+	}
+
+	if len(suichains) > 0 {
+
+		ctype := chaintype.Sui
+		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
+		require.NoError(t, err)
+		keys, err := app.GetKeyStore().OCR2().GetAllOfType(ctype)
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		keybundle := keys[0]
+
+		keybundles[ctype] = keybundle
+
+		for sel, _ := range suichains {
+			keystore := app.GetKeyStore().Sui()
+			err = keystore.EnsureKey(ctx)
+			require.NoError(t, err, "failed to create key for sui")
+
+			keys, err := keystore.GetAll()
+			require.NoError(t, err)
+			require.Len(t, keys, 1)
+
+			transmitter := keys[0]
+			transmitters[sel] = transmitter.ID()
+			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
+
+			lggr := logger.NewSingleFileLogger(t)
+			err = sui_testutils.FundWithFaucet(lggr, "localnet", "0x"+transmitter.Account())
+			require.NoError(t, err)
+
 		}
 	}
 

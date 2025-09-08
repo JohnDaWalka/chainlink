@@ -253,6 +253,9 @@ func (kr *keyRing) raw() (rawKeys rawKeyRing) {
 	for _, tronkey := range kr.Tron {
 		rawKeys.Tron = append(rawKeys.Tron, internal.RawBytes(tronkey))
 	}
+	for _, suikey := range kr.Sui {
+		rawKeys.Sui = append(rawKeys.Sui, internal.RawBytes(suikey))
+	}
 	for _, tonkey := range kr.TON {
 		rawKeys.TON = append(rawKeys.TON, internal.RawBytes(tonkey))
 	}
@@ -313,6 +316,10 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	for _, tronKey := range kr.Tron {
 		tronIDs = append(tronIDs, tronKey.ID())
 	}
+	var suiIDs []string
+	for _, suiKey := range kr.Sui {
+		suiIDs = append(suiIDs, suiKey.ID())
+	}
 	tonIDs := []string{}
 	for _, tonKey := range kr.TON {
 		tonIDs = append(tonIDs, tonKey.ID())
@@ -335,6 +342,7 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 		workflowIDs[i] = workflowKey.ID()
 		i++
 	}
+	lggr.Infow(fmt.Sprintf("Unlocked %d SUIII keys", len(suiIDs)), "keys", suiIDs)
 	if len(csaIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d CSA keys", len(csaIDs)), "keys", csaIDs)
 	}
@@ -364,6 +372,9 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 	}
 	if len(tronIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d Tron keys", len(tronIDs)), "keys", tronIDs)
+	}
+	if len(suiIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Sui keys", len(suiIDs)), "keys", suiIDs)
 	}
 	if len(tonIDs) > 0 {
 		lggr.Infow(fmt.Sprintf("Unlocked %d TON keys", len(tonIDs)), "keys", tonIDs)
@@ -446,9 +457,19 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 		aptosKey := aptoskey.KeyFor(internal.NewRaw(rawAptosKey))
 		keyRing.Aptos[aptosKey.ID()] = aptosKey
 	}
+
+	for _, rawSuiKey := range rawKeys.Sui {
+		suiKey := suikey.KeyFor(internal.NewRaw(rawSuiKey))
+		keyRing.Sui[suiKey.ID()] = suiKey
+	}
+
 	for _, rawTronKey := range rawKeys.Tron {
 		tronKey := tronkey.KeyFor(internal.NewRaw(rawTronKey))
 		keyRing.Tron[tronKey.ID()] = tronKey
+	}
+	for _, rawSuiKey := range rawKeys.Sui {
+		suiKey := suikey.KeyFor(internal.NewRaw(rawSuiKey))
+		keyRing.Sui[suiKey.ID()] = suiKey
 	}
 	for _, rawTONKey := range rawKeys.TON {
 		tonKey := tonkey.KeyFor(internal.NewRaw(rawTONKey))

@@ -20,11 +20,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/block-vision/sui-go-sdk/models"
+	"github.com/block-vision/sui-go-sdk/sui"
+
 	aptos_ccip_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
+	sui_module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
+	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui/bindings/packages/offramp"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
@@ -41,8 +46,8 @@ import (
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 )
@@ -245,6 +250,16 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 					expectedSeqNum,
 					true,
 				))
+			case chainsel.FamilySui:
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeSui(
+					t,
+					srcChain,
+					e.BlockChains.SuiChains()[dstChain],
+					state.SuiChains[dstChain].CCIPAddress,
+					startBlock,
+					expectedSeqNum,
+					true,
+				))
 			case chainsel.FamilyAptos:
 				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeAptos(
 					t,
@@ -363,6 +378,17 @@ func ConfirmMultipleCommits(
 					enforceSingleCommit,
 				)
 				return err
+			case chainsel.FamilySui:
+				_, err := ConfirmCommitWithExpectedSeqNumRangeSui(
+					t,
+					srcChain,
+					env.BlockChains.SuiChains()[destChain],
+					state.SuiChains[destChain].CCIPAddress,
+					startBlocks[destChain],
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
 			case chainsel.FamilyAptos:
 				_, err := ConfirmCommitWithExpectedSeqNumRangeAptos(
 					t,
@@ -407,7 +433,9 @@ func ConfirmCommitWithExpectedSeqNumRange(
 	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
 
 	verifyCommitReport := func(report *offramp.OffRampCommitReportAccepted) bool {
+		fmt.Println("REPORT: ", report)
 		processRoots := func(roots []offramp.InternalMerkleRoot) bool {
+			fmt.Println("ROOTS: ", roots)
 			for _, mr := range roots {
 				t.Logf(
 					"Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
@@ -456,12 +484,14 @@ func ConfirmCommitWithExpectedSeqNumRange(
 			iter, err := offRamp.FilterCommitReportAccepted(&bind.FilterOpts{
 				Context: t.Context(),
 			})
+
 			// In some test case the test ends while the filter is still running resulting in a context.Canceled error.
 			if err != nil && !errors.Is(err, context.Canceled) {
 				require.NoError(t, err)
 			}
 			for iter.Next() {
 				event := iter.Event
+				fmt.Printf("RECEIpVED COMMIT REPORt ACCEPTED: %v", *event)
 				verified := verifyCommitReport(event)
 				if verified {
 					return event, nil
@@ -1228,5 +1258,154 @@ func AssertTimelockOwnership(
 		owner, _, err := commonchangeset.LoadOwnableContract(contract, e.Env.BlockChains.EVMChains()[e.HomeChainSel].Client)
 		require.NoError(t, err)
 		require.Equal(t, homeChainTimelockAddress, owner)
+	}
+}
+
+func SuiEventEmitter[T any](
+	t *testing.T,
+	client sui.ISuiAPI,
+	packageId, moduleName, event string,
+	done chan any,
+) (<-chan struct {
+	Event   T
+	Version uint64
+}, <-chan error) {
+	ch := make(chan struct {
+		Event   T
+		Version uint64
+	}, 200)
+	errChan := make(chan error)
+	limit := uint64(50)
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 2)
+		defer ticker.Stop()
+
+		for {
+			for {
+				// As this can take a few iterations if there are many events, check for done before each request
+				select {
+				case <-done:
+					return
+				default:
+				}
+				events, err := client.SuiXQueryEvents(t.Context(), models.SuiXQueryEventsRequest{
+					SuiEventFilter: models.EventFilterByMoveEventModule{
+						MoveEventModule: models.MoveEventModule{
+							Package: packageId,
+							Module:  moduleName,
+							Event:   event,
+						},
+					},
+					Limit:           limit,
+					DescendingOrder: false,
+				})
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				if len(events.Data) == 0 {
+					// No new events found
+					break
+				}
+
+				for _, event := range events.Data {
+
+					fmt.Println("EVENTT SUII: ", event)
+					// seqNum = event.SequenceNumber + 1
+					// if startVersion != nil && event.Version < *startVersion {
+					// 	continue
+					// }
+					var out T
+					if err := codec.DecodeAptosJsonValue(event, &out); err != nil {
+						errChan <- err
+						continue
+					}
+					ch <- struct {
+						Event   T
+						Version uint64
+					}{
+						Event:   out,
+						Version: 1, // todo: change this
+					}
+				}
+
+			}
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				continue
+			}
+		}
+	}()
+	return ch, errChan
+}
+
+func ConfirmCommitWithExpectedSeqNumRangeSui(
+	t *testing.T,
+	srcSelector uint64,
+	dest cldf_sui.Chain,
+	offRampAddress string,
+	startVersion *uint64,
+	expectedSeqNumRange ccipocr3.SeqNumRange,
+	enforceSingleCommit bool,
+) (any, error) {
+	// Bound the offRamp
+	boundOffRamp, err := sui_ccip_offramp.NewOfframp(offRampAddress, dest.Client)
+	require.NoError(t, err)
+
+	done := make(chan any)
+	defer close(done)
+	sink, errChan := SuiEventEmitter[sui_module_offramp.CommitReportAccepted](t, dest.Client, boundOffRamp.Address(), "offramp", "CommitReportAccepted", done)
+
+	timeout := time.NewTimer(tests.WaitTimeout(t))
+	defer timeout.Stop()
+
+	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
+
+	verifyCommitReport := func(report sui_module_offramp.CommitReportAccepted) bool {
+		processRoots := func(roots []sui_module_offramp.MerkleRoot) bool {
+			for _, mr := range roots {
+				t.Logf("(Sui) Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
+					mr.MinSeqNr, mr.MaxSeqNr, dest.Selector, srcSelector, expectedSeqNumRange.String(), report.PriceUpdates.TokenPriceUpdates,
+				)
+				seenMessages.visitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
+
+				if mr.SourceChainSelector == srcSelector && uint64(expectedSeqNumRange.Start()) >= mr.MinSeqNr && uint64(expectedSeqNumRange.End()) <= mr.MaxSeqNr {
+					t.Logf("(Sui) All sequence numbers committed in a single report [%d, %d]",
+						expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+					)
+					return true
+				}
+
+				if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
+					t.Logf(
+						"(Sui) All sequence numbers already committed from range [%d, %d]",
+						expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+					)
+					return true
+				}
+			}
+			return false
+		}
+
+		return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
+	}
+
+	for {
+		select {
+		case event := <-sink:
+			verified := verifyCommitReport(event.Event)
+			if verified {
+				return &event.Event, nil
+			}
+		case err := <-errChan:
+			require.NoError(t, err)
+		case <-timeout.C:
+			return nil, fmt.Errorf("(sui) timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				dest.Selector, srcSelector, expectedSeqNumRange.String())
+		}
 	}
 }

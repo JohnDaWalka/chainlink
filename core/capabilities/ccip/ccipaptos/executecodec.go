@@ -10,6 +10,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
+	"github.com/smartcontractkit/wsrpc/logger"
 )
 
 // ExecutePluginCodecV1 is a codec for encoding and decoding execute plugin reports.
@@ -25,6 +26,13 @@ func NewExecutePluginCodecV1(extraDataCodec ccipcommon.ExtraDataCodec) *ExecuteP
 }
 
 func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+	lggr, err := logger.New()
+	if err != nil {
+		return nil, err
+	}
+
+	lggr.Info("ENCODING SUI REPORT: ", report.ChainReports)
+
 	if len(report.ChainReports) == 0 {
 		return nil, nil
 	}
@@ -44,12 +52,21 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	}
 
 	message := chainReport.Messages[0]
-	offchainTokenData := chainReport.OffchainTokenData[0]
+	var offchainTokenData [][]byte
+	if len(chainReport.OffchainTokenData) > 0 {
+		offchainTokenData = chainReport.OffchainTokenData[0]
+	} else {
+		offchainTokenData = [][]byte{}
+	}
 
 	s := &bcs.Serializer{}
+	logLen := func(label string) {
+		lggr.Infow("bcs length checkpoint", "field", label, "len", len(s.ToBytes()))
+	}
 
 	// 1. source_chain_selector: u64
 	s.U64(uint64(chainReport.SourceChainSelector))
+	logLen("source_chain_selector")
 
 	// --- Start Message Header ---
 	// 2. message_id: fixed_vector_u8(32)
@@ -57,25 +74,32 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 		return nil, fmt.Errorf("invalid message ID length: expected 32, got %d", len(message.Header.MessageID))
 	}
 	s.FixedBytes(message.Header.MessageID[:])
+	logLen("message_id")
 
 	// 3. header_source_chain_selector: u64
 	s.U64(uint64(message.Header.SourceChainSelector))
+	logLen("header_source_chain_selector")
 
 	// 4. dest_chain_selector: u64
 	s.U64(uint64(message.Header.DestChainSelector))
+	logLen("dest_chain_selector")
 
 	// 5. sequence_number: u64
 	s.U64(uint64(message.Header.SequenceNumber))
+	logLen("sequence_number")
 
 	// 6. nonce: u64
 	s.U64(message.Header.Nonce)
+	logLen("nonce")
 	// --- End Message Header ---
 
 	// 7. sender: vector<u8>
 	s.WriteBytes(message.Sender)
+	logLen("sender")
 
 	// 8. data: vector<u8>
 	s.WriteBytes(message.Data)
+	logLen("data")
 
 	// 9. receiver: address (Aptos address, 32 bytes)
 	var receiverAddr aptos.AccountAddress
@@ -83,6 +107,11 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 		return nil, fmt.Errorf("failed to parse receiver address '%s': %w", message.Receiver.String(), err)
 	}
 	s.Struct(&receiverAddr)
+	logLen("receiver")
+
+	lggr.Infow("Initializing plugin config",
+		"extraDataCodecType", fmt.Sprintf("%T", e.extraDataCodec),
+	)
 
 	// 10. gas_limit: u256
 	// Extract gas limit from ExtraArgs
@@ -90,11 +119,17 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ExtraArgs: %w", err)
 	}
+
+	lggr.Info("Decoded sui extraArgs map", decodedExtraArgsMap)
+
 	gasLimit, err := parseExtraDataMap(decodedExtraArgsMap) // Use a helper to extract the gas limit
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract gas limit from decoded ExtraArgs map: %w", err)
 	}
 	s.U256(*gasLimit)
+	logLen("gas_limit")
+
+	lggr.Infow("Extracted gasLimit from ExtraArgs", "gasLimit", gasLimit.String())
 
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
 	bcs.SerializeSequenceWithFunction(message.TokenAmounts, s, func(s *bcs.Serializer, item cciptypes.RampTokenAmount) {
@@ -132,6 +167,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 		}
 		s.U256(*item.Amount.Int)
 	})
+	logLen("token_amounts")
 	if err != nil { // Check error from SerializeSequenceWithFunction itself
 		return nil, fmt.Errorf("failed during token_amounts serialization: %w", err)
 	}
@@ -143,11 +179,16 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	bcs.SerializeSequenceWithFunction(offchainTokenData, s, func(s *bcs.Serializer, item []byte) {
 		s.WriteBytes(item)
 	})
+	logLen("offchain_token_data")
 	if err != nil { // Check error from SerializeSequenceWithFunction itself
 		return nil, fmt.Errorf("failed during offchain_token_data serialization: %w", err)
 	}
 	if s.Error() != nil { // Check error set within the lambda (though unlikely here)
 		return nil, fmt.Errorf("failed to serialize offchain_token_data: %w", s.Error())
+	}
+
+	if chainReport.Proofs == nil {
+		chainReport.Proofs = []cciptypes.Bytes32{}
 	}
 
 	// 13. proofs: vector<fixed_vector_u8(32)>
@@ -158,6 +199,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 		}
 		s.FixedBytes(item[:])
 	})
+	logLen("proofs")
 	if err != nil { // Check error from SerializeSequenceWithFunction itself
 		return nil, fmt.Errorf("failed during proofs serialization: %w", err)
 	}
@@ -169,6 +211,9 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	if s.Error() != nil {
 		return nil, fmt.Errorf("BCS serialization failed: %w", s.Error())
 	}
+
+	logLen("final")
+	lggr.Info("SERIALIZED SUI REPORT IN BCS FORMAT: ", s.ToBytes(), "length", len(s.ToBytes()))
 
 	return s.ToBytes(), nil
 }

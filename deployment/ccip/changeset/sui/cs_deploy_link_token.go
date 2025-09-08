@@ -1,0 +1,86 @@
+package sui
+
+import (
+	"fmt"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
+	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
+	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
+)
+
+var _ cldf.ChangeSetV2[DeployLinkTokenConfig] = DeployLinkToken{}
+
+// DeployAptosChain deploys Aptos chain packages and modules
+type DeployLinkToken struct{}
+
+// Apply implements deployment.ChangeSetV2.
+func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
+	}
+
+	ab := cldf.NewMemoryAddressBook()
+	seqReports := make([]operations.Report[any, any], 0)
+
+	suiChain := e.BlockChains.SuiChains()[config.ChainSelector]
+
+	deps := SuiDeps{
+		AB: ab,
+		SuiChain: sui_ops.OpTxDeps{
+			Client: suiChain.Client,
+			Signer: suiChain.Signer,
+			GetCallOpts: func() *bind.CallOpts {
+				b := uint64(400_000_000)
+				return &bind.CallOpts{
+					WaitForExecution: true,
+					GasBudget:        &b,
+				}
+			},
+		},
+		CCIPOnChainState: state,
+	}
+
+	// Run DeployLinkToken Operation
+	linkTokenReport, err := operations.ExecuteOperation(e.OperationsBundle, linkops.DeployLINKOp, deps.SuiChain, cld_ops.EmptyInput{})
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy LinkToken for Sui chain %d: %w", config.ChainSelector, err)
+	}
+
+	// save LinkToken address to the addressbook
+	typeAndVersionLinkToken := cldf.NewTypeAndVersion(shared.SuiLinkTokenType, deployment.Version1_0_0)
+	err = deps.AB.Save(config.ChainSelector, linkTokenReport.Output.PackageId, typeAndVersionLinkToken)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken address %s for Sui chain %d: %w", linkTokenReport.Output.PackageId, config.ChainSelector, err)
+	}
+
+	// save LinkTokenCoinMetadataId address to the addressbook
+	typeAndVersionCoinMetadataId := cldf.NewTypeAndVersion(shared.SuiLinkTokenObjectMetadataId, deployment.Version1_0_0)
+	err = deps.AB.Save(config.ChainSelector, linkTokenReport.Output.Objects.CoinMetadataObjectId, typeAndVersionCoinMetadataId)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken CoinmetadataObjectId address %s for Sui chain %d: %w", linkTokenReport.Output.Objects.CoinMetadataObjectId, config.ChainSelector, err)
+	}
+
+	// save LinkTokenTreasuryCapId address to the addressbook
+	typeAndVersionTreasuryCapId := cldf.NewTypeAndVersion(shared.SuiLinkTokenTreasuryCapId, deployment.Version1_0_0)
+	err = deps.AB.Save(config.ChainSelector, linkTokenReport.Output.Objects.TreasuryCapObjectId, typeAndVersionTreasuryCapId)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken TreasuryCapObjectId address %s for Sui chain %d: %w", linkTokenReport.Output.Objects.TreasuryCapObjectId, config.ChainSelector, err)
+	}
+
+	return cldf.ChangesetOutput{
+		AddressBook: ab,
+		Reports:     seqReports,
+	}, nil
+}
+
+// VerifyPreconditions implements deployment.ChangeSetV2.
+func (d DeployLinkToken) VerifyPreconditions(e cldf.Environment, config DeployLinkTokenConfig) error {
+	return nil
+}

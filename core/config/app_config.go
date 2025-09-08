@@ -26,6 +26,7 @@ type AppConfig interface {
 	StarkNetEnabled() bool
 	AptosEnabled() bool
 	TronEnabled() bool
+	SuiEnabled() bool
 	TONEnabled() bool
 	SuiEnabled() bool
 

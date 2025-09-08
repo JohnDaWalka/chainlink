@@ -21,6 +21,8 @@ const (
 	StarkNet ChainType = "starknet"
 	// Aptos for the Aptos chain
 	Aptos ChainType = "aptos"
+	// Sui for the Sui chain
+	Sui ChainType = "sui"
 	// Tron for the Tron chain
 	Tron ChainType = "tron"
 	// TON for the TON chain

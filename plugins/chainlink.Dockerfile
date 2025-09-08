@@ -12,10 +12,11 @@ WORKDIR /chainlink
 COPY GNUmakefile package.json ./
 COPY tools/bin/ldflags ./tools/bin/
 
-ADD go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
 COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=secret,id=GIT_AUTH_TOKEN \
+    ./plugins/scripts/setup_git_auth.sh && \
+    GOPRIVATE=github.com/smartcontractkit/chainlink-sui go mod download
 
 # Install Delve for debugging with cache mounts
 RUN --mount=type=cache,target=/go/pkg/mod \

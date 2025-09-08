@@ -615,6 +615,23 @@ func (_m *Master) TON() keystore.TON {
 	return r0
 }
 
+// Master_Sui_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Sui'
+type Master_Sui_Call struct {
+	*mock.Call
+}
+
+// Sui is a helper method to define mock.On call
+func (_e *Master_Expecter) Sui() *Master_Sui_Call {
+	return &Master_Sui_Call{Call: _e.mock.On("Sui")}
+}
+
+func (_c *Master_Sui_Call) Run(run func()) *Master_Sui_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
 // Master_TON_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TON'
 type Master_TON_Call struct {
 	*mock.Call
@@ -632,8 +649,17 @@ func (_c *Master_TON_Call) Run(run func()) *Master_TON_Call {
 	return _c
 }
 
+func (_c *Master_Sui_Call) Return(_a0 keystore.Sui) *Master_Sui_Call {
+	return _c
+}
+
 func (_c *Master_TON_Call) Return(_a0 keystore.TON) *Master_TON_Call {
 	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Master_Sui_Call) RunAndReturn(run func() keystore.Sui) *Master_Sui_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

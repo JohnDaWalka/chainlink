@@ -127,10 +127,21 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		return nil, fmt.Errorf("failed to get chain family from selector %d: %w", config.Config.ChainSelector, err)
 	}
 
-	destChainID, err := chainsel.GetChainIDFromSelector(chainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chain ID from selector %d: %w", chainSelector, err)
+	var destChainID string
+	// TODO: don't hardcode this
+	switch config.Config.ChainSelector {
+	case 18395503381733958356:
+		destChainID = "4"
+	case 9762610643973837292:
+		destChainID = "2"
+	default:
+		var err error
+		destChainID, err = chainsel.GetChainIDFromSelector(uint64(config.Config.ChainSelector))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain ID from selector: %w", err)
+		}
 	}
+
 	destRelayID := types.NewRelayID(destChainFamily, destChainID)
 
 	configTracker, err := ocrimpls.NewConfigTracker(config, i.addressCodec)
@@ -541,6 +552,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, nil, fmt.Errorf("failed to get chain selector from chain ID %s: %w", chainID, err1)
 		}
 
+		i.lggr.Infow("INSIDE RELAYER LOOP", "relayID", relayID, "relayChainFam", relayChainFamily)
+
 		cr, err1 := crcw.GetChainReader(ctx, ccipcommon.ChainReaderProviderOpts{
 			Lggr:            i.lggr,
 			Relayer:         relayer,
@@ -557,6 +570,13 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, nil, err1
 		}
 
+		i.lggr.Infow("CW CONDITION DEBUG",
+			"chainID", chainID,
+			"destChainID", destChainID,
+			"relayChainFamily", relayChainFamily,
+			"destChainFamily", destChainFamily,
+			"offRampAddr:", destAddrStr)
+
 		if chainID == destChainID && destChainFamily == relayChainFamily {
 			offrampAddress := destAddrStr
 			err2 := cr.Bind(ctx, []types.BoundContract{
@@ -570,14 +590,25 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			}
 		}
 
+		i.lggr.Infow("START CHAIN READER")
+
 		if err2 := cr.Start(ctx); err2 != nil {
 			return nil, nil, nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chainID, err2)
 		}
+
+		i.lggr.Infow("CHAINREADER STARTED")
 
 		var solanaChainWriterConfigVersion *string
 		if ofc.Execute != nil {
 			solanaChainWriterConfigVersion = ofc.Execute.SolanaChainWriterConfigVersion
 		}
+
+		i.lggr.Infow("INITIALIZING CW FOR SUI(1): ", "chainID", chainID)
+		i.lggr.Infow("INITIALIZING CW FOR SUI(2): ", "relayer", relayer)
+		for rid, txs := range i.transmitters {
+			i.lggr.Infow("CW Transmitter Entry", "relayID", rid.String(), "transmitters", txs)
+		}
+
 		cw, err1 := crcw.GetChainWriter(ctx, ccipcommon.ChainWriterProviderOpts{
 			ChainID:                        chainID,
 			Relayer:                        relayer,
@@ -591,6 +622,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			return nil, nil, nil, err1
 		}
 
+		i.lggr.Infow("starting CW FOR: ", cw)
+
 		if err4 := cw.Start(ctx); err4 != nil {
 			return nil, nil, nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chainID, err4)
 		}
@@ -599,6 +632,8 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to wrap contract reader for chain %s: %w", chainID, err)
 		}
+
+		i.lggr.Infow("started CW")
 
 		contractReaders[chainSelector] = cr
 		extendedReaders[chainSelector] = extendedCr

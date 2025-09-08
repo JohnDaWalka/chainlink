@@ -2,10 +2,14 @@ module github.com/smartcontractkit/chainlink/core/scripts
 
 go 1.24.5
 
+replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
+
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../../
 
-replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+
+// replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 
 replace github.com/smartcontractkit/chainlink/system-tests/lib => ../../system-tests/lib
 

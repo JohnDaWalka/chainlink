@@ -313,6 +313,11 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 	if cfg.TronEnabled() {
 		initOps = append(initOps, InitTron(relayerFactory, keyStore.Tron(), keyStore.CSA(), cfg.TronConfigs()))
 	}
+
+	if cfg.SuiEnabled() {
+		initOps = append(initOps, InitSui(relayerFactory, keyStore.Sui(), keyStore.CSA(), cfg.SuiConfigs()))
+	}
+
 	if cfg.TONEnabled() {
 		initOps = append(initOps, InitTON(relayerFactory, keyStore.TON(), keyStore.CSA(), cfg.TONConfigs()))
 	}

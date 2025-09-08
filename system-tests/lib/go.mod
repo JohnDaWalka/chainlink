@@ -11,8 +11,11 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
-// Uncomment to work with local version of crib-sdk
-// replace github.com/smartcontractkit/crib-sdk => ../../../crib-sdk
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+
+// replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
+
+// replace github.com/smartcontractkit/chainlink-deployments-framework => ../../../chainlink-deployments-framework
 
 require (
 	dario.cat/mergo v1.0.2

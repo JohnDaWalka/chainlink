@@ -685,6 +685,11 @@ func validateKeyStoreMatchForRelay(ctx context.Context, network string, keyStore
 		if err != nil {
 			return errors.Errorf("no Aptos key matching: %q", key)
 		}
+	case relay.NetworkSui:
+		_, err := keyStore.Sui().Get(key)
+		if err != nil {
+			return errors.Errorf("no Sui key matching: %q", key)
+		}
 	case relay.NetworkTron:
 		_, err := keyStore.Tron().Get(key)
 		if err != nil {
