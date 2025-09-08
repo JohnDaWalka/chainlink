@@ -163,7 +163,7 @@ type keyRing struct {
 	Cosmos       map[string]cosmoskey.Key
 	Solana       map[string]solkey.Key
 	StarkNet     map[string]starkkey.Key
-	Sui        map[string]suikey.Key
+	Sui          map[string]suikey.Key
 	Aptos        map[string]aptoskey.Key
 	Tron         map[string]tronkey.Key
 	TON          map[string]tonkey.Key
@@ -183,7 +183,7 @@ func newKeyRing() *keyRing {
 		Cosmos:       make(map[string]cosmoskey.Key),
 		Solana:       make(map[string]solkey.Key),
 		StarkNet:     make(map[string]starkkey.Key),
-		Sui:      make(map[string]suikey.Key),
+		Sui:          make(map[string]suikey.Key),
 		Aptos:        make(map[string]aptoskey.Key),
 		Tron:         make(map[string]tronkey.Key),
 		TON:          make(map[string]tonkey.Key),
@@ -389,22 +389,22 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 // it holds only the essential key information to avoid adding unnecessary data
 // (like public keys) to the database
 type rawKeyRing struct {
-	Eth        [][]byte
-	CSA        [][]byte
-	OCR        [][]byte
-	OCR2       [][]byte
-	P2P        [][]byte
-	Cosmos     [][]byte
-	Solana     [][]byte
-	StarkNet   [][]byte
-	Sui        [][]byte
-	Aptos      [][]byte
-	Tron       [][]byte
-	TON        [][]byte
-	Sui        [][]byte
-	VRF        [][]byte
-	Workflow   [][]byte
-	LegacyKeys LegacyKeyStorage `json:"-"`
+	Eth          [][]byte
+	CSA          [][]byte
+	OCR          [][]byte
+	OCR2         [][]byte
+	P2P          [][]byte
+	Cosmos       [][]byte
+	Solana       [][]byte
+	StarkNet     [][]byte
+	Sui          [][]byte
+	Aptos        [][]byte
+	Tron         [][]byte
+	TON          [][]byte
+	VRF          [][]byte
+	Workflow     [][]byte
+	DKGRecipient [][]byte
+	LegacyKeys   LegacyKeyStorage `json:"-"`
 }
 
 func (rawKeys rawKeyRing) keys() (*keyRing, error) {
@@ -420,6 +420,7 @@ func (rawKeys rawKeyRing) keys() (*keyRing, error) {
 	for _, rawOCRKey := range rawKeys.OCR {
 		ocrKey := ocrkey.KeyFor(internal.NewRaw(rawOCRKey))
 		keyRing.OCR[ocrKey.ID()] = ocrKey
+	}
 	for _, rawOCR2Key := range rawKeys.OCR2 {
 		if ocr2Key := ocr2key.KeyFor(internal.NewRaw(rawOCR2Key)); ocr2Key != nil {
 			keyRing.OCR2[ocr2Key.ID()] = ocr2Key
