@@ -120,7 +120,7 @@ func (d *dons) allDonCapabilities() []keystone_changeset.DonCapabilities {
 	return out
 }
 
-func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfigFns []cre.CapabilityRegistryConfigFn) error {
+func ConfigureKeystone(input cre.ConfigureKeystoneInput) error {
 	if err := input.Validate(); err != nil {
 		return errors.Wrap(err, "input validation failed")
 	}
@@ -139,7 +139,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		var capabilities []keystone_changeset.DONCapabilityWithConfig
 
 		// check what capabilities each DON has and register them with Capabilities Registry contract
-		for _, configFn := range capabilityRegistryConfigFns {
+		for _, configFn := range input.CapabilityRegistryConfigFns {
 			if configFn == nil {
 				continue
 			}

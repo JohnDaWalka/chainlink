@@ -26,6 +26,14 @@ import (
 )
 
 func Bootstrap(infraInput *infra.Input) error {
+	if infraInput == nil {
+		return errors.New("infra input is nil")
+	}
+
+	if infraInput.Type != infra.CRIB {
+		return nil
+	}
+
 	plan := crib.NewPlan(
 		"namespace",
 		crib.Namespace(infraInput.CRIB.Namespace),

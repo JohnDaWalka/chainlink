@@ -375,10 +375,11 @@ func (d *DebugInput) Validate() error {
 }
 
 type ConfigureKeystoneInput struct {
-	ChainSelector uint64
-	Topology      *Topology
-	CldEnv        *cldf.Environment
-	NodeSets      []*CapabilitiesAwareNodeSet
+	ChainSelector               uint64
+	Topology                    *Topology
+	CldEnv                      *cldf.Environment
+	NodeSets                    []*CapabilitiesAwareNodeSet
+	CapabilityRegistryConfigFns []CapabilityRegistryConfigFn
 
 	OCR3Config  keystone_changeset.OracleConfig
 	OCR3Address *common.Address // v1 consensus contract address

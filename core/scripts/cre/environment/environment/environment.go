@@ -28,6 +28,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/sets"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/cre/environment/tracking"
@@ -681,18 +682,19 @@ func StartCLIEnvironment(
 		in.JD.CSAEncryptionKey = hex.EncodeToString(crypto.FromECDSA(key)[:32])
 		fmt.Printf("Generated new CSA encryption key for JD: %s\n", in.JD.CSAEncryptionKey)
 	}
-	universalSetupInput := creenv.SetupInput{
+	universalSetupInput := &creenv.SetupInput{
 		CapabilitiesAwareNodeSets: in.NodeSets,
 		BlockchainsInput:          in.Blockchains,
 		ContractVersions:          env.ContractVersions(),
 		WithV2Registries:          env.WithV2Registries(),
 		JdInput:                   *in.JD,
 		InfraInput:                *in.Infra,
-		// S3ProviderInput:           in.S3ProviderInput,
-		CapabilityConfigs:       in.CapabilityConfigs,
-		CopyCapabilityBinaries:  withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
-		Capabilities:            capabilities,
-		JobSpecFactoryFunctions: extraJobSpecFunctions,
+		S3ProviderInput:           in.S3ProviderInput,
+		CapabilityConfigs:         in.CapabilityConfigs,
+		CopyCapabilityBinaries:    withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
+		Capabilities:              capabilities,
+		JobSpecFactoryFunctions:   extraJobSpecFunctions,
+		StageGen:                  initLocalCREStageGen(in),
 	}
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)
@@ -976,4 +978,13 @@ func removeCtfConfigsCacheFiles(shouldRemove shouldRemove) error {
 	}
 
 	return nil
+}
+
+func initLocalCREStageGen(in *envconfig.Config) *stagegen.StageGen {
+	stages := 9
+	if in.S3ProviderInput != nil {
+		stages++
+	}
+
+	return stagegen.NewStageGen(stages, "STAGE")
 }

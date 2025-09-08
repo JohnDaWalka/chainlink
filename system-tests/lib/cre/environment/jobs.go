@@ -3,6 +3,7 @@ package environment
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
@@ -50,6 +52,21 @@ func StartJD(lggr zerolog.Logger, jdInput jd.Input, infraInput infra.Input) (*jd
 	}
 
 	lggr.Info().Msgf("Job Distributor started in %.2f seconds", time.Since(startTime).Seconds())
+
+	return jdOutput, nil
+}
+
+func CreateJobDistributor(input *jd.Input) (*jd.Output, error) {
+	if os.Getenv("CI") == "true" {
+		jdImage := ctfconfig.MustReadEnvVar_String(E2eJobDistributorImageEnvVarName)
+		jdVersion := os.Getenv(E2eJobDistributorVersionEnvVarName)
+		input.Image = fmt.Sprintf("%s:%s", jdImage, jdVersion)
+	}
+
+	jdOutput, err := jd.NewJD(input)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to create new job distributor")
+	}
 
 	return jdOutput, nil
 }
