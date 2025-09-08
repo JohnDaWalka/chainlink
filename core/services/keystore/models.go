@@ -389,7 +389,6 @@ func (kr *keyRing) logPubKeys(lggr logger.Logger) {
 // it holds only the essential key information to avoid adding unnecessary data
 // (like public keys) to the database
 type rawKeyRing struct {
-<<<<<<< HEAD
 	Eth        [][]byte
 	CSA        [][]byte
 	OCR        [][]byte
