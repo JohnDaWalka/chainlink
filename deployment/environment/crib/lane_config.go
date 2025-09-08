@@ -563,20 +563,31 @@ func (lc *LaneConfiguration) isDestinationEnabledOnSuiRouter(env cldf.Environmen
 
 	callOpts := &suiBind.CallOpts{
 		WaitForExecution: false,
+		Signer:           suiChain.Signer,
 	}
 
-	isSupported, err := onrampContract.DevInspect().IsChainSupported(
+	config, err := onrampContract.DevInspect().GetDestChainConfig(
 		env.GetContext(),
 		callOpts,
 		suiBind.Object{Id: chainState.OnRampStateObjectId},
 		destinationChain,
 	)
 	if err != nil {
-		// If we can't check the destination, assume it's not supported
-		return false, fmt.Errorf("failed to check if destination chain %d is supported on SUI onramp: %w", destinationChain, err)
+		// If we can't get the config, assume it's not enabled (similar to EVM approach)
+		return false, fmt.Errorf("failed to get dest chain config for chain %d on SUI onramp: %w", destinationChain, err)
 	}
 
-	return isSupported, nil
+	// The first return value is isEnabled (bool), similar to EVM's approach
+	if len(config) == 0 {
+		return false, fmt.Errorf("empty config returned for dest chain %d", destinationChain)
+	}
+
+	isEnabled, ok := config[0].(bool)
+	if !ok {
+		return false, fmt.Errorf("failed to parse isEnabled from config for dest chain %d", destinationChain)
+	}
+
+	return isEnabled, nil
 }
 
 // GetSourceChainsForDestination returns all source chains that can send to a specific destination

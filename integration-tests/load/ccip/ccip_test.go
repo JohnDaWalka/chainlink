@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	solState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
 
@@ -49,6 +51,9 @@ const (
 	solTestKey      = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
 	aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
 )
+
+var suiTestKey = os.Getenv("SUI_TEST_KEY")
+var simChainTestKey = os.Getenv("SIM_CHAIN_TEST_KEY")
 
 func runSafely(ops ...func()) {
 	for _, op := range ops {
@@ -122,6 +127,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	destinationChains := env.BlockChains.ListChainSelectors()[:*userOverrides.NumDestinationChains]
 	evmChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyEVM))
 	solChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilySolana))
+	suiChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilySui))
 
 	// initialize the block time for each chain
 	blockTimes := make(map[uint64]uint64)
@@ -145,11 +151,19 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	for _, cs := range solChains {
 		blockTimes[cs] = 0
 	}
+	for _, cs := range suiChains {
+		// Sui has fast finality with checkpoint-based consensus
+		// Block time varies from 0.24-0.5 seconds, using 1 second as conservative estimate
+		blockTimes[cs] = 1
+		lggr.Infow("Chain block time", "chainSelector", cs, "blockTime", 1, "note", "Sui checkpoint-based")
+	}
 
 	// initialize additional accounts on EVM, we need more accounts to avoid nonce issues
 	// Solana doesn't have a nonce concept so we just use a single account for all chains
 	evmSenders, err := fundAdditionalKeys(lggr, *env, destinationChains)
 	require.NoError(t, err)
+
+	// Sui doesn't have nonce concept, so we can use deployer keys directly like Solana
 
 	// Keep track of the block number for each chain so that event subscription can be done from that block.
 	startBlocks := make(map[uint64]*uint64)
@@ -228,11 +242,31 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				mm.InputChan,
 				finalSeqNrCommitChannels,
 				finalSeqNrExecChannels)
+		case selectors.FamilySui:
+			suiClient := env.BlockChains.SuiChains()[cs].Client
+			checkpoint, err := suiClient.SuiGetLatestCheckpointSequenceNumber(ctx)
+			require.NoError(t, err)
+			startBlocks[cs] = &checkpoint
+			go subscribeSuiTransmitEvents(
+				ctx,
+				t,
+				lggr,
+				env.BlockChains.SuiChains()[cs],
+				state.SuiChains[cs],
+				destChains,
+				checkpoint,
+				cs,
+				loadFinished,
+				&wg,
+				mm.InputChan,
+				finalSeqNrCommitChannels,
+				finalSeqNrExecChannels)
 		}
 	}
 
 	evmSourceKeys := make(map[uint64]map[uint64]*bind.TransactOpts)
 	solSourceKeys := make(map[uint64]*solana.PrivateKey)
+	suiSourceKeys := make(map[uint64]cldf_sui.Chain)
 	var mu sync.Mutex
 
 	for ind, cs := range destinationChains {
@@ -264,6 +298,11 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				if _, exists := solSourceKeys[src]; !exists {
 					solSourceKeys[src] = env.BlockChains.SolanaChains()[src].DeployerKey
 				}
+			case selectors.FamilySui:
+				if _, exists := suiSourceKeys[src]; !exists {
+					// Sui doesn't have nonce conflicts, use deployer key directly
+					suiSourceKeys[src] = env.BlockChains.SuiChains()[src]
+				}
 			}
 			mu.Unlock()
 		}
@@ -281,13 +320,18 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
-					return prepareAccountToSendLink(
-						lggr,
-						state,
-						*env,
-						src,
-						evmSourceKeys[cs][src],
-					)
+					if userOverrides.TestnetConfig.Testnet != nil {
+						return nil
+					} else {
+						return prepareAccountToSendLink(
+							lggr,
+							state,
+							*env,
+							src,
+							evmSourceKeys[cs][src],
+						)
+					}
+
 				default:
 					return nil
 				}
@@ -311,6 +355,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				userOverrides,
 				evmSourceKeys[cs],
 				solSourceKeys,
+				suiSourceKeys,
 				mm.InputChan,
 				srcChains,
 			)
@@ -365,6 +410,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				userOverrides,
 				evmSourceKeys[cs],
 				solSourceKeys,
+				suiSourceKeys,
 				mm.InputChan,
 				srcChains,
 			)
@@ -393,6 +439,52 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				*startBlocks[cs],
 				cs,
 				env.BlockChains.SolanaChains()[cs].Client,
+				finalSeqNrExecChannels[cs],
+				&wg,
+				mm.InputChan)
+		case selectors.FamilySui:
+			// Sui doesn't have a specific receiver field, use default receiver address
+			defaultSuiReceiver := make([]byte, 32) // 32-byte zero address for Sui
+			gunMap[cs], err = NewDestinationGun(
+				env.Logger,
+				cs,
+				*env,
+				&state,
+				defaultSuiReceiver,
+				userOverrides,
+				evmSourceKeys[cs],
+				solSourceKeys,
+				suiSourceKeys,
+				mm.InputChan,
+				srcChains,
+			)
+			if err != nil {
+				lggr.Errorw("Failed to initialize DestinationGun for", "chainSelector", cs, "error", err)
+				t.Fatal(err)
+			}
+			wg.Add(2)
+			go subscribeSuiCommitEvents(
+				ctx,
+				t,
+				lggr,
+				env.BlockChains.SuiChains()[cs],
+				state.SuiChains[cs],
+				srcChains,
+				*startBlocks[cs],
+				cs,
+				finalSeqNrCommitChannels[cs],
+				&wg,
+				mm.InputChan)
+
+			go subscribeSuiExecutionEvents(
+				ctx,
+				t,
+				lggr,
+				env.BlockChains.SuiChains()[cs],
+				state.SuiChains[cs],
+				srcChains,
+				*startBlocks[cs],
+				cs,
 				finalSeqNrExecChannels[cs],
 				&wg,
 				mm.InputChan)

@@ -77,6 +77,7 @@ type SuiExecutionStateChanged struct {
 
 func subscribeSuiTransmitEvents(
 	ctx context.Context,
+	t *testing.T,
 	lggr logger.Logger,
 	suiChain cldf_sui.Chain,
 	chainState suiState.CCIPChainState,
@@ -114,7 +115,7 @@ func subscribeSuiTransmitEvents(
 	}
 
 	// Create ChainReader for SUI events
-	chainReader, indexerInstance, err := createSuiChainReader(ctx, lggr, suiChain, chainState)
+	chainReader, indexerInstance, err := createSuiChainReader(ctx, t, lggr, suiChain, chainState)
 	if err != nil {
 		lggr.Errorw("Failed to create SUI chain reader", "error", err)
 		return
@@ -251,6 +252,7 @@ func subscribeSuiTransmitEvents(
 
 func subscribeSuiCommitEvents(
 	ctx context.Context,
+	t *testing.T,
 	lggr logger.Logger,
 	suiChain cldf_sui.Chain,
 	chainState suiState.CCIPChainState,
@@ -278,7 +280,7 @@ func subscribeSuiCommitEvents(
 	}
 
 	// Create ChainReader for SUI offramp events
-	chainReader, indexerInstance, err := createSuiChainReader(ctx, lggr, suiChain, chainState)
+	chainReader, indexerInstance, err := createSuiChainReader(ctx, t, lggr, suiChain, chainState)
 	if err != nil {
 		lggr.Errorw("Failed to create SUI chain reader for commit events", "error", err)
 		return
@@ -420,6 +422,7 @@ func subscribeSuiCommitEvents(
 
 func subscribeSuiExecutionEvents(
 	ctx context.Context,
+	t *testing.T,
 	lggr logger.Logger,
 	suiChain cldf_sui.Chain,
 	chainState suiState.CCIPChainState,
@@ -447,7 +450,7 @@ func subscribeSuiExecutionEvents(
 	}
 
 	// Create ChainReader for SUI offramp execution events
-	chainReader, indexerInstance, err := createSuiChainReader(ctx, lggr, suiChain, chainState)
+	chainReader, indexerInstance, err := createSuiChainReader(ctx, t, lggr, suiChain, chainState)
 	if err != nil {
 		lggr.Errorw("Failed to create SUI chain reader for execution events", "error", err)
 		return
@@ -587,7 +590,7 @@ func subscribeSuiExecutionEvents(
 }
 
 // createSuiChainReader creates a SUI ChainReader instance for event subscriptions
-func createSuiChainReader(ctx context.Context, lggr logger.Logger, suiChain cldf_sui.Chain, chainState suiState.CCIPChainState) (chain_reader_types.ContractReader, *indexer.Indexer, error) {
+func createSuiChainReader(ctx context.Context, t *testing.T, lggr logger.Logger, suiChain cldf_sui.Chain, chainState suiState.CCIPChainState) (chain_reader_types.ContractReader, *indexer.Indexer, error) {
 	chainReaderConfig := crConfig.ChainReaderConfig{
 		IsLoopPlugin: false,
 		EventsIndexer: crConfig.EventsIndexerConfig{
@@ -661,7 +664,6 @@ func createSuiChainReader(ctx context.Context, lggr logger.Logger, suiChain cldf
 		return nil, nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	var t *testing.T = nil
 	keystoreInstance := suitestutils.NewTestKeystore(t)
 	priv, err := cldf_sui.PrivateKey(suiChain.Signer)
 	if err != nil {

@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/block-vision/sui-go-sdk/sui"
+	"github.com/btcsuite/btcutil/bech32"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -362,13 +364,59 @@ func (c *ChainConfig) SetSuiDeployerKey(keyString *string) error {
 		return errors.New("no SUI private key provided")
 	}
 
-	suiSigner, err := cldf_sui.NewSignerFromHexPrivateKey(*keyString)
+	var hexKey string
+	var err error
+
+	// Handle bech32 format (suiprivkey1...)
+	if strings.HasPrefix(*keyString, "suiprivkey1") {
+		hexKey, err = decodeSuiBech32ToHex(*keyString)
+		if err != nil {
+			return fmt.Errorf("failed to decode bech32 Sui private key: %w", err)
+		}
+	} else {
+		// Use as hex format directly
+		hexKey = *keyString
+	}
+
+	// Create signer using hex key
+	suiSigner, err := cldf_sui.NewSignerFromHexPrivateKey(hexKey)
 	if err != nil {
 		return fmt.Errorf("invalid SUI private key: %w", err)
 	}
 
 	c.SuiDeployerKey = suiSigner
 	return nil
+}
+
+// decodeSuiBech32ToHex decodes a Sui bech32 private key to hex format
+func decodeSuiBech32ToHex(bech32Key string) (string, error) {
+	// Step 1: Decode the bech32 string
+	hrp, data, err := bech32.Decode(bech32Key)
+	if err != nil {
+		return "", fmt.Errorf("bech32 decode error: %w", err)
+	}
+
+	// Verify the human readable part
+	if hrp != "suiprivkey" {
+		return "", fmt.Errorf("unexpected HRP: %s, expected 'suiprivkey'", hrp)
+	}
+
+	// Step 2: Convert 5-bit words to bytes
+	raw, err := bech32.ConvertBits(data, 5, 8, false)
+	if err != nil {
+		return "", fmt.Errorf("convertBits error: %w", err)
+	}
+
+	// Should be 33 bytes: [flagByte][32-byte privateKey]
+	if len(raw) != 33 {
+		return "", fmt.Errorf("unexpected raw length: %d, expected 33 bytes", len(raw))
+	}
+
+	// Step 3: Extract the 32-byte private key (skip flag byte)
+	privKeyBytes := raw[1:]
+	hexKey := hex.EncodeToString(privKeyBytes)
+
+	return hexKey, nil
 }
 
 func generateSolanaKeypair(privateKey solana.PrivateKey, dir string) (string, error) {
