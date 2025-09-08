@@ -22,7 +22,7 @@ func ExecuteBeholderTest(t *testing.T, testEnv *TestEnvironment) {
 	workflowFileLocation := "../../../../core/scripts/cre/environment/examples/workflows/v2/cron/main.go"
 	workflowName := "cronbeholder"
 
-	testLogger.Info().Msg("Starting Beholder...")
+	testLogger.Info().Msg("Starting Beholder..")
 	bErr := startBeholderStackIfIsNotRunning(testEnv.TestConfig.RelativePathToRepoRoot, testEnv.TestConfig.EnvironmentDirPath)
 	require.NoError(t, bErr, "failed to start Beholder")
 
