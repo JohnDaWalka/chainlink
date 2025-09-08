@@ -7,6 +7,7 @@ type CRE interface {
 	StreamsAPISecret() string
 	WorkflowFetcher() WorkflowFetcher
 	UseLocalTimeProvider() bool
+	EnableDKGRecipient() bool
 }
 
 // WorkflowFetcher defines configuration for fetching workflow files

@@ -1826,6 +1826,7 @@ type CreConfig struct {
 	Streams              *StreamsConfig         `toml:",omitempty"`
 	WorkflowFetcher      *WorkflowFetcherConfig `toml:",omitempty"`
 	UseLocalTimeProvider *bool                  `toml:",omitempty"`
+	EnableDKGRecipient   *bool                  `toml:",omitempty"`
 }
 
 // WorkflowFetcherConfig holds the configuration for fetching workflow files
@@ -1860,6 +1861,11 @@ func (c *CreConfig) setFrom(f *CreConfig) {
 			c.UseLocalTimeProvider = f.UseLocalTimeProvider
 		}
 	}
+
+	if f.EnableDKGRecipient != nil {
+		c.EnableDKGRecipient = f.EnableDKGRecipient
+	}
+
 }
 
 func (w *WorkflowFetcherConfig) ValidateConfig() error {
