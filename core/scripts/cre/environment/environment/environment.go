@@ -182,7 +182,8 @@ var StartCmdGenerateSettingsFile = func(homeChainOut *cre.WrappedBlockchainOutpu
 		output.DonTopology.WorkflowDonID,
 		homeChainOut.ChainSelector,
 		rpcs,
-		output.S3ProviderOutput,
+		// output.S3ProviderOutput,
+		nil,
 	)
 
 	if settingsErr != nil {
@@ -687,11 +688,11 @@ func StartCLIEnvironment(
 		WithV2Registries:          env.WithV2Registries(),
 		JdInput:                   *in.JD,
 		InfraInput:                *in.Infra,
-		S3ProviderInput:           in.S3ProviderInput,
-		CapabilityConfigs:         in.CapabilityConfigs,
-		CopyCapabilityBinaries:    withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
-		Capabilities:              capabilities,
-		JobSpecFactoryFunctions:   extraJobSpecFunctions,
+		// S3ProviderInput:           in.S3ProviderInput,
+		CapabilityConfigs:       in.CapabilityConfigs,
+		CopyCapabilityBinaries:  withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)
+		Capabilities:            capabilities,
+		JobSpecFactoryFunctions: extraJobSpecFunctions,
 	}
 
 	ctx, cancel := context.WithTimeout(cmdContext, 10*time.Minute)

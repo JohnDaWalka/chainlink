@@ -354,7 +354,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput, capabilityRegistryConfi
 		}
 	}
 
-	for chainSelector, evmOCR3Address := range *input.EVMOCR3Addresses {
+	for chainSelector, evmOCR3Address := range input.EVMOCR3Addresses {
 		// not sure how to map EVM chains to DONs, so for now we assume that there's only one DON that supports EVM chains
 		evmDON, err := dons.shouldBeOneDon(cre.EVMCapability)
 		if err != nil {

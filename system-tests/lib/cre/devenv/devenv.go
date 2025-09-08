@@ -5,11 +5,13 @@ import (
 	"slices"
 	"time"
 
+	solrpc "github.com/gagliardetto/solana-go/rpc"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/credentials"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -24,6 +26,23 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 	}
 	if err := input.Validate(); err != nil {
 		return nil, errors.Wrap(err, "input validation failed")
+	}
+
+	bcOuts := make(map[uint64]*cre.WrappedBlockchainOutput)
+	sethClients := make(map[uint64]*seth.Client)
+	solClients := make(map[uint64]*solrpc.Client)
+	for _, bcOut := range input.BlockchainOutputs {
+		if bcOut.SolChain != nil {
+			sel := bcOut.SolChain.ChainSelector
+			bcOuts[sel] = bcOut
+			solClients[sel] = bcOut.SolClient
+			bcOuts[sel].ChainSelector = sel
+			bcOuts[sel].SolChain = bcOut.SolChain
+			bcOuts[sel].SolChain.ArtifactsDir = bcOut.SolChain.ArtifactsDir
+			continue
+		}
+		bcOuts[bcOut.ChainSelector] = bcOut
+		sethClients[bcOut.ChainSelector] = bcOut.SethClient
 	}
 
 	envs := make([]*cldf.Environment, len(input.NodeSetOutput))

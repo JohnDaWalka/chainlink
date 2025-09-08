@@ -1143,7 +1143,7 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 			input.DonTopology.HomeChainSelector,
 			datastore.ContractType(keystone_changeset.OCR3Capability.String()),
 			semver.MustParse("1.0.0"),
-			"capability_ocr3",
+			crecontracts.OCR3ContractQualifier,
 		)
 		ocr3CapabilityAddress, err := input.CldEnvironment.DataStore.Addresses().Get(ocr3Key)
 		if err != nil {
@@ -1154,7 +1154,7 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 			input.DonTopology.HomeChainSelector,
 			datastore.ContractType(keystone_changeset.OCR3Capability.String()),
 			semver.MustParse("1.0.0"),
-			"DONTime",
+			crecontracts.DONTimeContractQualifier,
 		)
 		donTimeAddress, err := input.CldEnvironment.DataStore.Addresses().Get(donTimeKey)
 		if err != nil {
