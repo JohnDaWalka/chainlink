@@ -289,10 +289,7 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			ComputeUnits:             150000,
 		}
 	case selectors.FamilySui:
-		// For Sui destinations, use simple receiver format
 		rcv = common.LeftPadBytes(m.receiver, 32)
-		// For now, use empty extra args to avoid BCS encoding complexity
-		// The key fix is in the SuiSendRequest structure (FeeTokenStore field)
 		extraArgs = []byte{}
 	}
 
@@ -313,9 +310,6 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 	}
 
 	if dstSelFamily == selectors.FamilySui {
-		// For Sui destinations, return with basic configuration
-		// TODO: Add proper Sui extra args with OOO configuration when SerializeClientSuiExtraArgsV1 is available
-		// Sui supports AllowOutOfOrderExecution in its extra args structure similar to Solana
 		return message, int64(2_500_000), nil
 	}
 
@@ -328,7 +322,6 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 		case selectors.FamilySolana:
 			dataLength = *m.testConfig.SolanaDataSize
 		case selectors.FamilySui:
-			// Use same data size as Solana for now, could be configurable in the future
 			dataLength = *m.testConfig.SolanaDataSize
 		}
 		data := make([]byte, dataLength)
