@@ -521,11 +521,16 @@ func (s *Shell) runNode(c *cli.Context) error {
 			return errors.Wrap(err2, "failed to ensure ton key")
 		}
 	}
-
 	if s.Config.SuiEnabled() {
 		err2 := app.GetKeyStore().Sui().EnsureKey(rootCtx)
 		if err2 != nil {
 			return errors.Wrap(err2, "failed to ensure Sui key")
+		}
+	}
+	if s.Config.CRE().EnableDKGRecipient() {
+		err2 := app.GetKeyStore().DKGRecipient().EnsureKey(rootCtx)
+		if err2 != nil {
+			return errors.Wrap(err2, "failed to ensure dkg recipient key")
 		}
 	}
 
