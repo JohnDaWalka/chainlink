@@ -87,10 +87,12 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 	case suiV1DecodeStructName:
 		// NOTE: the cast only works with this exact struct layout and types, including the json tags
 		extraArgsStruct, ok := args["extraArgs"].(struct {
-			GasLimit                 *big.Int   `json:"gasLimit"`
-			AllowOutOfOrderExecution bool       `json:"allowOutOfOrderExecution"`
-			TokenReceiver            [32]byte   `json:"tokenReceiver"`
-			ReceiverObjectIds        [][32]byte `json:"receiverObjectIds"`
+			GasLimit                 *big.Int `json:"gasLimit"`
+			AllowOutOfOrderExecution bool     `json:"allowOutOfOrderExecution"`
+			TokenReceiver            [32]byte `json:"tokenReceiver"`
+			// revive:disable:var-naming
+			ReceiverObjectIds [][32]byte `json:"receiverObjectIds"`
+			// revive:enable:var-naming
 		})
 		if !ok {
 			return nil, errors.New("sui extra args struct is not the equivalent of message_hasher.ClientSuiExtraArgsV1")
