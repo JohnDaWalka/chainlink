@@ -76,7 +76,7 @@ func TestShell_SuiKeys(t *testing.T) {
 		key, err := app.GetKeyStore().Sui().Create(ctx)
 		require.NoError(t, err)
 		requireSuiKeyCount(t, app, 1)
-		assert.NoError(t, cmd.NewSuiKeysClient(client).ListKeys(cltest.EmptyCLIContext()))
+		require.NoError(t, cmd.NewSuiKeysClient(client).ListKeys(cltest.EmptyCLIContext()))
 		require.Len(t, r.Renders, 1)
 		keys := *r.Renders[0].(*cmd.SuiKeyPresenters)
 		assert.Equal(t, key.PublicKeyStr(), keys[0].PubKey)
