@@ -49,7 +49,8 @@ var (
 	solWriterDonConfig = "../../../../core/scripts/cre/environment/configs/workflow-solana-don-cache.toml"
 )
 
-func Test_CRE_WorkflowDon_WriteSolana(t *testing.T) {
+// EVM test lives in core/capabilities/integration_tests/keystone/securemint_workflow_test.go
+func Test_SecureMint(t *testing.T) {
 	tenv := SetupTestEnvironmentV2(t, &TestConfig{
 		EnvironmentDirPath:      "../../../../core/scripts/cre/environment",
 		EnvironmentConfigPath:   "../../../../core/scripts/cre/environment/configs/workflow-solana-don.toml",
