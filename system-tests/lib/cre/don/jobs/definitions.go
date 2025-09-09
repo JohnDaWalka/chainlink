@@ -251,10 +251,6 @@ func DonTimeJob(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 
 func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocr2KeyBundles map[string]string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
-	strategyName := "single-chain"
-	if len(ocr2KeyBundles) > 1 {
-		strategyName = "multi-chain"
-	}
 
 	spec := fmt.Sprintf(`
 	type = "offchainreporting2"
@@ -278,7 +274,7 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	providerType = "ocr3-capability"
 	telemetryType = "plugin"
 	[onchainSigningStrategy]
-	strategyName = "%s"
+	strategyName = "multi-chain"
 	[onchainSigningStrategy.config]
 `,
 		uuid,
@@ -289,7 +285,6 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 		fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
 		nodeEthAddress,
 		chainID,
-		strategyName,
 	)
 	for family, key := range ocr2KeyBundles {
 		spec += fmt.Sprintf(`

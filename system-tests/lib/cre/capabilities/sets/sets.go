@@ -96,7 +96,6 @@ func NewDefaultSet(homeChainID uint64) ([]cre.InstallableCapability, error) {
 	}
 	capabilities = append(capabilities, writeevm)
 
-	// temp remove since solana is non-standard anyway
 	writesol, writeSolErr := writesolanacapability.New()
 	if writeSolErr != nil {
 		return nil, errors.Wrap(writeSolErr, "failed to create write solana capability")

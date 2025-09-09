@@ -64,7 +64,6 @@ var (
 
 const (
 	TopologyWorkflow                    = "workflow"
-	TopologyWorkflowSolana              = "workflow-solana"
 	TopologyWorkflowGateway             = "workflow-gateway"
 	TopologyWorkflowGatewayCapabilities = "workflow-gateway-capabilities"
 	TopologyMock                        = "mock"
@@ -669,8 +668,6 @@ func defaultCtfConfigs(topologyFlag string) error {
 		switch topologyFlag {
 		case TopologyWorkflow:
 			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-don.toml")
-		case TopologyWorkflowSolana:
-			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-solana-don.toml")
 		case TopologyWorkflowGateway:
 			setErr = os.Setenv("CTF_CONFIGS", "configs/workflow-gateway-don.toml")
 		case TopologyWorkflowGatewayCapabilities:
