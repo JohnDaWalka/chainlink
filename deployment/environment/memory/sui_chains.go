@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/block-vision/sui-go-sdk/models"
+	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf_sui_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui/provider"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
@@ -75,4 +78,20 @@ func createSuiChainConfig(chainID string, chain suichain.Chain) chainlink.RawCon
 	}
 
 	return chainConfig
+}
+
+func FundSuiAccount(url string, address string) error {
+	r := resty.New().SetBaseURL(url)
+	b := &models.FaucetRequest{
+		FixedAmountRequest: &models.FaucetFixedAmountRequest{
+			Recipient: address,
+		},
+	}
+	resp, err := r.R().SetBody(b).SetHeader("Content-Type", "application/json").Post("/gas")
+	if err != nil {
+		return err
+	}
+	framework.L.Info().Any("Resp", resp).Msg("Address is funded!")
+
+	return nil
 }

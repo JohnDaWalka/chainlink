@@ -23,7 +23,6 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-	sui_testutils "github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
@@ -662,7 +661,7 @@ func CreateKeys(t *testing.T,
 
 		keybundles[ctype] = keybundle
 
-		for sel, _ := range suichains {
+		for sel, chain := range suichains {
 			keystore := app.GetKeyStore().Sui()
 			err = keystore.EnsureKey(ctx)
 			require.NoError(t, err, "failed to create key for sui")
@@ -675,8 +674,7 @@ func CreateKeys(t *testing.T,
 			transmitters[sel] = transmitter.ID()
 			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 
-			lggr := logger.NewSingleFileLogger(t)
-			err = sui_testutils.FundWithFaucet(lggr, "localnet", "0x"+transmitter.Account())
+			err = FundSuiAccount(chain.FaucetUrl, "0x"+transmitter.Account())
 			require.NoError(t, err)
 
 		}
