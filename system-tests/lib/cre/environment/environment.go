@@ -33,6 +33,7 @@ import (
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
@@ -291,6 +292,19 @@ func SetupTestEnvironment(
 
 	// deploy solana forwarders
 	for _, sel := range solForwardersSelectors {
+		// When we spin up localnet we provided it with contracts that already deployed onchain
+		// here we populate datastore with their addresses
+		populateContracts := map[string]datastore.ContractType{
+			deployment.KeystoneForwarderProgramName: ks_sol.ForwarderContract,
+		}
+		version := semver.MustParse(input.ContractVersions[ks_sol.ForwarderContract.String()])
+
+		errp := memory.PopulateDatastore(memoryDatastore.AddressRefStore, populateContracts,
+			version, ks_sol.DefaultForwarderQualifier, sel)
+		if errp != nil {
+			return nil, pkgerrors.Wrap(errp, "failed to populate datastore with predeployed contracts")
+		}
+
 		out, err := operations.ExecuteSequence(
 			allChainsCLDEnvironment.OperationsBundle,
 			ks_sol_seq.DeployForwarderSeq,
@@ -300,23 +314,15 @@ func SetupTestEnvironment(
 				Datastore: memoryDatastore.Seal(),
 			},
 			ks_sol_seq.DeployForwarderSeqInput{
-				ChainSel:    sel,
-				ProgramName: deployment.KeystoneForwarderProgramName,
+				ChainSel:     sel,
+				ProgramName:  deployment.KeystoneForwarderProgramName,
+				Qualifier:    ks_sol.DefaultForwarderQualifier,
+				ContractType: ks_sol.ForwarderContract,
+				Version:      version,
 			},
 		)
 		if err != nil {
 			return nil, pkgerrors.Wrap(err, "failed to deploy sol forwarder")
-		}
-
-		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{
-			Address:       out.Output.ProgramID.String(),
-			ChainSelector: sel,
-			Version:       semver.MustParse(input.ContractVersions[ks_sol.ForwarderContract.String()]),
-			Qualifier:     ks_sol.DefaultForwarderQualifier,
-			Type:          ks_sol.ForwarderContract,
-		})
-		if err != nil {
-			return nil, pkgerrors.Wrap(err, "failed to add address to the datastore for Solana Forwarder contract")
 		}
 
 		err = memoryDatastore.AddressRefStore.Add(datastore.AddressRef{

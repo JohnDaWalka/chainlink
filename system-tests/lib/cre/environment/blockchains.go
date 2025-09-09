@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -24,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -94,6 +97,8 @@ func CreateBlockchains(
 // Will be set as --mint when spin up local solana validator, unless env variable with a different key provided
 var defaultSolanaPrivateKey = solana.MustPrivateKeyFromBase58("4u2itaM9r5kxsmoti3GMSDZrQEFpX14o6qPWY9ZrrYTR6kduDBr4YAZJsjawKzGP3wDzyXqterFmfcLUmSBro5AT")
 
+var once = &sync.Once{}
+
 func initSolanaInput(bi *blockchain.Input) error {
 	err := SetDefaultSolanaPrivateKeyIfEmpty(defaultSolanaPrivateKey)
 	if err != nil {
@@ -101,6 +106,18 @@ func initSolanaInput(bi *blockchain.Input) error {
 	}
 	bi.PublicKey = defaultSolanaPrivateKey.PublicKey().String()
 	bi.ContractsDir = getSolProgramsPath(bi.ContractsDir)
+
+	if bi.SolanaPrograms != nil {
+		var err2 error
+		once.Do(func() {
+			// TODO PLEX-1718 use latest contracts sha for now. Derive commit sha from go.mod once contracts are in a separate go module
+			err2 = memory.DownloadSolanaProgramArtifacts(context.Background(), bi.ContractsDir, logger.Nop(), "b0f7cd3fbdbb")
+		})
+		if err2 != nil {
+			return fmt.Errorf("failed to download solana artifacts: %w", err2)
+		}
+	}
+
 	return nil
 }
 
