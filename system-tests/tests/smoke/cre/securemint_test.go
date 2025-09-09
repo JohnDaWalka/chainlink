@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -51,12 +52,10 @@ var (
 
 // EVM test lives in core/capabilities/integration_tests/keystone/securemint_workflow_test.go
 func Test_SecureMint(t *testing.T) {
-	tenv := SetupTestEnvironmentV2(t, &TestConfig{
-		EnvironmentDirPath:      "../../../../core/scripts/cre/environment",
-		EnvironmentConfigPath:   "../../../../core/scripts/cre/environment/configs/workflow-solana-don.toml",
-		EnvironmentArtifactPath: "../../../../core/scripts/cre/environment/env_artifact/env_artifact.json",
-		BeholderConfigPath:      "../../../../core/scripts/cre/environment/configs/chip-ingress-cache.toml",
-	})
+	tconf := getDefaultTestConfig(t)
+	tconf.EnvironmentConfigPath = filepath.Join(tconf.EnvironmentDirPath, "/configs/workflow-solana-don.toml")
+
+	tenv := SetupTestEnvironmentV2(t, tconf)
 
 	executeSecureMintTest(t, tenv)
 }
