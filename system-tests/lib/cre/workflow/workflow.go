@@ -101,6 +101,46 @@ func GetWorkflowNames(ctx context.Context, sc *seth.Client, workflowRegistryAddr
 	return workflows, nil
 }
 
+type WorkflowMetadata struct {
+	WorkflowID   [32]byte
+	Owner        common.Address
+	DonID        uint32
+	Status       uint8
+	WorkflowName string
+	BinaryURL    string
+	ConfigURL    string
+	SecretsURL   string
+}
+
+func GetWorkflows(ctx context.Context, sc *seth.Client, workflowRegistryAddr common.Address) ([]WorkflowMetadata, error) {
+	workflowRegistryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create workflow registry instance")
+	}
+
+	metadataList, metadataListErr := workflowRegistryInstance.GetWorkflowMetadataListByOwner(sc.NewCallOpts(), sc.MustGetRootKeyAddress(), big.NewInt(0), big.NewInt(10))
+	if metadataListErr != nil {
+		return nil, errors.Wrap(metadataListErr, "failed to get workflow metadata list")
+	}
+
+	workflows := make([]WorkflowMetadata, 0)
+
+	for _, metadata := range metadataList {
+		workflows = append(workflows, WorkflowMetadata{
+			WorkflowID:   metadata.WorkflowID,
+			Owner:        metadata.Owner,
+			DonID:        metadata.DonID,
+			Status:       metadata.Status,
+			WorkflowName: metadata.WorkflowName,
+			BinaryURL:    metadata.BinaryURL,
+			ConfigURL:    metadata.ConfigURL,
+			SecretsURL:   metadata.SecretsURL,
+		})
+	}
+
+	return workflows, nil
+}
+
 func DeleteAllWithContract(ctx context.Context, sc *seth.Client, workflowRegistryAddr common.Address) error {
 	workflowRegistryInstance, err := workflow_registry_wrapper.NewWorkflowRegistry(workflowRegistryAddr, sc.Client)
 	if err != nil {

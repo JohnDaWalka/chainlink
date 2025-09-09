@@ -28,6 +28,10 @@ const (
 	DefaultCapabilitiesRegistryAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
 
 	DefaultWorkflowOwnerAddress = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+
+	// WorkflowStatusActive status values
+	WorkflowStatusActive = 0
+	WorkflowStatusPaused = 1
 )
 
 func workflowCmds() *cobra.Command {
@@ -43,6 +47,7 @@ func workflowCmds() *cobra.Command {
 	workflowCmd.AddCommand(deleteAllWorkflowsCmd())
 	workflowCmd.AddCommand(compileWorkflowCmd())
 	workflowCmd.AddCommand(deployWorkflowCmd())
+	workflowCmd.AddCommand(listWorkflowsCmd())
 
 	return workflowCmd
 }
@@ -549,4 +554,63 @@ func isBase64Content(content string) bool {
 
 	_, err := base64.StdEncoding.DecodeString(content)
 	return err == nil
+}
+
+func listWorkflowsCmd() *cobra.Command {
+	var (
+		workflowRegistryAddressFlag string
+		rpcURLFlag                  string
+	)
+
+	cmd := &cobra.Command{
+		Use:              "list",
+		Short:            "List all workflows in the workflow registry",
+		Long:             `List all available workflow details in the workflow registry`,
+		PersistentPreRun: globalPreRunFunc,
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if pkErr := creenv.SetDefaultPrivateKeyIfEmpty(blockchain.DefaultAnvilPrivateKey); pkErr != nil {
+				return pkErr
+			}
+
+			sethClient, scErr := seth.NewClientBuilder().
+				WithRpcUrl(rpcURLFlag).
+				WithPrivateKeys([]string{os.Getenv("PRIVATE_KEY")}).
+				WithProtections(false, false, seth.MustMakeDuration(time.Minute)).
+				Build()
+			if scErr != nil {
+				return errors.Wrap(scErr, "failed to create Seth client")
+			}
+
+			workflows, err := creworkflow.GetWorkflows(cmd.Context(), sethClient, common.HexToAddress(workflowRegistryAddressFlag))
+			if err != nil {
+				return errors.Wrap(err, "failed to get workflows from the registry")
+			}
+
+			for _, workflow := range workflows {
+				fmt.Printf("Workflow ID: %s\n", workflow.WorkflowID)
+				fmt.Printf("  Name: %s\n", workflow.WorkflowName)
+				fmt.Printf("  Owner: %s\n", workflow.Owner.Hex())
+				fmt.Printf("  DON ID: %d\n", workflow.DonID)
+				fmt.Printf("  Status: %d (%s)\n", workflow.Status, formatWorkflowStatus(workflow.Status))
+				fmt.Printf("  Binary URL: %s\n", workflow.BinaryURL)
+				fmt.Printf("  Config URL: %s\n", workflow.ConfigURL)
+				fmt.Printf("  Secrets URL: %s\n", workflow.SecretsURL)
+				fmt.Printf("---\n")
+			}
+			return nil
+		},
+	}
+	return cmd
+}
+
+func formatWorkflowStatus(status uint8) string {
+	switch status {
+	case WorkflowStatusActive:
+		return "Active"
+	case WorkflowStatusPaused:
+		return "Paused"
+	default:
+		return fmt.Sprintf("Unknown (%d)", status)
+	}
 }
