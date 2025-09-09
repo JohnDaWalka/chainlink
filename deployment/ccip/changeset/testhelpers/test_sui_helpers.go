@@ -301,7 +301,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		"state":               onRampStateObjectId,
 		"clock":               "0x6",
 		"dest_chain_selector": cfg.DestChain,
-		"token_receiver":      "0xf05ebbc239612bdcfc6eff5f6f4728e87bc56d25e6f9dfcce9cffd6cc3eeb3ca", // random sui address
+		"token_receiver":      "0x0000000000000000000000000000000000000000000000000000000000000000", // random sui address
 		"receiver": []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
 			0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
@@ -331,10 +331,10 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 			"state": BurnMintTPState,
 			"c":     msg.TokenAmounts[0].Token,
 		}
-		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", extra)
+		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", extra)
 	} else {
 		// Build PTB for msg transfer
-		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", nil)
+		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", nil)
 	}
 
 	// Setup new PTB client
