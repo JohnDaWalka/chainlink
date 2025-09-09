@@ -553,10 +553,13 @@ func (m *DestinationGun) getSuiMessage(src uint64) (testhelpers.SuiSendRequest, 
 		return testhelpers.SuiSendRequest{}, fmt.Errorf("no Sui state available for source chain %d", src)
 	}
 
+	// SuiTxm  Failed to broadcast transaction {"version": "(devel)@unset", "txID": "ccip_send_msg_transfer", "function inputs": [], "error": "failed to execute transaction: {\"code\":-32002,\"message\":\"Transaction validator signing failed due to issues with transaction inputs,
+	// please review the errors and try again:\\n- The transaction inputs contain duplicated ObjectRef's\"}"}
 	message := testhelpers.SuiSendRequest{
-		Receiver:  common.LeftPadBytes(m.receiver, 32),
-		ExtraArgs: []byte{},
-		FeeToken:  srcChainState.LinkTokenAddress,
+		Receiver:         common.LeftPadBytes(m.receiver, 32),
+		ExtraArgs:        []byte{},
+		FeeToken:         srcChainState.LinkTokenAddress,
+		FeeTokenMetadata: srcChainState.LinkTokenCoinMetadataId,
 	}
 
 	switch {

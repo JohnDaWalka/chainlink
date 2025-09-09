@@ -34,9 +34,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_evm_client "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider/rpcclient"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
@@ -76,10 +76,10 @@ type ChainConfig struct {
 	ClientZkSyncVM      *clients.Client
 	DeployerKeyZkSyncVM *accounts.Wallet
 	SolDeployerKey      solana.PrivateKey
-	SolArtifactDir      string                      // directory of pre-built solana artifacts, if any
-	SuiDeployerKey      cldf_sui.SuiSigner          // SUI deployer key signer
-	Users               []*bind.TransactOpts        // map of addresses to their transact opts to interact with the chain as users
-	MultiClientOpts     []func(c *cldf.MultiClient) // options to configure the multi client
+	SolArtifactDir      string                                 // directory of pre-built solana artifacts, if any
+	SuiDeployerKey      cldf_sui.SuiSigner                     // SUI deployer key signer
+	Users               []*bind.TransactOpts                   // map of addresses to their transact opts to interact with the chain as users
+	MultiClientOpts     []func(c *cldf_evm_client.MultiClient) // options to configure the multi client
 }
 
 func (c *ChainConfig) SetUsers(pvtkeys []string) error {

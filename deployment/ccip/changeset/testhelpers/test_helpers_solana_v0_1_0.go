@@ -991,6 +991,265 @@ func SendRequestSol(
 	}, nil
 }
 
+<<<<<<< HEAD
+=======
+func SendRequestSui(
+	e cldf.Environment,
+	state stateview.CCIPOnChainState,
+	cfg *ccipclient.CCIPSendReqConfig,
+) (*ccipclient.AnyMsgSentEvent, error) {
+	return SendSuiRequestViaChainWriter(e, cfg)
+}
+
+func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig, deps suideps.SuiDeps) (string, string, error) {
+	evmChain := e.BlockChains.EVMChains()[cfg.DestChain]
+	suiChains := e.BlockChains.SuiChains()
+	suiChain := suiChains[cfg.SourceChain]
+
+	// Deploy Transferrable TOKEN on ETH
+	// EVM
+	evmDeployerKey := evmChain.DeployerKey
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return "", "", fmt.Errorf("failed load onstate chains %w", err)
+	}
+
+	tokenPoolAddress := state.SuiChains[cfg.SourceChain].TokenPoolAddress
+	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef
+	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress
+	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId
+	linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId
+	CCIPPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress
+	MCMsPackageId := state.SuiChains[cfg.SourceChain].MCMsAddress
+
+	suiSigner, err := deps.SuiChain.Signer.GetAddress()
+	if err != nil {
+		return "", "", err
+	}
+
+	// Deploy transferrable token on EVM
+	evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to deploy transfer token for evm chain %d: %w", cfg.DestChain, err)
+	}
+
+	err = attachTokenToTheRegistry(evmChain, state.MustGetEVMChainState(evmChain.Selector), evmDeployerKey, evmToken.Address(), evmPool.Address())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to attach token to registry for evm %d: %w", cfg.DestChain, err)
+	}
+
+	// // // Deploy BurnMint TP on SUI
+	deployBurnMintTp, err := operations.ExecuteSequence(e.OperationsBundle, burnminttokenpoolops.DeployAndInitBurnMintTokenPoolSequence, deps.SuiChain,
+		burnminttokenpoolops.DeployAndInitBurnMintTokenPoolInput{
+			BurnMintTokenPoolDeployInput: burnminttokenpoolops.BurnMintTokenPoolDeployInput{
+				CCIPPackageId:          CCIPPackageId,
+				CCIPTokenPoolPackageId: tokenPoolAddress,
+				MCMSAddress:            MCMsPackageId,
+				MCMSOwnerAddress:       suiSigner,
+			},
+
+			CoinObjectTypeArg:      linkTokenPkgId + "::link::LINK",
+			CCIPObjectRefObjectId:  ccipObjectRefId,
+			CoinMetadataObjectId:   linkTokenObjectMetadataId,
+			TreasuryCapObjectId:    linkTokenTreasuryCapId,
+			TokenPoolAdministrator: suiSigner,
+
+			// apply dest chain updates
+			RemoteChainSelectorsToRemove: []uint64{},
+			RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
+			RemotePoolAddressesToAdd:     [][]string{{evmPool.Address().String()}},
+			RemoteTokenAddressesToAdd: []string{
+				evmToken.Address().String(),
+			},
+
+			// set chain rate limiter configs
+			RemoteChainSelectors: []uint64{909606746561742123},
+			OutboundIsEnableds:   []bool{false},
+			OutboundCapacities:   []uint64{100000},
+			OutboundRates:        []uint64{100},
+			InboundIsEnableds:    []bool{false},
+			InboundCapacities:    []uint64{100000},
+			InboundRates:         []uint64{100},
+		})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to deploy LockRelaseTP for Sui chain %d: %w", cfg.SourceChain, err)
+	}
+
+	suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
+	suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.BurnMintTPPackageID)
+
+	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
+	if err != nil {
+		return "", "", fmt.Errorf("failed to add token to the counterparty %d: %w", cfg.DestChain, err)
+	}
+
+	err = grantMintBurnPermissions(e.Logger, e.BlockChains.EVMChains()[evmChain.Selector], evmToken, evmDeployerKey, evmPool.Address())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to grant burnMint %d: %w", cfg.DestChain, err)
+	}
+
+	return deployBurnMintTp.Output.BurnMintTPPackageID, deployBurnMintTp.Output.Objects.StateObjectId, nil
+}
+
+// Helper function to convert a string to a string pointer
+func strPtr(s string) *string {
+	return &s
+}
+
+// Aptos doesn't provide any struct that we could reuse here
+type AptosSendRequest struct {
+	Receiver      []byte
+	Data          []byte
+	ExtraArgs     []byte
+	FeeToken      aptos.AccountAddress
+	FeeTokenStore aptos.AccountAddress
+	TokenAmounts  []AptosTokenAmount
+}
+
+type AptosTokenAmount struct {
+	Token  aptos.AccountAddress
+	Amount uint64
+}
+
+type SuiSendRequest struct {
+	Receiver         []byte
+	Data             []byte
+	ExtraArgs        []byte
+	FeeToken         string
+	FeeTokenMetadata string
+	TokenAmounts     []SuiTokenAmount
+}
+
+type SuiTokenAmount struct {
+	Token  string
+	Amount uint64
+}
+
+func SendRequestAptos(
+	e cldf.Environment,
+	state stateview.CCIPOnChainState,
+	cfg *ccipclient.CCIPSendReqConfig,
+) (*ccipclient.AnyMsgSentEvent, error) {
+	sender := e.BlockChains.AptosChains()[cfg.SourceChain].DeployerSigner
+	senderAddress := sender.AccountAddress()
+	client := e.BlockChains.AptosChains()[cfg.SourceChain].Client
+
+	e.Logger.Infof("(Aptos) Sending CCIP request from chain selector %d to chain selector %d using sender %s",
+		cfg.SourceChain, cfg.DestChain, senderAddress.StringLong())
+
+	msg := cfg.Message.(AptosSendRequest)
+	router := state.AptosChains[cfg.SourceChain].CCIPAddress
+	if cfg.IsTestRouter {
+		router = state.AptosChains[cfg.DestChain].TestRouterAddress
+	}
+
+	tokenAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
+	tokenAmounts := make([]uint64, len(msg.TokenAmounts))
+	tokenStoreAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
+	for i, v := range msg.TokenAmounts {
+		tokenAddresses[i] = v.Token
+		tokenAmounts[i] = v.Amount
+		tokenStoreAddresses[i] = aptos.AccountAddress{}
+	}
+
+	// Debug information
+	var (
+		tokenAddressStrings []string
+		tokenStoreStrings   []string
+	)
+	feeTokenBalance, err := helpers.GetFungibleAssetBalance(client, senderAddress, msg.FeeToken)
+	if err != nil {
+		return nil, err
+	}
+	e.Logger.Debugw("Fungible Asset balance", "feeToken", feeTokenBalance)
+	for _, address := range tokenAddresses {
+		tokenAddressStrings = append(tokenAddressStrings, address.StringLong())
+		transferTokenBalance, err := helpers.GetFungibleAssetBalance(client, senderAddress, address)
+		if err != nil {
+			return nil, err
+		}
+		e.Logger.Debugw("Fungible Asset balance", "transferToken", transferTokenBalance)
+	}
+	for _, address := range tokenStoreAddresses {
+		tokenStoreStrings = append(tokenStoreStrings, address.StringLong())
+	}
+	e.Logger.Debugw("(Aptos) Sending message: ",
+		"destChainSelector", cfg.DestChain,
+		"routerAddress", router.StringLong(),
+		"receiver", hex.EncodeToString(msg.Receiver),
+		"data", hex.EncodeToString(msg.Data),
+		"tokenAddresses", tokenAddressStrings,
+		"tokenAmounts", tokenAmounts,
+		"tokenStoreAddresses", tokenStoreStrings,
+		"feeToken", msg.FeeToken.StringLong(),
+		"feeTokenStore", msg.FeeTokenStore.StringLong(),
+		"extraArgs", hex.EncodeToString(msg.ExtraArgs),
+	)
+
+	routerContract := aptos_router.Bind(router, client)
+	fee, err := routerContract.Router().GetFee(
+		nil,
+		cfg.DestChain,
+		msg.Receiver,
+		msg.Data,
+		tokenAddresses,
+		tokenAmounts,
+		tokenStoreAddresses,
+		msg.FeeToken,
+		msg.FeeTokenStore,
+		msg.ExtraArgs,
+	)
+	if err != nil {
+		e.Logger.Errorf("Estimating fee: %v", err)
+	}
+	e.Logger.Infof("Estimated fee: %v", fee)
+
+	opts := &aptosBind.TransactOpts{
+		Signer: sender,
+	}
+	tx, err := routerContract.Router().CCIPSend(
+		opts,
+		cfg.DestChain,
+		msg.Receiver,
+		msg.Data,
+		tokenAddresses,
+		tokenAmounts,
+		tokenStoreAddresses,
+		msg.FeeToken,
+		msg.FeeTokenStore,
+		msg.ExtraArgs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send CCIP message: %w", err)
+	}
+	data, err := client.WaitForTransaction(tx.Hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for transaction: %w", err)
+	}
+	if !data.Success {
+		return nil, fmt.Errorf("transaction reverted: %v", data.VmStatus)
+	}
+	e.Logger.Infof("(Aptos) CCIP message sent (tx %s) from chain selector %d to chain selector %d", tx.Hash, cfg.SourceChain, cfg.DestChain)
+
+	for _, event := range data.Events {
+		e.Logger.Debugf("(Aptos) Message contains event type: %v", event.Type)
+		// The RPC strips all leading zeroes from the event type
+		if event.Type == fmt.Sprintf("0x%s::onramp::CCIPMessageSent", strings.TrimLeft(strings.TrimPrefix(router.String(), "0x"), "0")) {
+			var msgSentEvent module_onramp.CCIPMessageSent
+			if err := codec.DecodeAptosJsonValue(event.Data, &msgSentEvent); err != nil {
+				return nil, fmt.Errorf("failed to decode CCIPMessageSentEvent: %w", err)
+			}
+			e.Logger.Debugf("CCIPMessageSentEvent: %v", msgSentEvent)
+			return &ccipclient.AnyMsgSentEvent{
+				SequenceNumber: msgSentEvent.SequenceNumber,
+				RawEvent:       msgSentEvent,
+			}, nil
+		}
+	}
+	return nil, errors.New("sent message but didn't receive CCIPMessageSent event")
+}
+
+>>>>>>> aa3a11c6d7 (working on feeToken rn)
 func ConvertSolanaCrossChainAmountToBigInt(amountLeBytes [32]uint8) *big.Int {
 	bytes := amountLeBytes[:]
 	slices.Reverse(bytes) // convert to big-endian

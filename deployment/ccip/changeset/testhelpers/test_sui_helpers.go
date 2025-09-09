@@ -308,7 +308,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 			0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd,
 		},
 		"data":               []byte("hello evm from sui"),
-		"fee_token_metadata": linkTokenObjectMetadataId,
+		"fee_token_metadata": msg.FeeTokenMetadata, // this should be the minted token objectId
 		"fee_token":          msg.FeeToken,
 		"extra_args":         []byte{},
 	}
@@ -331,10 +331,10 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 			"state": BurnMintTPState,
 			"c":     msg.TokenAmounts[0].Token,
 		}
-		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", extra)
+		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", extra)
 	} else {
 		// Build PTB for msg transfer
-		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link::LINK", nil)
+		ptbArgs = BuildPTBArgs(baseArgs, linkTokenPkgId+"::link_token::LINK_TOKEN", nil)
 	}
 
 	// Setup new PTB client
@@ -345,7 +345,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	}
 	keystoreInstance.AddKey(priv)
 
+<<<<<<< HEAD
 	relayerClient, err := client.NewPTBClient(e.Logger, suiChain.URL, nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
+=======
+	relayerClient, err := client.NewPTBClient(e.Logger, "https://testnet.sui.eu.endpoints.matrixed.link/?auth=CL-DNqCV86SzbDs2m", nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
+>>>>>>> aa3a11c6d7 (working on feeToken rn)
 	if err != nil {
 		return &ccipclient.AnyMsgSentEvent{}, err
 	}

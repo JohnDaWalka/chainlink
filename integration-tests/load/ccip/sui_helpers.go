@@ -593,14 +593,6 @@ func subscribeSuiExecutionEvents(
 func createSuiChainReader(ctx context.Context, t *testing.T, lggr logger.Logger, suiChain cldf_sui.Chain, chainState suiState.CCIPChainState) (chain_reader_types.ContractReader, *indexer.Indexer, error) {
 	chainReaderConfig := crConfig.ChainReaderConfig{
 		IsLoopPlugin: false,
-		EventsIndexer: crConfig.EventsIndexerConfig{
-			PollingInterval: 10 * time.Second,
-			SyncTimeout:     10 * time.Second,
-		},
-		TransactionsIndexer: crConfig.TransactionsIndexerConfig{
-			PollingInterval: 10 * time.Second,
-			SyncTimeout:     10 * time.Second,
-		},
 		Modules: map[string]*crConfig.ChainReaderModule{
 			"onramp": {
 				Name: "onramp",
@@ -681,8 +673,8 @@ func createSuiChainReader(ctx context.Context, t *testing.T, lggr logger.Logger,
 		db,
 		lggr,
 		relayerClient,
-		chainReaderConfig.TransactionsIndexer.PollingInterval,
-		chainReaderConfig.TransactionsIndexer.SyncTimeout,
+		10*time.Second,
+		10*time.Second,
 		map[string]*crConfig.ChainReaderEvent{},
 	)
 	evIndexer := indexer.NewEventIndexer(
@@ -690,8 +682,8 @@ func createSuiChainReader(ctx context.Context, t *testing.T, lggr logger.Logger,
 		lggr,
 		relayerClient,
 		[]*client.EventSelector{},
-		chainReaderConfig.EventsIndexer.PollingInterval,
-		chainReaderConfig.EventsIndexer.SyncTimeout,
+		10*time.Second,
+		10*time.Second,
 	)
 	indexerInstance := indexer.NewIndexer(
 		lggr,
