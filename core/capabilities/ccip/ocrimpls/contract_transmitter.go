@@ -157,33 +157,10 @@ func (c *ccipTransmitter) Transmit(
 	}
 	zero := big.NewInt(0)
 	c.lggr.Infow("Submitting transaction", "tx", txID)
-	c.lggr.Info("SUBMITTING TX TO CW: ", contract, method, args, c.offrampAddress, txID.String(), c.offrampAddress, meta, zero)
-	c.lggr.Infow("SUBMIT TX INTERFACE", "type", fmt.Sprintf("%T", c.cw), "value", c.cw)
-	c.lggr.Infow("SUBMIT TX CW VALUE: ", "value", c.cw.Name()) // Sui.2.RelayerService.PluginRelayerClient.RelayerClient.ContractWriterClient
-	if dl, ok := ctx.Deadline(); ok {
-		c.lggr.Infow("SubmitTransaction context deadline", "deadline", dl)
-	} else {
-		c.lggr.Infow("SubmitTransaction context has no deadline")
-	}
-
 	if err := c.cw.SubmitTransaction(ctx, contract, method, args,
 		fmt.Sprintf("%s-%s-%s", contract, c.offrampAddress, txID.String()),
 		c.offrampAddress, &meta, zero); err != nil {
-		// log everything you know
-		c.lggr.Errorw(" failed",
-			"contract", contract,
-			"method", method,
-			"to", c.offrampAddress,
-			"txID", txID.String(),
-			"err", err,
-			"ctxErr", ctx.Err(),
-		)
-
-		// wrap the error so callers see the metadata too
-		return fmt.Errorf(
-			"failed to submit tx via chain writer (contract=%s method=%s to=%s txID=%s): %w",
-			contract, method, c.offrampAddress, txID.String(), err,
-		)
+		return fmt.Errorf("failed to submit transaction via chain writer: %w", err)
 	}
 
 	return nil

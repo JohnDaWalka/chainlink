@@ -337,7 +337,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 
 	e.Logger.Info("relayerClient", relayerClient)
 
-	store := txm.NewTxmStoreImpl()
+	store := txm.NewTxmStoreImpl(e.Logger)
 	conf := txm.DefaultConfigSet
 
 	retryManager := txm.NewDefaultRetryManager(5)
@@ -405,14 +405,6 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	// Query the CCIPSend Event via chainReader
 	chainReaderConfig := crConfig.ChainReaderConfig{
 		IsLoopPlugin: false,
-		EventsIndexer: crConfig.EventsIndexerConfig{
-			PollingInterval: 10 * time.Second,
-			SyncTimeout:     10 * time.Second,
-		},
-		TransactionsIndexer: crConfig.TransactionsIndexerConfig{
-			PollingInterval: 10 * time.Second,
-			SyncTimeout:     10 * time.Second,
-		},
 		Modules: map[string]*crConfig.ChainReaderModule{
 			"onramp": {
 				Name: "onramp",
@@ -456,8 +448,8 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		db,
 		e.Logger,
 		relayerClient,
-		chainReaderConfig.TransactionsIndexer.PollingInterval,
-		chainReaderConfig.TransactionsIndexer.SyncTimeout,
+		10*time.Second,
+		10*time.Second,
 		// start without any configs, they will be set when ChainReader is initialized and gets a reference
 		// to the transaction indexer to avoid having to reading ChainReader configs here as well
 		map[string]*crConfig.ChainReaderEvent{},
@@ -468,8 +460,8 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		relayerClient,
 		// start without any selectors, they will be added during .Bind() calls on ChainReader
 		[]*client.EventSelector{},
-		chainReaderConfig.EventsIndexer.PollingInterval,
-		chainReaderConfig.EventsIndexer.SyncTimeout,
+		10*time.Second,
+		10*time.Second,
 	)
 	indexerInstance := indexer.NewIndexer(
 		e.Logger,

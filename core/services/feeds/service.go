@@ -504,7 +504,7 @@ func (s *service) CreateChainConfig(ctx context.Context, cfg ChainConfig) (int64
 
 	id, err := s.orm.CreateChainConfig(ctx, cfg)
 	if err != nil {
-		return 0, errors.Wrap(err, "CreateChainConfig failed here")
+		return 0, errors.Wrap(err, "CreateChainConfig failed")
 	}
 
 	mgr, err := s.orm.GetManager(ctx, cfg.FeedsManagerID)

@@ -2208,23 +2208,6 @@ func (_m *GeneralConfig) TONConfigs() chainlink.RawConfigs {
 	return r0
 }
 
-// GeneralConfig_SuiConfigs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SuiConfigs'
-type GeneralConfig_SuiConfigs_Call struct {
-	*mock.Call
-}
-
-// SuiConfigs is a helper method to define mock.On call
-func (_e *GeneralConfig_Expecter) SuiConfigs() *GeneralConfig_SuiConfigs_Call {
-	return &GeneralConfig_SuiConfigs_Call{Call: _e.mock.On("SuiConfigs")}
-}
-
-func (_c *GeneralConfig_SuiConfigs_Call) Run(run func()) *GeneralConfig_SuiConfigs_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
 // GeneralConfig_TONConfigs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TONConfigs'
 type GeneralConfig_TONConfigs_Call struct {
 	*mock.Call
@@ -2242,42 +2225,14 @@ func (_c *GeneralConfig_TONConfigs_Call) Run(run func()) *GeneralConfig_TONConfi
 	return _c
 }
 
-func (_c *GeneralConfig_SuiConfigs_Call) Return(_a0 chainlink.RawConfigs) *GeneralConfig_SuiConfigs_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
 func (_c *GeneralConfig_TONConfigs_Call) Return(_a0 chainlink.RawConfigs) *GeneralConfig_TONConfigs_Call {
 	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *GeneralConfig_SuiConfigs_Call) RunAndReturn(run func() chainlink.RawConfigs) *GeneralConfig_SuiConfigs_Call {
-	_c.Call.Return(run)
 	return _c
 }
 
 func (_c *GeneralConfig_TONConfigs_Call) RunAndReturn(run func() chainlink.RawConfigs) *GeneralConfig_TONConfigs_Call {
 	_c.Call.Return(run)
 	return _c
-}
-
-// SuiEnabled provides a mock function with no fields
-func (_m *GeneralConfig) SuiEnabled() bool {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for SuiEnabled")
-	}
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
 }
 
 // TONEnabled provides a mock function with no fields
@@ -2298,23 +2253,6 @@ func (_m *GeneralConfig) TONEnabled() bool {
 	return r0
 }
 
-// GeneralConfig_SuiEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SuiEnabled'
-type GeneralConfig_SuiEnabled_Call struct {
-	*mock.Call
-}
-
-// SuiEnabled is a helper method to define mock.On call
-func (_e *GeneralConfig_Expecter) SuiEnabled() *GeneralConfig_SuiEnabled_Call {
-	return &GeneralConfig_SuiEnabled_Call{Call: _e.mock.On("SuiEnabled")}
-}
-
-func (_c *GeneralConfig_SuiEnabled_Call) Run(run func()) *GeneralConfig_SuiEnabled_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
 // GeneralConfig_TONEnabled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TONEnabled'
 type GeneralConfig_TONEnabled_Call struct {
 	*mock.Call
@@ -2332,18 +2270,8 @@ func (_c *GeneralConfig_TONEnabled_Call) Run(run func()) *GeneralConfig_TONEnabl
 	return _c
 }
 
-func (_c *GeneralConfig_SuiEnabled_Call) Return(_a0 bool) *GeneralConfig_SuiEnabled_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
 func (_c *GeneralConfig_TONEnabled_Call) Return(_a0 bool) *GeneralConfig_TONEnabled_Call {
 	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *GeneralConfig_SuiEnabled_Call) RunAndReturn(run func() bool) *GeneralConfig_SuiEnabled_Call {
-	_c.Call.Return(run)
 	return _c
 }
 

@@ -50,7 +50,6 @@ type Master interface {
 	StarkNet() StarkNet
 	Aptos() Aptos
 	Tron() Tron
-	Sui() Sui
 	TON() TON
 	Sui() Sui
 	VRF() VRF
@@ -152,10 +151,6 @@ func (ks *master) Aptos() Aptos {
 
 func (ks *master) Tron() Tron {
 	return ks.tron
-}
-
-func (ks *master) Sui() Sui {
-	return ks.sui
 }
 
 func (ks *master) TON() TON {
@@ -312,8 +307,6 @@ func GetFieldNameForKey(unknownKey Key) (string, error) {
 		return "Aptos", nil
 	case tronkey.Key:
 		return "Tron", nil
-	case suikey.Key:
-		return "Sui", nil
 	case tonkey.Key:
 		return "TON", nil
 	case suikey.Key:

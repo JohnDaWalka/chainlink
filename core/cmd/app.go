@@ -201,7 +201,6 @@ func NewApp(s *Shell) *cli.App {
 				keysCommand("Solana", NewSolanaKeysClient(s)),
 				keysCommand("StarkNet", NewStarkNetKeysClient(s)),
 				keysCommand("Aptos", NewAptosKeysClient(s)),
-				keysCommand("Sui", NewSuiKeysClient(s)),
 				keysCommand("Tron", NewTronKeysClient(s)),
 				keysCommand("TON", NewTONKeysClient(s)),
 				keysCommand("Sui", NewSuiKeysClient(s)),

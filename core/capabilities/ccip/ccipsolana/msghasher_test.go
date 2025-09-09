@@ -28,7 +28,6 @@ import (
 
 func TestMessageHasher_EVM2SVM(t *testing.T) {
 	registeredExtraDataCodecMap := map[string]ccipcommon.SourceChainExtraDataCodec{
-		chainsel.FamilySui:    ccipaptos.ExtraDataDecoder{},
 		chainsel.FamilyAptos:  ccipaptos.ExtraDataDecoder{},
 		chainsel.FamilyEVM:    ccipevm.ExtraDataDecoder{},
 		chainsel.FamilySolana: ExtraDataDecoder{},

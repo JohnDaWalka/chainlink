@@ -16,7 +16,6 @@ const (
 	evmV1DecodeName       = "decodeEVMExtraArgsV1"
 	evmV2DecodeName       = "decodeEVMExtraArgsV2"
 	evmDestExecDataKey    = "destGasAmount"
-	suiV1DecodeStructName = "decodeSuiExtraArgsStruct"
 )
 
 // ExtraDataDecoder is a concrete implementation of SourceChainExtraDataCodec
@@ -53,7 +52,7 @@ func (d ExtraDataDecoder) DecodeExtraArgsToMap(extraArgs cciptypes.Bytes) (map[s
 	case string(suiVMExtraArgsV1Tag):
 		method = suiV1DecodeStructName
 	default:
-		return nil, fmt.Errorf("unknown extra args tag EVM DECODER: %x", extraArgs)
+		return nil, fmt.Errorf("unknown extra args tag: %x", extraArgs)
 	}
 
 	output := make(map[string]any)

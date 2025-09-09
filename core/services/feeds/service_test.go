@@ -586,13 +586,6 @@ func Test_Service_CreateChainConfig(t *testing.T) {
 			expectedID:        int64(1),
 			expectedChainType: proto.ChainType_CHAIN_TYPE_TRON,
 		},
-		//
-		//{
-		//	name:              "Sui Chain Type",
-		//	chainType:         feeds.ChainTypeSui,
-		//	expectedID:        int64(1),
-		//	expectedChainType: proto.ChainType_CHAIN_TYPE_SUI,
-		//},
 	}
 
 	for _, tt := range tests {

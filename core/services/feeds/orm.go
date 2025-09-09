@@ -144,7 +144,7 @@ RETURNING id;
 		cfg.OCR2Config,
 	)
 
-	return id, errors.Wrap(err, "CreateChainConfig failed here1")
+	return id, errors.Wrap(err, "CreateChainConfig failed")
 }
 
 // CreateBatchChainConfig creates multiple chain configs.

@@ -113,7 +113,6 @@ func setupFramework(t *testing.T) *gqlTestFramework {
 		vrf:                  keystoreMocks.NewVRF(t),
 		solana:               keystoreMocks.NewSolana(t),
 		aptos:                keystoreMocks.NewAptos(t),
-		sui:                  keystoreMocks.NewSui(t),
 		cosmos:               keystoreMocks.NewCosmos(t),
 		starknet:             keystoreMocks.NewStarkNet(t),
 		sui:                  keystoreMocks.NewSui(t),

@@ -214,10 +214,6 @@ func (g *generalConfig) AptosConfigs() RawConfigs {
 	return g.c.Aptos
 }
 
-func (g *generalConfig) SuiConfigs() RawConfigs {
-	return g.c.Sui
-}
-
 func (g *generalConfig) TronConfigs() RawConfigs {
 	return g.c.Tron
 }
@@ -361,15 +357,6 @@ func (g *generalConfig) AptosEnabled() bool {
 
 func (g *generalConfig) TronEnabled() bool {
 	for _, c := range g.c.Tron {
-		if c.IsEnabled() {
-			return true
-		}
-	}
-	return false
-}
-
-func (g *generalConfig) SuiEnabled() bool {
-	for _, c := range g.c.Sui {
 		if c.IsEnabled() {
 			return true
 		}

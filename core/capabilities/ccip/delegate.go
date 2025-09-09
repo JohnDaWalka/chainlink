@@ -157,10 +157,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		return nil, err
 	}
 
-	for rid, txs := range transmitterKeys {
-		d.lggr.Infow("DELEGATE Transmitter Entry", "relayID", rid.String(), "transmitters", txs)
-	}
-
 	bootstrapperLocators, err := ocrcommon.ParseBootstrapPeers(spec.CCIPSpec.P2PV2Bootstrappers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse bootstrapper locators: %w", err)
@@ -342,9 +338,6 @@ func (d *Delegate) getTransmitterKeys(ctx context.Context, relayIDs []types.Rela
 			keys, err = getKeys(d.keystore.Cosmos())
 		case relay.NetworkStarkNet:
 			keys, err = getKeys(d.keystore.StarkNet())
-		case relay.NetworkSui:
-			keys, err = getKeys(d.keystore.Sui())
-			d.lggr.Info("SUI KEYS DELEGATE: (EXPECTED PUBKEY)", keys)
 		case relay.NetworkTON:
 			keys, err = getKeys(d.keystore.TON())
 		case relay.NetworkSui:

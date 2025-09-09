@@ -45,8 +45,6 @@ type Config struct {
 
 	Tron RawConfigs `toml:",omitempty"`
 
-	Sui RawConfigs `toml:",omitempty"`
-
 	TON RawConfigs `toml:",omitempty"`
 
 	Sui RawConfigs `toml:",omitempty"`
@@ -347,7 +345,6 @@ func (c *Config) setDefaults() {
 
 	c.Tron.SetDefaults()
 
-	c.Sui.SetDefaults()
 	c.TON.SetDefaults()
 
 	c.Sui.SetDefaults()
@@ -370,6 +367,7 @@ func (c *Config) SetFrom(f *Config) (err error) {
 	appendErr(c.Tron.SetFrom(f.Tron), "Tron")
 	appendErr(c.TON.SetFrom(f.TON), "TON")
 	appendErr(c.Sui.SetFrom(f.Sui), "Sui")
+
 	_, err = commonconfig.MultiErrorList(err)
 	return err
 }
