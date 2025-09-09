@@ -124,22 +124,24 @@ func baseCCIPConfig(
 func configureChainWriterForMsg(
 	ccipPkg, onRampPkg string,
 	pubKey []byte,
+	feeTokenPkgId string,
 ) config.ChainWriterConfig {
+	feeTokenType := fmt.Sprintf("%s::link::LINK", feeTokenPkgId)
 	extra := []config.ChainWriterPTBCommand{{
 		Type:      suicodec.SuiPTBCommandMoveCall,
 		PackageId: strPtr(onRampPkg),
 		ModuleId:  strPtr("onramp"),
 		Function:  strPtr("ccip_send"),
 		Params: []suicodec.SuiFunctionParam{
-			{Name: "ref", Type: "object_id", Required: true},
-			{Name: "state", Type: "object_id", Required: true},
+			{Name: "ref", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(true)},
+			{Name: "state", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(true)},
 			{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
 			{Name: "dest_chain_selector", Type: "u64", Required: true},
 			{Name: "receiver", Type: "vector<u8>", Required: true},
 			{Name: "data", Type: "vector<u8>", Required: true},
 			{Name: "token_params", Type: "ptb_dependency", Required: true,
 				PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 0}},
-			{Name: "fee_token_metadata", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
+			{Name: "fee_token_metadata", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false), GenericType: strPtr(feeTokenType)},
 			{Name: "fee_token", Type: "object_id", Required: true},
 			{Name: "extra_args", Type: "vector<u8>", Required: true},
 		},
@@ -330,7 +332,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	}
 	keystoreInstance.AddKey(priv)
 
-	relayerClient, err := client.NewPTBClient(e.Logger, "http://127.0.0.1:9000", nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
+	relayerClient, err := client.NewPTBClient(e.Logger, suiChain.URL, nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
 	if err != nil {
 		return &ccipclient.AnyMsgSentEvent{}, err
 	}
@@ -353,7 +355,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	if BurnMintTP != "" {
 		chainWriterConfig = configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, BurnMintTP)
 	} else {
-		chainWriterConfig = configureChainWriterForMsg(ccipPackageId, onRampPackageId, publicKeyBytes)
+		chainWriterConfig = configureChainWriterForMsg(ccipPackageId, onRampPackageId, publicKeyBytes, linkTokenPkgId)
 	}
 
 	chainWriter, err := chainwriter.NewSuiChainWriter(e.Logger, txManager, chainWriterConfig, false)

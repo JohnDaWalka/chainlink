@@ -9,7 +9,7 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.0.0-20250826151008-ae5ec0ee6f2c
 
-// replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
 

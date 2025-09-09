@@ -7,7 +7,7 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
-// replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
 

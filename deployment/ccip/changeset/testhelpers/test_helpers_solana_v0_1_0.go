@@ -942,7 +942,7 @@ func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *ccipclient.CCIP
 				MCMSOwnerAddress:       suiSigner,
 			},
 
-			CoinObjectTypeArg:      linkTokenPkgId + "::link_token::LINK_TOKEN",
+			CoinObjectTypeArg:      linkTokenPkgId + "::link::LINK",
 			CCIPObjectRefObjectId:  ccipObjectRefId,
 			CoinMetadataObjectId:   linkTokenObjectMetadataId,
 			TreasuryCapObjectId:    linkTokenTreasuryCapId,
