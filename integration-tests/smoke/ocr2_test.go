@@ -45,7 +45,7 @@ func defaultTestData() ocr2test {
 	return ocr2test{
 		name: "n/a",
 		env: map[string]string{
-			string(env.EVMPlugin.Cmd): "", // not yet supported
+			string(env.EVMPlugin.Cmd): "chainlink-evm",
 		},
 		chainReaderAndCodec: false,
 	}
