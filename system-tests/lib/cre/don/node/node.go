@@ -14,18 +14,18 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
-const (
-	NodeTypeKey            = "type"
-	HostLabelKey           = "host"
-	IndexKey               = "node_index"
-	ExtraRolesKey          = "extra_roles"
-	NodeIDKey              = "node_id"
-	NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
-	NodeP2PIDKey           = "p2p_id"
-	DONIDKey               = "don_id"
-	EnvironmentKey         = "environment"
-	ProductKey             = "product"
-	DONNameKey             = "don_name"
+var (
+	NodeTypeKey            = cre.NodeTypeKey
+	HostLabelKey           = cre.HostLabelKey
+	IndexKey               = cre.IndexKey
+	ExtraRolesKey          = cre.ExtraRolesKey
+	NodeIDKey              = cre.NodeIDKey
+	NodeOCR2KeyBundleIDKey = cre.NodeOCR2KeyBundleIDKey
+	NodeP2PIDKey           = cre.NodeP2PIDKey
+	DONIDKey               = cre.DONIDKey
+	EnvironmentKey         = cre.EnvironmentKey
+	ProductKey             = cre.ProductKey
+	DONNameKey             = cre.DONNameKey
 )
 
 func AddressKeyFromSelector(chainSelector uint64) string {

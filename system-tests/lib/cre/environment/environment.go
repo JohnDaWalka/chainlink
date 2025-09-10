@@ -30,7 +30,6 @@ import (
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	libdevenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
-	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
@@ -114,11 +113,6 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(err, "input validation failed")
 	}
 
-	topologyErr := libdon.ValidateTopology(input.CapabilitiesAwareNodeSets, input.InfraInput)
-	if topologyErr != nil {
-		return nil, pkgerrors.Wrap(topologyErr, "failed to validate topology")
-	}
-
 	if input.InfraInput.Type == infra.CRIB {
 		cribErr := crib.Bootstrap(input.InfraInput)
 		if cribErr != nil {
@@ -142,6 +136,11 @@ func SetupTestEnvironment(
 	})
 	if bcOutErr != nil {
 		return nil, pkgerrors.Wrap(bcOutErr, "failed to start blockchains")
+	}
+
+	topology, err := cre.NewTopology(input.CapabilitiesAwareNodeSets, input.InfraInput)
+	if err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to create topology")
 	}
 
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Blockchains started in %.2f seconds", input.StageGen.Elapsed().Seconds())))

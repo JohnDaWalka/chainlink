@@ -49,7 +49,7 @@ type NodeSecret struct {
 	SolKeys NodeSolKeyWrapper `toml:"Solana"`
 	P2PKey  NodeP2PKey        `toml:"P2PKey"`
 	// Add more fields as needed to reflect 'Secrets' struct from /core/config/toml/types.go
-	// We can't use the original struct, because it's using custom types that serlialize secrets to 'xxxxx'
+	// We can't use the original struct, because it's using custom types that serialize secrets to 'xxxxx'
 }
 
 func GenerateSecrets(input *cre.GenerateSecretsInput) (cre.NodeIndexToSecretsOverride, error) {
