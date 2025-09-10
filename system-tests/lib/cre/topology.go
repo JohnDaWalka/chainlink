@@ -11,8 +11,6 @@ import (
 const (
 	OCRPeeringPort          = 5001
 	CapabilitiesPeeringPort = 6690
-	GatewayIncomingPort     = 5002
-	GatewayOutgoingPort     = 5003
 )
 
 var (
@@ -54,20 +52,6 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 		return nil, fmt.Errorf("failed to create DONs metadata: %w", err)
 	}
 
-	topology := &Topology{}
-	if donsMetadata.GatewayRequired() {
-		topology.GatewayConnectorOutput = NewGatewayConnectorOutput()
-	}
-
-	for _, d := range donsMetadata.List() {
-		if d.IsGateway() {
-			gc, err := d.GatewayConfig(infraInput)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get gateway config for DON %s: %w", d.Name, err)
-			}
-			topology.GatewayConnectorOutput.Configurations = append(topology.GatewayConnectorOutput.Configurations, gc)
-		}
-	}
 	wfDon, err := donsMetadata.GetWorkflowDON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workflow DON: %w", err)
@@ -80,11 +64,28 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 	if err != nil {
 		return nil, fmt.Errorf("failed to get peering data: %w", err)
 	}
-	topology.DonsMetadata = dm
-	topology.WorkflowDONID = wfDon.ID
-	topology.HomeChainSelector = homeChainSelector
-	topology.CapabilitiesPeeringData = capPeeringCfg
-	topology.OCRPeeringData = ocrPeeringCfg
+
+	topology := &Topology{
+		WorkflowDONID:           wfDon.ID,
+		HomeChainSelector:       homeChainSelector,
+		DonsMetadata:            dm,
+		CapabilitiesPeeringData: capPeeringCfg,
+		OCRPeeringData:          ocrPeeringCfg,
+	}
+
+	if donsMetadata.GatewayRequired() {
+		topology.GatewayConnectorOutput = NewGatewayConnectorOutput()
+		for _, d := range donsMetadata.List() {
+			if d.IsGateway() {
+				gc, err := d.GatewayConfig(infraInput)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get gateway config for DON %s: %w", d.Name, err)
+				}
+				topology.GatewayConnectorOutput.Configurations = append(topology.GatewayConnectorOutput.Configurations, gc)
+			}
+		}
+	}
+
 	return topology, nil
 }
 
