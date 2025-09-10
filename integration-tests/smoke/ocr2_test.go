@@ -59,7 +59,7 @@ func TestOCRv2Basic(t *testing.T) {
 		string(env.MedianPlugin.Cmd): "",
 	}
 	plugins := map[string]string{
-		string(env.EVMPlugin.Cmd):    "chainlink-evm", // not yet supported
+		string(env.EVMPlugin.Cmd):    "chainlink-evm",
 		string(env.MedianPlugin.Cmd): "chainlink-feeds",
 	}
 	for _, test := range []ocr2test{
