@@ -2,6 +2,7 @@ package environment
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -59,7 +60,7 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 
 		// for each nodeSet create only chains that the DON supports
 		for chainSelector, bcOut := range input.BlockchainOutputs {
-			if len(input.Topology.DonsMetadata[idx].SupportedChains) > 0 && !slices.Contains(input.Topology.DonsMetadata[idx].SupportedChains, bcOut.ChainID) {
+			if len(input.Topology.DonsMetadata[idx].EVMChainIDs) > 0 && !slices.Contains(input.Topology.DonsMetadata[idx].EVMChainIDs, bcOut.ChainID) {
 				continue
 			}
 
@@ -173,11 +174,21 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 		},
 	}
 
-	donTopology := &cre.DonTopology{}
-	donTopology.WorkflowDonID = input.Topology.WorkflowDONID
-	donTopology.HomeChainSelector = input.RegistryChainSelector()
-	donTopology.CapabilitiesPeeringData = input.Topology.CapabilitiesPeeringData
-	donTopology.OCRPeeringData = input.Topology.OCRPeeringData
+	bt, err := input.Topology.BootstrapNode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bootstrap node: %w", err)
+	}
+	capabilitiesPeering, ocrPeering, err := cre.PeeringCfgs(bt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get peering configs: %w", err)
+	}
+
+	donTopology := &cre.DonTopology{
+		WorkflowDonID:           input.Topology.WorkflowDONID,
+		HomeChainSelector:       input.RegistryChainSelector(),
+		CapabilitiesPeeringData: capabilitiesPeering,
+		OCRPeeringData:          ocrPeering,
+	}
 
 	for i, donMetadata := range input.Topology.DonsMetadata {
 		donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &cre.DonWithMetadata{

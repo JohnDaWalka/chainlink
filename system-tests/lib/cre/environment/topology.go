@@ -66,12 +66,12 @@ func PrepareConfiguration(
 	}
 
 	generateKeysInput := &cre.GenerateKeysInput{
-		GenerateEVMKeysForChainIDs: evmChainIDs,
-		GenerateSolKeysForChainIDs: solChainIDs,
-		GenerateP2PKeys:            true,
-		Topology:                   topology,
-		Password:                   "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
-		Out:                        keysOutput,
+		EVMChainIDs:     evmChainIDs,
+		SolanaChainIDs:  solChainIDs,
+		GenerateP2PKeys: true,
+		Topology:        topology,
+		Password:        "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
+		Out:             keysOutput,
 	}
 	keys, keysErr := cresecrets.GenerateKeys(generateKeysInput)
 	if keysErr != nil {
@@ -88,8 +88,8 @@ func PrepareConfiguration(
 		return nil, nil, errors.Wrap(peeringErr, "failed to find peering data")
 	}
 
-	topology.CapabilitiesPeeringData = capabilitiesPeeringData
-	topology.OCRPeeringData = ocrPeeringData
+	//topology.CapabilitiesPeeringData = capabilitiesPeeringData
+	//topology.OCRPeeringData = ocrPeeringData
 
 	for i, donMetadata := range topology.DonsMetadata {
 		configsFound := 0

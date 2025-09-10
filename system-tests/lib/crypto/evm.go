@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -18,6 +19,26 @@ type EVMKeys struct {
 	ChainID         int
 }
 
+type EVMKey struct {
+	EncryptedJSON []byte
+	PublicAddress common.Address
+	Password      string
+	ChainID       int
+}
+
+func NewEVMKey(password string, chainID int) (*EVMKey, error) {
+	key, addr, err := clclient.NewETHKey(password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new EVM key: %w", err)
+	}
+	return &EVMKey{
+		EncryptedJSON: key,
+		PublicAddress: addr,
+		Password:      password,
+		ChainID:       chainID,
+	}, nil
+}
+
 func GenerateEVMKeys(password string, n int) (*EVMKeys, error) {
 	result := &EVMKeys{
 		Password: password,
@@ -25,7 +46,7 @@ func GenerateEVMKeys(password string, n int) (*EVMKeys, error) {
 	for range n {
 		key, addr, err := clclient.NewETHKey(password)
 		if err != nil {
-			return result, nil
+			return result, fmt.Errorf("failed to create new EVM key: %w", err)
 		}
 		result.EncryptedJSONs = append(result.EncryptedJSONs, key)
 		result.PublicAddresses = append(result.PublicAddresses, addr)

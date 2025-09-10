@@ -512,25 +512,48 @@ type DonWithMetadata struct {
 }
 
 type DonMetadata struct {
-	NodesMetadata   []*NodeMetadata `toml:"nodes_metadata" json:"nodes_metadata"`
-	Flags           []string        `toml:"flags" json:"flags"`
-	ID              uint64          `toml:"id" json:"id"`
-	Name            string          `toml:"name" json:"name"`
-	SupportedChains []uint64        `toml:"supported_chains" json:"supported_chains"` // chain IDs that the DON supports, empty means all chains
+	NodesMetadata []*NodeMetadata `toml:"nodes_metadata" json:"nodes_metadata"`
+	Flags         []string        `toml:"flags" json:"flags"`
+	ID            uint64          `toml:"id" json:"id"`
+	Name          string          `toml:"name" json:"name"`
+	EVMChainIDs   []uint64        `toml:"supported_chains" json:"supported_chains"` // chain IDs that the DON supports, empty means all chains
 
 	ns CapabilitiesAwareNodeSet // computed field, not serialized
 }
 
-func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) *DonMetadata {
-	out := &DonMetadata{
-		ID:              id,
-		Flags:           c.Flags(),
-		NodesMetadata:   make([]*NodeMetadata, len(c.NodeSpecs)),
-		Name:            c.Name,
-		SupportedChains: c.SupportedChains,
-		ns:              *c,
+func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error) {
+	nodes := make([]*NodeMetadata, len(c.NodeSpecs))
+	// generate keys for each node
+	evmChains := make([]int, len(c.SupportedChains))
+	for i, chainID := range c.SupportedChains {
+		evmChains[i] = int(chainID) //nolint:gosec // disable G115
 	}
-	return out
+	cfg := NodeMetadataConfig{
+		Labels: []*Label{},
+		Keys: NodeKeyInput{
+			EVMChainIDs:     evmChains,
+			SolanaChainIDs:  c.SupportedSolChains,
+			GenerateP2PKeys: true,
+			Password:        "dev-password",
+		},
+		Host: "",
+	}
+	for i := range nodes {
+		n, err := NewNodeMetadata(cfg)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create node metadata: %v", err))
+		}
+		nodes[i] = n
+	}
+	out := &DonMetadata{
+		ID:            id,
+		Flags:         c.Flags(),
+		NodesMetadata: nodes,
+		Name:          c.Name,
+		EVMChainIDs:   c.SupportedChains,
+		ns:            *c,
+	}
+	return out, nil
 }
 
 func (m *DonMetadata) labelNodes(infraInput infra.Input) {
@@ -679,6 +702,16 @@ func (m DonsMetadata) validate() error {
 	return nil
 }
 
+// Get the bootstrap node from the first DON that contains one. Currently only one bootstrap node is supported.
+func (m DonsMetadata) BootstrapNode() (*NodeMetadata, error) {
+	for _, don := range m.dons {
+		if don.ContainsBootstrapNode() {
+			return don.GetBootstrapNode()
+		}
+	}
+	return nil, errors.New("no don contains a bootstrap node")
+}
+
 func (m DonsMetadata) BootstrapNodeCount() int {
 	count := 0
 	for _, don := range m.dons {
@@ -786,11 +819,27 @@ func LabelFromProto(p *ptypes.Label) (*Label, error) {
 }
 
 type NodeMetadata struct {
-	Labels []*Label `toml:"labels" json:"labels"`
-	// TODO use real types
-	Keys []string `toml:"keys" json:"keys"` //
-	P2P  string   `toml:"p2p" json:"p2p"`
-	Host string   `toml:"host" json:"host"`
+	Labels []*Label  `toml:"labels" json:"labels"`
+	Keys   *NodeKeys `toml:"keys" json:"keys"`
+	Host   string    `toml:"host" json:"host"`
+}
+
+type NodeMetadataConfig struct {
+	Labels []*Label
+	Keys   NodeKeyInput
+	Host   string
+}
+
+func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
+	keys, err := NewNodeKeys(c.Keys)
+	if err != nil {
+		return nil, err
+	}
+	return &NodeMetadata{
+		Labels: c.Labels,
+		Keys:   keys,
+		Host:   "", // we set the host later when we have the infra input
+	}, nil
 }
 
 // TODO make a constructor from Topology and find better names
@@ -1015,12 +1064,12 @@ func (c *CapabilitiesAwareNodeSet) MaxFaultyNodes() (uint32, error) {
 }
 
 type GenerateKeysInput struct {
-	GenerateEVMKeysForChainIDs []int
-	GenerateSolKeysForChainIDs []string
-	GenerateP2PKeys            bool
-	Topology                   *Topology
-	Password                   string
-	Out                        *GenerateKeysOutput
+	EVMChainIDs     []int
+	SolanaChainIDs  []string
+	GenerateP2PKeys bool
+	Topology        *Topology
+	Password        string
+	Out             *GenerateKeysOutput
 }
 
 func (g *GenerateKeysInput) Validate() error {
@@ -1041,6 +1090,63 @@ type ChainIDToEVMKeys = map[int]*crypto.EVMKeys
 
 // chainID -> SolKeys
 type ChainIDToSolKeys = map[string]*crypto.SolKeys
+
+type NodeKeys struct {
+	EVM    map[int]*crypto.EVMKey
+	Solana map[string]*crypto.SolKey
+	P2PKey *crypto.P2PKey
+}
+
+// returns the PeerID without the "p2p_" prefix, or an empty string if P2PKey is nil
+func (n NodeKeys) CleansedPeerID() string {
+	if n.P2PKey == nil {
+		return ""
+	}
+	return strings.TrimPrefix(string(n.P2PKey.PeerID.String()), "p2p_")
+}
+
+type NodeKeyInput struct {
+	EVMChainIDs     []int
+	SolanaChainIDs  []string
+	GenerateP2PKeys bool
+	Password        string
+}
+
+func NewNodeKeys(input NodeKeyInput) (*NodeKeys, error) {
+	out := &NodeKeys{
+		EVM:    make(map[int]*crypto.EVMKey),
+		Solana: make(map[string]*crypto.SolKey),
+	}
+	if input.GenerateP2PKeys {
+		p2pKey, err := crypto.NewP2PKey(input.Password)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate P2P keys")
+		}
+		out.P2PKey = p2pKey
+	}
+
+	if len(input.EVMChainIDs) > 0 {
+		for _, chainID := range input.EVMChainIDs {
+			// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
+			c := int(chainID) //nolint:gosec // disable G115
+			k, err := crypto.NewEVMKey(input.Password, c)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate EVM keys: %w", err)
+			}
+			out.EVM[c] = k
+
+		}
+	}
+
+	for _, chainID := range input.SolanaChainIDs {
+		k, err := crypto.NewSolKey(input.Password, chainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate Sol keys: %w", err)
+		}
+		out.Solana[chainID] = k
+	}
+	return out, nil
+}
 
 // donID -> chainID -> EVMKeys
 type DonsToEVMKeys = map[uint64]ChainIDToEVMKeys
@@ -1088,14 +1194,8 @@ func (g *GenerateSecretsInput) Validate() error {
 		}
 	}
 	if g.P2PKeys != nil {
-		if len(g.P2PKeys.EncryptedJSONs) == 0 {
-			return errors.New("encrypted jsons not set")
-		}
-		if len(g.P2PKeys.PeerIDs) == 0 {
-			return errors.New("peer ids not set")
-		}
-		if len(g.P2PKeys.EncryptedJSONs) != len(g.P2PKeys.PeerIDs) {
-			return errors.New("encrypted jsons and peer ids must have the same length")
+		if len(g.P2PKeys.Keys) == 0 {
+			return errors.New("P2P keys not set")
 		}
 	}
 

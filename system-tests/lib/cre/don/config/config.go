@@ -439,7 +439,7 @@ func findEVMChains(input cre.GenerateConfigsInput) []*evmChain {
 
 		// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
 		// TODO: review if we really need this SupportedChains functionality
-		if len(input.DonMetadata.SupportedChains) > 0 && !slices.Contains(input.DonMetadata.SupportedChains, bcOut.ChainID) {
+		if len(input.DonMetadata.EVMChainIDs) > 0 && !slices.Contains(input.DonMetadata.EVMChainIDs, bcOut.ChainID) {
 			continue
 		}
 

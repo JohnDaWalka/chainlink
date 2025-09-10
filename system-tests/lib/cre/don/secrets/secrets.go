@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
 type NodeEthKey struct {
@@ -77,7 +78,7 @@ func GenerateSecrets(input *cre.GenerateSecretsInput) (cre.NodeIndexToSecretsOve
 
 		if input.P2PKeys != nil {
 			nodeSecret.P2PKey = NodeP2PKey{
-				JSON:     string(input.P2PKeys.EncryptedJSONs[i]),
+				JSON:     string(input.P2PKeys.Keys[i].EncryptedJSON),
 				Password: input.P2PKeys.Password,
 			}
 		}
@@ -127,13 +128,13 @@ func AddKeysToTopology(topology *cre.Topology, keys *cre.GenerateKeysOutput) (*c
 		}
 
 		p2pKeys := keys.P2PKeys[donMetadata.ID]
-		if len(p2pKeys.PeerIDs) != len(donMetadata.NodesMetadata) {
-			return nil, fmt.Errorf("number of P2P keys for DON %d does not match the number of nodes. Expected %d, got %d", donMetadata.ID, len(donMetadata.NodesMetadata), len(p2pKeys.PeerIDs))
+		if len(p2pKeys.Keys) != len(donMetadata.NodesMetadata) {
+			return nil, fmt.Errorf("number of P2P keys for DON %d does not match the number of nodes. Expected %d, got %d", donMetadata.ID, len(donMetadata.NodesMetadata), len(p2pKeys.Keys))
 		}
 		for idx, nodeMetadata := range donMetadata.NodesMetadata {
 			nodeMetadata.Labels = append(nodeMetadata.Labels, &cre.Label{
 				Key:   node.NodeP2PIDKey,
-				Value: p2pKeys.PeerIDs[idx],
+				Value: p2pKeys.Keys[idx].PeerID.String(),
 			})
 		}
 
@@ -298,13 +299,20 @@ func KeysOutputFromConfig(nodeSets []*cre.CapabilitiesAwareNodeSet) (*cre.Genera
 				if sSecrets.P2PKey.JSON == nil || sSecrets.P2PKey.Password == nil {
 					return nil, fmt.Errorf("P2P key or password is nil for node %d in DON %d", nodeIdx, donIdx)
 				}
-				p2pKeys.EncryptedJSONs = append(p2pKeys.EncryptedJSONs, []byte(*sSecrets.P2PKey.JSON))
-				p2pKeys.Password = *sSecrets.P2PKey.Password
 				peerID, peerIDErr := publicP2PAddressFromEncryptedJSON(*sSecrets.P2PKey.JSON)
 				if peerIDErr != nil {
 					return nil, errors.Wrapf(peerIDErr, "failed to get public p2p address for node %d in DON %d from encrypted JSON", nodeIdx, donIdx)
 				}
-				p2pKeys.PeerIDs = append(p2pKeys.PeerIDs, peerID)
+				p := new(p2pkey.PeerID)
+				if err := p.UnmarshalString(peerID); err != nil {
+					return nil, errors.Wrapf(err, "failed to unmarshal peer ID for node %d in DON %d", nodeIdx, donIdx)
+				}
+				p2pKeys.Keys = append(p2pKeys.Keys, crypto.P2PKey{
+					EncryptedJSON: []byte(*sSecrets.P2PKey.JSON),
+					Password:      *sSecrets.P2PKey.Password,
+					PeerID:        *p,
+				})
+
 				p2pKeysFoundPerDon[donIdxUint32]++
 				if len(sSecrets.EVM.Keys) == 0 {
 					return nil, fmt.Errorf("EVM keys is nil for node %d in DON %d", nodeIdx, donIdx)
@@ -408,7 +416,20 @@ func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error)
 		P2PKeys: make(cre.DonsToP2PKeys),
 	}
 
+	keyConfig := cre.NodeKeyInput{
+		EVMChainIDs:     input.EVMChainIDs,
+		SolanaChainIDs:  input.SolanaChainIDs,
+		GenerateP2PKeys: input.GenerateP2PKeys,
+		Password:        input.Password,
+	}
 	for _, donMetadata := range input.Topology.DonsMetadata {
+		for i := range len(donMetadata.NodesMetadata) {
+			keys, err := cre.NewNodeKeys(keyConfig)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to generate keys for DON %d", donMetadata.ID)
+			}
+			donMetadata.NodesMetadata[i].Keys = keys
+		}
 		if input.GenerateP2PKeys {
 			p2pKeys, err := crypto.GenerateP2PKeys(input.Password, len(donMetadata.NodesMetadata))
 			if err != nil {
@@ -417,10 +438,10 @@ func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error)
 			output.P2PKeys[donMetadata.ID] = p2pKeys
 		}
 
-		if len(input.GenerateEVMKeysForChainIDs) > 0 {
-			for _, chainID := range input.GenerateEVMKeysForChainIDs {
+		if len(input.EVMChainIDs) > 0 {
+			for _, chainID := range input.EVMChainIDs {
 				// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
-				if len(donMetadata.SupportedChains) > 0 && !slices.Contains(donMetadata.SupportedChains, libc.MustSafeUint64(int64(chainID))) {
+				if len(donMetadata.EVMChainIDs) > 0 && !slices.Contains(donMetadata.EVMChainIDs, libc.MustSafeUint64(int64(chainID))) {
 					continue
 				}
 				evmKeys, err := crypto.GenerateEVMKeys(input.Password, len(donMetadata.NodesMetadata))
@@ -434,8 +455,8 @@ func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error)
 			}
 		}
 
-		for _, chainID := range input.GenerateSolKeysForChainIDs {
-			solKeys, err := crypto.GenerateSolKeys(input.Password, len(donMetadata.NodesMetadata))
+		for _, chainID := range input.SolanaChainIDs {
+			solKeys, err := crypto.GenerateSolKeys(input.Password, len(donMetadata.NodesMetadata), chainID)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to generate Sol keys")
 			}

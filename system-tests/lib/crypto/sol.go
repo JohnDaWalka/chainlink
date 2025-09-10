@@ -9,6 +9,32 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
+type SolKey struct {
+	EncryptedJSON []byte
+	PublicAddress solana.PublicKey
+	Password      string
+	ChainID       string
+}
+
+func NewSolKey(password, chainID string) (*SolKey, error) {
+	key, err := solkey.New()
+	if err != nil {
+		return nil, fmt.Errorf("err create solkey: %w", err)
+	}
+
+	enc, err := key.ToEncryptedJSON(password, utils.DefaultScryptParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt key: %w", err)
+	}
+
+	return &SolKey{
+		EncryptedJSON: enc,
+		PublicAddress: key.PublicKey(),
+		Password:      password,
+		ChainID:       chainID,
+	}, nil
+}
+
 type SolKeys struct {
 	EncryptedJSONs  [][]byte
 	PublicAddresses []solana.PublicKey
@@ -16,23 +42,19 @@ type SolKeys struct {
 	ChainID         string
 }
 
-func GenerateSolKeys(password string, n int) (*SolKeys, error) {
+func GenerateSolKeys(password string, n int, chainID string) (*SolKeys, error) {
 	result := &SolKeys{
 		Password: password,
+		ChainID:  chainID,
 	}
 	for range n {
-		key, err := solkey.New()
+		key, err := NewSolKey(password, chainID)
 		if err != nil {
 			return nil, fmt.Errorf("err create solkey: %w", err)
 		}
 
-		enc, err := key.ToEncryptedJSON(password, utils.DefaultScryptParams)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encrypt key: %w", err)
-		}
-
-		result.EncryptedJSONs = append(result.EncryptedJSONs, enc)
-		result.PublicAddresses = append(result.PublicAddresses, key.PublicKey())
+		result.EncryptedJSONs = append(result.EncryptedJSONs, key.EncryptedJSON)
+		result.PublicAddresses = append(result.PublicAddresses, key.PublicAddress)
 	}
 
 	return result, nil
