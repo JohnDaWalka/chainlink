@@ -626,6 +626,11 @@ func (m *DonMetadata) RequiresWebAPI() bool {
 		slices.Contains(m.Flags, WebAPITargetCapability)
 }
 
+func (m *DonMetadata) IsWorkflowDON() bool {
+	// TODO enum type for DON types
+	return slices.Contains(m.ns.DONTypes, WorkflowDON)
+}
+
 type DonsMetadata struct {
 	dons  []*DonMetadata
 	infra infra.Input
@@ -704,19 +709,16 @@ func (m DonsMetadata) FindByName(name string) (*DonMetadata, error) {
 }
 
 func (m DonsMetadata) FindByFlag(flag string) (*DonsMetadata, error) {
-	m2, err := NewDonsMetadata(nil, m.infra)
-	if err != nil {
-		return nil, err
-	}
+	dons := make([]*DonMetadata, 0)
 	for _, don := range m.dons {
 		if slices.Contains(don.Flags, flag) {
-			m2.dons = append(m2.dons, don)
+			dons = append(dons, don)
 		}
 	}
-	if len(m2.dons) == 0 {
+	if len(dons) == 0 {
 		return nil, fmt.Errorf("no dons with flag %s found", flag)
 	}
-	return m2, nil
+	return NewDonsMetadata(dons, m.infra)
 }
 
 func (m DonsMetadata) GetOneByFlag(flag string) (*DonMetadata, error) {
@@ -733,7 +735,13 @@ func (m DonsMetadata) GetOneByFlag(flag string) (*DonMetadata, error) {
 // GetWorkflowDON returns the DON with the WorkflowDON flag. Returns an error if
 // there is not exactly one such DON. Currently, the WorkflowDON flag is required on exactly one DON.
 func (m DonsMetadata) GetWorkflowDON() (*DonMetadata, error) {
-	return m.GetOneByFlag(WorkflowDON)
+	// don't use flag b/c may not be set
+	for _, don := range m.dons {
+		if don.IsWorkflowDON() {
+			return don, nil
+		}
+	}
+	return nil, fmt.Errorf("no dons with flag %s found", WorkflowDON)
 }
 
 func (m DonsMetadata) GatewayEnabled() bool {
