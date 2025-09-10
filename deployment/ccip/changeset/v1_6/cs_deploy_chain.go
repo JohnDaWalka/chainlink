@@ -9,17 +9,116 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink/deployment"
 	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
+	suiFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	ccipopsv1_6 "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
 )
 
 var _ cldf.ChangeSet[ccipseq.DeployChainContractsConfig] = DeployChainContractsChangeset
+
+var (
+	FeeQuoterWithSuiSupportChangeset = cldf.CreateChangeSet(deployFeeQuoterWithSuiSupportLogic, deployFeeQuoterWithSuiSupportPreCondition)
+)
+
+type FeeQuoterWithSuiSupportConfig struct {
+	HomeChainSelector      uint64
+	ContractParamsPerChain map[uint64]ChainContractParams
+}
+
+type ChainContractParams struct {
+	FeeQuoterParams ccipopsv1_6.FeeQuoterParamsSui
+}
+
+func deployFeeQuoterWithSuiSupportLogic(e cldf.Environment, config FeeQuoterWithSuiSupportConfig) (cldf.ChangesetOutput, error) {
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		e.Logger.Errorw("Failed to load existing onchain state", "err", err)
+		return cldf.ChangesetOutput{}, err
+	}
+
+	ab := cldf.NewMemoryAddressBook()
+	for chainSelector, contractParams := range config.ContractParamsPerChain {
+		targetChain := e.BlockChains.EVMChains()[chainSelector]
+
+		err = deployFeeQuoterWithSuiSupportContract(e, ab, state, targetChain, contractParams.FeeQuoterParams)
+		if err != nil {
+			e.Logger.Errorw("Failed to deploy donIDClaimer contract", "err", err, "addressBook", ab)
+			return cldf.ChangesetOutput{
+				AddressBook: ab,
+			}, fmt.Errorf("failed to deploy donIDClaimer contract: %w", err)
+		}
+	}
+	return cldf.ChangesetOutput{
+		AddressBook: ab,
+	}, nil
+}
+
+func deployFeeQuoterWithSuiSupportContract(e cldf.Environment, ab cldf.AddressBook, state stateview.CCIPOnChainState, targetChain cldf_evm.Chain, input ccipopsv1_6.FeeQuoterParamsSui) error {
+	targetChainState, chainExists := state.Chains[targetChain.Selector]
+	if !chainExists {
+		return fmt.Errorf("chain %s not found in existing state, deploy the prerequisites first", targetChain.String())
+	}
+
+	// get the existing contract addresses
+	linkAddr, err := targetChainState.LinkTokenAddress()
+	if err != nil {
+		return err
+	}
+
+	weth9Addr := getAddressSafely(targetChainState.Weth9)
+	timelockAddr := getAddressSafely(targetChainState.Timelock)
+
+	_, err = cldf.DeployContract(e.Logger, targetChain, ab,
+		func(chain cldf_evm.Chain) cldf.ContractDeploy[*suiFeeQuoter.FeeQuoter] {
+			feeTokenWithSuiSupportAddr, tx2, feeTokenWithSuiSupportC, err2 := suiFeeQuoter.DeployFeeQuoter(
+				chain.DeployerKey,
+				chain.Client,
+				fee_quoter.FeeQuoterStaticConfig{
+					MaxFeeJuelsPerMsg:            input.MaxFeeJuelsPerMsg,
+					LinkToken:                    linkAddr,
+					TokenPriceStalenessThreshold: input.TokenPriceStalenessThreshold,
+				},
+				[]common.Address{timelockAddr, chain.DeployerKey.From}, // priceUpdaters
+				[]common.Address{weth9Addr, linkAddr},                  // fee tokens
+				input.TokenPriceFeedUpdates,
+				input.TokenTransferFeeConfigArgs,
+				append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+					{
+						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplierWeiPerEth,
+						Token:                      linkAddr,
+					},
+					{
+						PremiumMultiplierWeiPerEth: input.WethPremiumMultiplierWeiPerEth,
+						Token:                      weth9Addr,
+					},
+				}, input.MorePremiumMultiplierWeiPerEth...),
+				input.DestChainConfigArgs,
+			)
+			return cldf.ContractDeploy[*suiFeeQuoter.FeeQuoter]{
+				Address: feeTokenWithSuiSupportAddr, Contract: feeTokenWithSuiSupportC, Tx: tx2, Tv: cldf.NewTypeAndVersion(shared.FeeQuoter, deployment.Version1_6_1), Err: err2,
+			}
+		})
+	if err != nil {
+		e.Logger.Errorw("Failed to deploy donIDClaimer contract", "chain", targetChain.String(), "err", err)
+		return err
+	}
+
+	return nil
+}
+
+func deployFeeQuoterWithSuiSupportPreCondition(e cldf.Environment, _ FeeQuoterWithSuiSupportConfig) error {
+	return nil
+}
 
 // DeployChainContracts deploys all new CCIP v1.6 or later contracts for the given chains.
 // It returns the new addresses for the contracts.

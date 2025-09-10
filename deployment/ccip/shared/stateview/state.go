@@ -35,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
 	suistate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/sui"
-	tonstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/ton"
 
 	commonstate "github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"

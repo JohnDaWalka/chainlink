@@ -169,9 +169,9 @@ func orchestrateChangesetsPrecondition(e cldf.Environment, c OrchestrateChangese
 	if c.Description == "" {
 		return errors.New("description must not be empty")
 	}
-	if c.MCMS == nil {
-		return errors.New("mcms must not be nil")
-	}
+	// if c.MCMS == nil {
+	// 	return errors.New("mcms must not be nil")
+	// }
 	for i, cs := range c.ChangeSets {
 		if err := cs.ChangeSet.VerifyPreconditions(e, cs.Config); err != nil {
 			return fmt.Errorf("precondition failed for changeset at index %d: %w", i, err)

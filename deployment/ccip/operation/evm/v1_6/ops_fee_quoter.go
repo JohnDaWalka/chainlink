@@ -3,7 +3,6 @@ package v1_6
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -16,6 +15,7 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
+	fqSui "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -51,7 +51,6 @@ var (
 		cldf.NewTypeAndVersion(shared.FeeQuoter, deployment.Version1_6_0),
 		opsutil.VMDeployers[DeployFeeQInput]{
 			DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, *types.Transaction, error) {
-				fmt.Println("DEPLOYING NEW FEEQUOTER FOR SUI SPECIFIC")
 				addr, tx, _, err := fee_quoter.DeployFeeQuoter(opts, backend,
 					fee_quoter.FeeQuoterStaticConfig{
 						MaxFeeJuelsPerMsg:            input.Params.MaxFeeJuelsPerMsg,
@@ -173,6 +172,17 @@ var (
 		},
 	)
 )
+
+type FeeQuoterParamsSui struct {
+	MaxFeeJuelsPerMsg              *big.Int
+	TokenPriceStalenessThreshold   uint32
+	LinkPremiumMultiplierWeiPerEth uint64
+	WethPremiumMultiplierWeiPerEth uint64
+	MorePremiumMultiplierWeiPerEth []fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs
+	TokenPriceFeedUpdates          []fqSui.FeeQuoterTokenPriceFeedUpdate
+	TokenTransferFeeConfigArgs     []fqSui.FeeQuoterTokenTransferFeeConfigArgs
+	DestChainConfigArgs            []fqSui.FeeQuoterDestChainConfigArgs
+}
 
 type FeeQuoterParams struct {
 	MaxFeeJuelsPerMsg              *big.Int
