@@ -518,12 +518,16 @@ func (m *DestinationGun) sendSuiSourceMessage(src uint64) error {
 
 	_, err = testhelpers.SendRequestSui(m.env, *m.state, &sendRequestCfg)
 	if err != nil {
-		m.l.Errorw("execution reverted",
+		m.l.Errorw("SendRequestSui failed",
 			"sourceChain", src,
 			"destChain", m.chainSelector,
 			"err", cldf.MaybeDataErr(err))
 		return fmt.Errorf("failed to send Sui request: %w", err)
 	}
+
+	m.l.Debugw("Successfully sent SUI message",
+		"sourceChain", src,
+		"destChain", m.chainSelector)
 
 	return nil
 }

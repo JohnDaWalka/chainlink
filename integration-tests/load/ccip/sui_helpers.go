@@ -98,6 +98,9 @@ func subscribeSuiTransmitEvents(
 	)
 
 	seqNums := make(map[testhelpers.SourceDestPair]SeqNumRange)
+	processedEvents := make(map[string]bool) // Track processed events to avoid duplicates
+	lastCheckpoint := startSlot - 1          // Start from the checkpoint before startSlot to ensure we don't miss any
+
 	for _, cs := range otherChains {
 		csPair := testhelpers.SourceDestPair{
 			SourceChainSelector: srcChainSel,
@@ -146,7 +149,7 @@ func subscribeSuiTransmitEvents(
 		return
 	}
 
-	ticker := time.NewTicker(10 * time.Second) // Poll every 10 seconds
+	ticker := time.NewTicker(1 * time.Second) // Poll every 1 second for responsive metrics
 	defer ticker.Stop()
 
 	for {
@@ -176,7 +179,19 @@ func subscribeSuiTransmitEvents(
 			}
 			return
 		case <-ticker.C:
-			// Query for new CCIPMessageSent events
+			// Get the current latest checkpoint
+			currentCheckpoint, err := suiChain.Client.SuiGetLatestCheckpointSequenceNumber(ctx)
+			if err != nil {
+				lggr.Errorw("Failed to get current SUI checkpoint", "error", err)
+				continue
+			}
+
+			// Only query if there are new checkpoints since our last query
+			if currentCheckpoint <= lastCheckpoint {
+				continue
+			}
+
+			// Query for new CCIPMessageSent events from the last processed checkpoint
 			var ccipSendEvent SuiCCIPMessageSent
 			sequences, err := chainReader.QueryKey(
 				ctx,
@@ -186,6 +201,8 @@ func subscribeSuiTransmitEvents(
 				},
 				sui_query.KeyFilter{
 					Key: "CCIPMessageSent",
+					// TODO: Add checkpoint filtering when supported by the QueryKey API
+					// For now, we'll filter in code below
 				},
 				sui_query.LimitAndSort{
 					Limit: sui_query.Limit{
@@ -200,6 +217,7 @@ func subscribeSuiTransmitEvents(
 				continue
 			}
 
+			newEventsFound := false
 			for _, sequence := range sequences {
 				event, ok := sequence.Data.(*SuiCCIPMessageSent)
 				if !ok {
@@ -207,12 +225,23 @@ func subscribeSuiTransmitEvents(
 					continue
 				}
 
+				// Create a unique key for this event to track if it's been processed
+				eventKey := fmt.Sprintf("%d_%d_%d", srcChainSel, event.DestChainSelector, event.SequenceNumber)
+
+				// Skip if we've already processed this event
+				if processedEvents[eventKey] {
+					continue
+				}
+
+				// Mark this event as processed
+				processedEvents[eventKey] = true
+				newEventsFound = true
+
 				lggr.Debugw("received SUI transmit event for",
 					"srcChain", srcChainSel,
 					"destChain", event.DestChainSelector,
 					"sequenceNumber", event.SequenceNumber)
 
-				// Send metrics
 				data := messageData{
 					eventType: transmitted,
 					srcDstSeqNum: srcDstSeqNum{
@@ -220,7 +249,7 @@ func subscribeSuiTransmitEvents(
 						dst:    event.DestChainSelector,
 						seqNum: event.SequenceNumber,
 					},
-					timestamp: uint64(time.Now().Unix()), // SUI doesn't have block timestamps like EVM
+					timestamp: uint64(time.Now().Unix()),
 				}
 				metricPipe <- data
 
@@ -245,6 +274,16 @@ func subscribeSuiTransmitEvents(
 				if event.SequenceNumber > seqNums[csPair].End.Load() {
 					seqNums[csPair].End.Store(event.SequenceNumber)
 				}
+			}
+
+			// Update last processed checkpoint
+			lastCheckpoint = currentCheckpoint
+
+			if newEventsFound {
+				lggr.Debugw("Processed new SUI transmit events",
+					"srcChain", srcChainSel,
+					"currentCheckpoint", currentCheckpoint,
+					"startSlot", startSlot)
 			}
 		}
 	}
@@ -274,6 +313,9 @@ func subscribeSuiCommitEvents(
 	seenMessages := make(map[uint64][]uint64)
 	expectedRange := make(map[uint64]ccipocr3.SeqNumRange)
 	completedSrcChains := make(map[uint64]bool)
+	processedCommits := make(map[string]bool) // Track processed commit reports to avoid duplicates
+	lastCheckpoint := startSlot - 1           // Start from the checkpoint before startSlot
+
 	for _, srcChain := range srcChains {
 		seenMessages[srcChain] = make([]uint64, 0)
 		completedSrcChains[srcChain] = false
@@ -311,7 +353,7 @@ func subscribeSuiCommitEvents(
 		return
 	}
 
-	ticker := time.NewTicker(tickerDuration)
+	ticker := time.NewTicker(1 * time.Second) // Use 1 second for consistency with transmit events
 	defer ticker.Stop()
 
 	for {
@@ -332,6 +374,18 @@ func subscribeSuiCommitEvents(
 			}
 
 		case <-ticker.C:
+			// Get the current latest checkpoint
+			currentCheckpoint, err := suiChain.Client.SuiGetLatestCheckpointSequenceNumber(ctx)
+			if err != nil {
+				lggr.Errorw("Failed to get current SUI checkpoint for commit events", "error", err)
+				continue
+			}
+
+			// Only query if there are new checkpoints since our last query
+			if currentCheckpoint <= lastCheckpoint {
+				continue
+			}
+
 			// Query for new commit events
 			var commitReport SuiCommitReport
 			sequences, err := chainReader.QueryKey(
@@ -356,12 +410,25 @@ func subscribeSuiCommitEvents(
 				continue
 			}
 
+			newCommitsFound := false
 			for _, sequence := range sequences {
 				report, ok := sequence.Data.(*SuiCommitReport)
 				if !ok {
 					lggr.Errorw("Failed to cast SUI commit report data")
 					continue
 				}
+
+				// Create a unique key for this commit report
+				commitKey := fmt.Sprintf("%d_%d_%d_%d", report.SourceChainSelector, chainSelector, report.MinSeqNr, report.MaxSeqNr)
+
+				// Skip if we've already processed this commit
+				if processedCommits[commitKey] {
+					continue
+				}
+
+				// Mark this commit as processed
+				processedCommits[commitKey] = true
+				newCommitsFound = true
 
 				lggr.Infow("Received SUI commit report ",
 					"sourceChain", report.SourceChainSelector,
@@ -383,6 +450,16 @@ func subscribeSuiCommitEvents(
 					metricPipe <- data
 					seenMessages[report.SourceChainSelector] = append(seenMessages[report.SourceChainSelector], i)
 				}
+			}
+
+			// Update last processed checkpoint
+			lastCheckpoint = currentCheckpoint
+
+			if newCommitsFound {
+				lggr.Debugw("Processed new SUI commit events",
+					"destChain", chainSelector,
+					"currentCheckpoint", currentCheckpoint,
+					"startSlot", startSlot)
 			}
 
 			lggr.Infow("ticking, checking SUI committed events",
@@ -444,6 +521,9 @@ func subscribeSuiExecutionEvents(
 	seenMessages := make(map[uint64][]uint64)
 	expectedRange := make(map[uint64]ccipocr3.SeqNumRange)
 	completedSrcChains := make(map[uint64]bool)
+	processedExecutions := make(map[string]bool) // Track processed execution events to avoid duplicates
+	lastCheckpoint := startSlot - 1              // Start from the checkpoint before startSlot
+
 	for _, srcChain := range srcChains {
 		seenMessages[srcChain] = make([]uint64, 0)
 		completedSrcChains[srcChain] = false
@@ -481,7 +561,7 @@ func subscribeSuiExecutionEvents(
 		return
 	}
 
-	ticker := time.NewTicker(tickerDuration)
+	ticker := time.NewTicker(1 * time.Second) // Use 1 second for consistency with transmit events
 	defer ticker.Stop()
 
 	for {
@@ -504,6 +584,18 @@ func subscribeSuiExecutionEvents(
 			}
 
 		case <-ticker.C:
+			// Get the current latest checkpoint
+			currentCheckpoint, err := suiChain.Client.SuiGetLatestCheckpointSequenceNumber(ctx)
+			if err != nil {
+				lggr.Errorw("Failed to get current SUI checkpoint for execution events", "error", err)
+				continue
+			}
+
+			// Only query if there are new checkpoints since our last query
+			if currentCheckpoint <= lastCheckpoint {
+				continue
+			}
+
 			// Query for new execution events
 			var executionEvent SuiExecutionStateChanged
 			sequences, err := chainReader.QueryKey(
@@ -528,12 +620,25 @@ func subscribeSuiExecutionEvents(
 				continue
 			}
 
+			newExecutionsFound := false
 			for _, sequence := range sequences {
 				event, ok := sequence.Data.(*SuiExecutionStateChanged)
 				if !ok {
 					lggr.Errorw("Failed to cast SUI execution event data")
 					continue
 				}
+
+				// Create a unique key for this execution event
+				executionKey := fmt.Sprintf("%d_%d_%d", event.SourceChainSelector, chainSelector, event.SequenceNumber)
+
+				// Skip if we've already processed this execution
+				if processedExecutions[executionKey] {
+					continue
+				}
+
+				// Mark this execution as processed
+				processedExecutions[executionKey] = true
+				newExecutionsFound = true
 
 				lggr.Debugw("received SUI execution event for",
 					"sourceChain", event.SourceChainSelector,
@@ -552,6 +657,16 @@ func subscribeSuiExecutionEvents(
 				}
 				metricPipe <- data
 				seenMessages[event.SourceChainSelector] = append(seenMessages[event.SourceChainSelector], event.SequenceNumber)
+			}
+
+			// Update last processed checkpoint
+			lastCheckpoint = currentCheckpoint
+
+			if newExecutionsFound {
+				lggr.Debugw("Processed new SUI execution events",
+					"destChain", chainSelector,
+					"currentCheckpoint", currentCheckpoint,
+					"startSlot", startSlot)
 			}
 
 			lggr.Infow("ticking, checking SUI executed events",

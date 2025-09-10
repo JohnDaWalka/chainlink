@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -47,9 +48,10 @@ var (
 
 // this key only works on simulated geth chains in crib
 const (
-	simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	solTestKey      = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
-	aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
+	solTestKey   = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
+	aptosTestKey = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
+	//simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	suiTestReceiverAddress = "3f6d6a9e3f7707485bf51c02a6bc6cb6e17dffe7f3e160b3c5520d55d1de8398"
 )
 
 var suiTestKey = os.Getenv("SUI_TEST_KEY")
@@ -443,14 +445,18 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				&wg,
 				mm.InputChan)
 		case selectors.FamilySui:
-			// Sui doesn't have a specific receiver field, use default receiver address
-			defaultSuiReceiver := make([]byte, 32) // 32-byte zero address for Sui
+
+			suiReceiver, err := hex.DecodeString(suiTestReceiverAddress)
+			if err != nil {
+				lggr.Errorw("Failed to decode SUI receiver address", "error", err)
+				t.Fatal(err)
+			}
 			gunMap[cs], err = NewDestinationGun(
 				env.Logger,
 				cs,
 				*env,
 				&state,
-				defaultSuiReceiver,
+				suiReceiver,
 				userOverrides,
 				evmSourceKeys[cs],
 				solSourceKeys,
