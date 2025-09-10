@@ -16,11 +16,11 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/ccip-owner-contracts/pkg/gethwrappers"
-
 	solOffRamp "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	solState "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20_with_drip"
+	"github.com/smartcontractkit/chainlink-ton/pkg/ccip/codec"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/link_token"
 
+	tonstate "github.com/smartcontractkit/chainlink-ton/deployment/state"
 	ccipshared "github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	aptosstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
@@ -656,7 +657,8 @@ func (c CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 		offRampAddress = normalizedAddr[:]
 	case chain_selectors.FamilyTon:
 		or := c.TonChains[chainSelector].OffRamp
-		offRampAddress = or.Data()
+		rawBytes := codec.ToRawAddr(&or)
+		offRampAddress = rawBytes[:]
 
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
@@ -701,6 +703,14 @@ func (c CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, e
 		}
 
 		onRampAddressBytes = normalizedAddr[:]
+	case chain_selectors.FamilyTon:
+		ramp := c.TonChains[chainSelector].OnRamp
+		if ramp.IsAddrNone() {
+			return nil, fmt.Errorf("no onramp found in the state for TON chain %d", chainSelector)
+		}
+		rawAddress := codec.ToRawAddr(&ramp)
+		onRampAddressBytes = rawAddress[:]
+
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}

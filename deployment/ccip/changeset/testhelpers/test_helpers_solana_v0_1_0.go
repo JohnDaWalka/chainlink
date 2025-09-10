@@ -29,6 +29,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	tonOps "github.com/smartcontractkit/chainlink-ton/deployment/ccip"
+	tonCfg "github.com/smartcontractkit/chainlink-ton/deployment/ccip/config"
+
 	aptosBind "github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	aptos_fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
@@ -553,6 +556,17 @@ func SendRequest(
 		return SendRequestSui(e, state, cfg)
 	case chainsel.FamilyAptos:
 		return SendRequestAptos(e, state, cfg)
+	case chainsel.FamilyTon:
+		seq, raw, err := tonOps.SendTonRequest(e, state.TonChains[cfg.SourceChain], cfg.SourceChain, cfg.DestChain, cfg.Message.(tonOps.TonSendRequest))
+		if err != nil {
+			return nil, err
+		}
+
+		return &ccipclient.AnyMsgSentEvent{
+			SequenceNumber: seq,
+			RawEvent:       raw,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("send request: unsupported chain family: %v", family)
 	}
@@ -1254,6 +1268,13 @@ func AddLane(
 			aptosTokenPrices[aptoscs.MustParseAddress(t, address)] = price
 		}
 		changesets = append(changesets, AddLaneAptosChangesets(t, from, to, gasPrices, aptosTokenPrices)...)
+	case chainsel.FamilyTon:
+		addLaneConfig := tonOps.AddLaneTONConfig(&e.Env, from, to, fromFamily, toFamily, gasPrices)
+		changesets = append(changesets, commoncs.Configure(tonOps.AddTonLanes{},
+			tonCfg.UpdateTonLanesConfig{
+				Lanes:      []tonCfg.LaneConfig{addLaneConfig},
+				TestRouter: false,
+			}))
 	}
 
 	changesets = append(changesets, AddEVMDestChangesets(e, 909606746561742123, 18395503381733958356, false)...)
@@ -1266,9 +1287,12 @@ func AddLane(
 	case chainsel.FamilyAptos:
 		changesets = append(changesets, AddLaneAptosChangesets(t, from, to, gasPrices, nil)...)
 	case chainsel.FamilyTon:
-		changesets = append(changesets, AddLaneTONChangesets(e, from, to, fromFamily, toFamily))
-		// case chainsel.FamilySui:
-		// 	changesets = append(changesets, AddLaneSuiChangesets(t, from, to, gasPrices, nil)...)
+		addLaneConfig := tonOps.AddLaneTONConfig(&e.Env, from, to, fromFamily, toFamily, gasPrices)
+		changesets = append(changesets, commoncs.Configure(tonOps.AddTonLanes{},
+			tonCfg.UpdateTonLanesConfig{
+				Lanes:      []tonCfg.LaneConfig{addLaneConfig},
+				TestRouter: false,
+			}))
 	}
 
 	e.Env, _, err = commoncs.ApplyChangesets(t, e.Env, changesets)
@@ -1645,8 +1669,15 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 		aptosState := state.AptosChains[from]
 		tokenPrices[aptosState.LinkTokenAddress.StringLong()] = deployment.EDecMult(20, 28)
 		tokenPrices[shared.AptosAPTAddress] = deployment.EDecMult(5, 28)
+	case chainsel.FamilyTon:
+		// TODO Need to double check this, LINK will have 9 decimals on TON like on Solana (not 18)
+		tonState := state.TonChains[from]
+		gasPrices[from] = big.NewInt(1e17)
+		gasPrices[to] = big.NewInt(1e17)
+		tokenPrices[tonState.LinkTokenAddress.String()] = deployment.EDecMult(20, 28)
 	}
 	fqCfg := v1_6.DefaultFeeQuoterDestChainConfig(true, to)
+
 	err = AddLane(
 		t,
 		e,
