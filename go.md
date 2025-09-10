@@ -246,6 +246,7 @@ flowchart LR
 	click chainlink-common/pkg/workflows/sdk/v2/pb href "https://github.com/smartcontractkit/chainlink-common"
 	chainlink-data-streams --> chainlink-common
 	click chainlink-data-streams href "https://github.com/smartcontractkit/chainlink-data-streams"
+	chainlink-deployments-framework --> ccip-owner-contracts
 	chainlink-deployments-framework --> chainlink-protos/chainlink-catalog
 	chainlink-deployments-framework --> chainlink-protos/job-distributor
 	chainlink-deployments-framework --> chainlink-testing-framework/seth
@@ -326,7 +327,6 @@ flowchart LR
 	chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/web-trigger-based --> chainlink/v2
 	click chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/web-trigger-based href "https://github.com/smartcontractkit/chainlink"
 	chainlink/deployment --> ccip-contract-examples/chains/evm
-	chainlink/deployment --> ccip-owner-contracts
 	chainlink/deployment --> chainlink-deployments-framework
 	chainlink/deployment --> chainlink-testing-framework/lib
 	chainlink/deployment --> chainlink/v2
@@ -347,7 +347,11 @@ flowchart LR
 	chainlink/system-tests/tests --> chainlink-testing-framework/wasp
 	chainlink/system-tests/tests --> chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based
 	chainlink/system-tests/tests --> chainlink/system-tests/lib
+	chainlink/system-tests/tests --> chainlink/system-tests/tests/smoke/cre/evmread
 	click chainlink/system-tests/tests href "https://github.com/smartcontractkit/chainlink"
+	chainlink/system-tests/tests/smoke/cre/evmread --> cre-sdk-go/capabilities/blockchain/evm
+	chainlink/system-tests/tests/smoke/cre/evmread --> cre-sdk-go/capabilities/scheduler/cron
+	click chainlink/system-tests/tests/smoke/cre/evmread href "https://github.com/smartcontractkit/chainlink"
 	chainlink/v2 --> chainlink-aptos
 	chainlink/v2 --> chainlink-automation
 	chainlink/v2 --> chainlink-data-streams
@@ -401,6 +405,7 @@ flowchart LR
 		 chainlink/load-tests
 		 chainlink/system-tests/lib
 		 chainlink/system-tests/tests
+		 chainlink/system-tests/tests/smoke/cre/evmread
 		 chainlink/v2
 	end
 	click chainlink-repo href "https://github.com/smartcontractkit/chainlink"

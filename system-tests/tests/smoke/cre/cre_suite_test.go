@@ -32,18 +32,17 @@ func Test_CRE_Suite(t *testing.T) {
 
 	t.Run("[v2] CRE Suite", func(t *testing.T) {
 		t.Run("[v2] vault DON test", func(t *testing.T) {
-			// Skip till we figure out and fix the issues with environment startup on this test
-			t.Skip("Skipping test for the following reason: Skip till the errors with topology TopologyWorkflowGatewayCapabilities are fixed: https://smartcontract-it.atlassian.net/browse/PRIV-160")
 			ExecuteVaultTest(t, testEnv)
 		})
 
 		t.Run("[v2] HTTP trigger and action test", func(t *testing.T) {
+			t.Skip("Skipping flaky test https://chainlink-core.slack.com/archives/C07GQNPVBB5/p1757085817724369")
 			// requires `http_trigger`, `http_action`
 			ExecuteHTTPTriggerActionTest(t, testEnv)
 		})
 
 		t.Run("[v2] DON Time test", func(t *testing.T) {
-			t.Skipf("Skipping test for the following reason: Implement smoke test - https://smartcontract-it.atlassian.net/browse/CAPPL-1028")
+			ExecuteDonTimeTest(t, testEnv)
 		})
 
 		t.Run("[v2] Beholder test", func(t *testing.T) {
@@ -52,6 +51,9 @@ func Test_CRE_Suite(t *testing.T) {
 
 		t.Run("[v2] Consensus test", func(t *testing.T) {
 			executeConsensusTest(t, testEnv)
+		})
+		t.Run("[v2] EVM test", func(t *testing.T) {
+			executeEVMReadTest(t, testEnv)
 		})
 	})
 }
