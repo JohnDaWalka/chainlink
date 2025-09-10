@@ -144,3 +144,7 @@ func (g *gatewayConnectorMock) DonID(ctx context.Context) (string, error) {
 func (g *gatewayConnectorMock) AwaitConnection(ctx context.Context, gatewayID string) error {
 	return nil
 }
+
+func (g *gatewayConnectorMock) RemoveHandler(ctx context.Context, methods []string) error {
+	return nil
+}
