@@ -68,7 +68,7 @@ jobs:
           # Get the list of tests, for each test add each of supported DON topologies and create JSON array to form a job matrix.
           # - This only needs to be updated if we want to run all tests on a new DON topology.
           # - Otherwise tests are auto-discovered and run on all topologies.
-
+          PER_TEST_MODE='replace'
           TOPOLOGIES_JSON='[
             {"topology":"workflow","configs":"configs/workflow-don.toml"},
             {"topology":"workflow-gateway","configs":"configs/workflow-gateway-don.toml"},

@@ -167,7 +167,7 @@ func wrapSolana(bi *blockchain.Input, bcOut *blockchain.Output) (*cre.WrappedBlo
 	if err := cldf_solana_provider.WritePrivateKeyToPath(filepath.Join(bi.ContractsDir, "deploy-keypair.json"), pk); err != nil {
 		return nil, pkgerrors.Wrap(err, "failed to save private key for solana")
 	}
-
+	fmt.Println("sol client url: ", bcOut.Nodes[0].ExternalHTTPUrl)
 	return &cre.WrappedBlockchainOutput{
 		BlockchainOutput: bcOut,
 		SolClient:        rpc.New(bcOut.Nodes[0].ExternalHTTPUrl),
