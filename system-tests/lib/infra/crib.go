@@ -5,17 +5,15 @@ import (
 )
 
 type Type = string
-
-const (
-	CRIB   Type = "crib"
-	Docker Type = "docker"
-)
-
 type CribProvider = string
 
 const (
-	AWS  CribProvider = "aws"
-	Kind CribProvider = "kind"
+	CRIB                Type         = "crib"
+	Docker              Type         = "docker"
+	AWS                 CribProvider = "aws"
+	Kind                CribProvider = "kind"
+	gatewayIncomingPort              = 5002
+	gatewayOutgoingPort              = 5003
 )
 
 type Input struct {
@@ -74,10 +72,22 @@ func (i *Input) ExternalGatewayPort(dockerPort int) int {
 	return dockerPort
 }
 
-var (
-	GatewayIncomingPort = 5002
-	GatewayOutgoingPort = 5003
-)
+func (i *Input) GatewayConfig(id int, isBootstrap bool, donName string) *GatewayConfiguration {
+	return NewGateway(
+		Outgoing{
+			Path: "/node",
+			Port: gatewayOutgoingPort,
+			Host: i.InternalGatewayHost(id, isBootstrap, donName),
+		},
+		Incoming{
+			Protocol:     "http",
+			Path:         "/",
+			InternalPort: gatewayIncomingPort,
+			ExternalPort: i.ExternalGatewayPort(gatewayIncomingPort),
+		},
+		"cre-gateway",
+	)
+}
 
 type GatewayConfiguration struct {
 	Outgoing      Outgoing `toml:"outgoing" json:"outgoing"`
@@ -105,24 +115,6 @@ func NewGateway(outgoing Outgoing, incoming Incoming, authGatewayID string) *Gat
 		Incoming:      incoming,
 		AuthGatewayID: authGatewayID,
 	}
-}
-
-func (i *Input) GatewayConfig(id int, isBootstrap bool, donName string) *GatewayConfiguration {
-	return NewGateway(
-		Outgoing{
-			Path: "/node",
-			Port: GatewayOutgoingPort,
-			Host: i.InternalGatewayHost(id, isBootstrap, donName),
-		},
-		Incoming{
-			Protocol:     "http",
-			Path:         "/",
-			InternalPort: GatewayIncomingPort,
-			ExternalPort: i.ExternalGatewayPort(GatewayIncomingPort),
-		},
-		"cre-gateway",
-	)
-
 }
 
 type CRIBInput struct {

@@ -87,8 +87,9 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 	return topology, nil
 }
 
+// TODO i don't this think is actually used in so much as it seems to be overwritten in other places
+// The keys should be set by the secret generator and are independent of the topology abstraction
 func peeringCfgs(bt *NodeMetadata) (CapabilitiesPeeringData, OCRPeeringData, error) {
-
 	return CapabilitiesPeeringData{
 			GlobalBootstraperPeerID: bt.P2P,
 			GlobalBootstraperHost:   bt.Host,

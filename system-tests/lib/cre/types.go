@@ -518,7 +518,7 @@ type DonMetadata struct {
 	Name            string          `toml:"name" json:"name"`
 	SupportedChains []uint64        `toml:"supported_chains" json:"supported_chains"` // chain IDs that the DON supports, empty means all chains
 
-	ns CapabilitiesAwareNodeSet `toml:"-" json:"-"`
+	ns CapabilitiesAwareNodeSet // computed field, not serialized
 }
 
 func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) *DonMetadata {
@@ -566,7 +566,6 @@ func (m *DonMetadata) labelNodes(infraInput infra.Input) {
 			Value: GatewayNode,
 		})
 	}
-
 }
 
 func (m *DonMetadata) GatewayConfig(infraInput infra.Input) (*GatewayConfiguration, error) {
@@ -583,13 +582,13 @@ func (m *DonMetadata) GatewayConfig(infraInput infra.Input) (*GatewayConfigurati
 		}, nil
 	}
 
-	return nil, fmt.Errorf("don does not have the gateway flag or gateway node index not set")
+	return nil, errors.New("don does not have the gateway flag or gateway node index not set")
 }
 
 // Currently only one bootstrap node is supported.
 func (m *DonMetadata) GetBootstrapNode() (*NodeMetadata, error) {
 	if !m.ContainsBootstrapNode() {
-		return nil, fmt.Errorf("don does not contain a bootstrap node")
+		return nil, errors.New("don does not contain a bootstrap node")
 	}
 	return m.NodesMetadata[m.ns.BootstrapNodeIndex], nil
 }
@@ -786,13 +785,6 @@ func LabelFromProto(p *ptypes.Label) (*Label, error) {
 	}, nil
 }
 
-// todo real types
-type keys struct {
-	evm []string
-	sol []string
-	p2p string
-	ocr string
-}
 type NodeMetadata struct {
 	Labels []*Label `toml:"labels" json:"labels"`
 	// TODO use real types
@@ -801,6 +793,7 @@ type NodeMetadata struct {
 	Host string   `toml:"host" json:"host"`
 }
 
+// TODO make a constructor from Topology and find better names
 type DonTopology struct {
 	WorkflowDonID           uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
 	HomeChainSelector       uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`
@@ -818,6 +811,7 @@ func (t *DonTopology) ToDonMetadata() []*DonMetadata {
 	return metadata
 }
 
+// CapabilitiesAwareNodeSet is the serialized form that declares nodesets in a topology.
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
 	Capabilities    []string `toml:"capabilities"` // global capabilities that have no chain-specific configuration (like cron, web-api-target, web-api-trigger, etc.)
