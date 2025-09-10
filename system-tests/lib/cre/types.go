@@ -1149,6 +1149,10 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 	return nil
 }
 
+func (f *FullCLDEnvironmentInput) RegistryChainSelector() uint64 {
+	return f.BlockchainOutputs[0].ChainSelector
+}
+
 type FullCLDEnvironmentOutput struct {
 	Environment *cldf.Environment
 	DonTopology *DonTopology

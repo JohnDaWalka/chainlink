@@ -29,14 +29,13 @@ var (
 
 type Topology struct {
 	WorkflowDONID           uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
-	HomeChainSelector       uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`
 	DonsMetadata            []*DonMetadata          `toml:"dons_metadata" json:"dons_metadata"`
 	CapabilitiesPeeringData CapabilitiesPeeringData `toml:"capabilities_peering_data" json:"capabilities_peering_data"`
 	OCRPeeringData          OCRPeeringData          `toml:"ocr_peering_data" json:"ocr_peering_data"`
 	GatewayConnectorOutput  *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
-func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Input, homeChainSelector uint64) (*Topology, error) {
+func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Input) (*Topology, error) {
 	// TODO this setup is awkward, consider an withInfra opt to constructor
 	dm := make([]*DonMetadata, len(nodeSetInput))
 	for i := range nodeSetInput {
@@ -67,7 +66,6 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 
 	topology := &Topology{
 		WorkflowDONID:           wfDon.ID,
-		HomeChainSelector:       homeChainSelector,
 		DonsMetadata:            dm,
 		CapabilitiesPeeringData: capPeeringCfg,
 		OCRPeeringData:          ocrPeeringCfg,
