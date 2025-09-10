@@ -20,7 +20,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -262,7 +261,7 @@ func getBoostrapWorkflowNames(bootstrapNode *cre.NodeMetadata, donName string, i
 		return nil, errors.Wrap(nIErr, "failed to convert index label value to int")
 	}
 
-	internalHostBS := don.InternalHost(nodeIndex, cre.BootstrapNode, donName, infraInput)
+	internalHostBS := infraInput.InternalHost(nodeIndex, true, donName)
 	return []string{internalHostBS}, nil
 }
 

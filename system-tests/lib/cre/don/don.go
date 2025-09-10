@@ -126,7 +126,7 @@ func BuildTopology(nodeSetInput []*cre.CapabilitiesAwareNodeSet, infraInput infr
 
 			// TODO think whether it would make sense for infraInput to also hold functions that resolve hostnames for various infra and node types
 			// and use it with some default, so that we can easily modify it with little effort
-			internalHost := InternalHost(nodeIdx, nodeType, donMetadata.Name, infraInput)
+			internalHost := infraInput.InternalHost(nodeIdx, nodeType == cre.BootstrapNode, donMetadata.Name)
 
 			if flags.HasFlag(donMetadata.Flags, cre.GatewayDON) {
 				if nodeSetInput[donIdx].GatewayNodeIndex != -1 && nodeIdx == nodeSetInput[donIdx].GatewayNodeIndex {
@@ -135,7 +135,7 @@ func BuildTopology(nodeSetInput []*cre.CapabilitiesAwareNodeSet, infraInput infr
 						Value: cre.GatewayNode,
 					})
 
-					gatewayInternalHost := InternalGatewayHost(nodeIdx, nodeType, donMetadata.Name, infraInput)
+					gatewayInternalHost := infraInput.InternalGatewayHost(nodeIdx, nodeType == cre.BootstrapNode, donMetadata.Name)
 
 					if topology.GatewayConnectorOutput == nil {
 						topology.GatewayConnectorOutput = &cre.GatewayConnectorOutput{
@@ -153,8 +153,8 @@ func BuildTopology(nodeSetInput []*cre.CapabilitiesAwareNodeSet, infraInput infr
 							Protocol:     "http",
 							Path:         "/",
 							InternalPort: GatewayIncomingPort,
-							ExternalPort: ExternalGatewayPort(infraInput),
-							Host:         ExternalGatewayHost(nodeIdx, nodeType, donMetadata.Name, infraInput),
+							ExternalPort: infraInput.ExternalGatewayPort(GatewayIncomingPort),
+							Host:         infraInput.ExternalGatewayHost(),
 						},
 						AuthGatewayID: "cre-gateway",
 						// do not set gateway connector dons, they will be resolved automatically
