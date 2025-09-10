@@ -11,7 +11,7 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 
@@ -34,17 +34,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
-<<<<<<< HEAD
 	github.com/smartcontractkit/chain-selectors v1.0.71
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250912150129-4e42c90b532e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.48.3-0.20250917071359-6392161beb84
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20250915101441-709f87f7d401
-=======
-	github.com/smartcontractkit/chain-selectors v1.0.67
-	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250901094903-99c1fc59d32c
-	github.com/smartcontractkit/chainlink-deployments-framework v0.43.1-0.20250909072629-f19f6856b0a4
-	github.com/smartcontractkit/chainlink-evm v0.3.2
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250911124514-5874cc6d62b2
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
@@ -113,7 +106,6 @@ require (
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.38.1 // indirect
-<<<<<<< HEAD
 	github.com/aws/aws-sdk-go-v2/config v1.29.14 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.67 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.30 // indirect
@@ -123,17 +115,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.57.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
-=======
-	github.com/aws/aws-sdk-go-v2/config v1.28.0 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.41 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.17 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.4 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.57.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.2 // indirect
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.1 // indirect
@@ -462,22 +443,14 @@ require (
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v3 v3.24.3 // indirect
-<<<<<<< HEAD
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
-=======
-	github.com/shirou/gopsutil/v4 v4.25.5 // indirect
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-<<<<<<< HEAD
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250915164817-46a35eda083d // indirect
-=======
-	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250905094443-ac02b032b32b // indirect
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250911201806-5a095deaeb52 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5 // indirect
@@ -515,10 +488,6 @@ require (
 	github.com/supranational/blst v0.3.14 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
-<<<<<<< HEAD
-=======
-	github.com/test-go/testify v1.1.4 // indirect
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/testcontainers/testcontainers-go v0.38.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/compose v0.37.0 // indirect
 	github.com/theodesp/go-heaps v0.0.0-20190520121037-88e35354fe0a // indirect

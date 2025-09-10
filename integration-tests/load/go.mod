@@ -9,7 +9,7 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
 // replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
 
@@ -38,7 +38,6 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/slack-go/slack v0.15.0
-<<<<<<< HEAD
 	github.com/smartcontractkit/chain-selectors v1.0.71
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250915164817-46a35eda083d
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250911201806-5a095deaeb52
@@ -47,15 +46,6 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250912150129-4e42c90b532e
 	github.com/smartcontractkit/chainlink-deployments-framework v0.48.3-0.20250917071359-6392161beb84
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20250915101441-709f87f7d401
-=======
-	github.com/smartcontractkit/chain-selectors v1.0.67
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250827185217-13a187fa8cbc
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250805210128-7f8a0f403c3a
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250805210128-7f8a0f403c3a
-	github.com/smartcontractkit/chainlink-common v0.9.4-0.20250901094903-99c1fc59d32c
-	github.com/smartcontractkit/chainlink-deployments-framework v0.43.1-0.20250909072629-f19f6856b0a4
-	github.com/smartcontractkit/chainlink-evm v0.3.2
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.24
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
@@ -487,10 +477,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-<<<<<<< HEAD
-=======
-	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250905094443-ac02b032b32b // indirect
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.1 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2 // indirect
