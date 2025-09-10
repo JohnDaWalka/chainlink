@@ -109,3 +109,10 @@ func (b *telemetryConfig) LogStreamingEnabled() bool {
 	}
 	return *b.s.LogStreamingEnabled
 }
+
+func (b *telemetryConfig) MetricCompressorEnabled() bool {
+	if b.s.MetricCompressorEnabled == nil {
+		return false
+	}
+	return *b.s.MetricCompressorEnabled
+}

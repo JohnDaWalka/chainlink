@@ -15,4 +15,5 @@ type Telemetry interface {
 	ChipIngressInsecureConnection() bool
 	HeartbeatInterval() time.Duration
 	LogStreamingEnabled() bool
+	MetricCompressorEnabled() bool
 }

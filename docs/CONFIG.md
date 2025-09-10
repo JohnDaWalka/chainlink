@@ -2311,6 +2311,7 @@ EmitterBatchProcessor = true # Default
 EmitterExportTimeout = '1s' # Default
 ChipIngressEndpoint = '' # Default
 ChipIngressInsecureConnection = false # Default
+MetricCompressorEnabled = false # Default
 HeartbeatInterval = '1s' # Default
 LogStreamingEnabled = false # Default
 ```
@@ -2373,6 +2374,12 @@ ChipIngressEndpoint enables sending custom messages to CHIP Ingress.
 ChipIngressInsecureConnection = false # Default
 ```
 ChipIngressInsecureConnection disables TLS when connecting to CHIP Ingress.
+
+### MetricCompressorEnabled
+```toml
+MetricCompressorEnabled = false # Default
+```
+MetricCompressorEnabled enables gRPC compression for metrics (uses "gzip").
 
 ### HeartbeatInterval
 ```toml

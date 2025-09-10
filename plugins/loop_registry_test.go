@@ -74,6 +74,8 @@ func (m mockCfgTelemetry) HeartbeatInterval() time.Duration {
 
 func (m mockCfgTelemetry) LogStreamingEnabled() bool { return false }
 
+func (m mockCfgTelemetry) MetricCompressorEnabled() bool { return false }
+
 type mockCfgDatabase struct{}
 
 func (m mockCfgDatabase) Backup() config.Backup { panic("unimplemented") }
@@ -220,6 +222,7 @@ func TestLoopRegistry_Register(t *testing.T) {
 	require.True(t, envCfg.TelemetryEmitterBatchProcessor)
 	require.Equal(t, 1*time.Second, envCfg.TelemetryEmitterExportTimeout)
 	require.False(t, envCfg.TelemetryLogStreamingEnabled)
+	require.False(t, envCfg.TelemetryMetricCompressorEnabled)
 
 	require.Equal(t, "example.com/chip-ingress", envCfg.ChipIngressEndpoint)
 }

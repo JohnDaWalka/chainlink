@@ -362,6 +362,7 @@ ChipIngressEndpoint = 'example.com/chip-ingress'
 ChipIngressInsecureConnection = false
 HeartbeatInterval = '1s'
 LogStreamingEnabled = false
+MetricCompressorEnabled = false
 
 [Telemetry.ResourceAttributes]
 Baz = 'test'
