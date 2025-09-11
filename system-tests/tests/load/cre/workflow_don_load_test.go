@@ -1208,18 +1208,17 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 				if nodeIDErr != nil {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
-
-				nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.AddressKeyFromSelector(input.DonTopology.HomeChainSelector))
-				if ethErr != nil {
-					return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
+				ethKey, ok := workerNode.Keys.EVM[int(chainID)]
+				if !ok {
+					return nil, fmt.Errorf("node %s does not have an eth key for chainID %d", nodeID, chainID)
 				}
 
 				ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
 				if ocr2Err != nil {
 					return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
 				}
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainID))
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, nodeEthAddr, ocr2KeyBundleID, ocrPeeringData, chainID))
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, ocrPeeringData, chainID))
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, ocrPeeringData, chainID))
 			}
 		}
 

@@ -45,13 +45,18 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 
 	var allNodesInfo []devenv.NodeInfo
 	for idx, nodeOutput := range input.NodeSetOutput {
+		donID := uint64(idx + 1) // DON IDs are 1-indexed
+		d, err := input.Topology.DonsMetadata.FindByID(donID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to find DON metadata by ID %d", donID)
+		}
 		// check how many bootstrap nodes we have in each DON
-		bootstrapNodes, err := libnode.FindManyWithLabel(input.Topology.DonsMetadata[idx].NodesMetadata, &cre.Label{Key: libnode.NodeTypeKey, Value: cre.BootstrapNode}, libnode.EqualLabels)
+		bootstrapNodes, err := libnode.FindManyWithLabel(d.NodesMetadata, &cre.Label{Key: libnode.NodeTypeKey, Value: cre.BootstrapNode}, libnode.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find bootstrap nodes")
 		}
 
-		nodeInfo, err := libnode.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, input.Topology.DonsMetadata[idx].ID, len(bootstrapNodes))
+		nodeInfo, err := libnode.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, d.ID, len(bootstrapNodes))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get node info")
 		}
@@ -60,7 +65,7 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 
 		// for each nodeSet create only chains that the DON supports
 		for chainSelector, bcOut := range input.BlockchainOutputs {
-			if len(input.Topology.DonsMetadata[idx].EVMChainIDs) > 0 && !slices.Contains(input.Topology.DonsMetadata[idx].EVMChainIDs, bcOut.ChainID) {
+			if len(d.EVMChains()) > 0 && !slices.Contains(d.EVMChains(), bcOut.ChainID) {
 				continue
 			}
 
@@ -104,7 +109,12 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 	}
 
 	for i, don := range dons {
-		for j, node := range input.Topology.DonsMetadata[i].NodesMetadata {
+		donID := uint64(i + 1) // DON IDs are 1-indexed
+		dm, err := input.Topology.DonsMetadata.FindByID(donID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to find DON metadata by ID %d", donID)
+		}
+		for j, node := range dm.NodesMetadata {
 			// required for job proposals, because they need to include the ID of the node in Job Distributor
 			node.Labels = append(node.Labels, &cre.Label{
 				Key:   libnode.NodeIDKey,
@@ -190,7 +200,7 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 		OCRPeeringData:          ocrPeering,
 	}
 
-	for i, donMetadata := range input.Topology.DonsMetadata {
+	for i, donMetadata := range input.Topology.DonsMetadata.List() {
 		donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &cre.DonWithMetadata{
 			DON:         dons[i],
 			DonMetadata: donMetadata,

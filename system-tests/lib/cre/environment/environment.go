@@ -167,8 +167,7 @@ func SetupTestEnvironment(
 
 	topology, updatedNodeSets, topoErr := PrepareConfiguration(
 		startBlockchainsOutput.RegistryChain().ChainSelector,
-		input.CapabilitiesAwareNodeSets,
-		input.InfraInput,
+		topology,
 		startBlockchainsOutput.BlockChainOutputs,
 		deployKeystoneContractsOutput.Env.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		deployKeystoneContractsOutput.Env.DataStore,

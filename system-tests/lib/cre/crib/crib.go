@@ -104,7 +104,7 @@ func DeployDons(input *cre.DeployCribDonsInput) ([]*cre.CapabilitiesAwareNodeSet
 
 	componentFuncs := make([]crib.ComponentFunc, 0)
 
-	for j, donMetadata := range input.Topology.DonsMetadata {
+	for j, donMetadata := range input.Topology.DonsMetadata.List() {
 		imageName, imageTag, err := imageNameAndTag(input, j)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get image name and tag for %s", donMetadata.Name)
@@ -160,7 +160,7 @@ func DeployDons(input *cre.DeployCribDonsInput) ([]*cre.CapabilitiesAwareNodeSet
 	}
 
 	// setting outputs in a similar way as in func ReadNodeSetURL
-	for j := range input.Topology.DonsMetadata {
+	for j := range input.Topology.DonsMetadata.List() {
 		out := &ns.Output{
 			// UseCache: true will disable deploying docker containers via CTF
 			UseCache: true,

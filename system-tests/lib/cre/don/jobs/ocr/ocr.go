@@ -86,30 +86,9 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 		}
 
 		donName := donWithMetadata.Name
-		// look for boostrap node and then for required values in its labels
-		bootstrapNode, bootErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
-		if bootErr != nil {
-			// if there is no bootstrap node in this DON, we need to use the global bootstrap node
-			found := false
-			for _, don := range donTopology.DonsWithMetadata {
-				for _, n := range don.NodesMetadata {
-					p2pValue, p2pErr := node.FindLabelValue(n, node.NodeP2PIDKey)
-					if p2pErr != nil {
-						continue
-					}
-
-					if strings.Contains(p2pValue, donTopology.OCRPeeringData.OCRBootstraperPeerID) {
-						bootstrapNode = n
-						donName = don.Name
-						found = true
-						break
-					}
-				}
-			}
-
-			if !found {
-				return nil, errors.New("failed to find global OCR bootstrap node")
-			}
+		bootstrapNode, err := donWithMetadata.DonMetadata.GetBootstrapNode()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
 		}
 
 		bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
@@ -170,32 +149,23 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				transmitterAddress, tErr := node.FindLabelValue(workerNode, node.AddressKeyFromSelector(chain.Selector))
-				if tErr != nil {
-					return nil, errors.Wrap(tErr, "failed to get transmitter address from bootstrap node labels")
+				ethKey, ok := workerNode.Keys.EVM[int(chainIDUint64)]
+				if !ok {
+					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainIDUint64)
 				}
+				transmitterAddress := ethKey.PublicAddress.Hex()
 
 				keyBundle, kErr := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
 				if kErr != nil {
 					return nil, errors.Wrap(kErr, "failed to get key bundle id from worker node labels")
 				}
 
-				keyNodeAddress := node.AddressKeyFromSelector(chain.Selector)
-				nodeAddress, nodeAddressErr := node.FindLabelValue(workerNode, keyNodeAddress)
-				if nodeAddressErr != nil {
-					return nil, errors.Wrap(nodeAddressErr, "failed to get node address from labels")
-				}
+				nodeAddress := transmitterAddress
 				logger.Debug().Msgf("Deployed node on chain %d/%d at %s", chainIDUint64, chain.Selector, nodeAddress)
 
-				bootstrapNodeP2pKeyID, pErr := node.FindLabelValue(bootstrapNode, node.NodeP2PIDKey)
-				if pErr != nil {
-					return nil, errors.Wrap(pErr, "failed to get p2p key id from bootstrap node labels")
-				}
-				// remove the prefix if it exists, to match the expected format
-				bootstrapNodeP2pKeyID = strings.TrimPrefix(bootstrapNodeP2pKeyID, "p2p_")
 				bootstrapPeers := make([]string, len(internalHostsBS))
 				for i, workflowName := range internalHostsBS {
-					bootstrapPeers[i] = fmt.Sprintf("%s@%s:5001", bootstrapNodeP2pKeyID, workflowName)
+					bootstrapPeers[i] = fmt.Sprintf("%s@%s:5001", bootstrapNode.Keys.CleansedPeerID(), workflowName)
 				}
 
 				oracleFactoryConfigInstance := job.OracleFactoryConfig{

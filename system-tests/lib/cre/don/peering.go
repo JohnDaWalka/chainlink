@@ -9,13 +9,13 @@ import (
 )
 
 func globalBootstraperNodeData(topology *cre.Topology) (string, string, error) {
-	if len(topology.DonsMetadata) == 0 {
+	if len(topology.DonsMetadata.List()) == 0 {
 		return "", "", errors.New("expected at least one DON topology")
 	}
 
 	// if there's more than one DON, then peering capabilitity needs to point to the same bootstrap node
 	// for all the DONs, and so we need to find it first. For us, it will always be the bootstrap node of the workflow DON.
-	for _, donTopology := range topology.DonsMetadata {
+	for _, donTopology := range topology.DonsMetadata.List() {
 		if flags.HasFlag(donTopology.Flags, cre.WorkflowDON) {
 			bootstrapNode, err := node.FindOneWithLabel(donTopology.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
 			if err != nil {

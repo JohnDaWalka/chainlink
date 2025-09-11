@@ -161,9 +161,9 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				nodeEthAddr, ethErr := node.FindLabelValue(workerNode, node.AddressKeyFromSelector(input.DonTopology.HomeChainSelector))
-				if ethErr != nil {
-					return nil, errors.Wrap(ethErr, "failed to get eth address from labels")
+				ethKey, ok := workerNode.Keys.EVM[int(chainID)]
+				if !ok {
+					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainID)
 				}
 
 				ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
@@ -176,7 +176,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(encErr, "failed to encrypt private share")
 				}
 
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerVaultOCR3(nodeID, vaultCapabilityAddress.Address, nodeEthAddr, ocr2KeyBundleID, input.DonTopology.OCRPeeringData, chainID, pk, encryptedShare))
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerVaultOCR3(nodeID, vaultCapabilityAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, input.DonTopology.OCRPeeringData, chainID, pk, encryptedShare))
 			}
 		}
 

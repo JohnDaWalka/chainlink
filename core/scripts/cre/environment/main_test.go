@@ -8,7 +8,7 @@ import (
 )
 
 func TestMyCommand(t *testing.T) {
-	t.Skip("manual test")
+	//	t.Skip("manual test")
 	cmd := root.RootCmd
 	b := &bytes.Buffer{}
 	cmd.SetOut(b)

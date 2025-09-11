@@ -264,7 +264,7 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 		c: make(map[string]donConfig),
 	}
 
-	for donIdx, donMetadata := range input.Topology.DonsMetadata {
+	for donIdx, donMetadata := range input.Topology.DonsMetadata.List() {
 		// if it's only a gateway DON, we don't want to register it with the Capabilities Registry
 		// since it doesn't have any capabilities
 		if flags.HasOnlyOneFlag(donMetadata.Flags, cre.GatewayDON) {
@@ -298,12 +298,7 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 
 		donPeerIDs := make([]string, len(workerNodes))
 		for i, node := range workerNodes {
-			p2pID, err := crenode.ToP2PID(node, crenode.NoOpTransformFn)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get p2p id for node %d", i)
-			}
-
-			donPeerIDs[i] = p2pID
+			donPeerIDs[i] = node.Keys.CleansedPeerID()
 		}
 
 		forwarderF := (len(workerNodes) - 1) / 3
@@ -623,7 +618,7 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput) error {
 func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig, error) {
 	var transmissionSchedule []int
 
-	for _, metaDon := range topology.DonsMetadata {
+	for _, metaDon := range topology.DonsMetadata.List() {
 		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
 			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
 				Key:   crenode.NodeTypeKey,

@@ -30,10 +30,8 @@ var (
 )
 
 type Topology struct {
-	WorkflowDONID uint64         `toml:"workflow_don_id" json:"workflow_don_id"`
-	DonsMetadata  []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
-	//	CapabilitiesPeeringData CapabilitiesPeeringData `toml:"capabilities_peering_data" json:"capabilities_peering_data"`
-	//	OCRPeeringData          OCRPeeringData          `toml:"ocr_peering_data" json:"ocr_peering_data"`
+	WorkflowDONID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
+	DonsMetadata           *DonsMetadata           `toml:"dons_metadata", json:"dons_metadata"` //[]*DonMetadata          `toml:"dons_metadata" json:"dons_metadata"`
 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
@@ -63,9 +61,7 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 
 	topology := &Topology{
 		WorkflowDONID: wfDon.ID,
-		DonsMetadata:  dm,
-		//	CapabilitiesPeeringData: capPeeringCfg,
-		//	OCRPeeringData:          ocrPeeringCfg,
+		DonsMetadata:  donsMetadata,
 	}
 
 	if donsMetadata.GatewayRequired() {
@@ -84,8 +80,19 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 	return topology, nil
 }
 
+func (t *Topology) CapabilitiesAwareNodeSets() []*CapabilitiesAwareNodeSet {
+	sets := make([]*CapabilitiesAwareNodeSet, len(t.DonsMetadata.List()))
+	for i, d := range t.DonsMetadata.List() {
+		ns := d.CapabilitiesAwareNodeSet()
+		sets[i] = ns
+	}
+	return sets
+}
+
+// BootstrapNode returns the metadata for the node that should be used as the bootstrap node for P2P peering
+// Currently only one bootstrap is supported.
 func (t *Topology) BootstrapNode() (*NodeMetadata, error) {
-	return DonsMetadata{dons: t.DonsMetadata}.BootstrapNode()
+	return t.DonsMetadata.BootstrapNode()
 }
 
 // TODO i don't this think is actually used in so much as it seems to be overwritten in other places

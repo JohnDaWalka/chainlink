@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"maps"
 
 	"github.com/pkg/errors"
@@ -46,12 +47,16 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 			}
 
 			ethAddresses := make([]string, len(workflowNodeSet))
-			var ethAddressErr error
+			chainID, err := chainselectors.ChainIdFromSelector(input.DonTopology.HomeChainSelector)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get home chain id from selector")
+			}
 			for i, n := range workflowNodeSet {
-				ethAddresses[i], ethAddressErr = node.FindLabelValue(n, node.AddressKeyFromSelector(input.DonTopology.HomeChainSelector))
-				if ethAddressErr != nil {
-					return nil, errors.Wrap(ethAddressErr, "failed to get eth address from labels")
+				k, ok := n.Keys.EVM[int(chainID)]
+				if !ok {
+					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", n.Host, chainID)
 				}
+				ethAddresses[i] = k.PublicAddress.Hex()
 			}
 
 			handlers := map[string]string{}

@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
@@ -96,7 +97,7 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		return nil, errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
-	for nodeIdx := range workflowNodeSet {
+	for nodeIdx, wnode := range workflowNodeSet {
 		var nodeIndex int
 		for _, label := range workflowNodeSet[nodeIdx].Labels {
 			if label.Key == node.IndexKey {
@@ -127,11 +128,11 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			}
 			evmData.ForwarderAddress = forwarderAddress.Hex()
 
-			ethAddress, addrErr := findNodeEthAddressAddress(chain.Selector, workflowNodeSet[nodeIdx].Labels)
-			if addrErr != nil {
-				return nil, errors.Wrapf(addrErr, "failed to get ETH address for chain %d for node at index %d", chain.Selector, nodeIdx)
+			k, ok := wnode.Keys.EVM[int(chainID)]
+			if !ok {
+				return nil, fmt.Errorf("failed to get ETH address for chainID %d selector %d for node at index %d", chainID, chain.Selector, nodeIdx)
 			}
-			evmData.FromAddress = *ethAddress
+			evmData.FromAddress = k.PublicAddress
 
 			var mergeErr error
 			evmData, mergeErr = mergeDefaultAndRuntimeConfigValues(evmData, input.CapabilityConfigs, input.NodeSet.ChainCapabilities, chainID)

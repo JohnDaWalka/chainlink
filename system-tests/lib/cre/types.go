@@ -409,10 +409,10 @@ func (c *ConfigureKeystoneInput) Validate() error {
 	if c.Topology == nil {
 		return errors.New("don topology not set")
 	}
-	if len(c.Topology.DonsMetadata) == 0 {
+	if len(c.Topology.DonsMetadata.List()) == 0 {
 		return errors.New("meta dons not set")
 	}
-	if len(c.NodeSets) != len(c.Topology.DonsMetadata) {
+	if len(c.NodeSets) != len(c.Topology.DonsMetadata.List()) {
 		return errors.New("node sets and don metadata must have the same length")
 	}
 	if c.CldEnv == nil {
@@ -516,16 +516,16 @@ type DonMetadata struct {
 	Flags         []string        `toml:"flags" json:"flags"`
 	ID            uint64          `toml:"id" json:"id"`
 	Name          string          `toml:"name" json:"name"`
-	EVMChainIDs   []uint64        `toml:"supported_chains" json:"supported_chains"` // chain IDs that the DON supports, empty means all chains
+	//	EVMChainIDs   []uint64        `toml:"supported_chains" json:"supported_chains"` // chain IDs that the DON supports, empty means all chains
 
 	ns CapabilitiesAwareNodeSet // computed field, not serialized
 }
 
 func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error) {
-	nodes := make([]*NodeMetadata, len(c.NodeSpecs))
+
 	// generate keys for each node
-	evmChains := make([]int, len(c.SupportedChains))
-	for i, chainID := range c.SupportedChains {
+	evmChains := make([]int, len(c.EVMChains()))
+	for i, chainID := range c.EVMChains() {
 		evmChains[i] = int(chainID) //nolint:gosec // disable G115
 	}
 	cfg := NodeMetadataConfig{
@@ -538,48 +538,45 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error
 		},
 		Host: "",
 	}
-	for i := range nodes {
-		n, err := NewNodeMetadata(cfg)
-		if err != nil {
-			panic(fmt.Sprintf("failed to create node metadata: %v", err))
-		}
-		nodes[i] = n
+	nodes, err := newNodes(cfg, len(c.NodeSpecs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create nodes metadata: %w", err)
 	}
 	out := &DonMetadata{
 		ID:            id,
 		Flags:         c.Flags(),
 		NodesMetadata: nodes,
 		Name:          c.Name,
-		EVMChainIDs:   c.SupportedChains,
-		ns:            *c,
+		//		EVMChainIDs:   c.SupportedChains,
+		ns: *c,
 	}
 	return out, nil
 }
 
 func (m *DonMetadata) labelNodes(infraInput infra.Input) {
 	for i := range m.NodesMetadata {
-		nodeWithLabels := NodeMetadata{}
+		labels := make([]*Label, 0)
 		nodeType := WorkerNode
 		if m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex {
 			nodeType = BootstrapNode
 		}
-		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &Label{
+		labels = append(labels, &Label{
 			Key:   NodeTypeKey,
 			Value: nodeType,
 		})
 
-		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &Label{
+		labels = append(labels, &Label{
 			Key:   IndexKey,
 			Value: strconv.Itoa(i),
 		})
 
 		internalHost := infraInput.InternalHost(i, nodeType == BootstrapNode, m.Name)
 
-		nodeWithLabels.Labels = append(nodeWithLabels.Labels, &Label{
+		labels = append(labels, &Label{
 			Key:   HostLabelKey,
 			Value: internalHost,
 		})
-		m.NodesMetadata[i] = &nodeWithLabels
+		m.NodesMetadata[i].Labels = labels
 	}
 
 	if m.IsGateway() {
@@ -616,8 +613,12 @@ func (m *DonMetadata) GetBootstrapNode() (*NodeMetadata, error) {
 	return m.NodesMetadata[m.ns.BootstrapNodeIndex], nil
 }
 
-func (m *DonMetadata) CapabilitiesAwareNodeSet() CapabilitiesAwareNodeSet {
-	return m.ns
+func (m *DonMetadata) CapabilitiesAwareNodeSet() *CapabilitiesAwareNodeSet {
+	return &m.ns
+}
+
+func (m *DonMetadata) EVMChains() []uint64 {
+	return m.ns.EVMChains()
 }
 
 func (m *DonMetadata) RequiresOCR() bool {
@@ -835,11 +836,27 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
+	labels := c.Labels
+	if labels == nil {
+		labels = make([]*Label, 0)
+	}
 	return &NodeMetadata{
-		Labels: c.Labels,
+		Labels: labels,
 		Keys:   keys,
 		Host:   "", // we set the host later when we have the infra input
 	}, nil
+}
+
+func newNodes(cfg NodeMetadataConfig, n int) ([]*NodeMetadata, error) {
+	nodes := make([]*NodeMetadata, n)
+	for i := range nodes {
+		node, err := NewNodeMetadata(cfg)
+		if err != nil {
+			return nil, err
+		}
+		nodes[i] = node
+	}
+	return nodes, nil
 }
 
 // TODO make a constructor from Topology and find better names
@@ -863,8 +880,9 @@ func (t *DonTopology) ToDonMetadata() []*DonMetadata {
 // CapabilitiesAwareNodeSet is the serialized form that declares nodesets in a topology.
 type CapabilitiesAwareNodeSet struct {
 	*ns.Input
-	Capabilities    []string `toml:"capabilities"` // global capabilities that have no chain-specific configuration (like cron, web-api-target, web-api-trigger, etc.)
-	DONTypes        []string `toml:"don_types"`
+	Capabilities []string `toml:"capabilities"` // global capabilities that have no chain-specific configuration (like cron, web-api-target, web-api-trigger, etc.)
+	DONTypes     []string `toml:"don_types"`
+	// SupportedChains is filter. Use EVMChains() to get the actual list of chains supported by the nodeset.
 	SupportedChains []uint64 `toml:"supported_chains"` // chain IDs that the DON supports, empty means all chains
 	// TODO separate out bootstrap as a concept rather than index
 	BootstrapNodeIndex   int               `toml:"bootstrap_node_index"` // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
@@ -890,6 +908,27 @@ func (c *CapabilitiesAwareNodeSet) Flags() []string {
 	var stringCaps []string
 
 	return append(stringCaps, append(c.ComputedCapabilities, c.DONTypes...)...)
+}
+
+func (c *CapabilitiesAwareNodeSet) EVMChains() []uint64 {
+	if len(c.SupportedChains) != 0 {
+		return c.SupportedChains
+	}
+	t := make(map[uint64]struct{})
+	for _, cc := range c.ChainCapabilities {
+		if cc != nil {
+			for _, chainID := range cc.EnabledChains {
+				t[chainID] = struct{}{}
+			}
+		}
+	}
+	// deduplicate
+	var out []uint64
+	for chainID := range t {
+		out = append(out, chainID)
+	}
+	slices.Sort(out)
+	return out
 }
 
 type CapabilitiesPeeringData struct {
@@ -1076,7 +1115,7 @@ func (g *GenerateKeysInput) Validate() error {
 	if g.Topology == nil {
 		return errors.New("topology not set")
 	}
-	if len(g.Topology.DonsMetadata) == 0 {
+	if len(g.Topology.DonsMetadata.List()) == 0 {
 		return errors.New("metadata not set")
 	}
 	if g.Topology.WorkflowDONID == 0 {
@@ -1127,7 +1166,6 @@ func NewNodeKeys(input NodeKeyInput) (*NodeKeys, error) {
 
 	if len(input.EVMChainIDs) > 0 {
 		for _, chainID := range input.EVMChainIDs {
-			// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
 			c := int(chainID) //nolint:gosec // disable G115
 			k, err := crypto.NewEVMKey(input.Password, c)
 			if err != nil {
@@ -1234,7 +1272,7 @@ func (f *FullCLDEnvironmentInput) Validate() error {
 	if f.Topology == nil {
 		return errors.New("topology not set")
 	}
-	if len(f.Topology.DonsMetadata) == 0 {
+	if len(f.Topology.DonsMetadata.List()) == 0 {
 		return errors.New("metadata not set")
 	}
 	if f.Topology.WorkflowDONID == 0 {
@@ -1263,7 +1301,7 @@ func (d *DeployCribDonsInput) Validate() error {
 	if d.Topology == nil {
 		return errors.New("topology not set")
 	}
-	if len(d.Topology.DonsMetadata) == 0 {
+	if len(d.Topology.DonsMetadata.List()) == 0 {
 		return errors.New("metadata not set")
 	}
 	if len(d.NodeSetInputs) == 0 {

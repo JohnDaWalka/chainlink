@@ -14,17 +14,14 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
-	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	creconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	cresecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	creflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
 func PrepareConfiguration(
 	registryChainSelector uint64,
-	nodeSets []*cre.CapabilitiesAwareNodeSet,
-	infraInput infra.Input,
+	topology *cre.Topology,
 	blockchainOutputs []*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	datastore datastore.DataStore,
@@ -32,22 +29,8 @@ func PrepareConfiguration(
 	capabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
-	topology, err := cre.NewTopology(nodeSets, infraInput)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create topology: %w", err)
-	}
 
-	localNodeSets := copyCapabilityAwareNodeSets(nodeSets)
-
-	// Generate EVM and P2P keys or read them from the config
-	// That way we can pass them final configs and do away with restarting the nodes
-	var keys *cre.GenerateKeysOutput
-
-	keysOutput, keysOutputErr := cresecrets.KeysOutputFromConfig(localNodeSets)
-	if keysOutputErr != nil {
-		return nil, nil, errors.Wrap(keysOutputErr, "failed to generate keys output")
-	}
-
+	localNodeSets := topology.CapabilitiesAwareNodeSets()
 	evmChainIDs := make([]int, 0)
 	solChainIDs := make([]string, 0)
 	chainPerSelector := make(map[uint64]*cre.WrappedBlockchainOutput)
@@ -64,26 +47,41 @@ func PrepareConfiguration(
 		chainPerSelector[bcOut.ChainSelector] = bcOut
 		evmChainIDs = append(evmChainIDs, libc.MustSafeInt(bcOut.ChainID))
 	}
+	/*
+		// Generate EVM and P2P keys or read them from the config
+		// That way we can pass them final configs and do away with restarting the nodes
+		var keys *cre.GenerateKeysOutput
 
-	generateKeysInput := &cre.GenerateKeysInput{
-		EVMChainIDs:     evmChainIDs,
-		SolanaChainIDs:  solChainIDs,
-		GenerateP2PKeys: true,
-		Topology:        topology,
-		Password:        "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
-		Out:             keysOutput,
-	}
-	keys, keysErr := cresecrets.GenerateKeys(generateKeysInput)
-	if keysErr != nil {
-		return nil, nil, errors.Wrap(keysErr, "failed to generate keys")
+		keysOutput, keysOutputErr := cresecrets.KeysOutputFromConfig(localNodeSets)
+		if keysOutputErr != nil {
+			return nil, nil, errors.Wrap(keysOutputErr, "failed to generate keys output")
+		}
+
+
+		generateKeysInput := &cre.GenerateKeysInput{
+			EVMChainIDs:     evmChainIDs,
+			SolanaChainIDs:  solChainIDs,
+			GenerateP2PKeys: true,
+			Topology:        topology,
+			Password:        "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
+			Out:             keysOutput,
+		}
+		keys, keysErr := cresecrets.GenerateKeys(generateKeysInput)
+		if keysErr != nil {
+			return nil, nil, errors.Wrap(keysErr, "failed to generate keys")
+		}
+
+		topology, addKeysErr := cresecrets.AddKeysToTopology(topology, keys)
+		if addKeysErr != nil {
+			return nil, nil, errors.Wrap(addKeysErr, "failed to add keys to topology")
+		}
+	*/
+	bt, err := topology.BootstrapNode()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to find bootstrap node")
 	}
 
-	topology, addKeysErr := cresecrets.AddKeysToTopology(topology, keys)
-	if addKeysErr != nil {
-		return nil, nil, errors.Wrap(addKeysErr, "failed to add keys to topology")
-	}
-
-	capabilitiesPeeringData, ocrPeeringData, peeringErr := libdon.FindPeeringData(topology)
+	capabilitiesPeeringData, ocrPeeringData, peeringErr := cre.PeeringCfgs(bt)
 	if peeringErr != nil {
 		return nil, nil, errors.Wrap(peeringErr, "failed to find peering data")
 	}
@@ -91,10 +89,11 @@ func PrepareConfiguration(
 	//topology.CapabilitiesPeeringData = capabilitiesPeeringData
 	//topology.OCRPeeringData = ocrPeeringData
 
-	for i, donMetadata := range topology.DonsMetadata {
+	for i, donMetadata := range topology.DonsMetadata.List() {
 		configsFound := 0
 		secretsFound := 0
-		for _, nodeSpec := range localNodeSets[i].NodeSpecs {
+		nodeSet := localNodeSets[i]
+		for _, nodeSpec := range nodeSet.NodeSpecs {
 			if nodeSpec.Node.TestConfigOverrides != "" {
 				configsFound++
 			}
@@ -152,32 +151,39 @@ func PrepareConfiguration(
 
 		// generate secrets only if they are not provided
 		if secretsFound == 0 {
-			secretsInput := &cre.GenerateSecretsInput{
-				DonMetadata: donMetadata,
-			}
+			/*
+				secretsInput := &cre.GenerateSecretsInput{
+					DonMetadata: donMetadata,
+				}
 
-			if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
-				secretsInput.EVMKeys = evmKeys
-			}
+				if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
+					secretsInput.EVMKeys = evmKeys
+				}
 
-			if solKeys, ok := keys.SolKeys[donMetadata.ID]; ok {
-				secretsInput.SolKeys = solKeys
-			}
+				if solKeys, ok := keys.SolKeys[donMetadata.ID]; ok {
+					secretsInput.SolKeys = solKeys
+				}
 
-			if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
-				secretsInput.P2PKeys = p2pKeys
-			}
+				if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
+					secretsInput.P2PKeys = p2pKeys
+				}
 
-			// EVM, Solana and P2P keys will be provided to nodes as secrets
-			secrets, secretsErr := cresecrets.GenerateSecrets(
-				secretsInput,
-			)
-			if secretsErr != nil {
-				return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
-			}
-
+				// EVM, Solana and P2P keys will be provided to nodes as secrets
+				secrets, secretsErr := cresecrets.GenerateSecrets(
+					secretsInput,
+				)
+				if secretsErr != nil {
+					return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
+				}
+			*/
 			for j := range donMetadata.NodesMetadata {
-				localNodeSets[i].NodeSpecs[j].Node.TestSecretsOverrides = secrets[j]
+				wnode := donMetadata.NodesMetadata[j]
+				nodeSecret := cresecrets.NewNodeSecret(wnode)
+				toml, err := nodeSecret.Toml()
+				if err != nil {
+					return nil, nil, errors.Wrap(err, "failed to marshal node secrets")
+				}
+				localNodeSets[i].NodeSpecs[j].Node.TestSecretsOverrides = toml
 			}
 		}
 
@@ -197,16 +203,17 @@ func PrepareConfiguration(
 			return nil, nil, errors.Wrap(executableErr, "failed to make binaries executable")
 		}
 
-		var appendErr error
-		localNodeSets[i], appendErr = crecapabilities.AppendBinariesPathsNodeSpec(localNodeSets[i], donMetadata, customBinariesPaths)
-		if appendErr != nil {
-			return nil, nil, errors.Wrapf(appendErr, "failed to append binaries paths to node spec for DON %d", donMetadata.ID)
+		var err error
+		ns, err := crecapabilities.AppendBinariesPathsNodeSpec(nodeSet, donMetadata, customBinariesPaths)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to append binaries paths to node spec for DON %d", donMetadata.ID)
 		}
+		localNodeSets[i] = ns
 	}
 
 	// Add env vars, which were provided programmatically, to the node specs
 	// or fail, if node specs already had some env vars set in the TOML config
-	for donIdx, donMetadata := range topology.DonsMetadata {
+	for donIdx, donMetadata := range topology.DonsMetadata.List() {
 		hasEnvVarsInTomlConfig := false
 		for nodeIdx, nodeSpec := range localNodeSets[donIdx].NodeSpecs {
 			if len(nodeSpec.Node.EnvVars) > 0 {

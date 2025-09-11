@@ -83,7 +83,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 				}
 			case cre.WorkerNode:
 				var cErr error
-				nodeConfig, cErr = addWorkerNodeConfig(nodeConfig, input.OCRPeeringData, input.CapabilitiesPeeringData, commonInputs, input.GatewayConnectorOutput, input.DonMetadata.Name, input.DonMetadata.Flags, nodeMetadata.Labels)
+				nodeConfig, cErr = addWorkerNodeConfig(nodeConfig, input.OCRPeeringData, input.CapabilitiesPeeringData, commonInputs, input.GatewayConnectorOutput, input.DonMetadata.Name, input.DonMetadata.Flags, nodeMetadata)
 				if cErr != nil {
 					return nil, errors.Wrapf(cErr, "failed to add worker node config for node at index %d in DON %s", nodeIdx, input.DonMetadata.Name)
 				}
@@ -213,7 +213,7 @@ func addWorkerNodeConfig(
 	gatewayConnector *cre.GatewayConnectorOutput,
 	donName string,
 	donFlags []string,
-	nodeLabels []*cre.Label,
+	m *cre.NodeMetadata,
 ) (corechainlink.Config, error) {
 	ocrBoostrapperLocator, ocrBErr := commontypes.NewBootstrapperLocator(ocrPeeringData.OCRBootstraperPeerID, []string{ocrPeeringData.OCRBootstraperHost + ":" + strconv.Itoa(ocrPeeringData.Port)})
 	if ocrBErr != nil {
@@ -291,7 +291,7 @@ func addWorkerNodeConfig(
 		// find node's ETH address on the registry chain
 		var nodeEthAddr string
 		expectedAddressKey := node.AddressKeyFromSelector(commonInputs.registryChainSelector)
-		for _, label := range nodeLabels {
+		for _, label := range m.Labels {
 			if label.Key == expectedAddressKey {
 				nodeEthAddr = label.Value
 				break
@@ -299,7 +299,12 @@ func addWorkerNodeConfig(
 		}
 
 		if nodeEthAddr == "" {
-			return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
+			// load from keys
+			k, ok := m.Keys.EVM[int(commonInputs.registryChainID)]
+			if !ok {
+				return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
+			}
+			nodeEthAddr = k.PublicAddress.Hex()
 		}
 
 		gateways := []coretoml.ConnectorGateway{}
@@ -439,7 +444,7 @@ func findEVMChains(input cre.GenerateConfigsInput) []*evmChain {
 
 		// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
 		// TODO: review if we really need this SupportedChains functionality
-		if len(input.DonMetadata.EVMChainIDs) > 0 && !slices.Contains(input.DonMetadata.EVMChainIDs, bcOut.ChainID) {
+		if len(input.DonMetadata.CapabilitiesAwareNodeSet().EVMChains()) > 0 && !slices.Contains(input.DonMetadata.CapabilitiesAwareNodeSet().EVMChains(), bcOut.ChainID) {
 			continue
 		}
 

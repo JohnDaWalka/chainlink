@@ -53,6 +53,48 @@ type NodeSecret struct {
 	// We can't use the original struct, because it's using custom types that serialize secrets to 'xxxxx'
 }
 
+func (ns *NodeSecret) Toml() (string, error) {
+	nodeSecretString, err := toml.Marshal(ns)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to marshal node secrets")
+	}
+	return string(nodeSecretString), nil
+}
+
+func NewNodeSecret(nm *cre.NodeMetadata) *NodeSecret {
+	nodeSecret := NodeSecret{}
+	if nm.Keys.EVM != nil {
+		nodeSecret.EthKeys = NodeEthKeyWrapper{}
+		for chainID, evmKeys := range nm.Keys.EVM {
+			nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, NodeEthKey{
+				JSON:     string(evmKeys.EncryptedJSON),
+				Password: evmKeys.Password,
+				ChainID:  chainID,
+			})
+		}
+	}
+
+	if nm.Keys.P2PKey != nil {
+		nodeSecret.P2PKey = NodeP2PKey{
+			JSON:     string(nm.Keys.P2PKey.EncryptedJSON),
+			Password: nm.Keys.P2PKey.Password,
+		}
+	}
+
+	if nm.Keys.Solana != nil {
+		nodeSecret.SolKeys = NodeSolKeyWrapper{}
+		for chainID, solKeys := range nm.Keys.Solana {
+			nodeSecret.SolKeys.SolKeys = append(nodeSecret.SolKeys.SolKeys, NodeSolKey{
+				JSON:     string(solKeys.EncryptedJSON),
+				Password: solKeys.Password,
+				ChainID:  chainID,
+			})
+		}
+	}
+	return &nodeSecret
+
+}
+
 func GenerateSecrets(input *cre.GenerateSecretsInput) (cre.NodeIndexToSecretsOverride, error) {
 	if input == nil {
 		return nil, errors.New("input is nil")
@@ -64,41 +106,48 @@ func GenerateSecrets(input *cre.GenerateSecretsInput) (cre.NodeIndexToSecretsOve
 	overrides := make(cre.NodeIndexToSecretsOverride)
 
 	for i := range input.DonMetadata.NodesMetadata {
-		nodeSecret := NodeSecret{}
-		if input.EVMKeys != nil {
-			nodeSecret.EthKeys = NodeEthKeyWrapper{}
-			for chainID, evmKeys := range input.EVMKeys {
-				nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, NodeEthKey{
-					JSON:     string(evmKeys.EncryptedJSONs[i]),
-					Password: evmKeys.Password,
-					ChainID:  chainID,
-				})
+		/*
+			nodeSecret := NodeSecret{}
+			if input.EVMKeys != nil {
+				nodeSecret.EthKeys = NodeEthKeyWrapper{}
+				for chainID, evmKeys := range input.EVMKeys {
+					nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, NodeEthKey{
+						JSON:     string(evmKeys.EncryptedJSONs[i]),
+						Password: evmKeys.Password,
+						ChainID:  chainID,
+					})
+				}
 			}
-		}
 
-		if input.P2PKeys != nil {
-			nodeSecret.P2PKey = NodeP2PKey{
-				JSON:     string(input.P2PKeys.Keys[i].EncryptedJSON),
-				Password: input.P2PKeys.Password,
+			if input.P2PKeys != nil {
+				nodeSecret.P2PKey = NodeP2PKey{
+					JSON:     string(input.P2PKeys.Keys[i].EncryptedJSON),
+					Password: input.P2PKeys.Password,
+				}
 			}
-		}
 
-		if input.SolKeys != nil {
-			nodeSecret.SolKeys = NodeSolKeyWrapper{}
-			for chainID, solKeys := range input.SolKeys {
-				nodeSecret.SolKeys.SolKeys = append(nodeSecret.SolKeys.SolKeys, NodeSolKey{
-					JSON:     string(solKeys.EncryptedJSONs[i]),
-					Password: solKeys.Password,
-					ChainID:  chainID,
-				})
+			if input.SolKeys != nil {
+				nodeSecret.SolKeys = NodeSolKeyWrapper{}
+				for chainID, solKeys := range input.SolKeys {
+					nodeSecret.SolKeys.SolKeys = append(nodeSecret.SolKeys.SolKeys, NodeSolKey{
+						JSON:     string(solKeys.EncryptedJSONs[i]),
+						Password: solKeys.Password,
+						ChainID:  chainID,
+					})
+				}
 			}
-		}
 
-		nodeSecretString, err := toml.Marshal(nodeSecret)
+			nodeSecretString, err := toml.Marshal(nodeSecret)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to marshal node secrets")
+			}
+		*/
+		wnode := input.DonMetadata.NodesMetadata[i]
+		nodeSecret := NewNodeSecret(wnode)
+		nodeSecretString, err := nodeSecret.Toml()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to marshal node secrets")
 		}
-
 		overrides[i] = string(nodeSecretString)
 	}
 
@@ -114,15 +163,15 @@ func AddKeysToTopology(topology *cre.Topology, keys *cre.GenerateKeysOutput) (*c
 		return nil, errors.New("keys is nil")
 	}
 
-	if len(keys.P2PKeys) != len(topology.DonsMetadata) {
-		return nil, fmt.Errorf("number of P2P keys does not match the number of DONs. Expected %d, got %d", len(topology.DonsMetadata), len(keys.P2PKeys))
+	if len(keys.P2PKeys) != len(topology.DonsMetadata.List()) {
+		return nil, fmt.Errorf("number of P2P keys does not match the number of DONs. Expected %d, got %d", len(topology.DonsMetadata.List()), len(keys.P2PKeys))
 	}
 
-	if len(keys.EVMKeys) != len(topology.DonsMetadata) {
-		return nil, fmt.Errorf("number of EVM keys does not match the number of DONs. Expected %d, got %d", len(topology.DonsMetadata), len(keys.EVMKeys))
+	if len(keys.EVMKeys) != len(topology.DonsMetadata.List()) {
+		return nil, fmt.Errorf("number of EVM keys does not match the number of DONs. Expected %d, got %d", len(topology.DonsMetadata.List()), len(keys.EVMKeys))
 	}
 
-	for _, donMetadata := range topology.DonsMetadata {
+	for _, donMetadata := range topology.DonsMetadata.List() {
 		if _, ok := keys.P2PKeys[donMetadata.ID]; !ok {
 			return nil, fmt.Errorf("no P2P keys found for DON %d", donMetadata.ID)
 		}
@@ -422,7 +471,7 @@ func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error)
 		GenerateP2PKeys: input.GenerateP2PKeys,
 		Password:        input.Password,
 	}
-	for _, donMetadata := range input.Topology.DonsMetadata {
+	for _, donMetadata := range input.Topology.DonsMetadata.List() {
 		for i := range len(donMetadata.NodesMetadata) {
 			keys, err := cre.NewNodeKeys(keyConfig)
 			if err != nil {
@@ -441,7 +490,7 @@ func GenerateKeys(input *cre.GenerateKeysInput) (*cre.GenerateKeysOutput, error)
 		if len(input.EVMChainIDs) > 0 {
 			for _, chainID := range input.EVMChainIDs {
 				// if the DON doesn't support the chain, we skip it; if slice is empty, it means that the DON supports all chains
-				if len(donMetadata.EVMChainIDs) > 0 && !slices.Contains(donMetadata.EVMChainIDs, libc.MustSafeUint64(int64(chainID))) {
+				if len(donMetadata.EVMChains()) > 0 && !slices.Contains(donMetadata.EVMChains(), libc.MustSafeUint64(int64(chainID))) {
 					continue
 				}
 				evmKeys, err := crypto.GenerateEVMKeys(input.Password, len(donMetadata.NodesMetadata))
