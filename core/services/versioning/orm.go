@@ -50,7 +50,7 @@ func (o *orm) UpsertNodeVersion(ctx context.Context, version NodeVersion) error 
 		if os.Getenv("CL_SKIP_APP_VERSION_CHECK") == "true" {
 			o.lggr.Warnw("Skipping app version check", "appVersion", version.Version)
 		} else if _, _, err := CheckVersion(ctx, tx, logger.NullLogger, version.Version); err != nil {
-			return err
+			o.lggr.Errorw("App version check failed", "appVersion", version.Version, "err", err)
 		}
 
 		stmt := `
