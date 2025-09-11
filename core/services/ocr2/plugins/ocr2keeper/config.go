@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// Dummy comment to trigger CI
+
 type Duration time.Duration
 
 func (d *Duration) UnmarshalJSON(b []byte) error {
