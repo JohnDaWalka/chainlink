@@ -130,7 +130,7 @@ func DeployKeystoneContracts(
 	}
 	if len(evmForwardersSelectors) > 0 {
 		// deploy evm forwarders
-		evmForwardersReport, seqErr := operations.ExecuteSequence(
+		evmForwardersReport, seqErr2 := operations.ExecuteSequence(
 			allChainsCLDEnvironment.OperationsBundle,
 			creforwarder.DeploySequence,
 			creforwarder.DeploySequenceDeps{
@@ -140,16 +140,16 @@ func DeployKeystoneContracts(
 				Targets: evmForwardersSelectors,
 			},
 		)
-		if seqErr != nil {
-			return nil, errors.Wrap(seqErr, "failed to deploy evm forwarder")
+		if seqErr2 != nil {
+			return nil, errors.Wrap(seqErr2, "failed to deploy evm forwarder")
 		}
 
-		if seqErr = allChainsCLDEnvironment.ExistingAddresses.Merge(evmForwardersReport.Output.AddressBook); seqErr != nil { //nolint:staticcheck // won't migrate now
-			return nil, errors.Wrap(seqErr, "failed to merge address book with Keystone contracts addresses")
+		if seqErr2 = allChainsCLDEnvironment.ExistingAddresses.Merge(evmForwardersReport.Output.AddressBook); seqErr2 != nil { //nolint:staticcheck // won't migrate now
+			return nil, errors.Wrap(seqErr2, "failed to merge address book with Keystone contracts addresses")
 		}
 
-		if seqErr = memoryDatastore.Merge(evmForwardersReport.Output.Datastore); seqErr != nil {
-			return nil, errors.Wrap(seqErr, "failed to merge datastore with Keystone contracts addresses")
+		if seqErr2 = memoryDatastore.Merge(evmForwardersReport.Output.Datastore); seqErr2 != nil {
+			return nil, errors.Wrap(seqErr2, "failed to merge datastore with Keystone contracts addresses")
 		}
 
 		for _, forwarderSelector := range evmForwardersSelectors {

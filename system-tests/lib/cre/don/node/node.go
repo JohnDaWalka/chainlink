@@ -59,7 +59,6 @@ func ExtractBundleKeysPerFamily(n *cre.NodeMetadata) (map[string]string, error) 
 		kBundle, kbErr := FindLabelValue(n, CreateNodeOCR2KeyBundleIDKey(family))
 		if kbErr != nil {
 			return nil, fmt.Errorf("failed to get ocr bundle id from worker node labels for family %s err: %w", family, kbErr)
-
 		}
 		bundlesPerFamily[family] = kBundle
 	}

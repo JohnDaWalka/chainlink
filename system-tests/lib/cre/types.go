@@ -394,9 +394,6 @@ type ConfigureKeystoneInput struct {
 	EVMOCR3Config    keystone_changeset.OracleConfig
 	EVMOCR3Addresses map[uint64]common.Address // chain selector to address map
 
-	SolanaOCR3Config  keystone_changeset.OracleConfig
-	solanaOCR3Address *common.Address
-
 	ConsensusV2OCR3Config  keystone_changeset.OracleConfig // v2 consensus contract config
 	ConsensusV2OCR3Address *common.Address
 

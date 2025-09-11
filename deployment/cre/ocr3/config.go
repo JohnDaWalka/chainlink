@@ -504,10 +504,10 @@ func makeNodeKeysSlice(nodes []deployment.Node, registryChainSel uint64) []NodeK
 }
 
 func toNodeKeys(o *deployment.Node, registryChainSel uint64) NodeKeys {
-	var aptosOcr2KeyBundleId string
+	var aptosOcr2KeyBundleID string
 	var aptosOnchainPublicKey string
 	var aptosCC *deployment.OCRConfig
-	var solanaOcr2KeyBundleId string
+	var solanaOcr2KeyBundleID string
 	var solanaCC *deployment.OCRConfig
 	var solanaOnchainPublickey string
 	for details, cfg := range o.SelToOCRConfig {
@@ -522,12 +522,12 @@ func toNodeKeys(o *deployment.Node, registryChainSel uint64) NodeKeys {
 	}
 
 	if aptosCC != nil {
-		aptosOcr2KeyBundleId = aptosCC.KeyBundleID
+		aptosOcr2KeyBundleID = aptosCC.KeyBundleID
 		aptosOnchainPublicKey = fmt.Sprintf("%x", aptosCC.OnchainPublicKey[:])
 	}
 
 	if solanaCC != nil {
-		solanaOcr2KeyBundleId = solanaCC.KeyBundleID
+		solanaOcr2KeyBundleID = solanaCC.KeyBundleID
 		solanaOnchainPublickey = fmt.Sprintf("%x", solanaCC.OnchainPublicKey[:])
 	}
 
@@ -548,9 +548,9 @@ func toNodeKeys(o *deployment.Node, registryChainSel uint64) NodeKeys {
 		EncryptionPublicKey: strings.TrimPrefix(o.CSAKey, "csa_"),
 		// TODO Aptos support. How will that be modeled in clo data?
 		// TODO: AptosAccount is unset but probably unused
-		AptosBundleID:          aptosOcr2KeyBundleId,
+		AptosBundleID:          aptosOcr2KeyBundleID,
 		AptosOnchainPublicKey:  aptosOnchainPublicKey,
 		SolanaOnchainPublicKey: solanaOnchainPublickey,
-		SolanaBundleID:         solanaOcr2KeyBundleId,
+		SolanaBundleID:         solanaOcr2KeyBundleID,
 	}
 }
