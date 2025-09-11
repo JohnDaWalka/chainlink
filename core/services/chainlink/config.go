@@ -20,6 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils/config"
 )
 
+// dummy comment to trigger ci
+
 // Config is the root type used for TOML configuration.
 //
 // See docs at /docs/CONFIG.md generated via config.GenerateDocs from /internal/config/docs.toml
