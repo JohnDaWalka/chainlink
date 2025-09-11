@@ -338,7 +338,7 @@ func (c *CreateJobsInput) Validate() error {
 type DebugInput struct {
 	DebugDons        []*DebugDon
 	BlockchainOutput *blockchain.Output
-	InfraInput       *infra.Input
+	InfraInput       *infra.Provider
 }
 
 type DebugDon struct {
@@ -431,18 +431,18 @@ type GatewayConnectorDons struct {
 	Handlers            map[string]string
 }
 type GatewayConnectorOutput struct {
-	Configurations []*GatewayConfiguration `toml:"configurations" json:"configurations"`
+	Configurations []*DonGatewayConfiguration `toml:"configurations" json:"configurations"`
 }
 
 func NewGatewayConnectorOutput() *GatewayConnectorOutput {
 	return &GatewayConnectorOutput{
-		Configurations: make([]*GatewayConfiguration, 0),
+		Configurations: make([]*DonGatewayConfiguration, 0),
 	}
 }
 
-type GatewayConfiguration struct {
+type DonGatewayConfiguration struct {
 	Dons []GatewayConnectorDons `toml:"dons" json:"dons"` // do not set, it will be set dynamically
-	infra.GatewayConfiguration
+	*GatewayConfiguration
 }
 
 type NodeConfigTransformerFn = func(input GenerateConfigsInput, existingConfigs NodeIndexToConfigOverride) (NodeIndexToConfigOverride, error)
@@ -533,7 +533,7 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) *DonMetadata {
 	return out
 }
 
-func (m *DonMetadata) labelNodes(infraInput infra.Input) {
+func (m *DonMetadata) labelNodes(infraInput infra.Provider) {
 	for i := range m.NodesMetadata {
 		nodeWithLabels := NodeMetadata{}
 		nodeType := WorkerNode
@@ -568,7 +568,7 @@ func (m *DonMetadata) labelNodes(infraInput infra.Input) {
 	}
 }
 
-func (m *DonMetadata) GatewayConfig(infraInput infra.Input) (*GatewayConfiguration, error) {
+func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration, error) {
 	if m.IsGateway() {
 		i := m.ns.GatewayNodeIndex
 		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
@@ -576,9 +576,9 @@ func (m *DonMetadata) GatewayConfig(infraInput infra.Input) (*GatewayConfigurati
 			Value: GatewayNode,
 		})
 		isBootstrapNode := (m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex)
-		return &GatewayConfiguration{
+		return &DonGatewayConfiguration{
 			Dons:                 make([]GatewayConnectorDons, 0),
-			GatewayConfiguration: *infraInput.GatewayConfig(i, isBootstrapNode, m.Name),
+			GatewayConfiguration: NewGatewayConfig(p, i, isBootstrapNode, m.Name),
 		}, nil
 	}
 
@@ -632,10 +632,10 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 
 type DonsMetadata struct {
 	dons  []*DonMetadata
-	infra infra.Input
+	infra infra.Provider
 }
 
-func NewDonsMetadata(dons []*DonMetadata, infra infra.Input) (*DonsMetadata, error) {
+func NewDonsMetadata(dons []*DonMetadata, infra infra.Provider) (*DonsMetadata, error) {
 	if dons == nil {
 		dons = make([]*DonMetadata, 0)
 	}
@@ -1208,7 +1208,7 @@ func (d *DeployCribBlockchainInput) Validate() error {
 }
 
 type StartNixShellInput struct {
-	InfraInput     *infra.Input
+	InfraInput     *infra.Provider
 	CribConfigsDir string
 	ExtraEnvVars   map[string]string
 	PurgeNamespace bool
@@ -1233,7 +1233,7 @@ type JobSpecInput struct {
 	CldEnvironment            *cldf.Environment
 	BlockchainOutput          *blockchain.Output
 	DonTopology               *DonTopology
-	InfraInput                infra.Input
+	InfraInput                infra.Provider
 	CapabilityConfigs         map[string]CapabilityConfig
 	Capabilities              []InstallableCapability
 	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet

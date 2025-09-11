@@ -30,7 +30,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 	donTopology *cre.DonTopology,
 	ds datastore.DataStore,
 	nodeSetInput []*cre.CapabilitiesAwareNodeSet,
-	infraInput infra.Input,
+	infraInput infra.Provider,
 	flag cre.CapabilityFlag,
 	contractNamer ContractNamer,
 	dataStoreOCR3ContractKeyProvider DataStoreOCR3ContractKeyProvider,
@@ -250,7 +250,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 	return donToJobSpecs, nil
 }
 
-func getBoostrapWorkflowNames(bootstrapNode *cre.NodeMetadata, donName string, infraInput infra.Input) ([]string, error) {
+func getBoostrapWorkflowNames(bootstrapNode *cre.NodeMetadata, donName string, infraInput infra.Provider) ([]string, error) {
 	nodeIndexStr, nErr := node.FindLabelValue(bootstrapNode, node.IndexKey)
 	if nErr != nil {
 		return nil, errors.Wrap(nErr, "failed to find index label")

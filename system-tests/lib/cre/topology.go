@@ -35,7 +35,7 @@ type Topology struct {
 	GatewayConnectorOutput  *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
-func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Input) (*Topology, error) {
+func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Provider) (*Topology, error) {
 	// TODO this setup is awkward, consider an withInfra opt to constructor
 	dm := make([]*DonMetadata, len(nodeSetInput))
 	for i := range nodeSetInput {
