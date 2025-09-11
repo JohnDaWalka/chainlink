@@ -287,6 +287,7 @@ func (s *Shell) RunNode(c *cli.Context) error {
 func (s *Shell) runNode(c *cli.Context) error {
 	ctx := s.ctx()
 	lggr := logger.Sugared(s.Logger.Named("RunNode"))
+	lggr.Debugw("Environment variables", "env", os.Environ())
 
 	var pwd, vrfpwd *string
 	if passwordFile := c.String("password"); passwordFile != "" {
