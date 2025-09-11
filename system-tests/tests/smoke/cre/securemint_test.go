@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -44,10 +45,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
-)
-
-var (
-	solWriterDonConfig = "../../../../core/scripts/cre/environment/configs/workflow-solana-don-cache.toml"
+	"golang.org/x/sync/errgroup"
 )
 
 // EVM test lives in core/capabilities/integration_tests/keystone/securemint_workflow_test.go
@@ -99,63 +97,65 @@ func executeSecureMintTest(t *testing.T, tenv *TestEnvironment) {
 	framework.L.Info().Msg("Generate and propose secure mint job...")
 	jobSpec := createSecureMintWorkflowJobSpec(t, &s, solChain)
 	proposeSecureMintJob(t, fullCldEnvOutput.Environment.Offchain, jobSpec)
-	framework.L.Info().Msgf("Secure mint job is succesfully posted. Job spec:\n %v", jobSpec)
+	framework.L.Info().Msgf("Secure mint job is successfully posted. Job spec:\n %v", jobSpec)
 
 	// trigger workflow
 	trigger := createFakeTrigger(t, &s, fullCldEnvOutput.DonTopology)
-	trigger.run(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	eg := &errgroup.Group{}
+	eg.Go(func() error {
+		return trigger.run(ctx)
+	})
 
 	// wait for price update
 	waitForFeedUpdate(t, solChain.SolClient, &s)
+	cancel()
+	require.NoError(t, eg.Wait(), "failed while waiting for feed update")
 }
 
 func waitForFeedUpdate(t *testing.T, solclient *rpc.Client, s *setup) {
 	tt := time.NewTicker(time.Second * 5)
+	defer tt.Stop()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*2)
+	defer cancel()
 	for {
-		defer tt.Stop()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
-		defer cancel()
-		for {
-			select {
-			case <-ctx.Done():
-				require.FailNow(t, "feed wasn't update before reaching timeout")
-				return
-			case <-tt.C:
-				reportAcc := getDecimalReportAccount(t, s)
+		select {
+		case <-ctx.Done():
+			require.FailNow(t, "The feed failed to update before timeout expired")
+		case <-tt.C:
+			reportAcc := getDecimalReportAccount(t, s)
 
-				decimalReportAccount, err := solclient.GetAccountInfoWithOpts(ctx, reportAcc, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
-				if err == rpc.ErrNotFound {
-					continue
-				}
-				require.NoError(t, err, "failed to receive decimal report account")
-				// that's how report is stored on chain
-				type report struct {
-					timestamp uint32   // 4 byte
-					answer    *big.Int // 16 byte
-				}
-				var r report
-				data := decimalReportAccount.Value.Data.GetBinary()
-				descriminatorLen := 8
-				expectedLen := descriminatorLen + 4 + 16
-				require.GreaterOrEqual(t, len(data), expectedLen)
-				offset := descriminatorLen
-				r.timestamp = binary.LittleEndian.Uint32(data[offset : offset+4])
-				offset += 4
-				answerLE := data[offset : offset+16]
-				amount, _, _ := parsePackedU128([16]byte(answerLE))
-				r.answer = amount
-
-				if r.answer.Uint64() == 0 {
-					framework.L.Info().Msgf("Feed is not update yet")
-					continue
-				}
-				framework.L.Info().Msg("Feed is updated. Asserting results...")
-				require.Equal(t, Mintable.String(), r.answer.String(), "onchain answer value is not equal to sent value")
-				require.Equal(t, uint32(SeqNr), r.timestamp)
-				return
+			decimalReportAccount, err := solclient.GetAccountInfoWithOpts(ctx, reportAcc, &rpc.GetAccountInfoOpts{Commitment: rpc.CommitmentProcessed})
+			if errors.Is(err, rpc.ErrNotFound) {
+				continue
 			}
-		}
+			require.NoError(t, err, "failed to receive decimal report account")
+			// that's how report is stored on chain
+			type report struct {
+				timestamp uint32   // 4 byte
+				answer    *big.Int // 16 byte
+			}
+			var r report
+			data := decimalReportAccount.Value.Data.GetBinary()
+			descriminatorLen := 8
+			expectedLen := descriminatorLen + 4 + 16
+			require.GreaterOrEqual(t, len(data), expectedLen)
+			offset := descriminatorLen
+			r.timestamp = binary.LittleEndian.Uint32(data[offset : offset+4])
+			offset += 4
+			answerLE := data[offset : offset+16]
+			amount, _, _ := parsePackedU128([16]byte(answerLE))
+			r.answer = amount
 
+			if r.answer.Uint64() == 0 {
+				framework.L.Info().Msgf("Feed is not update yet")
+				continue
+			}
+			framework.L.Info().Msg("Feed is updated. Asserting results...")
+			require.Equal(t, Mintable.String(), r.answer.String(), "onchain answer value is not equal to sent value")
+			require.Equal(t, uint32(SeqNr), r.timestamp) // #nosec G115 - we defined seqnr above
+			return
+		}
 	}
 }
 
@@ -442,30 +442,32 @@ type fakeTrigger struct {
 	keys       []ocr2key.KeyBundle
 }
 
-func (f *fakeTrigger) run(t *testing.T) {
-	go func() {
-		tt := time.NewTicker(time.Second * 25)
-		defer tt.Stop()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
-		defer cancel()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-tt.C:
-				f.Call(t)
+func (f *fakeTrigger) run(ctx context.Context) error {
+	tt := time.NewTicker(time.Second * 25)
+	defer tt.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tt.C:
+			err := f.Call(ctx)
+			if err != nil {
+				return fmt.Errorf("failed call fake trigger: %w", err)
 			}
 		}
-
-	}()
+	}
 }
 
-func (f *fakeTrigger) Call(t *testing.T) {
+func (f *fakeTrigger) Call(ctx context.Context) error {
 	outputs, err := f.createReport()
-	require.NoError(t, err, "failed to create fake report")
+	if err != nil {
+		return fmt.Errorf("failed to create fake report: %w", err)
+	}
 
 	outputsBytes, err := mock_capability.MapToBytes(outputs)
-	require.NoError(t, err, "failed to convert map to bytes")
+	if err != nil {
+		return fmt.Errorf("failed to convert map to bytes: %w", err)
+	}
 
 	message := pb.SendTriggerEventRequest{
 		TriggerID: f.triggerID,
@@ -473,8 +475,12 @@ func (f *fakeTrigger) Call(t *testing.T) {
 		Outputs:   outputsBytes,
 	}
 
-	err = f.triggerCap.SendTrigger(t.Context(), &message)
-	require.NoError(t, err, "failed to send trigger to workflow")
+	err = f.triggerCap.SendTrigger(ctx, &message)
+	if err != nil {
+		return fmt.Errorf("failed to send trigger event: %w", err)
+	}
+
+	return nil
 }
 
 func (f *fakeTrigger) createReport() (*values.Map, error) {
@@ -488,8 +494,8 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 	configDigest, _ := hex.DecodeString("000eb2d48aa4727bab3d60885ed3ab7be6e9d6b5855f706b4b01086797ac7730")
 	report := &secureMintReport{
 		ConfigDigest: ocr2types.ConfigDigest(configDigest),
-		SeqNr:        uint64(SeqNr),
-		Block:        uint64(Block),
+		SeqNr:        uint64(SeqNr), // #nosec G115 - const conversion
+		Block:        uint64(Block), // #nosec G115 - const conversion
 		Mintable:     Mintable,
 	}
 
@@ -523,7 +529,7 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 func createFakeTrigger(t *testing.T, s *setup, dons *cre.DonTopology) *fakeTrigger {
 	client := createMockClient(t)
 	keys := exportOcr2Keys(t, dons)
-	require.NotEqual(t, len(keys), 0)
+	require.NotEmpty(t, keys)
 	framework.L.Info().Msg("Successfully exported ocr2 keys")
 
 	return &fakeTrigger{
@@ -539,15 +545,15 @@ func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
 	for _, don := range dons.DonsWithMetadata {
 		if flags.HasFlag(don.Flags, cre.MockCapability) {
 			for _, n := range don.DON.Nodes {
-				key, err2 := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
-				if err2 == nil {
+				key, err := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
+				if err == nil {
 					b, err2 := json.Marshal(key)
 					require.NoError(t, err2, "could not marshal OCR2 key")
 					kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
 					require.NoError(t, err3, "could not decrypt OCR2 key json")
 					kb = append(kb, kk)
 				} else {
-					framework.L.Error().Msgf("Could not export OCR2 key: %s", err2)
+					framework.L.Error().Msgf("Could not export OCR2 key: %s", err)
 				}
 			}
 		}
