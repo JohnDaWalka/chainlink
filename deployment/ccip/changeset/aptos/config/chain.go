@@ -71,8 +71,11 @@ type AptosChainDefinition struct {
 	TokenPrices map[aptos.AccountAddress]*big.Int
 	// FeeQuoterDestChainConfig is the configuration on a fee quoter for this chain as a destination.
 	FeeQuoterDestChainConfig aptos_fee_quoter.DestChainConfig `json:"feeQuoterDestChainConfig"`
+
+	// TODO: Unused - remove, this is for TP setup
 	// AddTokenTransferFeeConfigs is the configuration for token transfer fees to be added to fee quoter
 	AddTokenTransferFeeConfigs []aptos_fee_quoter.TokenTransferFeeConfigAdded
+	// TODO: Unused - remove, this is for TP setup
 	// RemoveTokenTransferFeeConfigs holds token transfer fees to be removed from fee quoter
 	RemoveTokenTransferFeeConfigs []aptos_fee_quoter.TokenTransferFeeConfigRemoved
 }
