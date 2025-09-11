@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Dummy comment to trigger CI
+// Dummy comment to trigger CI 2
 
 type Duration time.Duration
 
