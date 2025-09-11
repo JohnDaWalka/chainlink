@@ -268,3 +268,95 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...ui
 		GasPriceStalenessThreshold:        90000,
 	}
 }
+
+func ToSuiPremiums(in []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs) []fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs {
+	out := make([]fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs, len(in))
+	for i := range in {
+		out[i] = fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs(in[i])
+	}
+	return out
+}
+
+func ToSuiPriceFeedUpdates(
+	in []fee_quoter.FeeQuoterTokenPriceFeedUpdate,
+) []fqSui.FeeQuoterTokenPriceFeedUpdate {
+	out := make([]fqSui.FeeQuoterTokenPriceFeedUpdate, len(in))
+	for i := range in {
+		out[i] = fqSui.FeeQuoterTokenPriceFeedUpdate{
+			SourceToken: in[i].SourceToken,
+			FeedConfig: fqSui.FeeQuoterTokenPriceFeedConfig{
+				DataFeedAddress: in[i].FeedConfig.DataFeedAddress,
+				TokenDecimals:   in[i].FeedConfig.TokenDecimals,
+				IsEnabled:       in[i].FeedConfig.IsEnabled,
+			},
+		}
+	}
+	return out
+}
+
+func ToSuiTransferFeeConfigArgs(
+	in []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs,
+) []fqSui.FeeQuoterTokenTransferFeeConfigArgs {
+	out := make([]fqSui.FeeQuoterTokenTransferFeeConfigArgs, len(in))
+	for i := range in {
+		out[i] = fqSui.FeeQuoterTokenTransferFeeConfigArgs{
+			DestChainSelector:       in[i].DestChainSelector,
+			TokenTransferFeeConfigs: toSuiSingleTokenTransfers(in[i].TokenTransferFeeConfigs),
+		}
+	}
+	return out
+}
+
+func toSuiSingleTokenTransfers(
+	in []fee_quoter.FeeQuoterTokenTransferFeeConfigSingleTokenArgs,
+) []fqSui.FeeQuoterTokenTransferFeeConfigSingleTokenArgs {
+	out := make([]fqSui.FeeQuoterTokenTransferFeeConfigSingleTokenArgs, len(in))
+	for i := range in {
+		out[i] = fqSui.FeeQuoterTokenTransferFeeConfigSingleTokenArgs{
+			Token: in[i].Token,
+			TokenTransferFeeConfig: fqSui.FeeQuoterTokenTransferFeeConfig{
+				MinFeeUSDCents:    in[i].TokenTransferFeeConfig.MinFeeUSDCents,
+				MaxFeeUSDCents:    in[i].TokenTransferFeeConfig.MaxFeeUSDCents,
+				DeciBps:           in[i].TokenTransferFeeConfig.DeciBps,
+				DestGasOverhead:   in[i].TokenTransferFeeConfig.DestGasOverhead,
+				DestBytesOverhead: in[i].TokenTransferFeeConfig.DestBytesOverhead,
+				IsEnabled:         in[i].TokenTransferFeeConfig.IsEnabled,
+			},
+		}
+	}
+	return out
+}
+
+func ToSuiDestConfigs(
+	in []fee_quoter.FeeQuoterDestChainConfigArgs,
+) []fqSui.FeeQuoterDestChainConfigArgs {
+	out := make([]fqSui.FeeQuoterDestChainConfigArgs, len(in))
+	for i := range in {
+		cfg := in[i].DestChainConfig
+		out[i] = fqSui.FeeQuoterDestChainConfigArgs{
+			DestChainSelector: in[i].DestChainSelector,
+			DestChainConfig: fqSui.FeeQuoterDestChainConfig{
+				IsEnabled:                         cfg.IsEnabled,
+				MaxNumberOfTokensPerMsg:           cfg.MaxNumberOfTokensPerMsg,
+				MaxDataBytes:                      cfg.MaxDataBytes,
+				MaxPerMsgGasLimit:                 cfg.MaxPerMsgGasLimit,
+				DestGasOverhead:                   cfg.DestGasOverhead,
+				DestGasPerPayloadByteBase:         cfg.DestGasPerPayloadByteBase,
+				DestGasPerPayloadByteHigh:         cfg.DestGasPerPayloadByteHigh,
+				DestGasPerPayloadByteThreshold:    cfg.DestGasPerPayloadByteThreshold,
+				DestDataAvailabilityOverheadGas:   cfg.DestDataAvailabilityOverheadGas,
+				DestGasPerDataAvailabilityByte:    cfg.DestGasPerDataAvailabilityByte,
+				DestDataAvailabilityMultiplierBps: cfg.DestDataAvailabilityMultiplierBps,
+				ChainFamilySelector:               cfg.ChainFamilySelector,
+				EnforceOutOfOrder:                 cfg.EnforceOutOfOrder,
+				DefaultTokenFeeUSDCents:           cfg.DefaultTokenFeeUSDCents,
+				DefaultTokenDestGasOverhead:       cfg.DefaultTokenDestGasOverhead,
+				DefaultTxGasLimit:                 cfg.DefaultTxGasLimit,
+				GasMultiplierWeiPerEth:            cfg.GasMultiplierWeiPerEth,
+				GasPriceStalenessThreshold:        cfg.GasPriceStalenessThreshold,
+				NetworkFeeUSDCents:                cfg.NetworkFeeUSDCents,
+			},
+		}
+	}
+	return out
+}
