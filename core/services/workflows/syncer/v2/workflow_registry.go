@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/workflow_registry_wrapper_v2"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -171,7 +170,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 
 		var (
 			initDoneCh = make(chan struct{})
-			reader     commontypes.ContractReader
+			reader     types.ContractReader
 			err        error
 		)
 
@@ -186,6 +185,10 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 				return
 			}
 
+			// Async initialization of contract reader because there is an on-chain
+			// call dependency.  Blocking on initialization results in a
+			// deadlock.  Instead wait until the node has identified it's DON
+			// as a proxy for a DON and on-chain ready state .
 			reader, err = w.newWorkflowRegistryContractReader(ctx)
 			if err != nil {
 				w.lggr.Criticalf("contract reader unavailable : %s", err)
