@@ -3,20 +3,18 @@ package v1_6
 import (
 	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
+	commonopsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
 )
 
 var _ cldf.ChangeSet[ccipseq.DeployChainContractsConfig] = DeployChainContractsChangeset
@@ -118,19 +116,19 @@ func deployChainContractsForChains(
 			return operations.SequenceReport[ccipseq.DeployChainContractsSeqConfig, map[uint64]map[string]string]{}, err
 		}
 		addresses[chainSel] = ccipseq.CCIPAddresses{
-			LegacyRMNAddress:          getAddressSafely(existingState.Chains[chainSel].RMN),
-			RMNProxyAddress:           getAddressSafely(existingState.Chains[chainSel].RMNProxy),
-			WrappedNativeAddress:      getAddressSafely(existingState.Chains[chainSel].Weth9),
-			TimelockAddress:           getAddressSafely(existingState.Chains[chainSel].Timelock),
+			LegacyRMNAddress:          commonopsutil.GetAddressSafely(existingState.Chains[chainSel].RMN),
+			RMNProxyAddress:           commonopsutil.GetAddressSafely(existingState.Chains[chainSel].RMNProxy),
+			WrappedNativeAddress:      commonopsutil.GetAddressSafely(existingState.Chains[chainSel].Weth9),
+			TimelockAddress:           commonopsutil.GetAddressSafely(existingState.Chains[chainSel].Timelock),
 			LinkAddress:               linkToken,
 			FeeAggregatorAddress:      existingState.Chains[chainSel].FeeAggregator,
-			TokenAdminRegistryAddress: getAddressSafely(existingState.Chains[chainSel].TokenAdminRegistry),
-			OnRampAddress:             getAddressSafely(existingState.Chains[chainSel].OnRamp),
-			TestRouterAddress:         getAddressSafely(existingState.Chains[chainSel].TestRouter),
-			OffRampAddress:            getAddressSafely(existingState.Chains[chainSel].OffRamp),
-			NonceManagerAddress:       getAddressSafely(existingState.Chains[chainSel].NonceManager),
-			FeeQuoterAddress:          getAddressSafely(existingState.Chains[chainSel].FeeQuoter),
-			RMNRemoteAddress:          getAddressSafely(existingState.Chains[chainSel].RMNRemote),
+			TokenAdminRegistryAddress: commonopsutil.GetAddressSafely(existingState.Chains[chainSel].TokenAdminRegistry),
+			OnRampAddress:             commonopsutil.GetAddressSafely(existingState.Chains[chainSel].OnRamp),
+			TestRouterAddress:         commonopsutil.GetAddressSafely(existingState.Chains[chainSel].TestRouter),
+			OffRampAddress:            commonopsutil.GetAddressSafely(existingState.Chains[chainSel].OffRamp),
+			NonceManagerAddress:       commonopsutil.GetAddressSafely(existingState.Chains[chainSel].NonceManager),
+			FeeQuoterAddress:          commonopsutil.GetAddressSafely(existingState.Chains[chainSel].FeeQuoter),
+			RMNRemoteAddress:          commonopsutil.GetAddressSafely(existingState.Chains[chainSel].RMNRemote),
 		}
 	}
 
@@ -139,7 +137,7 @@ func deployChainContractsForChains(
 		ccipseq.DeployChainContractsSeq,
 		e.BlockChains.EVMChains(),
 		ccipseq.DeployChainContractsSeqConfig{
-			RMNHomeAddress:             getAddressSafely(existingState.Chains[homeChainSel].RMNHome),
+			RMNHomeAddress:             commonopsutil.GetAddressSafely(existingState.Chains[homeChainSel].RMNHome),
 			DeployChainContractsConfig: c,
 			AddressesPerChain:          addresses,
 			GasBoostConfigPerChain:     c.GasBoostConfigPerChain,
@@ -150,15 +148,4 @@ func deployChainContractsForChains(
 	}
 
 	return report, nil
-}
-
-type addressable interface {
-	Address() common.Address
-}
-
-func getAddressSafely(a addressable) common.Address {
-	if a == nil || reflect.ValueOf(a).IsNil() { // assumes 'a' is a pointer type
-		return common.Address{}
-	}
-	return a.Address()
 }
