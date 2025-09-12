@@ -1,4 +1,4 @@
-package v1_6_3
+package v1_6_3_dev
 
 import (
 	"errors"
@@ -17,8 +17,8 @@ import (
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	ccipopsv1_6_3 "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6_3"
-	ccipseqs "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6_3"
+	ccipopsv1_6_3_dev "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6_3_dev"
+	ccipseqs "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6_3_dev"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	commonopsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
@@ -26,7 +26,7 @@ import (
 )
 
 type ChainContractParams struct {
-	FeeQuoterParams ccipopsv1_6_3.FeeQuoterParamsSui
+	FeeQuoterParams ccipopsv1_6_3_dev.FeeQuoterParamsSui
 }
 
 var (
@@ -67,9 +67,9 @@ func deployFeeQuoterWithSuiSupportLogic(e cldf.Environment, config FeeQuoterWith
 		timelockAddr := commonopsutil.GetAddressSafely(targetChainState.Timelock)
 		offRampAddr := commonopsutil.GetAddressSafely(targetChainState.OffRamp)
 
-		report, err := operations.ExecuteOperation(e.OperationsBundle, ccipopsv1_6_3.DeploySuiSupportedFeeQuoterOp, targetChain, opsutil.EVMDeployInput[ccipopsv1_6_3.DeployFeeQInput]{
+		report, err := operations.ExecuteOperation(e.OperationsBundle, ccipopsv1_6_3_dev.DeploySuiSupportedFeeQuoterOp, targetChain, opsutil.EVMDeployInput[ccipopsv1_6_3_dev.DeployFeeQInput]{
 			ChainSelector: targetChain.Selector,
-			DeployInput: ccipopsv1_6_3.DeployFeeQInput{
+			DeployInput: ccipopsv1_6_3_dev.DeployFeeQInput{
 				Chain:    targetChain.Selector,
 				Params:   contractParams.FeeQuoterParams,
 				LinkAddr: linkAddr,
@@ -90,7 +90,7 @@ func deployFeeQuoterWithSuiSupportLogic(e cldf.Environment, config FeeQuoterWith
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save address %s for chain %d: %w", feeQuoterAddress.String(), targetChain.Selector, err)
 		}
 
-		_, err = operations.ExecuteOperation(e.OperationsBundle, ccipopsv1_6_3.SuiFeeQApplyAuthorizedCallerOp, targetChain, opsutil.EVMCallInput[fee_quoter.AuthorizedCallersAuthorizedCallerArgs]{
+		_, err = operations.ExecuteOperation(e.OperationsBundle, ccipopsv1_6_3_dev.SuiFeeQApplyAuthorizedCallerOp, targetChain, opsutil.EVMCallInput[fee_quoter.AuthorizedCallersAuthorizedCallerArgs]{
 			ChainSelector: chainSelector,
 			NoSend:        false,
 			Address:       feeQuoterAddress,

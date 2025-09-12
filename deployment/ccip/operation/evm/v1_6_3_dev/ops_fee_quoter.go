@@ -1,4 +1,4 @@
-package v1_6_3
+package v1_6_3_dev
 
 import (
 	"encoding/hex"
@@ -47,7 +47,7 @@ var (
 	DeploySuiSupportedFeeQuoterOp = opsutil.NewEVMDeployOperation(
 		"DeploySuiSupportedFeeQuoterOp",
 		semver.MustParse("1.0.0"),
-		"Deploys FeeQuoter 1.6 contract on the specified evm chain",
+		"Deploys FeeQuoter 1.6.3-dev contract on the specified evm chain",
 		cldf.NewTypeAndVersion(shared.SuiSupportedFeeQuoter, deployment.Version1_6_3Dev),
 		opsutil.VMDeployers[DeployFeeQInput]{
 			DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, *types.Transaction, error) {
@@ -104,7 +104,7 @@ var (
 	SuiSupportedFeeQuoterApplyDestChainConfigUpdatesOp = opsutil.NewEVMCallOperation(
 		"SuiSupportedFeeQuoterApplyDestChainConfigUpdatesOp",
 		semver.MustParse("1.0.0"),
-		"Apply updates to destination chain configs on the FeeQuoter 1.6.3 contract",
+		"Apply updates to destination chain configs on the FeeQuoter 1.6.3-dev contract",
 		fqSui.FeeQuoterABI,
 		shared.SuiSupportedFeeQuoter,
 		fqSui.NewFeeQuoter,
@@ -117,7 +117,7 @@ var (
 	SuiSupportedFeeQuoterUpdatePricesOp = opsutil.NewEVMCallOperation(
 		"SuiSupportedFeeQuoterUpdatePricesOp",
 		semver.MustParse("1.0.0"),
-		"Update token and gas prices on the FeeQuoter 1.6.3 contract",
+		"Update token and gas prices on the FeeQuoter 1.6.3-dev contract",
 		fqSui.FeeQuoterABI,
 		shared.SuiSupportedFeeQuoter,
 		fqSui.NewFeeQuoter,
@@ -129,7 +129,7 @@ var (
 	SuiSupportedFeeQuoterApplyTokenTransferFeeCfgOp = opsutil.NewEVMCallOperation(
 		"SuiSupportedFeeQuoterApplyTokenTransferFeeCfgOp",
 		semver.MustParse("1.0.0"),
-		"Update or Remove token transfer Fee Configs on the FeeQuoter 1.6.3 contract",
+		"Update or Remove token transfer Fee Configs on the FeeQuoter 1.6.3-dev contract",
 		fqSui.FeeQuoterABI,
 		shared.SuiSupportedFeeQuoter,
 		fqSui.NewFeeQuoter,
@@ -141,7 +141,7 @@ var (
 	SuiSupportedFeeQuoterApplyFeeTokensUpdatesOp = opsutil.NewEVMCallOperation(
 		"SuiSupportedFeeQuoterApplyFeeTokensUpdatesOp",
 		semver.MustParse("1.0.0"),
-		"Add or Remove supported fee tokens FeeQuoter 1.6.3 contract",
+		"Add or Remove supported fee tokens FeeQuoter 1.6.3-dev contract",
 		fqSui.FeeQuoterABI,
 		shared.SuiSupportedFeeQuoter,
 		fqSui.NewFeeQuoter,
@@ -153,7 +153,7 @@ var (
 	SuiSupportedFeeQApplyPremiumMultiplierWeiPerEthUpdateOp = opsutil.NewEVMCallOperation(
 		"SuiSupportedFeeQApplyPremiumMultiplierWeiPerEthUpdateOp",
 		semver.MustParse("1.0.0"),
-		"Applies premiumMultiplierWeiPerEth for tokens in FeeQuoter 1.6.3 contract",
+		"Applies premiumMultiplierWeiPerEth for tokens in FeeQuoter 1.6.3-dev contract",
 		fqSui.FeeQuoterABI,
 		shared.SuiSupportedFeeQuoter,
 		fqSui.NewFeeQuoter,
