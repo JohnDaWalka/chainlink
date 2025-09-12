@@ -167,7 +167,7 @@ func (o *orm) AssertBridgesExist(ctx context.Context, p pipeline.Pipeline) error
 	return nil
 }
 
-// CreateJob creates the job, and it's associated spec record.
+// CreateJob creates the job, and its associated spec record.
 // Expects an unmarshalled job spec as the jb argument i.e. output from ValidatedXX.
 // Scans all persisted records back into jb
 func (o *orm) CreateJob(ctx context.Context, jb *Job) error {
@@ -647,7 +647,7 @@ func (o *orm) insertGatewaySpec(ctx context.Context, spec *GatewaySpec) (specID 
 // ValidateKeyStoreMatch confirms that the key has a valid match in the keystore
 func ValidateKeyStoreMatch(ctx context.Context, spec *OCR2OracleSpec, keyStore keystore.Master, key string) (err error) {
 	switch spec.PluginType {
-	case types.Mercury, types.LLO:
+	case types.Mercury, types.LLO, types.SecureMint:
 		_, err = keyStore.CSA().Get(key)
 		if err != nil {
 			err = errors.Errorf("no CSA key matching: %q", key)

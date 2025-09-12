@@ -12,8 +12,6 @@ import (
 	"github.com/pelletier/go-toml"
 	pkgerrors "github.com/pkg/errors"
 
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -25,11 +23,13 @@ import (
 	lloconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/llo/config"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/vault"
+	sm_config "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/securemint/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 )
 
 // ValidatedOracleSpecToml validates an oracle spec that came from TOML
@@ -132,6 +132,8 @@ func validateSpec(ctx context.Context, tree *toml.Tree, spec job.Job, rc plugins
 		return validateVaultPluginSpec(spec.OCR2OracleSpec.PluginConfig)
 	case types.DonTimePlugin:
 		return validateDonTimePluginSpec(spec.OCR2OracleSpec.PluginConfig)
+	case types.SecureMint:
+		return validateSecureMintSpec(spec.OCR2OracleSpec.PluginConfig)
 	case "":
 		return errors.New("no plugin specified")
 	default:
@@ -404,4 +406,21 @@ func validateOCR2LLOSpec(jsonConfig job.JSONConfig) error {
 		return pkgerrors.Wrap(err, "error while unmarshaling plugin config")
 	}
 	return pkgerrors.Wrap(pluginConfig.Validate(), "LLO PluginConfig is invalid")
+}
+
+func validateSecureMintSpec(jsonConfig job.JSONConfig) error {
+	if jsonConfig == nil {
+		return errors.New("secure mint plugin config is empty")
+	}
+
+	smConfig, err := sm_config.Parse(jsonConfig.Bytes())
+	if err != nil {
+		return pkgerrors.Wrap(err, "error while parsing secure mint plugin config")
+	}
+
+	if err := smConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid secure mint plugin config: %#v, err: %w", smConfig, err)
+	}
+
+	return nil
 }

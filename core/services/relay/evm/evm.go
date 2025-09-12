@@ -690,7 +690,7 @@ func (r *Relayer) NewFunctionsProvider(ctx context.Context, rargs commontypes.Re
 	return NewFunctionsProvider(ctx, r.chain, rargs, pargs, lggr, r.evmKeystore, functions.FunctionsPlugin)
 }
 
-// NewConfigProvider is called by bootstrap jobs
+// NewConfigProvider is called by bootstrap jobs and by the secure mint plugin
 func (r *Relayer) NewConfigProvider(ctx context.Context, args commontypes.RelayArgs) (configProvider commontypes.ConfigProvider, err error) {
 	lggr := r.lggr.Named(args.ExternalJobID.String()).Named("ConfigProvider")
 	relayOpts := types.NewRelayOpts(args)
@@ -727,6 +727,9 @@ func (r *Relayer) NewConfigProvider(ctx context.Context, args commontypes.RelayA
 		configProvider, err = newLLOConfigProvider(ctx, lggr, r.chain, &retirement.NullRetirementReportCache{}, relayOpts)
 	case "ocr3-capability":
 		configProvider, err = NewOCR3CapabilityConfigProvider(ctx, lggr, r.chain, relayOpts)
+	case "securemint":
+		// secure mint uses the OCR3 Configurator contract for onchain config, the LLO config provider works with that out of the box
+		configProvider, err = newLLOConfigProvider(ctx, lggr, r.chain, &retirement.NullRetirementReportCache{}, relayOpts)
 	default:
 		return nil, fmt.Errorf("unrecognized provider type: %q", args.ProviderType)
 	}
