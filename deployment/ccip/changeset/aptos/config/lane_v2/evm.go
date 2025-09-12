@@ -1,4 +1,4 @@
-package lane
+package lane_v2
 
 import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
