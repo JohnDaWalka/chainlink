@@ -1,8 +1,9 @@
-package v1_6
+package v1_6_3
 
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -15,7 +16,7 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	fqSui "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
@@ -26,15 +27,15 @@ import (
 
 type DeployFeeQInput struct {
 	Chain         uint64
-	Params        FeeQuoterParams
+	Params        FeeQuoterParamsSui
 	LinkAddr      common.Address
 	WethAddr      common.Address
 	PriceUpdaters []common.Address
 }
 
 type ApplyTokenTransferFeeConfigUpdatesConfigPerChain struct {
-	TokenTransferFeeConfigs       []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
-	TokenTransferFeeConfigsRemove []fee_quoter.FeeQuoterTokenTransferFeeConfigRemoveArgs
+	TokenTransferFeeConfigs       []fqSui.FeeQuoterTokenTransferFeeConfigArgs
+	TokenTransferFeeConfigsRemove []fqSui.FeeQuoterTokenTransferFeeConfigRemoveArgs
 }
 
 type ApplyFeeTokensUpdatesInput struct {
@@ -43,15 +44,15 @@ type ApplyFeeTokensUpdatesInput struct {
 }
 
 var (
-	DeployFeeQuoterOp = opsutil.NewEVMDeployOperation(
-		"DeployFeeQuoter",
+	DeploySuiSupportedFeeQuoterOp = opsutil.NewEVMDeployOperation(
+		"DeploySuiSupportedFeeQuoterOp",
 		semver.MustParse("1.0.0"),
 		"Deploys FeeQuoter 1.6 contract on the specified evm chain",
-		cldf.NewTypeAndVersion(shared.FeeQuoter, deployment.Version1_6_0),
+		cldf.NewTypeAndVersion(shared.SuiSupportedFeeQuoter, deployment.Version1_6_3Dev),
 		opsutil.VMDeployers[DeployFeeQInput]{
 			DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, *types.Transaction, error) {
-				addr, tx, _, err := fee_quoter.DeployFeeQuoter(opts, backend,
-					fee_quoter.FeeQuoterStaticConfig{
+				addr, tx, _, err := fqSui.DeployFeeQuoter(opts, backend,
+					fqSui.FeeQuoterStaticConfig{
 						MaxFeeJuelsPerMsg:            input.Params.MaxFeeJuelsPerMsg,
 						LinkToken:                    input.LinkAddr,
 						TokenPriceStalenessThreshold: input.Params.TokenPriceStalenessThreshold,
@@ -60,7 +61,7 @@ var (
 					[]common.Address{input.WethAddr, input.LinkAddr}, // fee tokens
 					input.Params.TokenPriceFeedUpdates,
 					input.Params.TokenTransferFeeConfigArgs,
-					append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+					append([]fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs{
 						{
 							PremiumMultiplierWeiPerEth: input.Params.LinkPremiumMultiplierWeiPerEth,
 							Token:                      input.LinkAddr,
@@ -75,8 +76,8 @@ var (
 				return addr, tx, err
 			},
 			DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, error) {
-				addr, _, _, err := fee_quoter.DeployFeeQuoterZk(opts, client, wallet, backend,
-					fee_quoter.FeeQuoterStaticConfig{
+				addr, _, _, err := fqSui.DeployFeeQuoterZk(opts, client, wallet, backend,
+					fqSui.FeeQuoterStaticConfig{
 						MaxFeeJuelsPerMsg:            input.Params.MaxFeeJuelsPerMsg,
 						LinkToken:                    input.LinkAddr,
 						TokenPriceStalenessThreshold: input.Params.TokenPriceStalenessThreshold,
@@ -85,7 +86,7 @@ var (
 					[]common.Address{input.WethAddr, input.LinkAddr}, // fee tokens
 					input.Params.TokenPriceFeedUpdates,
 					input.Params.TokenTransferFeeConfigArgs,
-					append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+					append([]fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs{
 						{
 							PremiumMultiplierWeiPerEth: input.Params.LinkPremiumMultiplierWeiPerEth,
 							Token:                      input.LinkAddr,
@@ -100,90 +101,92 @@ var (
 			},
 		})
 
-	FeeQApplyAuthorizedCallerOp = opsutil.NewEVMCallOperation(
-		"FeeQApplyAuthorizedCallerOp",
+	SuiSupportedFeeQuoterApplyDestChainConfigUpdatesOp = opsutil.NewEVMCallOperation(
+		"SuiSupportedFeeQuoterApplyDestChainConfigUpdatesOp",
 		semver.MustParse("1.0.0"),
-		"Apply authorized caller to FeeQuoter 1.6 contract on the specified evm chain",
-		fee_quoter.FeeQuoterABI,
-		shared.FeeQuoter,
-		fee_quoter.NewFeeQuoter,
-		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input fee_quoter.AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
-			return feeQuoter.ApplyAuthorizedCallerUpdates(opts, input)
-		},
-	)
-
-	FeeQuoterApplyDestChainConfigUpdatesOp = opsutil.NewEVMCallOperation(
-		"FeeQuoterApplyDestChainConfigUpdatesOp",
-		semver.MustParse("1.0.0"),
-		"Apply updates to destination chain configs on the FeeQuoter 1.6.0 contract",
-		fee_quoter.FeeQuoterABI,
-		shared.FeeQuoter,
-		fee_quoter.NewFeeQuoter,
-		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input []fee_quoter.FeeQuoterDestChainConfigArgs) (*types.Transaction, error) {
+		"Apply updates to destination chain configs on the FeeQuoter 1.6.3 contract",
+		fqSui.FeeQuoterABI,
+		shared.SuiSupportedFeeQuoter,
+		fqSui.NewFeeQuoter,
+		func(feeQuoter *fqSui.FeeQuoter, opts *bind.TransactOpts, input []fqSui.FeeQuoterDestChainConfigArgs) (*types.Transaction, error) {
+			fmt.Println("APPLY FQ: ", feeQuoter.Address())
 			return feeQuoter.ApplyDestChainConfigUpdates(opts, input)
 		},
 	)
 
-	FeeQuoterUpdatePricesOp = opsutil.NewEVMCallOperation(
-		"FeeQuoterUpdatePricesOp",
+	SuiSupportedFeeQuoterUpdatePricesOp = opsutil.NewEVMCallOperation(
+		"SuiSupportedFeeQuoterUpdatePricesOp",
 		semver.MustParse("1.0.0"),
-		"Update token and gas prices on the FeeQuoter 1.6.0 contract",
-		fee_quoter.FeeQuoterABI,
-		shared.FeeQuoter,
-		fee_quoter.NewFeeQuoter,
-		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input fee_quoter.InternalPriceUpdates) (*types.Transaction, error) {
+		"Update token and gas prices on the FeeQuoter 1.6.3 contract",
+		fqSui.FeeQuoterABI,
+		shared.SuiSupportedFeeQuoter,
+		fqSui.NewFeeQuoter,
+		func(feeQuoter *fqSui.FeeQuoter, opts *bind.TransactOpts, input fqSui.InternalPriceUpdates) (*types.Transaction, error) {
 			return feeQuoter.UpdatePrices(opts, input)
 		},
 	)
-	FeeQuoterApplyTokenTransferFeeCfgOp = opsutil.NewEVMCallOperation(
-		"FeeQuoterApplyTokenTransferFeeCfgOp",
+
+	SuiSupportedFeeQuoterApplyTokenTransferFeeCfgOp = opsutil.NewEVMCallOperation(
+		"SuiSupportedFeeQuoterApplyTokenTransferFeeCfgOp",
 		semver.MustParse("1.0.0"),
-		"Update or Remove token transfer Fee Configs on the FeeQuoter 1.6.0 contract",
-		fee_quoter.FeeQuoterABI,
-		shared.FeeQuoter,
-		fee_quoter.NewFeeQuoter,
-		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input ApplyTokenTransferFeeConfigUpdatesConfigPerChain) (*types.Transaction, error) {
+		"Update or Remove token transfer Fee Configs on the FeeQuoter 1.6.3 contract",
+		fqSui.FeeQuoterABI,
+		shared.SuiSupportedFeeQuoter,
+		fqSui.NewFeeQuoter,
+		func(feeQuoter *fqSui.FeeQuoter, opts *bind.TransactOpts, input ApplyTokenTransferFeeConfigUpdatesConfigPerChain) (*types.Transaction, error) {
 			return feeQuoter.ApplyTokenTransferFeeConfigUpdates(opts, input.TokenTransferFeeConfigs, input.TokenTransferFeeConfigsRemove)
 		},
 	)
 
-	FeeQuoterApplyFeeTokensUpdatesOp = opsutil.NewEVMCallOperation(
-		"FeeQuoterApplyFeeTokensUpdatesOp",
+	SuiSupportedFeeQuoterApplyFeeTokensUpdatesOp = opsutil.NewEVMCallOperation(
+		"SuiSupportedFeeQuoterApplyFeeTokensUpdatesOp",
 		semver.MustParse("1.0.0"),
-		"Add or Remove supported fee tokens FeeQuoter 1.6.0 contract",
-		fee_quoter.FeeQuoterABI,
-		shared.FeeQuoter,
-		fee_quoter.NewFeeQuoter,
-		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input ApplyFeeTokensUpdatesInput) (*types.Transaction, error) {
+		"Add or Remove supported fee tokens FeeQuoter 1.6.3 contract",
+		fqSui.FeeQuoterABI,
+		shared.SuiSupportedFeeQuoter,
+		fqSui.NewFeeQuoter,
+		func(feeQuoter *fqSui.FeeQuoter, opts *bind.TransactOpts, input ApplyFeeTokensUpdatesInput) (*types.Transaction, error) {
 			return feeQuoter.ApplyFeeTokensUpdates(opts, input.FeeTokensToRemove, input.FeeTokensToAdd)
 		},
 	)
 
-	FeeQApplyPremiumMultiplierWeiPerEthUpdateOp = opsutil.NewEVMCallOperation(
-		"FeeQApplyPremiumMultiplierWeiPerEthUpdateOp",
+	SuiSupportedFeeQApplyPremiumMultiplierWeiPerEthUpdateOp = opsutil.NewEVMCallOperation(
+		"SuiSupportedFeeQApplyPremiumMultiplierWeiPerEthUpdateOp",
 		semver.MustParse("1.0.0"),
-		"Applies premiumMultiplierWeiPerEth for tokens in FeeQuoter 1.6.0 contract",
-		fee_quoter.FeeQuoterABI,
-		shared.FeeQuoter,
-		fee_quoter.NewFeeQuoter,
-		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs) (*types.Transaction, error) {
+		"Applies premiumMultiplierWeiPerEth for tokens in FeeQuoter 1.6.3 contract",
+		fqSui.FeeQuoterABI,
+		shared.SuiSupportedFeeQuoter,
+		fqSui.NewFeeQuoter,
+		func(feeQuoter *fqSui.FeeQuoter, opts *bind.TransactOpts, input []fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs) (*types.Transaction, error) {
 			return feeQuoter.ApplyPremiumMultiplierWeiPerEthUpdates(opts, input)
+		},
+	)
+
+	SuiFeeQApplyAuthorizedCallerOp = opsutil.NewEVMCallOperation(
+		"SuiFeeQApplyAuthorizedCallerOp",
+		semver.MustParse("1.0.0"),
+		"Apply authorized caller to FeeQuoter 1.6 contract on the specified evm chain",
+		fqSui.FeeQuoterABI,
+		shared.SuiSupportedFeeQuoter,
+		fqSui.NewFeeQuoter,
+		func(feeQuoter *fqSui.FeeQuoter, opts *bind.TransactOpts, input fqSui.AuthorizedCallersAuthorizedCallerArgs) (*types.Transaction, error) {
+			return feeQuoter.ApplyAuthorizedCallerUpdates(opts, input)
 		},
 	)
 )
 
-type FeeQuoterParams struct {
+type FeeQuoterParamsSui struct {
 	MaxFeeJuelsPerMsg              *big.Int
 	TokenPriceStalenessThreshold   uint32
 	LinkPremiumMultiplierWeiPerEth uint64
 	WethPremiumMultiplierWeiPerEth uint64
-	MorePremiumMultiplierWeiPerEth []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs
-	TokenPriceFeedUpdates          []fee_quoter.FeeQuoterTokenPriceFeedUpdate
-	TokenTransferFeeConfigArgs     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs
-	DestChainConfigArgs            []fee_quoter.FeeQuoterDestChainConfigArgs
+	MorePremiumMultiplierWeiPerEth []fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs
+	TokenPriceFeedUpdates          []fqSui.FeeQuoterTokenPriceFeedUpdate
+	TokenTransferFeeConfigArgs     []fqSui.FeeQuoterTokenTransferFeeConfigArgs
+	DestChainConfigArgs            []fqSui.FeeQuoterDestChainConfigArgs
 }
 
-func (c FeeQuoterParams) Validate() error {
+func (c FeeQuoterParamsSui) Validate() error {
 	if c.MaxFeeJuelsPerMsg == nil {
 		return errors.New("MaxFeeJuelsPerMsg is nil")
 	}
@@ -196,16 +199,16 @@ func (c FeeQuoterParams) Validate() error {
 	return nil
 }
 
-func DefaultFeeQuoterParams() FeeQuoterParams {
-	return FeeQuoterParams{
+func DefaultFeeQuoterParams() FeeQuoterParamsSui {
+	return FeeQuoterParamsSui{
 		MaxFeeJuelsPerMsg:              big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
 		TokenPriceStalenessThreshold:   uint32(24 * 60 * 60),
 		LinkPremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
 		WethPremiumMultiplierWeiPerEth: 1e18, // 1.0 ETH
-		TokenPriceFeedUpdates:          []fee_quoter.FeeQuoterTokenPriceFeedUpdate{},
-		TokenTransferFeeConfigArgs:     []fee_quoter.FeeQuoterTokenTransferFeeConfigArgs{},
-		MorePremiumMultiplierWeiPerEth: []fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
-		DestChainConfigArgs:            []fee_quoter.FeeQuoterDestChainConfigArgs{},
+		TokenPriceFeedUpdates:          []fqSui.FeeQuoterTokenPriceFeedUpdate{},
+		TokenTransferFeeConfigArgs:     []fqSui.FeeQuoterTokenTransferFeeConfigArgs{},
+		MorePremiumMultiplierWeiPerEth: []fqSui.FeeQuoterPremiumMultiplierWeiPerEthArgs{},
+		DestChainConfigArgs:            []fqSui.FeeQuoterDestChainConfigArgs{},
 	}
 }
 
@@ -224,7 +227,7 @@ const (
 	AptosFamilySelector = "ac77ffec"
 )
 
-func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...uint64) fee_quoter.FeeQuoterDestChainConfig {
+func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...uint64) fqSui.FeeQuoterDestChainConfig {
 	familySelector, _ := hex.DecodeString(EVMFamilySelector) // evm
 	if len(destChainSelector) > 0 {
 		destFamily, _ := chain_selectors.GetSelectorFamily(destChainSelector[0])
@@ -235,7 +238,7 @@ func DefaultFeeQuoterDestChainConfig(configEnabled bool, destChainSelector ...ui
 			familySelector, _ = hex.DecodeString(AptosFamilySelector) // aptos
 		}
 	}
-	return fee_quoter.FeeQuoterDestChainConfig{
+	return fqSui.FeeQuoterDestChainConfig{
 		IsEnabled:                         configEnabled,
 		MaxNumberOfTokensPerMsg:           10,
 		MaxDataBytes:                      30_000,

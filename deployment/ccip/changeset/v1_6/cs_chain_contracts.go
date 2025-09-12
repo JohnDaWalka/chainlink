@@ -887,6 +887,7 @@ func UpdateFeeQuoterPricesChangeset(e cldf.Environment, cfg UpdateFeeQuoterPrice
 type UpdateFeeQuoterDestsConfig struct {
 	// UpdatesByChain is a mapping from source -> dest -> config update.
 	UpdatesByChain map[uint64]map[uint64]fee_quoter.FeeQuoterDestChainConfig
+
 	// Disallow mixing MCMS/non-MCMS per chain for simplicity.
 	// (can still be achieved by calling this function multiple times)
 	MCMS *proposalutils.TimelockConfig
@@ -976,7 +977,6 @@ func (cfg UpdateFeeQuoterDestsConfig) ToSequenceInput(state stateview.CCIPOnChai
 }
 
 func UpdateFeeQuoterDestsChangeset(e cldf.Environment, cfg UpdateFeeQuoterDestsConfig) (cldf.ChangesetOutput, error) {
-	fmt.Println("UPDATE FEEQUOTER AGAIN")
 	output := cldf.ChangesetOutput{}
 
 	if err := cfg.Validate(e); err != nil {
@@ -993,6 +993,7 @@ func UpdateFeeQuoterDestsChangeset(e cldf.Environment, cfg UpdateFeeQuoterDestsC
 		e.BlockChains.EVMChains(),
 		cfg.ToSequenceInput(s),
 	)
+
 	return opsutil.AddEVMCallSequenceToCSOutput(e, output, report, err, s.EVMMCMSStateByChain(), cfg.MCMS, "Call ApplyDestChainConfigUpdates on FeeQuoters")
 }
 

@@ -3,137 +3,21 @@ package v1_6
 import (
 	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
-	suiFeeQuoter "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
-	ccipopsv1_6 "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
+	commonopsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
 )
 
 var _ cldf.ChangeSet[ccipseq.DeployChainContractsConfig] = DeployChainContractsChangeset
-
-var (
-	FeeQuoterWithSuiSupportChangeset = cldf.CreateChangeSet(deployFeeQuoterWithSuiSupportLogic, deployFeeQuoterWithSuiSupportPreCondition)
-)
-
-type FeeQuoterWithSuiSupportConfig struct {
-	ContractParamsPerChain map[uint64]v1_6.ChainContractParams
-}
-
-func deployFeeQuoterWithSuiSupportLogic(e cldf.Environment, config FeeQuoterWithSuiSupportConfig) (cldf.ChangesetOutput, error) {
-	state, err := stateview.LoadOnchainState(e)
-	if err != nil {
-		e.Logger.Errorw("Failed to load existing onchain state", "err", err)
-		return cldf.ChangesetOutput{}, err
-	}
-
-	ab := cldf.NewMemoryAddressBook()
-	for chainSelector, contractParams := range config.ContractParamsPerChain {
-		targetChain := e.BlockChains.EVMChains()[chainSelector]
-
-		err = deployFeeQuoterWithSuiSupportContract(e, ab, state, targetChain, contractParams.FeeQuoterParams)
-		if err != nil {
-			e.Logger.Errorw("Failed to deploy donIDClaimer contract", "err", err, "addressBook", ab)
-			return cldf.ChangesetOutput{
-				AddressBook: ab,
-			}, fmt.Errorf("failed to deploy donIDClaimer contract: %w", err)
-		}
-	}
-
-	fmt.Println("FEE QUOTER DEPLOYED: ", ab)
-	return cldf.ChangesetOutput{
-		AddressBook: ab,
-	}, nil
-}
-
-func deployFeeQuoterWithSuiSupportContract(e cldf.Environment, ab cldf.AddressBook, state stateview.CCIPOnChainState, targetChain cldf_evm.Chain, input ccipopsv1_6.FeeQuoterParams) error {
-	targetChainState, chainExists := state.Chains[targetChain.Selector]
-	if !chainExists {
-		return fmt.Errorf("chain %s not found in existing state, deploy the prerequisites first", targetChain.String())
-	}
-
-	// get the existing contract addresses
-	linkAddr, err := targetChainState.LinkTokenAddress()
-	if err != nil {
-		return err
-	}
-
-	weth9Addr := getAddressSafely(targetChainState.Weth9)
-	timelockAddr := getAddressSafely(targetChainState.Timelock)
-	offRampAddr := getAddressSafely(targetChainState.OffRamp)
-
-	wrappedInput := ccipopsv1_6.FeeQuoterParamsSui{
-		TokenPriceFeedUpdates:          ccipopsv1_6.ToSuiPriceFeedUpdates(input.TokenPriceFeedUpdates),
-		TokenTransferFeeConfigArgs:     ccipopsv1_6.ToSuiTransferFeeConfigArgs(input.TokenTransferFeeConfigArgs),
-		MorePremiumMultiplierWeiPerEth: ccipopsv1_6.ToSuiPremiums(input.MorePremiumMultiplierWeiPerEth),
-		DestChainConfigArgs:            ccipopsv1_6.ToSuiDestConfigs(input.DestChainConfigArgs),
-	}
-
-	fmt.Println("DEPLOYING FEE QUOTER")
-	fq, err := cldf.DeployContract(e.Logger, targetChain, ab,
-		func(chain cldf_evm.Chain) cldf.ContractDeploy[*suiFeeQuoter.FeeQuoter] {
-			feeTokenWithSuiSupportAddr, tx2, feeTokenWithSuiSupportC, err2 := suiFeeQuoter.DeployFeeQuoter(
-				chain.DeployerKey,
-				chain.Client,
-				fee_quoter.FeeQuoterStaticConfig{
-					MaxFeeJuelsPerMsg:            input.MaxFeeJuelsPerMsg,
-					LinkToken:                    linkAddr,
-					TokenPriceStalenessThreshold: input.TokenPriceStalenessThreshold,
-				},
-				[]common.Address{timelockAddr, chain.DeployerKey.From}, // priceUpdaters
-				[]common.Address{weth9Addr, linkAddr},                  // fee tokens
-				wrappedInput.TokenPriceFeedUpdates,
-				wrappedInput.TokenTransferFeeConfigArgs,
-				append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
-					{
-						PremiumMultiplierWeiPerEth: input.LinkPremiumMultiplierWeiPerEth,
-						Token:                      linkAddr,
-					},
-					{
-						PremiumMultiplierWeiPerEth: input.WethPremiumMultiplierWeiPerEth,
-						Token:                      weth9Addr,
-					},
-				}, wrappedInput.MorePremiumMultiplierWeiPerEth...),
-				wrappedInput.DestChainConfigArgs,
-			)
-			return cldf.ContractDeploy[*suiFeeQuoter.FeeQuoter]{
-				Address: feeTokenWithSuiSupportAddr, Contract: feeTokenWithSuiSupportC, Tx: tx2, Tv: cldf.NewTypeAndVersion(shared.SuiSupportedFeeQuoter, deployment.Version1_6_3Dev), Err: err2,
-			}
-		})
-	if err != nil {
-		e.Logger.Errorw("Failed to deploy FeeQuoter contract", "chain", targetChain.String(), "err", err)
-		return err
-	}
-
-	_, err = fq.Contract.ApplyAuthorizedCallerUpdates(targetChain.DeployerKey, suiFeeQuoter.AuthorizedCallersAuthorizedCallerArgs{
-		AddedCallers: []common.Address{offRampAddr},
-	})
-	if err != nil {
-		e.Logger.Errorw("Failed to apply authorized caller update on FeeQuoter contract.", "chain", targetChain.String(), "err", err)
-		return err
-	}
-
-	return nil
-}
-
-func deployFeeQuoterWithSuiSupportPreCondition(e cldf.Environment, _ FeeQuoterWithSuiSupportConfig) error {
-	return nil
-}
 
 // DeployChainContracts deploys all new CCIP v1.6 or later contracts for the given chains.
 // It returns the new addresses for the contracts.
@@ -232,19 +116,19 @@ func deployChainContractsForChains(
 			return operations.SequenceReport[ccipseq.DeployChainContractsSeqConfig, map[uint64]map[string]string]{}, err
 		}
 		addresses[chainSel] = ccipseq.CCIPAddresses{
-			LegacyRMNAddress:          getAddressSafely(existingState.Chains[chainSel].RMN),
-			RMNProxyAddress:           getAddressSafely(existingState.Chains[chainSel].RMNProxy),
-			WrappedNativeAddress:      getAddressSafely(existingState.Chains[chainSel].Weth9),
-			TimelockAddress:           getAddressSafely(existingState.Chains[chainSel].Timelock),
+			LegacyRMNAddress:          commonopsutil.GetAddressSafely(existingState.Chains[chainSel].RMN),
+			RMNProxyAddress:           commonopsutil.GetAddressSafely(existingState.Chains[chainSel].RMNProxy),
+			WrappedNativeAddress:      commonopsutil.GetAddressSafely(existingState.Chains[chainSel].Weth9),
+			TimelockAddress:           commonopsutil.GetAddressSafely(existingState.Chains[chainSel].Timelock),
 			LinkAddress:               linkToken,
 			FeeAggregatorAddress:      existingState.Chains[chainSel].FeeAggregator,
-			TokenAdminRegistryAddress: getAddressSafely(existingState.Chains[chainSel].TokenAdminRegistry),
-			OnRampAddress:             getAddressSafely(existingState.Chains[chainSel].OnRamp),
-			TestRouterAddress:         getAddressSafely(existingState.Chains[chainSel].TestRouter),
-			OffRampAddress:            getAddressSafely(existingState.Chains[chainSel].OffRamp),
-			NonceManagerAddress:       getAddressSafely(existingState.Chains[chainSel].NonceManager),
-			FeeQuoterAddress:          getAddressSafely(existingState.Chains[chainSel].FeeQuoter),
-			RMNRemoteAddress:          getAddressSafely(existingState.Chains[chainSel].RMNRemote),
+			TokenAdminRegistryAddress: commonopsutil.GetAddressSafely(existingState.Chains[chainSel].TokenAdminRegistry),
+			OnRampAddress:             commonopsutil.GetAddressSafely(existingState.Chains[chainSel].OnRamp),
+			TestRouterAddress:         commonopsutil.GetAddressSafely(existingState.Chains[chainSel].TestRouter),
+			OffRampAddress:            commonopsutil.GetAddressSafely(existingState.Chains[chainSel].OffRamp),
+			NonceManagerAddress:       commonopsutil.GetAddressSafely(existingState.Chains[chainSel].NonceManager),
+			FeeQuoterAddress:          commonopsutil.GetAddressSafely(existingState.Chains[chainSel].FeeQuoter),
+			RMNRemoteAddress:          commonopsutil.GetAddressSafely(existingState.Chains[chainSel].RMNRemote),
 		}
 	}
 
@@ -253,7 +137,7 @@ func deployChainContractsForChains(
 		ccipseq.DeployChainContractsSeq,
 		e.BlockChains.EVMChains(),
 		ccipseq.DeployChainContractsSeqConfig{
-			RMNHomeAddress:             getAddressSafely(existingState.Chains[homeChainSel].RMNHome),
+			RMNHomeAddress:             commonopsutil.GetAddressSafely(existingState.Chains[homeChainSel].RMNHome),
 			DeployChainContractsConfig: c,
 			AddressesPerChain:          addresses,
 			GasBoostConfigPerChain:     c.GasBoostConfigPerChain,
@@ -264,15 +148,4 @@ func deployChainContractsForChains(
 	}
 
 	return report, nil
-}
-
-type addressable interface {
-	Address() common.Address
-}
-
-func getAddressSafely(a addressable) common.Address {
-	if a == nil || reflect.ValueOf(a).IsNil() { // assumes 'a' is a pointer type
-		return common.Address{}
-	}
-	return a.Address()
 }

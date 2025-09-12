@@ -3,6 +3,7 @@ package opsutils
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -393,4 +394,15 @@ func GetBoostedGasForAttempt(cfg commontypes.GasBoostConfig, attempt uint) (gasL
 	gasPrice = initialGasPrice + uint64(attempt)*gasPriceIncrement
 
 	return
+}
+
+type addressable interface {
+	Address() common.Address
+}
+
+func GetAddressSafely(a addressable) common.Address {
+	if a == nil || reflect.ValueOf(a).IsNil() { // assumes 'a' is a pointer type
+		return common.Address{}
+	}
+	return a.Address()
 }
