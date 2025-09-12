@@ -324,8 +324,18 @@ func (s *TriggerService) convertLegacyToMultiLog(legacy *legacyTriggerConfig) (*
 		Contracts: make(map[string]interface{}),
 	}
 
-	// Add the contract configuration - preserve all existing contractReaderConfig data
-	contractReaderConfig.Contracts[legacy.ContractName] = legacy.ContractReaderConfig
+	// Extract the actual contract configuration from the legacy contractReaderConfig
+	// Legacy format: contractReaderConfig.contracts.ContractName.{configs, contractABI, etc}
+	// We need: contractReaderConfig.contracts.ContractName.{configs, contractABI, etc}
+	if legacyContracts, ok := legacy.ContractReaderConfig["contracts"].(map[string]interface{}); ok {
+		if contractConfig, ok := legacyContracts[legacy.ContractName]; ok {
+			contractReaderConfig.Contracts[legacy.ContractName] = contractConfig
+		} else {
+			return nil, fmt.Errorf("contract %s not found in legacy contractReaderConfig.contracts", legacy.ContractName)
+		}
+	} else {
+		return nil, fmt.Errorf("legacy contractReaderConfig missing 'contracts' field")
+	}
 
 	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Created contract reader config",
 		"contractReaderConfig", contractReaderConfig)
