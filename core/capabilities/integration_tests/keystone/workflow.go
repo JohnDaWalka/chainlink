@@ -161,14 +161,14 @@ consensus:
           "{{.ChainSelector}}" # CHAIN_ID_FOR_WRITE_TARGET: NEW Param, to match write target
       encoder: "EVM"
       encoder_config:
-        abi: "(bytes16 DataID, uint32 Timestamp, uint224 Answer)[] Reports"
+        abi: "(bytes32 FeedID, uint224 Price, uint32 Timestamp)[] Reports"
 
 targets:
   - id: "write_geth-testnet@1.0.0"
     inputs:
       signed_report: $(secure-mint-consensus.outputs)
     config:
-      address: "{{.DFCacheAddr}}"
+      address: "{{.ConsumerAddr}}"
       params: ["$(report)"]
       abi: "receive(report bytes)"
       deltaStage: 1s
@@ -178,15 +178,15 @@ targets:
 type secureMintWorkflowData struct {
 	WorkflowName  string
 	WorkflowOwner string
-	ChainSelector uint64
-	DFCacheAddr   string
+	ChainSelector int64
+	ConsumerAddr  string
 }
 
 func createSecureMintWorkflowJob(t *testing.T,
 	workflowName string,
 	workflowOwner string,
-	chainSelector uint64,
-	dfCacheAddr common.Address) job.Job {
+	chainSelector int64,
+	consumerAddr common.Address) job.Job {
 	tmpl, err := template.New("secureMintWorkflow").Parse(secureMintWorkflowTemplate)
 	require.NoError(t, err)
 
@@ -194,7 +194,7 @@ func createSecureMintWorkflowJob(t *testing.T,
 		WorkflowName:  workflowName,
 		WorkflowOwner: workflowOwner,
 		ChainSelector: chainSelector,
-		DFCacheAddr:   dfCacheAddr.String(),
+		ConsumerAddr:  consumerAddr.String(),
 	}
 
 	var buf bytes.Buffer
