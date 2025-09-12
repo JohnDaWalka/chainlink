@@ -1,15 +1,31 @@
 package lane_v2
 
 import (
+	"errors"
 	"testing"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/test-go/testify/require"
 )
 
 func TestMultipleLanes(t *testing.T) {
 	cfgs := multipleFamiliesLanes()
 	require.NotEmpty(t, cfgs)
+	// Call changesets based on selector family
+	// This can be used in a multi-family changeset (TBD) or inside a durable pipeline
+	for selector, cfg := range cfgs {
+		family, _ := chain_selectors.GetSelectorFamily(selector)
+		switch family {
+		case chain_selectors.FamilyAptos:
+			mockAptosUpdateCS(cfg.(*UpdateAptosLanes))
+		default:
+			panic(errors.New("unsupported chain family"))
+		}
+
+	}
 }
+
+func mockAptosUpdateCS(_ *UpdateAptosLanes) {}
 
 func multipleFamiliesLanes() map[uint64]UpdateLanesCfg {
 	lanes := []LaneConfig{
