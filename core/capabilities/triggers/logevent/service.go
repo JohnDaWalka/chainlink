@@ -130,36 +130,109 @@ func (s *TriggerService) RegisterTrigger(ctx context.Context,
 
 // convertLegacyConfigIfNeeded checks if the config is legacy format and converts it to multi-log format
 func (s *TriggerService) convertLegacyConfigIfNeeded(config *values.Map) (*values.Map, error) {
+	// Log the raw config structure for debugging
+	var configMap map[string]interface{}
+	if err := config.UnwrapTo(&configMap); err == nil {
+		s.lggr.Infow("LEGACY_CONFIG_DEBUG: Raw config structure", "keys", getMapKeys(configMap), "rawConfig", configMap, "contractsValue", configMap["contracts"], "contractsType", fmt.Sprintf("%T", configMap["contracts"]))
+	} else {
+		s.lggr.Errorw("LEGACY_CONFIG_DEBUG: Failed to unwrap config for logging", "error", err)
+	}
+
 	// First, try to unmarshal as multi-log config to see if it's already in the right format
 	var multiLogConfig logeventcap.Config
-	if err := config.UnwrapTo(&multiLogConfig); err == nil {
-		// Successfully unmarshaled as multi-log config, no conversion needed
-		return config, nil
+	err := config.UnwrapTo(&multiLogConfig)
+	if err == nil {
+		// Check if this is actually a valid multi-log config (has contracts)
+		if len(multiLogConfig.Contracts) > 0 {
+			s.lggr.Infow("LEGACY_CONFIG_DEBUG: Config is already in multi-log format, no conversion needed",
+				"contracts", len(multiLogConfig.Contracts))
+			return config, nil
+		} else {
+			// Check if there's an explicit contracts: null
+			var configMap map[string]interface{}
+			if err2 := config.UnwrapTo(&configMap); err2 == nil {
+				contractsVal, hasContracts := configMap["contracts"]
+				if hasContracts {
+					s.lggr.Errorw("LEGACY_CONFIG_DEBUG: Config has explicit contracts field set to null - this should not happen!",
+						"contractsValue", contractsVal, "contractsType", fmt.Sprintf("%T", contractsVal))
+					return nil, fmt.Errorf("config has explicit contracts field set to null, this indicates a malformed workflow specification")
+				}
+			}
+			s.lggr.Infow("LEGACY_CONFIG_DEBUG: Config unmarshaled as multi-log but has no contracts, treating as legacy",
+				"contracts", len(multiLogConfig.Contracts))
+		}
+	} else {
+		s.lggr.Infow("LEGACY_CONFIG_DEBUG: Config failed to unmarshal as multi-log format", "error", err)
 	}
+
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Proceeding to check for legacy format")
 
 	// Multi-log config failed, check if this looks like a legacy config
 	legacyConfig, err := s.extractLegacyConfig(config)
 	if err != nil {
 		// Neither multi-log nor legacy format
+		s.lggr.Errorw("LEGACY_CONFIG_DEBUG: Failed to extract legacy config", "error", err)
 		return nil, fmt.Errorf("config is neither a valid multi-log trigger config nor a legacy single-log trigger config: %w", err)
 	}
 
 	// Convert legacy config to multi-log format
-	s.lggr.Infow("Config appears to be legacy single-log trigger format, attempting conversion")
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Config appears to be legacy single-log trigger format, attempting conversion",
+		"legacyConfig", legacyConfig)
 	convertedConfig, err := s.convertLegacyToMultiLog(legacyConfig)
 	if err != nil {
+		s.lggr.Errorw("LEGACY_CONFIG_DEBUG: Failed to convert legacy to multi-log", "error", err)
 		return nil, fmt.Errorf("failed to convert legacy config to multi-log format: %w", err)
 	}
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Successfully converted legacy to multi-log",
+		"convertedConfig", convertedConfig)
 
-	// Convert the converted config to a values.Map
-	convertedConfigMap, err := values.WrapMap(convertedConfig)
+	// Get the original config to preserve all top-level fields
+	var originalConfigMap map[string]interface{}
+	if err := config.UnwrapTo(&originalConfigMap); err != nil {
+		s.lggr.Errorw("LEGACY_CONFIG_DEBUG: Failed to unwrap original config for field preservation", "error", err)
+		return nil, fmt.Errorf("failed to unwrap original config: %w", err)
+	}
+
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Preserving top-level fields",
+		"originalKeys", getMapKeys(originalConfigMap))
+
+	// Create the final config with all original fields preserved
+	finalConfig := make(map[string]interface{})
+
+	// Preserve all the original top-level fields
+	for key, value := range originalConfigMap {
+		// Skip the legacy trigger config key (e.g., "detectEventTriggerConfig", "dtaSettlementFailedTriggerConfig")
+		if strings.HasSuffix(key, "TriggerConfig") {
+			s.lggr.Infow("LEGACY_CONFIG_DEBUG: Skipping legacy trigger config key", "key", key)
+			continue
+		}
+		// Preserve all other fields
+		finalConfig[key] = value
+	}
+
+	// Add the converted contracts array
+	finalConfig["contracts"] = convertedConfig.Contracts
+
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Created final config",
+		"finalConfigKeys", getMapKeys(finalConfig),
+		"contractsLength", len(convertedConfig.Contracts),
+		"finalConfig", finalConfig)
+
+	// Convert the final config to a values.Map
+	convertedConfigMap, err := values.WrapMap(finalConfig)
 	if err != nil {
+		s.lggr.Errorw("LEGACY_CONFIG_DEBUG: Failed to wrap final config", "error", err)
 		return nil, fmt.Errorf("failed to wrap converted config: %w", err)
 	}
 
-	s.lggr.Infow("Successfully converted legacy config to multi-log format",
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Successfully wrapped final config",
+		"wrappedConfigMap", convertedConfigMap)
+
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: CONVERSION COMPLETE - Successfully converted legacy config to multi-log format",
 		"contracts", len(convertedConfig.Contracts),
-		"contractNames", s.getContractNames(convertedConfig))
+		"contractNames", s.getContractNames(convertedConfig),
+		"finalConfigKeys", getMapKeys(finalConfig),
+		"hasContracts", finalConfig["contracts"] != nil)
 
 	return convertedConfigMap, nil
 }
@@ -172,12 +245,19 @@ func (s *TriggerService) extractLegacyConfig(config *values.Map) (*legacyTrigger
 		return nil, fmt.Errorf("failed to unwrap config: %w", err)
 	}
 
+	// First, check if the top-level config itself is a legacy config
+	if s.isValidLegacyTriggerConfig(configMap) {
+		s.lggr.Infow("LEGACY_CONFIG_DEBUG: Found legacy config at top level")
+		return s.parseLegacyTriggerConfig(configMap)
+	}
+
 	// Look for any key that ends with "TriggerConfig" and contains the expected structure
 	for key, value := range configMap {
 		if strings.HasSuffix(key, "TriggerConfig") {
 			// Found a potential trigger config, check if it has the right structure
 			if triggerConfig, ok := value.(map[string]interface{}); ok {
 				if s.isValidLegacyTriggerConfig(triggerConfig) {
+					s.lggr.Infow("LEGACY_CONFIG_DEBUG: Found legacy config in nested key", "key", key)
 					return s.parseLegacyTriggerConfig(triggerConfig)
 				}
 			}
@@ -233,6 +313,12 @@ func (s *TriggerService) parseLegacyTriggerConfig(config map[string]interface{})
 
 // convertLegacyToMultiLog converts a legacy trigger config to the new multi-log format
 func (s *TriggerService) convertLegacyToMultiLog(legacy *legacyTriggerConfig) (*logeventcap.Config, error) {
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Starting conversion of legacy config",
+		"contractName", legacy.ContractName,
+		"contractAddress", legacy.ContractAddress,
+		"contractEventName", legacy.ContractEventName,
+		"contractReaderConfig", legacy.ContractReaderConfig)
+
 	// Create the contract reader config structure
 	contractReaderConfig := logeventcap.ConfigContractsElemContractReaderConfig{
 		Contracts: make(map[string]interface{}),
@@ -240,6 +326,9 @@ func (s *TriggerService) convertLegacyToMultiLog(legacy *legacyTriggerConfig) (*
 
 	// Add the contract configuration - preserve all existing contractReaderConfig data
 	contractReaderConfig.Contracts[legacy.ContractName] = legacy.ContractReaderConfig
+
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Created contract reader config",
+		"contractReaderConfig", contractReaderConfig)
 
 	// Create the contract element
 	contractElem := logeventcap.ConfigContractsElem{
@@ -249,10 +338,17 @@ func (s *TriggerService) convertLegacyToMultiLog(legacy *legacyTriggerConfig) (*
 		ContractReaderConfig: contractReaderConfig,
 	}
 
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Created contract element",
+		"contractElem", contractElem)
+
 	// Create the multi-log config
 	multiLogConfig := &logeventcap.Config{
 		Contracts: []logeventcap.ConfigContractsElem{contractElem},
 	}
+
+	s.lggr.Infow("LEGACY_CONFIG_DEBUG: Created final multi-log config",
+		"multiLogConfig", multiLogConfig,
+		"contractsCount", len(multiLogConfig.Contracts))
 
 	return multiLogConfig, nil
 }
@@ -264,6 +360,15 @@ func (s *TriggerService) getContractNames(config *logeventcap.Config) []string {
 		names = append(names, contract.ContractName)
 	}
 	return names
+}
+
+// getMapKeys is a helper function to get keys from a map for logging
+func getMapKeys(m map[string]interface{}) []string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // legacyTriggerConfig represents the structure of a legacy single-log trigger configuration
