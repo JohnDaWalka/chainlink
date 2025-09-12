@@ -1,9 +1,15 @@
 package lane
 
 type LaneConfig struct {
-	Source     ChainDefinition
-	Dest       ChainDefinition
-	IsDisabled bool
+	Source            ChainDefinition
+	Dest              ChainDefinition
+	IsDisabled        bool
+	TestRouter        bool
+	AptosExtraConfigs AptosExtraConfigs
+}
+
+type AptosExtraConfigs struct {
+	OnRampVersion []byte
 }
 
 type UpdateLanesCfg interface {
