@@ -405,3 +405,5 @@ require (
 )
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20250528121202-292529af39df
+
+replace github.com/smartcontractkit/libocr => github.com/Unheilbar/libocr v0.0.0-20250911150531-ba325918e9a3
