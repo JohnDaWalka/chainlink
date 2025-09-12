@@ -65,6 +65,6 @@ func toDestUpdates(laneCfg LaneConfig, destChainUpdates UpdateLanesCfg) error {
 	// Setting off ramp sources updates
 	destChainUpdates.SetUpdateOffRampSourcesConfig(laneCfg)
 	// Setting router off ramp updates
-	destChainUpdates.SetUpdateRouterRampsConfig(laneCfg)
+	destChainUpdates.SetUpdateRouterRampsConfig(laneCfg) // TODO: will need to differentiate when it's source/destination
 	return nil
 }
