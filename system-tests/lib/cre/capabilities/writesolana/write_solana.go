@@ -166,7 +166,7 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			return nil, errors.Wrapf(err, "Solana chainID is nil for node at index %d", nodeIndex)
 		}
 
-		var solCfg *solcfg.WorkflowConfig
+		var solCfg solcfg.WorkflowConfig
 
 		// Execute template with chain's workflow configuration
 		tmpl, err := template.New("solanaWorkflowConfig").Parse(solWorkflowConfigTemplate)
