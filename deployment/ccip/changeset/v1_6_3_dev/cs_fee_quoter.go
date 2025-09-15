@@ -21,7 +21,6 @@ import (
 	ccipseqs "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6_3_dev"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	commonopsutil "github.com/smartcontractkit/chainlink/deployment/common/opsutils"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
@@ -63,9 +62,9 @@ func deployFeeQuoterWithSuiSupportLogic(e cldf.Environment, config FeeQuoterWith
 			return cldf.ChangesetOutput{}, err
 		}
 
-		weth9Addr := commonopsutil.GetAddressSafely(targetChainState.Weth9)
-		timelockAddr := commonopsutil.GetAddressSafely(targetChainState.Timelock)
-		offRampAddr := commonopsutil.GetAddressSafely(targetChainState.OffRamp)
+		weth9Addr := opsutil.GetAddressSafely(targetChainState.Weth9)
+		timelockAddr := opsutil.GetAddressSafely(targetChainState.Timelock)
+		offRampAddr := opsutil.GetAddressSafely(targetChainState.OffRamp)
 
 		report, err := operations.ExecuteOperation(e.OperationsBundle, ccipopsv1_6_3_dev.DeploySuiSupportedFeeQuoterOp, targetChain, opsutil.EVMDeployInput[ccipopsv1_6_3_dev.DeployFeeQInput]{
 			ChainSelector: targetChain.Selector,
