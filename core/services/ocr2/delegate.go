@@ -823,7 +823,8 @@ func (d *Delegate) newServicesVaultPlugin(
 	}
 	oracleArgs.ReportingPluginFactory = rpf
 
-	oracle, err := libocr2.NewOracle(oracleArgs)
+	oracle, err := libocr2.NewOracle(
+		oracleArgs)
 	if err != nil {
 		return nil, err
 	}

@@ -185,6 +185,11 @@ func (a *OCR3OnchainKeyringMultiChainAdapter) PublicKey() ocrtypes.OnchainPublic
 	return a.publicKey
 }
 
+func (a *OCR3OnchainKeyringMultiChainAdapter) Equal(key ocrtypes.OnchainPublicKey) bool {
+	//TODO implement me
+	return true
+}
+
 func (a *OCR3OnchainKeyringMultiChainAdapter) getKeyBundleFromInfo(info []byte) (string, ocr2key.KeyBundle, error) {
 	unmarshalledInfo := new(structpb.Struct)
 	err := proto.Unmarshal(info, unmarshalledInfo)
