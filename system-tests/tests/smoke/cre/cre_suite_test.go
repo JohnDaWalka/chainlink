@@ -16,7 +16,7 @@ Inside `core/scripts/cre/environment` directory
     `export  CTF_CONFIGS=../../../../core/scripts/cre/environment/configs/<topology>.toml; go test -timeout 15m -run ^Test_CRE_Suite$`.
 */
 func Test_CRE_Suite(t *testing.T) {
-	testEnv := SetupTestEnvironment(t)
+	testEnv := SetupTestEnvironmentWithConfig(t, getDefaultTestConfig(t))
 	priceProvider, porWfCfg := beforePoRTest(t, testEnv)
 
 	// WARNING: currently we can't run these tests in parallel, because each test rebuilds environment structs and that includes
@@ -64,7 +64,7 @@ func Test_withV2Registries(t *testing.T) {
 		t.Skipf("Skipping test for the following reason: %s", skipReason)
 		flags := []string{"--with-contracts-version", "v2"}
 
-		testEnv := SetupTestEnvironment(t, flags...)
+		testEnv := SetupTestEnvironmentWithConfig(t, getDefaultTestConfig(t), flags...)
 		priceProvider, wfConfig := beforePoRTest(t, testEnv)
 		wfConfig.WorkflowFileLocation = "../../../../core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/main.go"
 		wfConfig.WorkflowName = "por-workflow"

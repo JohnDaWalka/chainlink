@@ -176,15 +176,14 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					return nil, errors.Wrap(tErr, "failed to get transmitter address from bootstrap node labels")
 				}
 
-				// TODO remove once key Bundles families handled
-				keyBundle, kErr := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
-				if kErr != nil {
-					return nil, errors.Wrap(kErr, "failed to get key bundle id from worker node labels")
-				}
-
 				bundlesPerFamily, kbErr := node.ExtractBundleKeysPerFamily(workerNode)
 				if kbErr != nil {
 					return nil, errors.Wrap(kbErr, "failed to get ocr families bundle id from worker node labels")
+				}
+
+				keyBundle, ok := bundlesPerFamily["evm"] // we can always expect evm bundle key id present since evm is homechain
+				if !ok {
+					return nil, errors.New("failed to get key bundle id for evm family")
 				}
 
 				keyNodeAddress := node.AddressKeyFromSelector(chain.Selector)

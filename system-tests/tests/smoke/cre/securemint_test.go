@@ -37,15 +37,12 @@ import (
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	df_sol "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
-	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock/pb"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/testdata/testspecs"
 )
 
@@ -54,7 +51,7 @@ func Test_SecureMint(t *testing.T) {
 	tconf := getDefaultTestConfig(t)
 	tconf.EnvironmentConfigPath = filepath.Join(tconf.EnvironmentDirPath, "/configs/workflow-solana-don.toml")
 
-	tenv := SetupTestEnvironmentV2(t, tconf)
+	tenv := SetupTestEnvironmentWithConfig(t, tconf)
 
 	executeSecureMintTest(t, tenv)
 }
@@ -440,7 +437,6 @@ type fakeTrigger struct {
 	triggerCap *mock_capability.Controller
 	setup      *setup
 	triggerID  string
-	keys       []ocr2key.KeyBundle
 }
 
 func (f *fakeTrigger) run(ctx context.Context) error {
@@ -529,38 +525,13 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 
 func createFakeTrigger(t *testing.T, s *setup, dons *cre.DonTopology) *fakeTrigger {
 	client := createMockClient(t)
-	keys := exportOcr2Keys(t, dons)
-	require.NotEmpty(t, keys)
 	framework.L.Info().Msg("Successfully exported ocr2 keys")
 
 	return &fakeTrigger{
 		triggerCap: client,
-		keys:       keys,
 		setup:      s,
 		triggerID:  "securemint-trigger@1.0.0",
 	}
-}
-
-func exportOcr2Keys(t *testing.T, dons *cre.DonTopology) []ocr2key.KeyBundle {
-	kb := make([]ocr2key.KeyBundle, 0)
-	for _, don := range dons.DonsWithMetadata {
-		if flags.HasFlag(don.Flags, cre.MockCapability) {
-			for _, n := range don.DON.Nodes {
-				key, err := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
-				if err == nil {
-					b, err2 := json.Marshal(key)
-					require.NoError(t, err2, "could not marshal OCR2 key")
-					kk, err3 := ocr2key.FromEncryptedJSON(b, nodeclient.ChainlinkKeyPassword)
-					require.NoError(t, err3, "could not decrypt OCR2 key json")
-					kb = append(kb, kk)
-				} else {
-					framework.L.Error().Msgf("Could not export OCR2 key: %s", err)
-				}
-			}
-		}
-	}
-
-	return kb
 }
 
 func createMockClient(t *testing.T) *mock_capability.Controller {
