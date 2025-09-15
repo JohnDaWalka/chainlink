@@ -112,7 +112,6 @@ var PrepareCLNodesFundingOp = operations.NewOperation[PrepareFundCLNodesOpInput,
 					output.PrivateKeysPerChainFamily[chainFamily] = make(map[uint64][]byte)
 				}
 				if _, exists := output.PrivateKeysPerChainFamily[chainFamily][bcOut.SolChain.ChainSelector]; !exists {
-					// TODO implement creation of new key and funding it
 					private, pkErr := solana.NewRandomPrivateKey()
 					if pkErr != nil {
 						return nil, pkgerrors.Wrap(pkErr, "failed to generate private key for solana")
@@ -179,7 +178,7 @@ var FundCLNodesOp = operations.NewOperation(
 			deps.TestLogger.Info().Msgf("Funding nodes for DON %s", metaDon.Name)
 			for _, bcOut := range deps.BlockchainOutputs {
 				if !flags.RequiresForwarderContract(metaDon.Flags, bcOut.ChainID) &&
-					bcOut.SolChain == nil { // consider solana chains always have forwarder
+					bcOut.SolChain == nil { // for now, we can only write to solana, so we consider forwarder is always present
 					continue
 				}
 				for _, node := range metaDon.DON.Nodes {

@@ -248,7 +248,7 @@ func DonTimeJob(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	}
 }
 
-func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocr2KeyBundles map[string]string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, offchainBundleID string, ocr2KeyBundles map[string]string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
 
 	spec := fmt.Sprintf(`
@@ -279,7 +279,7 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 		uuid,
 		cre.ConsensusCapability,
 		ocr3CapabilityAddress,
-		ocr2KeyBundles["evm"], // use EVM as offchain key
+		offchainBundleID,
 		ocrPeeringData.OCRBootstraperPeerID,
 		fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
 		nodeEthAddress,
@@ -291,7 +291,6 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 		spec += "\n"
 	}
 
-	fmt.Println("ocr3 spec:", spec)
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec:   spec,

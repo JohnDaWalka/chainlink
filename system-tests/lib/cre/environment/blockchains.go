@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -108,6 +109,9 @@ func initSolanaInput(bi *blockchain.Input) error {
 	if bi.SolanaPrograms != nil {
 		var err2 error
 		once.Do(func() {
+			if hasSolanaArtifacts(bi.ContractsDir) {
+				return
+			}
 			// TODO PLEX-1718 use latest contracts sha for now. Derive commit sha from go.mod once contracts are in a separate go module
 			err2 = memory.DownloadSolanaProgramArtifacts(context.Background(), bi.ContractsDir, logger.Nop(), "b0f7cd3fbdbb")
 		})
@@ -117,6 +121,23 @@ func initSolanaInput(bi *blockchain.Input) error {
 	}
 
 	return nil
+}
+
+func hasSolanaArtifacts(dir string) bool {
+	ents, err := os.ReadDir(dir)
+	if err != nil { // dir missing or unreadable -> treat as not present
+		return false
+	}
+	for _, e := range ents {
+		if e.IsDir() {
+			continue
+		}
+		n := e.Name()
+		if strings.HasSuffix(n, ".so") || strings.HasSuffix(n, ".json") {
+			return true
+		}
+	}
+	return false
 }
 
 func deployBlockchain(testLogger zerolog.Logger, infraIn infra.Input, bi blockchain.Input) (*blockchain.Output, error) {

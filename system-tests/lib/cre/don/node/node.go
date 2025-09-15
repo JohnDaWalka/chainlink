@@ -38,10 +38,6 @@ func CreateNodeOCRFamiliesListValue(families []string) string {
 	return strings.Join(families, ",")
 }
 
-func ParseNodeOCRFamiliesListValue(families string) []string {
-	return strings.Split(families, ",")
-}
-
 func AddressKeyFromSelector(chainSelector uint64) string {
 	return strconv.FormatUint(chainSelector, 10) + "_public_address"
 }
@@ -52,7 +48,7 @@ func ExtractBundleKeysPerFamily(n *cre.NodeMetadata) (map[string]string, error) 
 		return nil, fmt.Errorf("failed to get ocr families bundle id from worker node labels: %w", fErr)
 	}
 
-	supportedFamilies := ParseNodeOCRFamiliesListValue(keyBundlesFamilies)
+	supportedFamilies := strings.Split(keyBundlesFamilies, ",")
 
 	bundlesPerFamily := make(map[string]string)
 	for _, family := range supportedFamilies {

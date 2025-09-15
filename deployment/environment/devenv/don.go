@@ -226,7 +226,6 @@ type Node struct {
 	JDId                   string            // job distributor id returned by node after Job distributor is created in node
 	Name                   string            // name of the node
 	AccountAddr            map[string]string // chain id to node's account address mapping for supported chains
-	Ocr2KeyBundleID        string            // OCR2 key bundle id of the node
 	ChainsOcr2KeyBundlesID map[string]string
 	gqlClient              client.Client             // graphql client to interact with the node
 	restClient             *clclient.ChainlinkClient // rest client to interact with the node
@@ -300,7 +299,7 @@ func (n *Node) CreateCCIPOCRSupportedChains(ctx context.Context, chains []JDChai
 		if ocr2BundleId == "" {
 			return fmt.Errorf("no OCR2 key bundle id found for node %s", n.Name)
 		}
-		n.Ocr2KeyBundleID = ocr2BundleId
+
 		n.ChainsOcr2KeyBundlesID[strings.ToLower(chain.ChainType)] = ocr2BundleId
 
 		// fetch node labels to know if the node is bootstrap or plugin

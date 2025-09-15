@@ -110,12 +110,6 @@ func BuildFullCLDEnvironment(ctx context.Context, lgr logger.Logger, input *cre.
 				Value: don.NodeIds()[j],
 			})
 
-			// required for OCR2/3 job specs
-			node.Labels = append(node.Labels, &cre.Label{
-				Key:   libnode.NodeOCR2KeyBundleIDKey,
-				Value: don.Nodes[j].Ocr2KeyBundleID,
-			})
-
 			ocrSupportedFamilies := make([]string, 0)
 			for family, key := range don.Nodes[j].ChainsOcr2KeyBundlesID {
 				node.Labels = append(node.Labels, &cre.Label{

@@ -41,31 +41,10 @@ type TestEnvironment struct {
 	WrappedBlockchainOutputs []*cre.WrappedBlockchainOutput
 }
 
-// setupTestEnvironment initializes the common test environment
-func SetupTestEnvironment(t *testing.T, flags ...string) *TestEnvironment {
+func SetupTestEnvironmentWithConfig(t *testing.T, tconf *TestConfig, flags ...string) *TestEnvironment {
 	t.Helper()
 
-	defaultTestConfig := getDefaultTestConfig(t)
-	createEnvironment(t, defaultTestConfig, flags...)
-	in := getEnvironmentConfig(t)
-	envArtifact := getEnvironmentArtifact(t, defaultTestConfig.RelativePathToRepoRoot)
-	fullCldEnvOutput, wrappedBlockchainOutputs, err := environment.BuildFromSavedState(t.Context(), cldlogger.NewSingleFileLogger(t), in, envArtifact)
-	require.NoError(t, err, "failed to load environment")
-
-	return &TestEnvironment{
-		Config:                   in,
-		TestConfig:               defaultTestConfig,
-		EnvArtifact:              envArtifact,
-		Logger:                   framework.L,
-		FullCldEnvOutput:         fullCldEnvOutput,
-		WrappedBlockchainOutputs: wrappedBlockchainOutputs,
-	}
-}
-
-func SetupTestEnvironmentV2(t *testing.T, tconf *TestConfig) *TestEnvironment {
-	t.Helper()
-
-	createEnvironment(t, tconf)
+	createEnvironment(t, tconf, flags...)
 	in := getEnvironmentConfig(t)
 	envArtifact := getEnvironmentArtifact(t, tconf.RelativePathToRepoRoot)
 	fullCldEnvOutput, wrappedBlockchainOutputs, err := environment.BuildFromSavedState(t.Context(), cldlogger.NewSingleFileLogger(t), in, envArtifact)
