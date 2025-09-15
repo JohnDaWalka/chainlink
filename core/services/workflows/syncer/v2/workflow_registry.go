@@ -74,6 +74,8 @@ type workflowRegistry struct {
 	allowListedMu       sync.RWMutex
 
 	contractReaderFn versioning.ContractReaderFactory
+	contractReader   types.ContractReader
+	readerMu         sync.RWMutex
 
 	config Config
 
@@ -168,11 +170,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 	return w.StartOnce(w.Name(), func() error {
 		ctx, cancel := w.stopCh.NewCtx()
 
-		var (
-			initDoneCh = make(chan struct{})
-			reader     types.ContractReader
-			err        error
-		)
+		initDoneCh := make(chan struct{})
 
 		w.wg.Add(1)
 		go func() {
@@ -180,7 +178,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			defer close(initDoneCh)
 
 			w.lggr.Debugw("Waiting for DON...")
-			if _, err = w.workflowDonNotifier.WaitForDon(ctx); err != nil {
+			if _, err := w.workflowDonNotifier.WaitForDon(ctx); err != nil {
 				w.lggr.Errorw("failed to wait for don", "err", err)
 				return
 			}
@@ -189,11 +187,15 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			// call dependency.  Blocking on initialization results in a
 			// deadlock.  Instead wait until the node has identified it's DON
 			// as a proxy for a DON and on-chain ready state .
-			reader, err = w.newWorkflowRegistryContractReader(ctx)
+			reader, err := w.newWorkflowRegistryContractReader(ctx)
 			if err != nil {
 				w.lggr.Criticalf("contract reader unavailable : %s", err)
 				return
 			}
+
+			w.readerMu.Lock()
+			defer w.readerMu.Unlock()
+			w.contractReader = reader
 		}()
 
 		w.wg.Add(1)
@@ -203,7 +205,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			// Start goroutines to gather changes from Workflow Registry contract
 			<-initDoneCh
 			don, _ := w.workflowDonNotifier.WaitForDon(ctx)
-			w.syncUsingReconciliationStrategy(ctx, don, reader)
+			w.syncUsingReconciliationStrategy(ctx, don)
 		}()
 
 		w.wg.Add(1)
@@ -212,7 +214,7 @@ func (w *workflowRegistry) Start(_ context.Context) error {
 			defer cancel()
 			// Start goroutines to gather allowlisted requests from Workflow Registry contract
 			<-initDoneCh
-			w.syncAllowlistedRequests(ctx, reader)
+			w.syncAllowlistedRequests(ctx)
 		}()
 
 		return nil
@@ -379,7 +381,7 @@ func (w *workflowRegistry) generateReconciliationEvents(_ context.Context, pendi
 	return events, nil
 }
 
-func (w *workflowRegistry) syncAllowlistedRequests(ctx context.Context, contractReader types.ContractReader) {
+func (w *workflowRegistry) syncAllowlistedRequests(ctx context.Context) {
 	ticker := time.NewTicker(defaultTickIntervalForAllowlistedRequests).C
 	w.lggr.Debug("starting syncAllowlistedRequests")
 	for {
@@ -388,7 +390,9 @@ func (w *workflowRegistry) syncAllowlistedRequests(ctx context.Context, contract
 			w.lggr.Debug("shutting down syncAllowlistedRequests, %s", ctx.Err())
 			return
 		case <-ticker:
-			allowListedRequests, head, err := w.getAllowlistedRequests(ctx, contractReader)
+			w.readerMu.RLock()
+			allowListedRequests, head, err := w.getAllowlistedRequests(ctx, w.contractReader)
+			w.readerMu.RUnlock()
 			if err != nil {
 				w.lggr.Errorw("failed to call getAllowlistedRequests", "err", err)
 				continue
@@ -403,7 +407,7 @@ func (w *workflowRegistry) syncAllowlistedRequests(ctx context.Context, contract
 
 // syncUsingReconciliationStrategy syncs workflow registry contract state by polling the workflow metadata state and comparing to local state.
 // NOTE: In this mode paused states will be treated as a deleted workflow. Workflows will not be registered as paused.
-func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, don capabilities.DON, contractReader types.ContractReader) {
+func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, don capabilities.DON) {
 	ticker := w.getTicker()
 	pendingEvents := map[string]*reconciliationEvent{}
 	w.lggr.Debug("running readRegistryStateLoop")
@@ -413,7 +417,9 @@ func (w *workflowRegistry) syncUsingReconciliationStrategy(ctx context.Context, 
 			w.lggr.Debug("shutting down readRegistryStateLoop")
 			return
 		case <-ticker:
-			workflowMetadata, head, err := w.getWorkflowMetadata(ctx, don, contractReader)
+			w.readerMu.RLock()
+			workflowMetadata, head, err := w.getWorkflowMetadata(ctx, don, w.contractReader)
+			w.readerMu.RUnlock()
 			if err != nil {
 				w.lggr.Errorw("failed to get registry state", "err", err)
 				continue
