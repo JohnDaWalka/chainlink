@@ -246,6 +246,7 @@ type WorkflowRegistrationConfig struct {
 	SecretsURL                  string
 	WorkflowRegistryAddr        common.Address
 	WorkflowRegistryTypeVersion deployment.TypeAndVersion
+	ChainID                     uint64
 	DonID                       uint64
 	ContainerTargetDir          string
 	WrappedBlockchainOutputs    []*cre.WrappedBlockchainOutput
@@ -421,6 +422,12 @@ func deleteWorkflows(t *testing.T, uniqueWorkflowName string,
 	localEnvErr := creworkflow.RemoveWorkflowArtifactsFromLocalEnv(workflowConfigFilePath, compressedWorkflowWasmPath)
 	require.NoError(t, localEnvErr, "failed to remove workflow artifacts from local environment")
 
+	switch tv.Version.Major() {
+	case 2:
+		// TODO(CRE-876): delete with workflowID
+		return
+	default:
+	}
 	deleteErr := creworkflow.DeleteWithContract(t.Context(), blockchainOutputs[0].SethClient, workflowRegistryAddress, tv, uniqueWorkflowName)
 	require.NoError(t, deleteErr, "failed to delete workflow '%s'. Please delete/unregister it manually.", uniqueWorkflowName)
 }
@@ -449,6 +456,7 @@ func compileAndDeployWorkflow[T WorkflowConfig](t *testing.T,
 		CompressedWasmPath:          compressedWorkflowWasmPath,
 		WorkflowRegistryAddr:        workflowRegistryAddress,
 		WorkflowRegistryTypeVersion: tv,
+		ChainID:                     homeChainSelector,
 		DonID:                       testEnv.FullCldEnvOutput.DonTopology.DonsWithMetadata[0].ID,
 		ContainerTargetDir:          creworkflow.DefaultWorkflowTargetDir,
 		WrappedBlockchainOutputs:    testEnv.WrappedBlockchainOutputs,
