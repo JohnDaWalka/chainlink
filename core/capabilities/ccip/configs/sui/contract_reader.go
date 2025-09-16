@@ -202,7 +202,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
 							{
-								Name:       "ref",
+								Name:       "object_ref_id",
 								Type:       "object_id",
 								PointerTag: &ccipObjectRefStatePointer,
 								Required:   true,
@@ -220,7 +220,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
 							{
-								Name:       "ref",
+								Name:       "object_ref_id",
 								Type:       "object_id",
 								PointerTag: &ccipObjectRefStatePointer,
 								Required:   true,
@@ -238,7 +238,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						SignerAddress: fromAddress,
 						Params: []codec.SuiFunctionParam{
 							{
-								Name:       "ref",
+								Name:       "object_ref_id",
 								Type:       "object_id",
 								PointerTag: &ccipObjectRefStatePointer,
 								Required:   true,
