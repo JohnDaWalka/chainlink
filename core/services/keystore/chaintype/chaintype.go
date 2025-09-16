@@ -27,7 +27,6 @@ const (
 	TON ChainType = "ton"
 	// Sui for the Sui chain
 	Sui ChainType = "sui"
-
 	// Offchain is used by the MultichainKeyringAdapter when we are signing for offchain (eg. for DKG).
 	Offchain ChainType = "offchain"
 )
@@ -87,6 +86,8 @@ func (c ChainType) Type() (uint8, error) {
 	case TON:
 		return 7, nil
 	case Sui:
+		return 8, nil
+	case Offchain:
 		return 8, nil
 	case Offchain:
 		return 9, nil

@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
@@ -32,7 +31,7 @@ var (
 // Compatible with ccip::offramp version 1.6.0
 type MessageHasherV1 struct {
 	lggr           logger.Logger
-	extraDataCodec ccipocr3.ExtraDataCodec
+	extraDataCodec ccipocr3common.ExtraDataCodec
 }
 
 type any2SuiTokenTransfer struct {
@@ -43,7 +42,7 @@ type any2SuiTokenTransfer struct {
 	Amount            *big.Int
 }
 
-func NewMessageHasherV1(lggr logger.Logger, extraDataCodec ccipocr3.ExtraDataCodec) *MessageHasherV1 {
+func NewMessageHasherV1(lggr logger.Logger, extraDataCodec ccipocr3common.ExtraDataCodec) *MessageHasherV1 {
 	return &MessageHasherV1{
 		lggr:           lggr,
 		extraDataCodec: extraDataCodec,
