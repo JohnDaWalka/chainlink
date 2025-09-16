@@ -89,8 +89,6 @@ func (c ChainType) Type() (uint8, error) {
 		return 8, nil
 	case Offchain:
 		return 8, nil
-	case Offchain:
-		return 9, nil
 	default:
 		return 0, fmt.Errorf("unexpected chaintype.ChainType: %#v", c)
 	}
