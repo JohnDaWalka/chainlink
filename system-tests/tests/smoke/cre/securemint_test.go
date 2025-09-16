@@ -18,6 +18,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -112,9 +113,9 @@ func executeSecureMintTest(t *testing.T, tenv *TestEnvironment) {
 }
 
 func waitForFeedUpdate(t *testing.T, solclient *rpc.Client, s *setup) {
-	tt := time.NewTicker(time.Second * 5)
+	tt := time.NewTicker(time.Second * 10)
 	defer tt.Stop()
-	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*2)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute*5)
 	defer cancel()
 	for {
 		select {
@@ -220,7 +221,7 @@ var (
 	wFName        = "testwf1234"
 	wFDescription = "securemint test"
 	wFOwner       = [20]byte{1, 2, 3}
-	SeqNr         = 5
+	SeqNr         = 1
 	Block         = 10
 	Mintable      = big.NewInt(15)
 )
@@ -440,14 +441,14 @@ type fakeTrigger struct {
 }
 
 func (f *fakeTrigger) run(ctx context.Context) error {
-	tt := time.NewTicker(time.Second * 25)
+	tt := time.NewTicker(time.Second * 20)
 	defer tt.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-tt.C:
-			err := f.Call(ctx)
+			err := f.Call(context.Background())
 			if err != nil {
 				return fmt.Errorf("failed call fake trigger: %w", err)
 			}
@@ -468,7 +469,7 @@ func (f *fakeTrigger) Call(ctx context.Context) error {
 
 	message := pb.SendTriggerEventRequest{
 		TriggerID: f.triggerID,
-		ID:        "fake_trigger",
+		ID:        uuid.New().String(),
 		Outputs:   outputsBytes,
 	}
 

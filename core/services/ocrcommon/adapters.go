@@ -22,6 +22,8 @@ import (
 )
 
 var _ ocr3types.OnchainKeyring[[]byte] = (*OCR3OnchainKeyringAdapter)(nil)
+var _ ocr3types.ComparableOnchainKeyring[[]byte] = (*OCR3OnchainKeyringMultiChainAdapter)(nil)
+var _ ocr3types.ComparableOnchainKeyring[[]byte] = (*OCR3OnchainKeyringAdapter)(nil)
 
 type OCR3OnchainKeyringAdapter struct {
 	o ocrtypes.OnchainKeyring
@@ -33,6 +35,10 @@ func NewOCR3OnchainKeyringAdapter(o ocrtypes.OnchainKeyring) *OCR3OnchainKeyring
 
 func (k *OCR3OnchainKeyringAdapter) PublicKey() ocrtypes.OnchainPublicKey {
 	return k.o.PublicKey()
+}
+
+func (k *OCR3OnchainKeyringAdapter) Equal(key ocrtypes.OnchainPublicKey) bool {
+	return k.o.PublicKey().Equal(key)
 }
 
 func (k *OCR3OnchainKeyringAdapter) Sign(digest ocrtypes.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[[]byte]) (signature []byte, err error) {
@@ -186,7 +192,24 @@ func (a *OCR3OnchainKeyringMultiChainAdapter) PublicKey() ocrtypes.OnchainPublic
 }
 
 func (a *OCR3OnchainKeyringMultiChainAdapter) Equal(key ocrtypes.OnchainPublicKey) bool {
-	//TODO implement me
+	keys, err := UnmarshalMultichainPublicKey(key)
+	if err != nil {
+		a.lggr.Errorf("invalid onchain public key: %x", key)
+		return false
+	}
+
+	for family, kb := range a.keyBundles {
+		key2, ok := keys[family]
+		if !ok {
+			return false
+		}
+		a.lggr.Infof("local key: %x onchain key: %x", kb.PublicKey(), key2)
+
+		if !kb.PublicKey().Equal(key2) {
+			return false
+		}
+	}
+
 	return true
 }
 

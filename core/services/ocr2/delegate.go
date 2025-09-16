@@ -799,15 +799,15 @@ func (d *Delegate) newServicesVaultPlugin(
 			ocrtypes.Account(spec.TransmitterID.String),
 			requestStoreHandler,
 		),
-		Database:                ocrDB,
-		KeyValueDatabaseFactory: kvFactory,
-		LocalConfig:             lc,
-		Logger:                  ocrLogger,
-		MonitoringEndpoint:      oracleEndpoint,
-		OffchainConfigDigester:  provider.OffchainConfigDigester(),
-		OffchainKeyring:         kb,
-		OnchainKeyring:          onchainKeyringAdapter,
-		MetricsRegisterer:       prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
+		Database:                 ocrDB,
+		KeyValueDatabaseFactory:  kvFactory,
+		LocalConfig:              lc,
+		Logger:                   ocrLogger,
+		MonitoringEndpoint:       oracleEndpoint,
+		OffchainConfigDigester:   provider.OffchainConfigDigester(),
+		OffchainKeyring:          kb,
+		ComparableOnchainKeyring: onchainKeyringAdapter,
+		MetricsRegisterer:        prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 	workflowKey, err := keystore.GetDefault(ctx, d.workflowKs)
 	if err != nil {
@@ -891,7 +891,7 @@ func (d *Delegate) newDonTimePlugin(
 		return nil, err
 	}
 
-	var onchainKeyringAdapter ocr3types.OnchainKeyring[[]byte]
+	var onchainKeyringAdapter ocr3types.ComparableOnchainKeyring[[]byte]
 	if onchainSigningStrategy.IsMultiChain() {
 		// We are extracting the config beforehand
 		keyBundles := map[string]ocr2key.KeyBundle{}
@@ -925,7 +925,7 @@ func (d *Delegate) newDonTimePlugin(
 		MonitoringEndpoint:           oracleEndpoint,
 		OffchainConfigDigester:       provider.OffchainConfigDigester(),
 		OffchainKeyring:              kb,
-		OnchainKeyring:               onchainKeyringAdapter,
+		ComparableOnchainKeyring:     onchainKeyringAdapter,
 		MetricsRegisterer:            prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 	oracleArgs.ReportingPluginFactory, err = dontime.NewFactory(d.dontimeStore, lggr.Named("DonTimePluginFactory"))
@@ -938,9 +938,6 @@ func (d *Delegate) newDonTimePlugin(
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	srvs = append(srvs, job.NewServiceAdapter(oracle))
 	return srvs, nil
 }
@@ -1139,7 +1136,7 @@ func (d *Delegate) newServicesGenericPlugin(
 		if ocr3Provider, ok := provider.(types.OCR3ContractTransmitter); ok {
 			contractTransmitter = ocr3Provider.OCR3ContractTransmitter()
 		}
-		var onchainKeyringAdapter ocr3types.OnchainKeyring[[]byte]
+		var onchainKeyringAdapter ocr3types.ComparableOnchainKeyring[[]byte]
 		if onchainSigningStrategy.IsMultiChain() {
 			// We are extracting the config beforehand
 			keyBundles := map[string]ocr2key.KeyBundle{}
@@ -1172,7 +1169,7 @@ func (d *Delegate) newServicesGenericPlugin(
 			MonitoringEndpoint:           oracleEndpoint,
 			OffchainConfigDigester:       provider.OffchainConfigDigester(),
 			OffchainKeyring:              kb,
-			OnchainKeyring:               onchainKeyringAdapter,
+			ComparableOnchainKeyring:     onchainKeyringAdapter,
 			MetricsRegisterer:            prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 		}
 		oracleArgs.ReportingPluginFactory = plugin
