@@ -6,8 +6,8 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	linkops "github.com/smartcontractkit/chainlink-sui/ops/link"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
+	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
 	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"

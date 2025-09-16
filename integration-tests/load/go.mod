@@ -9,9 +9,9 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
-replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
+// replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 
 // replace github.com/smartcontractkit/chainlink-deployments-framework => ../../../chainlink-deployments-framework
 
@@ -39,10 +39,10 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250912150129-4e42c90b532e
-	github.com/smartcontractkit/chainlink-deployments-framework v0.44.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.47.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20250915101441-709f87f7d401
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.23
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.24
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.5
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
@@ -492,6 +492,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250908151016-bf310cf85379 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250910230900-fa42dad2d413 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250915151322-46a7be42bf43 // indirect
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20250915151322-46a7be42bf43 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/sentinel v0.1.2 // indirect

@@ -38,18 +38,19 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
 
+	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
+	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
-	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
-	aptosstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 
 	ccipChangeSetSolanaV0_1_0 "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana_v0_1_0"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -95,12 +96,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
-	solanastateview "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
-	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
-	"github.com/smartcontractkit/chainlink/deployment/common/changeset/state"
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
@@ -563,6 +558,102 @@ func SendRequest(
 	}
 }
 
+func handleTokenAndPoolDeploymentForSUI(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig, deps suideps.SuiDeps) (string, string, error) {
+	return "", "", nil
+	// evmChain := e.BlockChains.EVMChains()[cfg.DestChain]
+	// suiChains := e.BlockChains.SuiChains()
+	// suiChain := suiChains[cfg.SourceChain]
+
+	// // Deploy Transferrable TOKEN on ETH
+	// // EVM
+	// evmDeployerKey := evmChain.DeployerKey
+	// state, err := stateview.LoadOnchainState(e)
+	// if err != nil {
+	// 	return "", "", fmt.Errorf("failed load onstate chains %w", err)
+	// }
+
+	// tokenPoolAddress := state.SuiChains[cfg.SourceChain].TokenPoolAddress
+	// ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef
+	// linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress
+	// linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId
+	// linkTokenTreasuryCapId := state.SuiChains[cfg.SourceChain].LinkTokenTreasuryCapId
+	// CCIPPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress
+	// MCMsPackageId := state.SuiChains[cfg.SourceChain].MCMsAddress
+
+	// suiSigner, err := deps.SuiChain.Signer.GetAddress()
+	// if err != nil {
+	// 	return "", "", err
+	// }
+
+	// // Deploy transferrable token on EVM
+	// evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
+	// if err != nil {
+	// 	return "", "", fmt.Errorf("failed to deploy transfer token for evm chain %d: %w", cfg.DestChain, err)
+	// }
+
+	// err = attachTokenToTheRegistry(evmChain, state.MustGetEVMChainState(evmChain.Selector), evmDeployerKey, evmToken.Address(), evmPool.Address())
+	// if err != nil {
+	// 	return "", "", fmt.Errorf("failed to attach token to registry for evm %d: %w", cfg.DestChain, err)
+	// }
+
+	// // // // Deploy BurnMint TP on SUI
+	// deployBurnMintTp, err := operations.ExecuteSequence(e.OperationsBundle, burnminttokenpoolops.DeployAndInitBurnMintTokenPoolSequence, deps.SuiChain,
+	// 	burnminttokenpoolops.DeployAndInitBurnMintTokenPoolInput{
+	// 		BurnMintTokenPoolDeployInput: burnminttokenpoolops.BurnMintTokenPoolDeployInput{
+	// 			CCIPPackageId:          CCIPPackageId,
+	// 			CCIPTokenPoolPackageId: tokenPoolAddress,
+	// 			MCMSAddress:            MCMsPackageId,
+	// 			MCMSOwnerAddress:       suiSigner,
+	// 		},
+
+	// 		CoinObjectTypeArg:      linkTokenPkgId + "::link::LINK",
+	// 		CCIPObjectRefObjectId:  ccipObjectRefId,
+	// 		CoinMetadataObjectId:   linkTokenObjectMetadataId,
+	// 		TreasuryCapObjectId:    linkTokenTreasuryCapId,
+	// 		TokenPoolAdministrator: suiSigner,
+
+	// 		// apply dest chain updates
+	// 		RemoteChainSelectorsToRemove: []uint64{},
+	// 		RemoteChainSelectorsToAdd:    []uint64{909606746561742123},
+	// 		RemotePoolAddressesToAdd:     [][]string{{evmPool.Address().String()}},
+	// 		RemoteTokenAddressesToAdd: []string{
+	// 			evmToken.Address().String(),
+	// 		},
+
+	// 		// set chain rate limiter configs
+	// 		RemoteChainSelectors: []uint64{909606746561742123},
+	// 		OutboundIsEnableds:   []bool{false},
+	// 		OutboundCapacities:   []uint64{100000},
+	// 		OutboundRates:        []uint64{100},
+	// 		InboundIsEnableds:    []bool{false},
+	// 		InboundCapacities:    []uint64{100000},
+	// 		InboundRates:         []uint64{100},
+	// 	})
+	// if err != nil {
+	// 	return "", "", fmt.Errorf("failed to deploy LockRelaseTP for Sui chain %d: %w", cfg.SourceChain, err)
+	// }
+
+	// suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
+	// suiPoolBytes, _ := hex.DecodeString(deployBurnMintTp.Output.BurnMintTPPackageID)
+
+	// err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
+	// if err != nil {
+	// 	return "", "", fmt.Errorf("failed to add token to the counterparty %d: %w", cfg.DestChain, err)
+	// }
+
+	// err = grantMintBurnPermissions(e.Logger, e.BlockChains.EVMChains()[evmChain.Selector], evmToken, evmDeployerKey, evmPool.Address())
+	// if err != nil {
+	// 	return "", "", fmt.Errorf("failed to grant burnMint %d: %w", cfg.DestChain, err)
+	// }
+
+	// return deployBurnMintTp.Output.BurnMintTPPackageID, deployBurnMintTp.Output.Objects.StateObjectId, nil
+}
+
+// Helper function to convert a string to a string pointer
+func strPtr(s string) *string {
+	return &s
+}
+
 func SendRequestEVM(
 	e cldf.Environment,
 	state stateview.CCIPOnChainState,
@@ -608,6 +699,14 @@ func SendRequestEVM(
 		SequenceNumber: it.Event.SequenceNumber,
 		RawEvent:       it.Event,
 	}, nil
+}
+
+func SendRequestSui(
+	e cldf.Environment,
+	state stateview.CCIPOnChainState,
+	cfg *ccipclient.CCIPSendReqConfig,
+) (*ccipclient.AnyMsgSentEvent, error) {
+	return SendSuiRequestViaChainWriter(e, cfg)
 }
 
 func SendRequestSol(
@@ -962,7 +1061,7 @@ const SVMExtraArgsV1Tag = "0x1f3b3aba"
 // MakeEVMExtraArgsV2 creates the extra args for the EVM2Any message that is destined
 // for an EVM chain. The extra args contain the gas limit and allow out of order flag.
 func MakeEVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
-	extraArgs, err := ccipevm.SerializeClientGenericExtraArgsV2(msghasher_160.ClientGenericExtraArgsV2{
+	extraArgs, err := ccipevm.SerializeClientGenericExtraArgsV2(message_hasher.ClientGenericExtraArgsV2{
 		GasLimit:                 new(big.Int).SetUint64(gasLimit),
 		AllowOutOfOrderExecution: allowOOO,
 	})

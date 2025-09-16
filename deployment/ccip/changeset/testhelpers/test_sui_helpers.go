@@ -16,8 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
-	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	ccipops "github.com/smartcontractkit/chainlink-sui/ops/ccip"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader/indexer"
 	chainreader "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/reader"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter"
@@ -39,6 +39,20 @@ import (
 	crConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
+
+type SuiSendRequest struct {
+	Receiver      []byte
+	Data          []byte
+	ExtraArgs     []byte
+	FeeToken      string
+	FeeTokenStore string
+	TokenAmounts  []SuiTokenAmount
+}
+
+type SuiTokenAmount struct {
+	Token  string
+	Amount uint64
+}
 
 type suiCtx struct {
 	Deps                suideps.SuiDeps

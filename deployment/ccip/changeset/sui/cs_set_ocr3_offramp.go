@@ -8,8 +8,8 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
-	sui_ops "github.com/smartcontractkit/chainlink-sui/ops"
-	offrampops "github.com/smartcontractkit/chainlink-sui/ops/ccip_offramp"
+	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
+	offrampops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip_offramp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
@@ -110,6 +110,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
 			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
 			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
+			CCIPObjectRefId:  state.SuiChains[remoteSelector].CCIPObjectRef,
 			// commit plugin config
 			ConfigDigest:                   commitArgs.ConfigDigest[:],
 			OCRPluginType:                  commitArgs.OcrPluginType,
@@ -147,6 +148,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
 			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
 			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
+			CCIPObjectRefId:  state.SuiChains[remoteSelector].CCIPObjectRef,
 			// exec plugin config
 			ConfigDigest:                   execArgs.ConfigDigest[:],
 			OCRPluginType:                  execArgs.OcrPluginType,

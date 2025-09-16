@@ -3,6 +3,7 @@ package v1_6
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/Masterminds/semver/v3"
@@ -121,6 +122,7 @@ var (
 		shared.FeeQuoter,
 		fee_quoter.NewFeeQuoter,
 		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input []fee_quoter.FeeQuoterDestChainConfigArgs) (*types.Transaction, error) {
+			fmt.Println("FEEQUOTER ADDR: ", feeQuoter.Address())
 			return feeQuoter.ApplyDestChainConfigUpdates(opts, input)
 		},
 	)
@@ -133,6 +135,7 @@ var (
 		shared.FeeQuoter,
 		fee_quoter.NewFeeQuoter,
 		func(feeQuoter *fee_quoter.FeeQuoter, opts *bind.TransactOpts, input fee_quoter.InternalPriceUpdates) (*types.Transaction, error) {
+			fmt.Println("FEEQUOTER ADDR: ", feeQuoter.Address())
 			return feeQuoter.UpdatePrices(opts, input)
 		},
 	)

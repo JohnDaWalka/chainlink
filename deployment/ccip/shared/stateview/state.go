@@ -1001,7 +1001,7 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			}
 			state.FeeQuoter = fq
 			state.ABIByAddress[address] = fee_quoter.FeeQuoterABI
-		case cldf.NewTypeAndVersion(ccipshared.SuiSupportedFeeQuoter, deployment.Version1_6_3Dev).String():
+		case cldf.NewTypeAndVersion(ccipshared.FeeQuoter, deployment.Version1_6_3Dev).String():
 			fq, err := fee_quoter.NewFeeQuoter(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
