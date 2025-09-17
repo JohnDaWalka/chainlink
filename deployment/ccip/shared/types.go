@@ -88,6 +88,7 @@ var (
 	AptosRegulatedTokenPoolType deployment.ContractType = "AptosRegulatedTokenPool"
 	AptosManagedTokenType       deployment.ContractType = "AptosManagedTokenType"
 	AptosRegulatedTokenType     deployment.ContractType = "AptosRegulatedTokenType"
+	AptosTestTokenType          deployment.ContractType = "AptosTestToken"
 
 	SuiCCIPRouterType              deployment.ContractType = "SuiRouter"
 	SuiCCIPType                    deployment.ContractType = "SuiCCIP"
