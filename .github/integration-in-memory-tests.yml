@@ -591,6 +591,7 @@ runner-test-matrix:
     test_go_project_path: integration-tests
     aptos_cli_version: 7.8.1
     install_plugins_public: true
+    sui_cli_version: mainnet-v1.50.1
 
   # TON tests
   - id: smoke/ccip/ccip_ton_messaging_test.go:*
