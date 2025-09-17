@@ -82,7 +82,7 @@ jobs:
       contents: read
     needs: changes
     if: github.event_name == 'pull_request' && ( needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@bce906395e51c0e25c163216271dbdb3f23f465c # Not merged yet
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@5227338834d530ed83eee67a2278645f31e50215 # Not merged yet
     with:
       workflow_name: Run CCIP Integration Tests For PR
       chainlink_version: ${{ inputs.cl_ref || github.sha }}
