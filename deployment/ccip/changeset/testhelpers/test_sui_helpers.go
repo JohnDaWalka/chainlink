@@ -345,11 +345,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	}
 	keystoreInstance.AddKey(priv)
 
-<<<<<<< HEAD
 	relayerClient, err := client.NewPTBClient(e.Logger, suiChain.URL, nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
-=======
-	relayerClient, err := client.NewPTBClient(e.Logger, "https://testnet.sui.eu.endpoints.matrixed.link/?auth=CL-DNqCV86SzbDs2m", nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
->>>>>>> aa3a11c6d7 (working on feeToken rn)
 	if err != nil {
 		return &ccipclient.AnyMsgSentEvent{}, err
 	}
