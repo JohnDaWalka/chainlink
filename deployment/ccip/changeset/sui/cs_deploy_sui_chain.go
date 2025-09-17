@@ -51,7 +51,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				Client: suiChain.Client,
 				Signer: suiSigner,
 				GetCallOpts: func() *bind.CallOpts {
-					b := uint64(400_000_000)
+					b := uint64(500_000_000)
 					return &bind.CallOpts{
 						WaitForExecution: true,
 						GasBudget:        &b,
@@ -199,11 +199,13 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				DestChainAllowListEnabled: []bool{true},
 			},
 			ApplyDestChainConfigureOnRampInput: onrampops.ApplyDestChainConfigureOnRampInput{
+				CCIPObjectRefId:           ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
 				DestChainSelector:         []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
 				DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{false},
 			},
 			ApplyAllowListUpdatesInput: onrampops.ApplyAllowListUpdatesInput{
+				CCIPObjectRefId:               ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
 				DestChainSelector:             []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
 				DestChainAllowListEnabled:     []bool{false},
 				DestChainAddAllowedSenders:    [][]string{{}},
