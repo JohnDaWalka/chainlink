@@ -22,7 +22,7 @@ runs:
       shell: bash
       run: |
         curl -sSfL https://raw.githubusercontent.com/MystenLabs/suiup/main/install.sh | sh
-        "$HOME/.local/bin/suiup" install sui@${{ inputs.version }}
+        "$HOME/.local/bin/suiup" install sui@${{ inputs.version }} --yes
 
     - name: Export Sui CLI to PATH
       shell: bash
