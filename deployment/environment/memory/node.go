@@ -661,7 +661,7 @@ func CreateKeys(t *testing.T,
 
 		keybundles[ctype] = keybundle
 
-		for sel, _ := range suichains {
+		for sel, chain := range suichains {
 			keystore := app.GetKeyStore().Sui()
 			err = keystore.EnsureKey(ctx)
 			require.NoError(t, err, "failed to create key for sui")
@@ -674,8 +674,8 @@ func CreateKeys(t *testing.T,
 			transmitters[sel] = transmitter.ID()
 			t.Logf("Created Sui Key: ID %v, Account %v", transmitter.ID(), transmitter.Account())
 
-			// err = FundSuiAccount(chain.FaucetUrl, "0x"+transmitter.Account())
-			// require.NoError(t, err)
+			err = FundSuiAccount(chain.FaucetURL, "0x"+transmitter.Account())
+			require.NoError(t, err)
 
 		}
 	}

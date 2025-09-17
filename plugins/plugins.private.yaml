@@ -8,6 +8,10 @@ defaults:
   goflags: "-ldflags=-s"
 
 plugins:
+  sui:
+    - moduleURI: "github.com/smartcontractkit/chainlink-sui"
+      gitRef: "8293c116ce39f800134ad6fcce01a34150d4b9cd"
+      installPath: "github.com/smartcontractkit/chainlink-sui/relayer/cmd/chainlink-sui"
   cron:
     - moduleURI: "github.com/smartcontractkit/capabilities/cron"
       gitRef: "01573000e81f91ea8b6a2641d49e5d9e02f58ef2"

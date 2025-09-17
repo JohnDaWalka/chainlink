@@ -31,6 +31,7 @@ import (
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -238,10 +239,10 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	suiChains := e.BlockChains.SuiChains()
 	suiChain := suiChains[cfg.SourceChain]
 
-	// publicKeyBytes, err := cldf_sui.PublicKeyBytes(suiChain.Signer)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	publicKeyBytes, err := cldf_sui.PublicKeyBytes(suiChain.Signer)
+	if err != nil {
+		return nil, err
+	}
 
 	// keyString, err := suiChain.Signer.GetAddress()
 	// if err != nil {
@@ -338,11 +339,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 
 	// Setup new PTB client
 	keystoreInstance := suitestutils.NewTestKeystore(&testing.T{})
-	// priv, err := cldf_sui.PrivateKey(suiChain.Signer)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// keystoreInstance.AddKey(priv)
+	priv, err := cldf_sui.PrivateKey(suiChain.Signer)
+	if err != nil {
+		return nil, err
+	}
+	keystoreInstance.AddKey(priv)
 
 	relayerClient, err := client.NewPTBClient(e.Logger, suiChain.URL, nil, 30*time.Second, keystoreInstance, 5, "WaitForEffectsCert")
 	if err != nil {
@@ -365,9 +366,9 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 
 	var chainWriterConfig suicrcwconfig.ChainWriterConfig
 	if BurnMintTP != "" {
-		chainWriterConfig = configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, []byte{}, BurnMintTP)
+		chainWriterConfig = configureChainWriterForMultipleTokens(ccipPackageId, onRampPackageId, publicKeyBytes, BurnMintTP)
 	} else {
-		chainWriterConfig = configureChainWriterForMsg(ccipPackageId, onRampPackageId, []byte{}, linkTokenPkgId)
+		chainWriterConfig = configureChainWriterForMsg(ccipPackageId, onRampPackageId, publicKeyBytes, linkTokenPkgId)
 	}
 
 	chainWriter, err := chainwriter.NewSuiChainWriter(e.Logger, txManager, chainWriterConfig, false)

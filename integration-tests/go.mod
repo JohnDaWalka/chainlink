@@ -9,6 +9,8 @@ replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
 // replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
+// replace github.com/smartcontractkit/chainlink-sui/deployment => ../../chainlink-sui/deployment
+
 // replace github.com/smartcontractkit/chainlink-ccip => ../../chainlink-ccip
 
 // replace github.com/smartcontractkit/chainlink-deployments-framework => ../../chainlink-deployments-framework
@@ -57,12 +59,12 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250912150129-4e42c90b532e
-	github.com/smartcontractkit/chainlink-deployments-framework v0.47.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.48.3-0.20250917071359-6392161beb84
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20250915101441-709f87f7d401
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250827130336-5922343458be
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250917063046-eb57b8a67f9c
-	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20250915151322-46a7be42bf43
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250917071718-8293c116ce39
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20250917071718-8293c116ce39
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0
