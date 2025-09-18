@@ -964,7 +964,7 @@ func (cfg UpdateFeeQuoterDestsConfig) ToSequenceInput(state stateview.CCIPOnChai
 			i++
 		}
 		updates[chainSel] = opsutil.EVMCallInput[[]fee_quoter.FeeQuoterDestChainConfigArgs]{
-			Address:       state.Chains[chainSel].FeeQuoter.Address(),
+			Address:       common.HexToAddress("0x5fDC703aFc9A124E5B2e60d2f87E706DbE4c5F57"),
 			ChainSelector: chainSel,
 			CallInput:     args,
 			NoSend:        cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.
