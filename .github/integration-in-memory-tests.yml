@@ -615,7 +615,7 @@ runner-test-matrix:
       - Nightly Integration CCIP Tests
     test_cmd: go test ./smoke/ccip -run "Test_CCIPMessaging_Sui2EVM" -timeout 20m -test.parallel=1 -count=1 -json
     test_go_project_path: integration-tests
-    sui_cli_version: 1.54.2
+    sui_cli_version: mainnet-v1.54.2
     install_plugins_public: true
 
   - id: smoke/ccip/ccip_sui_source_messaging_test.go:Test_CCIPMessaging_EVM2Sui
@@ -627,7 +627,7 @@ runner-test-matrix:
       - Nightly Integration CCIP Tests
     test_cmd: go test ./smoke/ccip -run "Test_CCIPMessaging_EVM2Sui" -timeout 20m -test.parallel=1 -count=1 -json
     test_go_project_path: integration-tests
-    sui_cli_version: 1.54.2
+    sui_cli_version: mainnet-v1.54.2
     install_plugins_public: true
 
   # END: CCIP tests
