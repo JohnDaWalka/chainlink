@@ -5,13 +5,10 @@ import (
 	"math/big"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
-
-	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 
@@ -23,14 +20,12 @@ var (
 )
 
 const (
-	MaxSigners          = 20
-	BaseMainnetSelector = 15971525489660198786
-	BaseSepoliaSelector = 10344971235874465080
+	MaxSigners                 = 20
+	BaseMainnetSelector uint64 = 15971525489660198786
+	BaseSepoliaSelector uint64 = 10344971235874465080
 )
 
 type SignerRegistryChangesetConfig struct {
-	// MCMS defines the delay to use for Timelock (if absent, the changeset will attempt to use the deployer key).
-	MCMS *proposalutils.TimelockConfig
 	// MaxSigners is the maximum number of signers that can be registered.
 	MaxSigners uint32
 	// Signers is the initial set of signers to register.
@@ -75,37 +70,35 @@ func signerRegistryDeploymentPrecondition(env cldf.Environment, config SignerReg
 
 func signerRegistryDeploymentLogic(e cldf.Environment, config SignerRegistryChangesetConfig) (cldf.ChangesetOutput, error) {
 	addressBook := cldf.NewMemoryAddressBook()
-
-	for _, chain := range e.BlockChains.EVMChains() {
-		// Only deploy on Base Mainnet and Base Sepolia
-		if chain.ChainSelector() != BaseMainnetSelector && chain.ChainSelector() != BaseSepoliaSelector {
-			e.Logger.Infof("Skipping deployment on chain %s (selector: %d) - only deploying on Base chains", chain.String(), chain.ChainSelector())
-			continue
-		}
-		signerRegistry, err := cldf.DeployContract(e.Logger, chain, addressBook,
-			func(chain cldf_evm.Chain) cldf.ContractDeploy[*signer_registry.SignerRegistry] {
-				address, tx, signerRegistry, err := signer_registry.DeploySignerRegistry(
-					chain.DeployerKey,
-					chain.Client,
-					big.NewInt(int64(config.MaxSigners)),
-					config.Signers,
-				)
-
-				return cldf.ContractDeploy[*signer_registry.SignerRegistry]{
-					Address:  address,
-					Contract: signerRegistry,
-					Tx:       tx,
-					Tv:       cldf.NewTypeAndVersion(shared.EVMSignerRegistry, deployment.Version1_0_0),
-					Err:      err,
-				}
-			},
-		)
-		if err != nil {
-			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy signer registry: %w", err)
-		}
-
-		e.Logger.Infof("Successfully deployed signer registry %s on %s", signerRegistry.Address.String(), chain.String())
+	selector := BaseSepoliaSelector
+	if e.Name == "mainnet" {
+		selector = BaseMainnetSelector
 	}
+
+	chain := e.BlockChains.EVMChains()[selector]
+	signerRegistry, err := cldf.DeployContract(e.Logger, chain, addressBook,
+		func(chain cldf_evm.Chain) cldf.ContractDeploy[*signer_registry.SignerRegistry] {
+			address, tx, signerRegistry, err := signer_registry.DeploySignerRegistry(
+				chain.DeployerKey,
+				chain.Client,
+				big.NewInt(int64(config.MaxSigners)),
+				config.Signers,
+			)
+
+			return cldf.ContractDeploy[*signer_registry.SignerRegistry]{
+				Address:  address,
+				Contract: signerRegistry,
+				Tx:       tx,
+				Tv:       cldf.NewTypeAndVersion(shared.EVMSignerRegistry, deployment.Version1_0_0),
+				Err:      err,
+			}
+		},
+	)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy signer registry: %w", err)
+	}
+
+	e.Logger.Infof("Successfully deployed signer registry %s on %s", signerRegistry.Address.String(), chain.String())
 
 	return cldf.ChangesetOutput{AddressBook: addressBook}, nil
 }
