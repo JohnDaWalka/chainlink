@@ -155,12 +155,14 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		)
 	)
 
+	// random reciever for now
 	hexStr := "3f6d6a9e3f7707485bf51c02a6bc6cb6e17dffe7f3e160b3c5520d55d1de8398"
 
 	bytes, err := hex.DecodeString(hexStr)
 	if err != nil {
 		panic(err)
 	}
+
 	receiverByte := bytes
 
 	t.Run("Message to Sui", func(t *testing.T) {
@@ -173,6 +175,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 				ValidationType: messagingtest.ValidationTypeExec,
 				Receiver:       receiverByte,
 				MsgData:        message,
+				ExtraArgs:      testhelpers.MakeSuiExtraArgs(1000000, true),
 				// true for out of order execution, which is necessary and enforced for Aptos
 				// ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, true),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,

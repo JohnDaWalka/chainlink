@@ -22,7 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
@@ -851,8 +851,8 @@ func (cfg UpdateFeeQuoterPricesConfig) ToSequenceInput(state stateview.CCIPOnCha
 		}
 		updates[chainSel] = opsutil.EVMCallInput[fee_quoter.InternalPriceUpdates]{
 			ChainSelector: chainSel,
-			// Address:       state.Chains[chainSel].FeeQuoter.Address(),
-			Address: common.HexToAddress("0x5fDC703aFc9A124E5B2e60d2f87E706DbE4c5F57"),
+			Address:       state.Chains[chainSel].FeeQuoter.Address(),
+			// Address: common.HexToAddress("0x5fDC703aFc9A124E5B2e60d2f87E706DbE4c5F57"),
 			CallInput: fee_quoter.InternalPriceUpdates{
 				TokenPriceUpdates: tokenPriceUpdates,
 				GasPriceUpdates:   gasPriceUpdates,
@@ -964,7 +964,8 @@ func (cfg UpdateFeeQuoterDestsConfig) ToSequenceInput(state stateview.CCIPOnChai
 			i++
 		}
 		updates[chainSel] = opsutil.EVMCallInput[[]fee_quoter.FeeQuoterDestChainConfigArgs]{
-			Address:       common.HexToAddress("0x5fDC703aFc9A124E5B2e60d2f87E706DbE4c5F57"),
+			Address: state.Chains[chainSel].FeeQuoter.Address(),
+			// Address:       common.HexToAddress("0x5fDC703aFc9A124E5B2e60d2f87E706DbE4c5F57"),
 			ChainSelector: chainSel,
 			CallInput:     args,
 			NoSend:        cfg.MCMS != nil, // If MCMS exists, we do not want to send the transaction.

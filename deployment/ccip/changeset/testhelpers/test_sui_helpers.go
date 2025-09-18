@@ -9,9 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/scylladb/go-reflectx"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/pg"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -30,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-sui/relayer/txm"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 
 	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -550,4 +553,33 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		SequenceNumber: rawevent.SequenceNumber,
 		RawEvent:       rawevent,
 	}, nil
+}
+
+func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool) []byte {
+	var clockObj [32]byte
+	copy(clockObj[:], hexutil.MustDecode(
+		"0x0000000000000000000000000000000000000000000000000000000000000006",
+	))
+
+	var stateObj [32]byte
+	copy(stateObj[:], hexutil.MustDecode(
+		"0xffa55df38c762e3c4ac661af441d19da5bd2a1bfbe1d6329c24cc10b4bb119be", // reciever CCIPReceiverStateObjectId
+	))
+
+	recieverObjectIds := [][32]byte{clockObj, stateObj}
+
+	extraArgs, err := ccipevm.SerializeClientSUIExtraArgsV1(message_hasher.ClientSuiExtraArgsV1{
+		GasLimit:                 new(big.Int).SetUint64(gasLimit),
+		AllowOutOfOrderExecution: allowOOO,
+		TokenReceiver:            [32]byte{},
+		// TokenReceiver: [32]byte{255, 165, 93, 243, 140, 118, 46, 60,
+		// 	74, 198, 97, 175, 68, 29, 25, 218,
+		// 	91, 210, 161, 191, 190, 29, 99, 41,
+		// 	194, 76, 193, 11, 75, 177, 25, 190}, // ObjectID i.e. CCIPReceiverStateObjectId
+		ReceiverObjectIds: recieverObjectIds,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return extraArgs
 }

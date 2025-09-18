@@ -325,5 +325,9 @@ func SerializeClientSVMExtraArgsV1(data message_hasher.ClientSVMExtraArgsV1) ([]
 	return SerializeExtraArgs(svmExtraArgsV1Tag, "encodeSVMExtraArgsV1", data)
 }
 
+func SerializeClientSUIExtraArgsV1(data message_hasher.ClientSuiExtraArgsV1) ([]byte, error) {
+	return SerializeExtraArgs(suiVMExtraArgsV1Tag, "encodeSUIExtraArgsV1", data)
+}
+
 // Interface compliance check
 var _ cciptypes.MessageHasher = (*MessageHasherV1)(nil)
