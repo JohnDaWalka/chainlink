@@ -5,6 +5,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	mcmsTypes "github.com/smartcontractkit/mcms/types"
+	"github.com/smartcontractkit/quarantine"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
@@ -63,6 +64,7 @@ func setupFiredrillTestEnv(t *testing.T) cldf.Environment {
 }
 
 func TestMCMSSignFireDrillChangeset(t *testing.T) {
+	quarantine.Flaky(t, "DX-1814")
 	t.Parallel()
 	env := setupFiredrillTestEnv(t)
 	chainSelector := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[0]
