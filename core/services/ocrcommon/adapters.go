@@ -181,6 +181,28 @@ func NewOCR3OnchainKeyringMultiChainAdapter(ost map[string]ocr2key.KeyBundle, lg
 	return &OCR3OnchainKeyringMultiChainAdapter{ost, publicKey, lggr}, nil
 }
 
+func (a *OCR3OnchainKeyringMultiChainAdapter) Equal(key ocrtypes.OnchainPublicKey) bool {
+	keys, err := UnmarshalMultichainPublicKey(key)
+	if err != nil {
+		a.lggr.Errorf("invalid onchain public key: %x", key)
+		return false
+	}
+
+	for family, kb := range a.keyBundles {
+		key2, ok := keys[family]
+		if !ok {
+			return false
+		}
+		a.lggr.Infof("local key: %x onchain key: %x", kb.PublicKey(), key2)
+
+		if !kb.PublicKey().Equal(key2) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (a *OCR3OnchainKeyringMultiChainAdapter) PublicKey() ocrtypes.OnchainPublicKey {
 	return a.publicKey
 }
