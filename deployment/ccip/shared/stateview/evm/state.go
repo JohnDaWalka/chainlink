@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/burn_mint_with_external_minter_token_pool"
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/hybrid_with_external_minter_token_pool"
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/token_governor"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_with_lock_release_flag_token_pool"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/don_id_claimer"
@@ -118,6 +119,7 @@ type CCIPChainState struct {
 	BurnFromMintTokenPools                           map[shared.TokenSymbol]map[semver.Version]*burn_from_mint_token_pool.BurnFromMintTokenPool
 	BurnMintWithExternalMinterTokenPool              map[shared.TokenSymbol]map[semver.Version]*burn_mint_with_external_minter_token_pool.BurnMintWithExternalMinterTokenPool
 	HybridWithExternalMinterTokenPool                map[shared.TokenSymbol]map[semver.Version]*hybrid_with_external_minter_token_pool.HybridWithExternalMinterTokenPool
+	BurnMintWithLockReleaseFlagTokenPool             map[shared.TokenSymbol]map[semver.Version]*burn_mint_with_lock_release_flag_token_pool.BurnMintWithLockReleaseFlagTokenPool
 	// Newer versions of the USDCTokenPool use a message transmitter proxy
 	CCTPMessageTransmitterProxies map[semver.Version]*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy
 	USDCTokenPools                map[semver.Version]*usdc_token_pool.USDCTokenPool

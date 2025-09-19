@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/burn_mint_with_external_minter_token_pool"
 	"github.com/smartcontractkit/ccip-contract-examples/chains/evm/gobindings/generated/latest/hybrid_with_external_minter_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_with_lock_release_flag_token_pool"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -291,6 +292,12 @@ func deployTokenPool(
 				tokenPoolVersion = deployment.Version1_6_0
 				tpAddr, tx, _, err = hybrid_with_external_minter_token_pool.DeployHybridWithExternalMinterTokenPool(
 					chain.DeployerKey, chain.Client, poolConfig.TokenGovernor, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
+					poolConfig.AllowList, rmnProxy.Address(), router.Address(),
+				)
+			case shared.BurnMintWithLockReleaseFlag:
+				tokenPoolVersion = deployment.Version1_5_1
+				tpAddr, tx, _, err = burn_mint_with_lock_release_flag_token_pool.DeployBurnMintWithLockReleaseFlagTokenPool(
+					chain.DeployerKey, chain.Client, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
 					poolConfig.AllowList, rmnProxy.Address(), router.Address(),
 				)
 			}

@@ -252,6 +252,12 @@ func GetTokenPoolAddressFromSymbolTypeAndVersion(
 				return tokenPool.Address(), true
 			}
 		}
+	case shared.BurnMintWithLockReleaseFlagTokenPool:
+		if tokenPools, ok := chainState.BurnMintWithLockReleaseFlagTokenPool[symbol]; ok {
+			if tokenPool, ok := tokenPools[version]; ok {
+				return tokenPool.Address(), true
+			}
+		}
 	}
 
 	return utils.ZeroAddress, false
