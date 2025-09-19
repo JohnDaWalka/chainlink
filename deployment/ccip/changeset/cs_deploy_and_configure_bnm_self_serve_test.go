@@ -49,7 +49,7 @@ func TestDeployAndConfigureBnMHelperE2E(t *testing.T) {
 	}
 	output, err := changeset.DeployPrerequisitesChangeset(e, prereqCfg)
 	require.NoError(t, err)
-	err = e.ExistingAddresses.Merge(output.AddressBook) //nolint
+	err = e.ExistingAddresses.Merge(output.AddressBook) //nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
 	require.NoError(t, err)
 
 	state, err := stateview.LoadOnchainState(e)
@@ -104,9 +104,9 @@ func TestDeployAndConfigureBnMHelperE2E(t *testing.T) {
 	changesetOutput, err := changeset.DeployAndConfigureBnMSelfServe.Apply(e, cfg)
 	require.NoError(t, err)
 	require.NotNil(t, changesetOutput)
-	require.NotNil(t, changesetOutput.AddressBook) //nolint
+	require.NotNil(t, changesetOutput.AddressBook) //nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
 
-	chainAddresses, err := changesetOutput.AddressBook.AddressesForChain(chainSelector) //nolint
+	chainAddresses, err := changesetOutput.AddressBook.AddressesForChain(chainSelector) //nolint:staticcheck // Addressbook is deprecated, but we still use it for the time being
 	require.NoError(t, err)
 	require.NotEmpty(t, chainAddresses, "Should have deployed contracts on the chain")
 
