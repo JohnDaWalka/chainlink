@@ -49,7 +49,7 @@ func TestDeployAndConfigureBnMHelperE2E(t *testing.T) {
 	}
 	output, err := changeset.DeployPrerequisitesChangeset(e, prereqCfg)
 	require.NoError(t, err)
-	err = e.ExistingAddresses.Merge(output.AddressBook)
+	err = e.ExistingAddresses.Merge(output.AddressBook) //nolint
 	require.NoError(t, err)
 
 	state, err := stateview.LoadOnchainState(e)
@@ -104,9 +104,9 @@ func TestDeployAndConfigureBnMHelperE2E(t *testing.T) {
 	changesetOutput, err := changeset.DeployAndConfigureBnMSelfServe.Apply(e, cfg)
 	require.NoError(t, err)
 	require.NotNil(t, changesetOutput)
-	require.NotNil(t, changesetOutput.AddressBook)
+	require.NotNil(t, changesetOutput.AddressBook) //nolint
 
-	chainAddresses, err := changesetOutput.AddressBook.AddressesForChain(chainSelector)
+	chainAddresses, err := changesetOutput.AddressBook.AddressesForChain(chainSelector) //nolint
 	require.NoError(t, err)
 	require.NotEmpty(t, chainAddresses, "Should have deployed contracts on the chain")
 
@@ -147,5 +147,4 @@ func TestDeployAndConfigureBnMHelperE2E(t *testing.T) {
 	poolAddr, err := tokenAdminReg.GetPool(nil, bnmToken.Address())
 	require.NoError(t, err)
 	require.Equal(t, poolAddr, bnmTokenPoolAddr)
-
 }

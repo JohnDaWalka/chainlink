@@ -31,7 +31,6 @@ type DeployAndConfigureBnMSelfServeConfig struct {
 }
 
 func deployAndConfigureBnMSelfServeValidation(e cldf.Environment, cfg DeployAndConfigureBnMSelfServeConfig) error {
-
 	if err := cldf.IsValidChainSelector(cfg.Selector); err != nil {
 		return fmt.Errorf("invalid chain selector: %d - %w", cfg.Selector, err)
 	}
@@ -56,7 +55,7 @@ func deployAndConfigureBnMSelfServeValidation(e cldf.Environment, cfg DeployAndC
 		return fmt.Errorf("%d does not exist in state", cfg.Selector)
 	}
 
-	if registry_module_owner_custom := chainState.RegistryModules1_6; registry_module_owner_custom == nil {
+	if registryModuleOwnerCustom := chainState.RegistryModules1_6; registryModuleOwnerCustom == nil {
 		return fmt.Errorf("missing registry_module_owner_custom on %d", cfg.Selector)
 	}
 
@@ -83,7 +82,7 @@ func deployAndConfigureBnMSelfServeLogic(e cldf.Environment, cfg DeployAndConfig
 
 	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("Failed to load existing onchain state: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load existing onchain state: %w", err)
 	}
 	chain := e.BlockChains.EVMChains()[cfg.Selector]
 	chainState, chainExists := state.EVMChainState(cfg.Selector)
@@ -133,7 +132,7 @@ func deployAndConfigureBnMSelfServeLogic(e cldf.Environment, cfg DeployAndConfig
 
 	state, err = stateview.LoadOnchainState(e)
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("Failed to load existing onchain state: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load existing onchain state: %w", err)
 	}
 
 	chainState, _ = state.EVMChainState(cfg.Selector)
@@ -211,7 +210,7 @@ func deployTokenBnMHelperToken(e cldf.Environment, state stateview.CCIPOnChainSt
 				chain.DeployerKey,
 				chain.Client,
 				cfg.TokenName,
-				string(cfg.TokenSymbol),
+				cfg.TokenSymbol,
 			)
 
 			return cldf.ContractDeploy[*burn_mint_erc677_helper.BurnMintERC677Helper]{
