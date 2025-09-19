@@ -165,7 +165,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIP FeeQuoter CapId Id %s for Sui chain %d: %w", ccipSeqReport.Output.Objects.FeeQuoterCapObjectId, chainSel, err)
 		}
-
+		fmt.Println("SUI DEPLOYED CCIP PKG ID: ", ccipSeqReport.Output.CCIPPackageId)
 		// No need to store rn
 		// save CCIP TransferCapId address to the addressbook
 		// typeAndVersionTransferCapId := cldf.NewTypeAndVersion(shared.SuiCCIPTransferCapIdType, deployment.Version1_6_0)
