@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
@@ -18,10 +20,9 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/stretchr/testify/require"
 )
 
-func Test_CCIPMessaging_Sui2EVM(t *testing.T) {
+func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 	// ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(
 		t,

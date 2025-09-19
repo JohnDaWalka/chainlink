@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
@@ -13,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	testsetups "github.com/smartcontractkit/chainlink/integration-tests/testsetups/ccip"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
