@@ -294,7 +294,7 @@ func deployTokenPool(
 					chain.DeployerKey, chain.Client, poolConfig.TokenGovernor, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
 					poolConfig.AllowList, rmnProxy.Address(), router.Address(),
 				)
-			case shared.BurnMintWithLockReleaseFlag:
+			case shared.BurnMintWithLockReleaseFlagTokenPool:
 				tokenPoolVersion = deployment.Version1_5_1
 				tpAddr, tx, _, err = burn_mint_with_lock_release_flag_token_pool.DeployBurnMintWithLockReleaseFlagTokenPool(
 					chain.DeployerKey, chain.Client, poolConfig.TokenAddress, poolConfig.LocalTokenDecimals,
