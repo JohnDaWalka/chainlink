@@ -7,6 +7,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	chainSelectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/quarantine"
 	"github.com/stretchr/testify/require"
 
 	cldfSolana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
@@ -585,6 +586,7 @@ func doTestBilling(t *testing.T, mcms bool) {
 }
 
 func TestBillingWithMcms(t *testing.T) {
+	quarantine.Flaky(t, "DX-1723")
 	t.Parallel()
 	doTestBilling(t, true)
 }
