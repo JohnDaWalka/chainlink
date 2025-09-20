@@ -7,6 +7,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	chainSelectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/quarantine"
 	"github.com/stretchr/testify/require"
 
 	cldfSolana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
@@ -78,6 +79,7 @@ func deployTokenAndMint(t *testing.T, tenv cldf.Environment, solChain uint64, wa
 
 // remote chain setup
 func TestAddRemoteChainWithMcms(t *testing.T) {
+	quarantine.Flaky(t, "DX-1823")
 	t.Parallel()
 	doTestAddRemoteChain(t, true)
 }
