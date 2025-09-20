@@ -255,7 +255,7 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 					t,
 					srcChain,
 					e.BlockChains.SuiChains()[dstChain],
-					state.SuiChains[dstChain].CCIPAddress,
+					state.SuiChains[dstChain].OffRampAddress,
 					startBlock,
 					expectedSeqNum,
 					true,
@@ -383,7 +383,7 @@ func ConfirmMultipleCommits(
 					t,
 					srcChain,
 					env.BlockChains.SuiChains()[destChain],
-					state.SuiChains[destChain].CCIPAddress,
+					state.SuiChains[destChain].OffRampAddress,
 					startBlocks[destChain],
 					seqRange,
 					enforceSingleCommit,
@@ -1276,6 +1276,7 @@ func SuiEventEmitter[T any](
 	errChan := make(chan error)
 	limit := uint64(50)
 
+	fmt.Println("SUI EVENTS EMITTER")
 	go func() {
 		ticker := time.NewTicker(time.Second * 2)
 		defer ticker.Stop()
@@ -1288,14 +1289,12 @@ func SuiEventEmitter[T any](
 					return
 				default:
 				}
+				eventFilter := models.EventFilterByMoveEventType{
+					MoveEventType: fmt.Sprintf("%s::%s::%s", packageId, moduleName, event),
+				}
+
 				events, err := client.SuiXQueryEvents(t.Context(), models.SuiXQueryEventsRequest{
-					SuiEventFilter: models.EventFilterByMoveEventModule{
-						MoveEventModule: models.MoveEventModule{
-							Package: packageId,
-							Module:  moduleName,
-							Event:   event,
-						},
-					},
+					SuiEventFilter:  eventFilter,
 					Limit:           limit,
 					DescendingOrder: false,
 				})
@@ -1303,6 +1302,8 @@ func SuiEventEmitter[T any](
 					errChan <- err
 					return
 				}
+
+				fmt.Println("SUI EVENTS: ", events)
 
 				if len(events.Data) == 0 {
 					// No new events found
@@ -1355,6 +1356,7 @@ func ConfirmCommitWithExpectedSeqNumRangeSui(
 	boundOffRamp, err := sui_ccip_offramp.NewOfframp(offRampAddress, dest.Client)
 	require.NoError(t, err)
 
+	fmt.Println("SUI COMMIT REPORT TRACKING", boundOffRamp.Address())
 	done := make(chan any)
 	defer close(done)
 	sink, errChan := SuiEventEmitter[sui_module_offramp.CommitReportAccepted](t, dest.Client, boundOffRamp.Address(), "offramp", "CommitReportAccepted", done)
