@@ -59,6 +59,7 @@ var (
 	BurnMintWithExternalMinterTokenPool             deployment.ContractType = "BurnMintWithExternalMinterTokenPool"
 	HybridWithExternalMinterTokenPool               deployment.ContractType = "HybridWithExternalMinterTokenPool"
 	BurnMintWithLockReleaseFlagTokenPool            deployment.ContractType = "BurnMintWithLockReleaseFlagTokenPool"
+	SiloedLockReleaseTokenPool                      deployment.ContractType = "SiloedLockReleaseTokenPool"
 
 	// Firedrill
 	FiredrillEntrypointType deployment.ContractType = "FiredrillEntrypoint"
