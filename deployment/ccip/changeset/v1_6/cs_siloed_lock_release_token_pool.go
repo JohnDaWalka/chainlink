@@ -6,8 +6,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/siloed_lock_release_token_pool"
+
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/deployergroup"
@@ -64,11 +67,7 @@ func validateSiloedLockReleaseTokenPool(e cldf.Environment, state stateview.CCIP
 		return fmt.Errorf("failed to get token address from pool with address %s: %w", pool.Address(), err)
 	}
 
-	if err := validateTokenSymbol(e.GetContext(), chain, tokenAddress, token); err != nil {
-		return err
-	}
-
-	return nil
+	return validateTokenSymbol(e.GetContext(), chain, tokenAddress, token)
 }
 
 func (c SiloedLockReleaseTokenPoolUpdateDesignationsChangesetConfig) Validate(e cldf.Environment) error {
@@ -89,7 +88,7 @@ func (c SiloedLockReleaseTokenPoolUpdateDesignationsChangesetConfig) Validate(e 
 			for _, remoteChainSelector := range designationConfig.Removes {
 				remoteChain, ok := e.BlockChains.EVMChains()[remoteChainSelector]
 				if !ok {
-					return fmt.Errorf("chain with selector %d does not exist in environment", remoteChain)
+					return fmt.Errorf("chain with selector %d does not exist in environment", remoteChainSelector)
 				}
 
 				isSiloed, err := pool.IsSiloed(&bind.CallOpts{Context: e.GetContext()}, remoteChainSelector)
@@ -105,7 +104,7 @@ func (c SiloedLockReleaseTokenPoolUpdateDesignationsChangesetConfig) Validate(e 
 			for _, add := range designationConfig.Adds {
 				remoteChain, ok := e.BlockChains.EVMChains()[add.RemoteChainSelector]
 				if !ok {
-					return fmt.Errorf("chain with selector %d does not exist in environment", remoteChain)
+					return fmt.Errorf("chain with selector %d does not exist in environment", add.RemoteChainSelector)
 				}
 
 				isSiloed, err := pool.IsSiloed(&bind.CallOpts{Context: e.GetContext()}, add.RemoteChainSelector)
@@ -186,7 +185,7 @@ func SiloedLockReleaseTokenPoolUpdateDesignations(e cldf.Environment, c SiloedLo
 
 		chainState, _ := state.EVMChainState(chainSelector)
 		for token, designationConfig := range tokens {
-			pool, _ := chainState.SiloedLockReleaseTokenPool[token][deployment.Version1_6_0]
+			pool := chainState.SiloedLockReleaseTokenPool[token][deployment.Version1_6_0]
 
 			if _, err := pool.UpdateSiloDesignations(opts, designationConfig.Removes, designationConfig.Adds); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to update designations for token %s on chain with selector %d: %w", token, chainSelector, err)
@@ -214,7 +213,7 @@ func SiloedLockReleaseTokenPoolSetRebalancer(e cldf.Environment, c SiloedLockRel
 
 		chainState, _ := state.EVMChainState(chainSelector)
 		for token, newRebalancer := range tokens {
-			pool, _ := chainState.SiloedLockReleaseTokenPool[token][deployment.Version1_6_0]
+			pool := chainState.SiloedLockReleaseTokenPool[token][deployment.Version1_6_0]
 
 			if _, err := pool.SetRebalancer(opts, newRebalancer); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to set rebalancer for token %s on chain with selector %d: %w", token, chainSelector, err)
