@@ -120,8 +120,8 @@ type CCIPChainState struct {
 	BurnFromMintTokenPools                           map[shared.TokenSymbol]map[semver.Version]*burn_from_mint_token_pool.BurnFromMintTokenPool
 	BurnMintWithExternalMinterTokenPool              map[shared.TokenSymbol]map[semver.Version]*burn_mint_with_external_minter_token_pool.BurnMintWithExternalMinterTokenPool
 	HybridWithExternalMinterTokenPool                map[shared.TokenSymbol]map[semver.Version]*hybrid_with_external_minter_token_pool.HybridWithExternalMinterTokenPool
-	BurnMintWithLockReleaseFlagTokenPool             map[shared.TokenSymbol]map[semver.Version]*burn_mint_with_lock_release_flag_token_pool.BurnMintWithLockReleaseFlagTokenPool
-	SiloedLockReleaseTokenPool                       map[shared.TokenSymbol]map[semver.Version]*siloed_lock_release_token_pool.SiloedLockReleaseTokenPool
+	BurnMintWithLockReleaseFlagTokenPools            map[shared.TokenSymbol]map[semver.Version]*burn_mint_with_lock_release_flag_token_pool.BurnMintWithLockReleaseFlagTokenPool
+	SiloedLockReleaseTokenPools                      map[shared.TokenSymbol]map[semver.Version]*siloed_lock_release_token_pool.SiloedLockReleaseTokenPool
 	// Newer versions of the USDCTokenPool use a message transmitter proxy
 	CCTPMessageTransmitterProxies map[semver.Version]*cctp_message_transmitter_proxy.CCTPMessageTransmitterProxy
 	USDCTokenPools                map[semver.Version]*usdc_token_pool.USDCTokenPool

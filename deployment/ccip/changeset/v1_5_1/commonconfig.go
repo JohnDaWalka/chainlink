@@ -40,12 +40,12 @@ func (c TokenAdminRegistryChangesetConfig) Validate(
 	env cldf.Environment,
 	mustBeOwner bool,
 	registryConfigCheck func(
-		config token_admin_registry.TokenAdminRegistryTokenConfig,
-		sender common.Address,
-		externalAdmin common.Address,
-		symbol shared.TokenSymbol,
-		chain cldf_evm.Chain,
-	) error,
+	config token_admin_registry.TokenAdminRegistryTokenConfig,
+	sender common.Address,
+	externalAdmin common.Address,
+	symbol shared.TokenSymbol,
+	chain cldf_evm.Chain,
+) error,
 ) error {
 	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
@@ -253,7 +253,13 @@ func GetTokenPoolAddressFromSymbolTypeAndVersion(
 			}
 		}
 	case shared.BurnMintWithLockReleaseFlagTokenPool:
-		if tokenPools, ok := chainState.BurnMintWithLockReleaseFlagTokenPool[symbol]; ok {
+		if tokenPools, ok := chainState.BurnMintWithLockReleaseFlagTokenPools[symbol]; ok {
+			if tokenPool, ok := tokenPools[version]; ok {
+				return tokenPool.Address(), true
+			}
+		}
+	case shared.SiloedLockReleaseTokenPool:
+		if tokenPools, ok := chainState.SiloedLockReleaseTokenPools[symbol]; ok {
 			if tokenPool, ok := tokenPools[version]; ok {
 				return tokenPool.Address(), true
 			}

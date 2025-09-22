@@ -1367,7 +1367,7 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", addr, err)
 			}
-			state.BurnMintWithLockReleaseFlagTokenPool = helpers.AddValueToNestedMap(state.BurnMintWithLockReleaseFlagTokenPool, metadata.Symbol, metadata.Version, pool)
+			state.BurnMintWithLockReleaseFlagTokenPools = helpers.AddValueToNestedMap(state.BurnMintWithLockReleaseFlagTokenPools, metadata.Symbol, metadata.Version, pool)
 			state.ABIByAddress[address] = burn_mint_with_lock_release_flag_token_pool.BurnMintWithLockReleaseFlagTokenPoolABI
 		case cldf.NewTypeAndVersion(ccipshared.SiloedLockReleaseTokenPool, deployment.Version1_5_1).String():
 			addr := common.HexToAddress(address)
@@ -1375,7 +1375,7 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			if err != nil {
 				return state, fmt.Errorf("failed to connect address %s with token pool bindings and get token symbol: %w", addr, err)
 			}
-			state.SiloedLockReleaseTokenPool = helpers.AddValueToNestedMap(state.SiloedLockReleaseTokenPool, metadata.Symbol, metadata.Version, pool)
+			state.SiloedLockReleaseTokenPools = helpers.AddValueToNestedMap(state.SiloedLockReleaseTokenPools, metadata.Symbol, metadata.Version, pool)
 			state.ABIByAddress[address] = siloed_lock_release_token_pool.SiloedLockReleaseTokenPoolABI
 		default:
 			// ManyChainMultiSig 1.0.0 can have any of these labels, it can have either 1,2 or 3 of these -
