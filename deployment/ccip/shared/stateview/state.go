@@ -73,7 +73,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_0/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
@@ -86,6 +85,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/rmn_remote"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/siloed_lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/burn_mint_with_lock_release_flag_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/cctp_message_transmitter_proxy"
 	usdc_token_pool_v1_6_2 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_2/usdc_token_pool"
 	capabilities_registry "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -1361,7 +1361,7 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 
 			state.SignerRegistry = signerRegistry
 			state.ABIByAddress[address] = signer_registry.SignerRegistryABI
-		case cldf.NewTypeAndVersion(ccipshared.BurnMintWithLockReleaseFlagTokenPool, deployment.Version1_5_1).String():
+		case cldf.NewTypeAndVersion(ccipshared.BurnMintWithLockReleaseFlagTokenPool, deployment.Version1_6_1).String():
 			addr := common.HexToAddress(address)
 			pool, metadata, err := ccipshared.NewTokenPoolWithMetadata(ctx, burn_mint_with_lock_release_flag_token_pool.NewBurnMintWithLockReleaseFlagTokenPool, addr, chain.Client)
 			if err != nil {
