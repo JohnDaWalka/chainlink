@@ -1,15 +1,12 @@
 package v1_6_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink/deployment"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -25,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
-func deployTokenAndPoolPrerequisites(
+/* func deployTokenAndPoolPrerequisites(
 	t *testing.T,
 	e cldf.Environment,
 	chain cldf_evm.Chain,
@@ -75,7 +72,7 @@ func deployTokenAndPoolPrerequisites(
 	)
 	require.NoError(t, err)
 	return e
-}
+} */
 
 /*
 func TestSiloedLockReleaseTokenPoolUpdateDesignations(t *testing.T) {
