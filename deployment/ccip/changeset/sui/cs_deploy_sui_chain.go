@@ -5,7 +5,6 @@ import (
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
@@ -62,7 +61,7 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 		}
 
 		// Deploy MCMS
-		mcmsSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, mcmsops.DeployMCMSSequence, deps.SuiChain, cld_ops.EmptyInput{})
+		mcmsSeqReport, err := operations.ExecuteSequence(e.OperationsBundle, mcmsops.DeployMCMSSequence, deps.SuiChain, mcmsops.DeployMCMSSeqInput{})
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy CCIP for Sui chain %d: %w", chainSel, err)
 		}
@@ -189,19 +188,19 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				MCMSOwnerPackageId: signerAddr,
 			},
 			OnRampInitializeInput: onrampops.OnRampInitializeInput{
-				NonceManagerCapId:         ccipSeqReport.Output.Objects.NonceManagerCapObjectId,   // this is from NonceManager init Op
-				SourceTransferCapId:       ccipSeqReport.Output.Objects.SourceTransferCapObjectId, // this is from CCIP package publish
-				ChainSelector:             suiChain.Selector,
-				FeeAggregator:             signerAddr,
-				AllowListAdmin:            signerAddr,
-				DestChainSelectors:        []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector}, // TODOD add this in input instead of hardcoding
-				DestChainEnabled:          []bool{true},
+				NonceManagerCapId:   ccipSeqReport.Output.Objects.NonceManagerCapObjectId,   // this is from NonceManager init Op
+				SourceTransferCapId: ccipSeqReport.Output.Objects.SourceTransferCapObjectId, // this is from CCIP package publish
+				ChainSelector:       suiChain.Selector,
+				FeeAggregator:       signerAddr,
+				AllowListAdmin:      signerAddr,
+				DestChainSelectors:  []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector}, // TODOD add this in input instead of hardcoding
+				// DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{true},
 			},
 			ApplyDestChainConfigureOnRampInput: onrampops.ApplyDestChainConfigureOnRampInput{
-				CCIPObjectRefId:           ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
-				DestChainSelector:         []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
-				DestChainEnabled:          []bool{true},
+				CCIPObjectRefId:   ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
+				DestChainSelector: []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
+				// DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{false},
 			},
 			ApplyAllowListUpdatesInput: onrampops.ApplyAllowListUpdatesInput{

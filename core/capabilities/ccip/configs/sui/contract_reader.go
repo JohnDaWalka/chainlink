@@ -365,7 +365,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
-						ResultTupleToStruct: []string{"isEnabled", "sequenceNumber", "allowListEnabled", "allowedSenders"},
+						ResultTupleToStruct: []string{"sequenceNumber", "allowListEnabled", "router"},
 					},
 					"GetExpectedNextSequenceNumber": {
 						Name:          "get_expected_next_sequence_number",
