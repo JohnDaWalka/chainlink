@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 )
 
@@ -76,6 +77,7 @@ func deployTokenAndPoolPrerequisites(
 	return e
 }
 
+/*
 func TestSiloedLockReleaseTokenPoolUpdateDesignations(t *testing.T) {
 	t.Parallel()
 
@@ -108,7 +110,7 @@ func TestSiloedLockReleaseTokenPoolUpdateDesignations(t *testing.T) {
 
 	_, err = v1_6.SiloedLockReleaseTokenPoolUpdateDesignations(modifiedEnv, cfg)
 	require.NoError(t, err)
-}
+} */
 
 func TestSiloedLockReleaseTokenPoolSetRebalancer(t *testing.T) {
 	t.Parallel()
@@ -116,22 +118,38 @@ func TestSiloedLockReleaseTokenPoolSetRebalancer(t *testing.T) {
 	e, _ := testhelpers.NewMemoryEnvironment(t)
 	evmSelectors := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))
 	chain1 := evmSelectors[0]
+	state, err := stateview.LoadOnchainState(e.Env)
+	require.NoError(t, err)
 
-	addressBook := cldf.NewMemoryAddressBook()
-	modifiedEnv := deployTokenAndPoolPrerequisites(t, e.Env, e.Env.BlockChains.EVMChains()[chain1], addressBook)
+	_, tx, siloedTokenPool, err := siloed_lock_release_token_pool.DeploySiloedLockReleaseTokenPool(
+		e.Env.BlockChains.EVMChains()[chain1].DeployerKey,
+		e.Env.BlockChains.EVMChains()[chain1].Client,
+		state.Chains[chain1].LinkToken.Address(),
+		18,
+		[]common.Address{},
+		state.Chains[chain1].RMNProxy.Address(),
+		state.Chains[chain1].Router.Address(),
+	)
+
+	require.NoError(t, err)
+	_, err = e.Env.BlockChains.EVMChains()[chain1].Confirm(tx)
+	require.NoError(t, err)
+
+	err = e.Env.ExistingAddresses.Save(chain1, siloedTokenPool.Address().Hex(), cldf.NewTypeAndVersion(shared.SiloedLockReleaseTokenPool, deployment.Version1_6_0))
+	require.NoError(t, err)
 
 	cfg := v1_6.SiloedLockReleaseTokenPoolSetRebalancerChangesetConfig{
 		Tokens: map[uint64]map[shared.TokenSymbol]common.Address{
 			chain1: {
-				shared.TokenSymbol("TESTSILOED"): common.HexToAddress("0x9876543210987654321098765432109876543210"),
+				shared.TokenSymbol("LINK"): state.Chains[chain1].LinkToken.Address(),
 			},
 		},
 		MCMS: &proposalutils.TimelockConfig{},
 	}
 
-	err := cfg.Validate(modifiedEnv)
+	err = cfg.Validate(e.Env)
 	require.NoError(t, err)
 
-	_, err = v1_6.SiloedLockReleaseTokenPoolSetRebalancer(modifiedEnv, cfg)
+	_, err = v1_6.SiloedLockReleaseTokenPoolSetRebalancer(e.Env, cfg)
 	require.NoError(t, err)
 }

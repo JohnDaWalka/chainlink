@@ -1369,7 +1369,7 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			}
 			state.BurnMintWithLockReleaseFlagTokenPools = helpers.AddValueToNestedMap(state.BurnMintWithLockReleaseFlagTokenPools, metadata.Symbol, metadata.Version, pool)
 			state.ABIByAddress[address] = burn_mint_with_lock_release_flag_token_pool.BurnMintWithLockReleaseFlagTokenPoolABI
-		case cldf.NewTypeAndVersion(ccipshared.SiloedLockReleaseTokenPool, deployment.Version1_5_1).String():
+		case cldf.NewTypeAndVersion(ccipshared.SiloedLockReleaseTokenPool, deployment.Version1_6_0).String():
 			addr := common.HexToAddress(address)
 			pool, metadata, err := ccipshared.NewTokenPoolWithMetadata(ctx, siloed_lock_release_token_pool.NewSiloedLockReleaseTokenPool, addr, chain.Client)
 			if err != nil {
