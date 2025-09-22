@@ -40,12 +40,12 @@ func (c TokenAdminRegistryChangesetConfig) Validate(
 	env cldf.Environment,
 	mustBeOwner bool,
 	registryConfigCheck func(
-	config token_admin_registry.TokenAdminRegistryTokenConfig,
-	sender common.Address,
-	externalAdmin common.Address,
-	symbol shared.TokenSymbol,
-	chain cldf_evm.Chain,
-) error,
+		config token_admin_registry.TokenAdminRegistryTokenConfig,
+		sender common.Address,
+		externalAdmin common.Address,
+		symbol shared.TokenSymbol,
+		chain cldf_evm.Chain,
+	) error,
 ) error {
 	state, err := stateview.LoadOnchainState(env)
 	if err != nil {
