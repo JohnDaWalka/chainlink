@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
@@ -27,14 +26,11 @@ import (
 
 func deployTokenAndPoolPrerequisites(
 	t *testing.T,
-	logger logger.Logger,
+	e cldf.Environment,
 	chain cldf_evm.Chain,
 	addressBook cldf.AddressBook,
-) (
-	*cldf.ContractDeploy[*burn_mint_erc20.BurnMintERC20],
-	*cldf.ContractDeploy[*siloed_lock_release_token_pool.SiloedLockReleaseTokenPool],
-) {
-	siloedToken, err := cldf.DeployContract(logger, chain, addressBook,
+) cldf.Environment {
+	siloedToken, err := cldf.DeployContract(e.Logger, chain, addressBook,
 		func(chain cldf_evm.Chain) cldf.ContractDeploy[*burn_mint_erc20.BurnMintERC20] {
 			tokenAddress, tx, token, err := burn_mint_erc20.DeployBurnMintERC20(
 				chain.DeployerKey,
@@ -56,7 +52,7 @@ func deployTokenAndPoolPrerequisites(
 	)
 	require.NoError(t, err)
 
-	siloedPool, err := cldf.DeployContract(logger, chain, addressBook,
+	_, err = cldf.DeployContract(e.Logger, chain, addressBook,
 		func(chain cldf_evm.Chain) cldf.ContractDeploy[*siloed_lock_release_token_pool.SiloedLockReleaseTokenPool] {
 			poolAddress, tx, token, err := siloed_lock_release_token_pool.DeploySiloedLockReleaseTokenPool(
 				chain.DeployerKey,
@@ -77,8 +73,7 @@ func deployTokenAndPoolPrerequisites(
 		},
 	)
 	require.NoError(t, err)
-
-	return siloedToken, siloedPool
+	return e
 }
 
 func TestSiloedLockReleaseTokenPoolUpdateDesignations(t *testing.T) {
@@ -89,7 +84,7 @@ func TestSiloedLockReleaseTokenPoolUpdateDesignations(t *testing.T) {
 	chain1, chain2 := evmSelectors[0], evmSelectors[1]
 
 	addressBook := cldf.NewMemoryAddressBook()
-	deployTokenAndPoolPrerequisites(t, logger.Test(t), e.Env.BlockChains.EVMChains()[chain1], addressBook)
+	modifiedEnv := deployTokenAndPoolPrerequisites(t, e.Env, e.Env.BlockChains.EVMChains()[chain1], addressBook)
 
 	cfg := v1_6.SiloedLockReleaseTokenPoolUpdateDesignationsChangesetConfig{
 		Tokens: map[uint64]map[shared.TokenSymbol]v1_6.SiloedLockReleaseTokenPoolUpdateDesignationsConfig{
@@ -108,10 +103,10 @@ func TestSiloedLockReleaseTokenPoolUpdateDesignations(t *testing.T) {
 		MCMS: &proposalutils.TimelockConfig{},
 	}
 
-	err := cfg.Validate(e.Env)
+	err := cfg.Validate(modifiedEnv)
 	require.NoError(t, err)
 
-	_, err = v1_6.SiloedLockReleaseTokenPoolUpdateDesignations(e.Env, cfg)
+	_, err = v1_6.SiloedLockReleaseTokenPoolUpdateDesignations(modifiedEnv, cfg)
 	require.NoError(t, err)
 }
 
@@ -123,7 +118,7 @@ func TestSiloedLockReleaseTokenPoolSetRebalancer(t *testing.T) {
 	chain1 := evmSelectors[0]
 
 	addressBook := cldf.NewMemoryAddressBook()
-	deployTokenAndPoolPrerequisites(t, logger.Test(t), e.Env.BlockChains.EVMChains()[chain1], addressBook)
+	modifiedEnv := deployTokenAndPoolPrerequisites(t, e.Env, e.Env.BlockChains.EVMChains()[chain1], addressBook)
 
 	cfg := v1_6.SiloedLockReleaseTokenPoolSetRebalancerChangesetConfig{
 		Tokens: map[uint64]map[shared.TokenSymbol]common.Address{
@@ -134,9 +129,9 @@ func TestSiloedLockReleaseTokenPoolSetRebalancer(t *testing.T) {
 		MCMS: &proposalutils.TimelockConfig{},
 	}
 
-	err := cfg.Validate(e.Env)
+	err := cfg.Validate(modifiedEnv)
 	require.NoError(t, err)
 
-	_, err = v1_6.SiloedLockReleaseTokenPoolSetRebalancer(e.Env, cfg)
+	_, err = v1_6.SiloedLockReleaseTokenPoolSetRebalancer(modifiedEnv, cfg)
 	require.NoError(t, err)
 }
