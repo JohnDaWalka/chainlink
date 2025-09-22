@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
+	"github.com/smartcontractkit/quarantine"
 
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
@@ -23,6 +24,7 @@ import (
 )
 
 func TestHomeChainReader_ChainConfigs(t *testing.T) {
+	quarantine.Flaky(t, "DX-1829")
 	ctx := testutils.Context(t)
 	lggr := logger.Test(t)
 	uni := integrationhelpers.NewTestUniverse(ctx, t, lggr)
