@@ -63,13 +63,17 @@ func SetupTestEnvironmentWithConfig(t *testing.T, tconf *TestConfig, flags ...st
 func getDefaultTestConfig(t *testing.T) *TestConfig {
 	t.Helper()
 
+	return getTestConfig(t, "/configs/workflow-don.toml")
+}
+
+func getTestConfig(t *testing.T, configPath string) *TestConfig {
 	relativePathToRepoRoot := "../../../../"
 	environmentDirPath := filepath.Join(relativePathToRepoRoot, "core/scripts/cre/environment")
 
 	return &TestConfig{
 		RelativePathToRepoRoot: relativePathToRepoRoot,
 		EnvironmentDirPath:     environmentDirPath,
-		EnvironmentConfigPath:  filepath.Join(environmentDirPath, "/configs/workflow-don.toml"), // change to your desired config, if you want to use another topology
+		EnvironmentConfigPath:  filepath.Join(environmentDirPath, configPath), // change to your desired config, if you want to use another topology
 		EnvironmentStateFile:   filepath.Join(environmentDirPath, envconfig.StateDirname, envconfig.LocalCREStateFilename),
 	}
 }

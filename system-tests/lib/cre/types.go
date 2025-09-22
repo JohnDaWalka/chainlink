@@ -413,6 +413,7 @@ type ConfigureKeystoneInput struct {
 	CldEnv                      *cldf.Environment
 	NodeSets                    []*CapabilitiesAwareNodeSet
 	CapabilityRegistryConfigFns []CapabilityRegistryConfigFn
+	BlockchainOutputs           []*WrappedBlockchainOutput
 
 	OCR3Config  keystone_changeset.OracleConfig
 	OCR3Address *common.Address // v1 consensus contract address

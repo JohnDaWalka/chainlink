@@ -40,20 +40,21 @@ import (
 	evmread_config "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evm/evmread/config"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	portypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/types"
+	crontypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v2/cron/types"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
+	environment "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	creworkflow "github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
 	crecrypto "github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 	crefunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
-
-	portypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/cron-based/types"
-	crontypes "github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v2/cron/types"
 )
 
 /////////////////////////
@@ -254,9 +255,7 @@ func drainChannels(messageChan <-chan proto.Message, kafkaErrChan <-chan error) 
 //////////////////////////////
 
 // Creates and funds a specified number of new Ethereum addresses on a given chain.
-func createAndFundAddresses(t *testing.T, testLogger zerolog.Logger, numberOfAddressesToCreate int, amountToFund *big.Int, sethClient *seth.Client) ([]common.Address, error) {
-	t.Helper()
-
+func createAndFundAddresses(t *testing.T, testLogger zerolog.Logger, numberOfAddressesToCreate int, amountToFund *big.Int, sethClient *seth.Client, bcOutput *cre.WrappedBlockchainOutput, fullCldEnvOutput *cre.Environment) ([]common.Address, error) {
 	testLogger.Info().Msgf("Creating and funding %d addresses...", numberOfAddressesToCreate)
 	var addressesToRead []common.Address
 
@@ -267,18 +266,33 @@ func createAndFundAddresses(t *testing.T, testLogger zerolog.Logger, numberOfAdd
 		testLogger.Info().Msgf("Generated address #%d: %s", orderNum, addressToRead.Hex())
 
 		testLogger.Info().Msgf("Funding address '%s' with amount of '%s' wei", addressToRead.Hex(), amountToFund.String())
-		receipt, funErr := crefunding.SendFunds(t.Context(), testLogger, sethClient, crefunding.FundsToSend{
-			ToAddress:  addressToRead,
-			Amount:     amountToFund,
-			PrivateKey: sethClient.MustGetRootPrivateKey(),
-		})
-		require.NoError(t, funErr, "failed to send funds")
-		testLogger.Info().Msgf("Funds sent successfully to address '%s': txHash='%s'", addressToRead.Hex(), receipt.TxHash)
+
+		switch bcOutput.BlockchainOutput.Family {
+		case blockchain.FamilyTron:
+			if err := environment.FundTronAddress(t.Context(), testLogger, addressToRead, amountToFund.Uint64(), bcOutput, fullCldEnvOutput.CldfEnvironment); err != nil {
+				return nil, err
+			}
+		default:
+			if err := fundEthAddress(t, testLogger, addressToRead, amountToFund, sethClient); err != nil {
+				return nil, err
+			}
+		}
 
 		addressesToRead = append(addressesToRead, addressToRead)
 	}
 
 	return addressesToRead, nil
+}
+
+func fundEthAddress(t *testing.T, testLogger zerolog.Logger, addressToRead common.Address, amountToFund *big.Int, sethClient *seth.Client) error {
+	receipt, funErr := crefunding.SendFunds(t.Context(), testLogger, sethClient, crefunding.FundsToSend{
+		ToAddress:  addressToRead,
+		Amount:     amountToFund,
+		PrivateKey: sethClient.MustGetRootPrivateKey(),
+	})
+	require.NoError(t, funErr, "failed to send funds")
+	testLogger.Info().Msgf("Funds sent successfully to address '%s': txHash='%s'", addressToRead.Hex(), receipt.TxHash)
+	return nil
 }
 
 //////////////////////////////

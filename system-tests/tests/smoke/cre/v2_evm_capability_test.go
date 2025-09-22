@@ -118,7 +118,7 @@ func configureEVMReadWorkflow(t *testing.T, lggr zerolog.Logger, chain *cre.Wrap
 	// create and fund an address to be used by the workflow
 	amountToFund := big.NewInt(0).SetUint64(10) // 10 wei
 	numberOfAddressesToCreate := 1
-	addresses, addrErr := createAndFundAddresses(t, lggr, numberOfAddressesToCreate, amountToFund, chainSethClient)
+	addresses, addrErr := createAndFundAddresses(t, lggr, numberOfAddressesToCreate, amountToFund, chainSethClient, chain, nil)
 	require.NoError(t, addrErr, "failed to create and fund new addresses")
 	require.Len(t, addresses, numberOfAddressesToCreate, "failed to create the correct number of addresses")
 

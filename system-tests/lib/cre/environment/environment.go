@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -252,6 +253,7 @@ func SetupTestEnvironment(
 	}, PrepareFundCLNodesOpInput{FundingPerChainFamilyForEachNode: map[string]uint64{
 		"evm":    10000000000000000, // 0.01 ETH
 		"solana": 50_000_000_000,    // 50 SOL
+		"tron":   100_000_000,       // 100 TRX in SUN
 	}})
 	if prefundErr != nil {
 		return nil, pkgerrors.Wrap(prefundErr, "failed to prepare funding of CL nodes")
@@ -392,6 +394,7 @@ func prepareKeystoneConfigurationInput(input SetupInput, homeChainSelector uint6
 	configureKeystoneInput := cre.ConfigureKeystoneInput{
 		ChainSelector:               homeChainSelector,
 		CldEnv:                      cldEnvironment,
+		BlockchainOutputs:           startBlockchainsOutput.BlockChainOutputs,
 		Topology:                    topology,
 		CapabilitiesRegistryAddress: ptr.Ptr(crecontracts.MustGetAddressFromMemoryDataStore(deployKeystoneContractsOutput.MemoryDataStore, homeChainSelector, keystone_changeset.CapabilitiesRegistry.String(), input.ContractVersions[keystone_changeset.CapabilitiesRegistry.String()], "")),
 		OCR3Address:                 ptr.Ptr(crecontracts.MustGetAddressFromMemoryDataStore(deployKeystoneContractsOutput.MemoryDataStore, homeChainSelector, keystone_changeset.OCR3Capability.String(), input.ContractVersions[keystone_changeset.OCR3Capability.String()], crecontracts.OCR3ContractQualifier)),
