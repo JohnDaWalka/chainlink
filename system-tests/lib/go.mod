@@ -468,7 +468,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250912140847-cbfb1710ac76 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250922045931-6a8f06ba4cef // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250922062548-30f28a4d4166 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250917170425-f6b7494e763a // indirect
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20250917170425-f6b7494e763a // indirect
