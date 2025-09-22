@@ -5,12 +5,13 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc20"
 	"github.com/smartcontractkit/chainlink/deployment"
-	"github.com/stretchr/testify/require"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
