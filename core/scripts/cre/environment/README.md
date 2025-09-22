@@ -1337,8 +1337,13 @@ Chainlink nodes are configured by default to send telemetry data to two services
 Nodes send telemetry to `host.docker.internal:4317` for metrics and tracing. Start the OTEL observability stack with:
 
 ```bash
-ctf obs u
+ctf obs up -f
 ```
+or, if you want to run a lighter weight observability stack without cadvisor metrics:
+```bash
+ctf obs up
+```
+
 
 This provides access to Grafana, Prometheus, and Loki for monitoring and log aggregation.
 
