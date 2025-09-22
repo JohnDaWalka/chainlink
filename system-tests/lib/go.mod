@@ -25,6 +25,7 @@ require (
 	github.com/cockroachdb/errors v1.11.3
 	github.com/docker/docker v28.3.2+incompatible
 	github.com/ethereum/go-ethereum v1.16.2
+	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b
 	github.com/gagliardetto/solana-go v1.13.0
 	github.com/goccy/go-yaml v1.18.0
 	github.com/google/go-cmp v0.7.0
@@ -50,7 +51,7 @@ require (
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20250906212935-a1521d24f47f
 	github.com/smartcontractkit/crib-sdk v0.4.0
 	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d
-	github.com/smartcontractkit/smdkg v0.0.0-20250910095332-fcfc37af3920
+	github.com/smartcontractkit/smdkg v0.0.0-20250916143931-2876ea233fd8
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20250624150019-e49f7e125e6b
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/ratelimit v0.3.1
@@ -221,7 +222,6 @@ require (
 	github.com/expr-lang/expr v1.17.5 // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
-	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
