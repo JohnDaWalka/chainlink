@@ -11,9 +11,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
+	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
+	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
-	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -42,6 +43,9 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
+	suiState, err := sui_deployment.LoadOnchainStatesui(e.Env)
+	require.NoError(t, err)
+
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
 	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
@@ -59,8 +63,8 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
 			ChainSelector:  sourceChain,
-			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
-			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			TokenPackageId: suiState[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  suiState[sourceChain].LinkTokenTreasuryCapId,
 			Amount:         1099999999999999984,
 		}),
 	})

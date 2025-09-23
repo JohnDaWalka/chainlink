@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil/sqltest"
 	sui_query "github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainreader/indexer"
@@ -41,7 +42,6 @@ import (
 	chain_reader_types "github.com/smartcontractkit/chainlink-common/pkg/types"
 	commonTypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	crConfig "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/config"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
 
 type SuiSendRequest struct {
@@ -234,7 +234,7 @@ func BuildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string
 }
 
 func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (*ccipclient.AnyMsgSentEvent, error) {
-	state, err := stateview.LoadOnchainState(e)
+	suiState, err := sui_deployment.LoadOnchainStatesui(e)
 	if err != nil {
 		return &ccipclient.AnyMsgSentEvent{}, err
 	}
@@ -266,12 +266,12 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		},
 	}
 
-	ccipObjectRefId := state.SuiChains[cfg.SourceChain].CCIPObjectRef
-	ccipPackageId := state.SuiChains[cfg.SourceChain].CCIPAddress
-	onRampPackageId := state.SuiChains[cfg.SourceChain].OnRampAddress
-	onRampStateObjectId := state.SuiChains[cfg.SourceChain].OnRampStateObjectId
-	linkTokenPkgId := state.SuiChains[cfg.SourceChain].LinkTokenAddress
-	linkTokenObjectMetadataId := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId
+	ccipObjectRefId := suiState[cfg.SourceChain].CCIPObjectRef
+	ccipPackageId := suiState[cfg.SourceChain].CCIPAddress
+	onRampPackageId := suiState[cfg.SourceChain].OnRampAddress
+	onRampStateObjectId := suiState[cfg.SourceChain].OnRampStateObjectId
+	linkTokenPkgId := suiState[cfg.SourceChain].LinkTokenAddress
+	linkTokenObjectMetadataId := suiState[cfg.SourceChain].LinkTokenCoinMetadataId
 
 	bigIntSourceUsdPerToken, ok := new(big.Int).SetString("150000000000000000000000000000", 10)
 	if !ok {

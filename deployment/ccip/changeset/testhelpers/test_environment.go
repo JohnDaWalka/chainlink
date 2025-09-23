@@ -40,10 +40,11 @@ import (
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
+	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
+	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
-	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
-	sui_cs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
+	sui_cs_core "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
 	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
@@ -1036,15 +1037,18 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		})
 		require.NoError(t, err)
 
-		// Deploy CCIP, OnRamp, OffRamp, TP, initialize the contracts
-		mockContractParamsPerChain, err := sui.GetMockChainContractParams(t, e.Env, suiChains[0])
+		state, err := stateview.LoadOnchainState(e.Env)
+		require.NoError(t, err)
+
+		suiState, err := sui_deployment.LoadOnchainStatesui(e.Env)
 		require.NoError(t, err)
 
 		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
-			commonchangeset.Configure(sui.DeploySuiChain{}, sui.DeploySuiChainConfig{
-				ContractParamsPerChain: map[uint64]sui.ChainContractParams{
-					suiChains[0]: mockContractParamsPerChain,
-				},
+			commonchangeset.Configure(sui_cs.DeploySuiChain{}, sui_cs.DeploySuiChainConfig{
+				SuiChainSelector:              suiChains[0],
+				DestChainSelector:             evmChains[0],
+				DestChainOnRampAddressBytes:   state.MustGetEVMChainState(e.HomeChainSel).OnRamp.Address().Bytes(),
+				LinkTokenCoinMetadataObjectId: suiState[suiChains[0]].LinkTokenCoinMetadataId,
 			}),
 		})
 	}
@@ -1379,7 +1383,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		))
 		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
-			sui.SetOCR3Offramp{},
+			sui_cs_core.SetOCR3Offramp{},
 			v1_6.SetOCR3OffRampConfig{
 				HomeChainSel:       e.HomeChainSel,
 				RemoteChainSels:    suiChains,

@@ -8,6 +8,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	offrampops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip_offramp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
@@ -29,6 +30,11 @@ const Ed25519Scheme byte = 0x00
 // Apply implements deployment.ChangeSetV2.
 func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConfig) (cldf.ChangesetOutput, error) {
 	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
+	}
+
+	suiState, err := sui_deployment.LoadOnchainStatesui(e)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
 	}
@@ -107,10 +113,10 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		}
 
 		setOCR3ConfigCommitInput := offrampops.SetOCR3ConfigInput{
-			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
-			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
-			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
-			CCIPObjectRefId:  state.SuiChains[remoteSelector].CCIPObjectRef,
+			OffRampPackageId: suiState[remoteSelector].OffRampAddress,
+			OffRampStateId:   suiState[remoteSelector].OffRampStateObjectId,
+			OwnerCapObjectId: suiState[remoteSelector].OffRampOwnerCapId,
+			CCIPObjectRefId:  suiState[remoteSelector].CCIPObjectRef,
 			// commit plugin config
 			ConfigDigest:                   commitArgs.ConfigDigest[:],
 			OCRPluginType:                  commitArgs.OcrPluginType,
@@ -145,10 +151,10 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		}
 
 		setOCR3ConfigExecInput := offrampops.SetOCR3ConfigInput{
-			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
-			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
-			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
-			CCIPObjectRefId:  state.SuiChains[remoteSelector].CCIPObjectRef,
+			OffRampPackageId: suiState[remoteSelector].OffRampAddress,
+			OffRampStateId:   suiState[remoteSelector].OffRampStateObjectId,
+			OwnerCapObjectId: suiState[remoteSelector].OffRampOwnerCapId,
+			CCIPObjectRefId:  suiState[remoteSelector].CCIPObjectRef,
 			// exec plugin config
 			ConfigDigest:                   execArgs.ConfigDigest[:],
 			OCRPluginType:                  execArgs.OcrPluginType,
