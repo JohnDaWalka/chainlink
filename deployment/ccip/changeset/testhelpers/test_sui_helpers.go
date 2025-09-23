@@ -272,6 +272,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	onRampStateObjectId := suiState[cfg.SourceChain].OnRampStateObjectId
 	linkTokenPkgId := suiState[cfg.SourceChain].LinkTokenAddress
 	linkTokenObjectMetadataId := suiState[cfg.SourceChain].LinkTokenCoinMetadataId
+	ccipOwnerCapId := suiState[cfg.SourceChain].CCIPOwnerCapObjectId
 
 	bigIntSourceUsdPerToken, ok := new(big.Int).SetString("150000000000000000000000000000", 10)
 	if !ok {
@@ -284,11 +285,11 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	}
 
 	// Update Prices on FeeQuoter with minted LinkToken
-	_, err = operations.ExecuteOperation(e.OperationsBundle, ccipops.FeeQuoterUpdateTokenPricesOp, deps.SuiChain,
-		ccipops.FeeQuoterUpdateTokenPricesInput{
-			CCIPPackageId: ccipPackageId,
-			CCIPObjectRef: ccipObjectRefId,
-			// FeeQuoterCapId:        feeQuoterCapId,
+	_, err = operations.ExecuteOperation(e.OperationsBundle, ccipops.FeeQuoterUpdatePricesWithOwnerCapOp, deps.SuiChain,
+		ccipops.FeeQuoterUpdatePricesWithOwnerCapInput{
+			CCIPPackageId:         ccipPackageId,
+			CCIPObjectRef:         ccipObjectRefId,
+			OwnerCapObjectId:      ccipOwnerCapId,
 			SourceTokens:          []string{linkTokenObjectMetadataId},
 			SourceUsdPerToken:     []*big.Int{bigIntSourceUsdPerToken},
 			GasDestChainSelectors: []uint64{cfg.DestChain},
