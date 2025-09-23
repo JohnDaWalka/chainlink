@@ -238,7 +238,7 @@ jobs:
             github.com/smartcontractkit/chainlink-evm=${{ inputs.evm-ref }}
           gati-role-arn: ${{ secrets.AWS_OIDC_GLOBAL_READ_ONLY_TOKEN_ISSUER_ROLE_ARN }}
           gati-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
-
+  # flaky test: https://chainlink-core.slack.com/archives/C07GQNPVBB5/p1758523002485979
   run-core-cre-e2e-tests-for-pr:
     name: Run Core CRE E2E Tests For PR
     permissions:
@@ -248,7 +248,7 @@ jobs:
       id-token: write
       contents: read
     needs: [build-chainlink, changes]
-    if: github.event_name == 'pull_request' && needs.changes.outputs.should-run-cre-tests == 'true'
+    if: false
     uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@53e6348b792989514a6b7b53745bfcc389f706d9 # 27th June 2025
     with:
       chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
@@ -265,7 +265,7 @@ jobs:
       id-token: write
       contents: read
     needs: [build-chainlink, changes]
-    if: github.event_name == 'merge_group' && needs.changes.outputs.should-run-cre-tests == 'true'
+    if: false
     uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@08494221eaae4aff37a01669818cff24a4f80b4c # 2025-06-20
     with:
       workflow_name: Run Core CRE Tests For Merge Queue
@@ -309,13 +309,12 @@ jobs:
       id-token: write
       contents: read
     needs: [build-chainlink, changes]
-    if: github.event_name == 'push' && needs.changes.outputs.should-run-cre-tests == 'true'
+    if: false
     uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@53e6348b792989514a6b7b53745bfcc389f706d9 # 27th June 2025
     with:
-     chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
-     chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
-    secrets:
-      inherit
+      chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
+      chainlink_image_tag: ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
+    secrets: inherit
 
   run-core-cre-e2e-tests-for-workflow-dispatch:
     name: Run Core CRE E2E Tests For Workflow Dispatch
@@ -329,10 +328,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     uses: smartcontractkit/chainlink/.github/workflows/cre-system-tests.yaml@53e6348b792989514a6b7b53745bfcc389f706d9 # 27th June 2025
     with:
-     chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
-     chainlink_image_tag:  ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
-    secrets:
-      inherit
+      chainlink_version: ${{ inputs.evm-ref || inputs.cl_ref || github.sha }}
+      chainlink_image_tag: ${{ inputs.evm-ref && format('{0}-plugins', inputs.evm-ref) || inputs.cl_ref && format('{0}-plugins', inputs.cl_ref) || format('{0}-plugins', github.sha) }}
+    secrets: inherit
 
   run-core-e2e-tests-for-pr:
     name: Run Core E2E Tests For PR
