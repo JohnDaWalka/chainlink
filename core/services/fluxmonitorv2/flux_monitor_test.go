@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/flux_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink-evm/pkg/log"
@@ -1818,6 +1819,7 @@ func TestFluxMonitor_DoesNotDoubleSubmit(t *testing.T) {
 // with the latter approach (somehow assert.Eventually gives it a little bit more time, and then it fails
 // with the same unexpected call).
 func TestFluxMonitor_DrumbeatTicker(t *testing.T) {
+	quarantine.Flaky(t, "DX-1848")
 	t.Parallel()
 
 	db, nodeAddr := setupStoreWithKey(t)
