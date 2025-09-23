@@ -166,12 +166,11 @@ jobs:
         env:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
 
-      # gotestloghelper gives us pretty test output
-      - name: Set Up gotestloghelper
+      - name: Set up gotestsum
         shell: bash
         run: |
-          echo "::startgroup::Install gotestloghelper"
-          go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@v1.1.1
+          echo "::startgroup::Install gotestsum"
+          go install gotest.tools/gotestsum@v1.12.3
           echo "::endgroup::"
 
       - name: Start local CRE
@@ -205,29 +204,33 @@ jobs:
           BILLING_PLATFORM_SERVICE_IMAGE: ${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/billing-platform-service:v1.36.2-amd64
           TEST_TIMEOUT: 30m
         run: |
-          go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre \
-            -v -run "^(${TEST_NAME})$" -timeout ${TEST_TIMEOUT} -count=1 -test.parallel=1 -json \
-          2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false
-
-      - name: Produce JUnit XML from output
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          echo "::startgroup::Install gotestsum"
-          go install gotest.tools/gotestsum@v1.12.3
-          echo "::endgroup::"
-
-          echo "::startgroup::Generate JUnit XML report"
-          # gotestsum consumes the output file and writes JUnit XML
-          #   - the /tmp/gotest.log file is created in the previous step and contains the combined stdout+stderr output
-          #     - during certain error scenarios, the output may contain non-json lines (errors produced outside of the test harness, ie. build errors)
-          #     - we use the --ignore-non-json-output-lines flag to ignore those lines, so that parsing can continue
           gotestsum \
-            --ignore-non-json-output-lines \ # ignore any non-json lines in the input
-            --junitfile /tmp/junit-report.xml \ # write JUnit XML to this file
-            --format=standard-quiet \
-            --raw-command -- cat /tmp/gotest.log # read input from this file
-          echo "::endgroup::"
+            --format=github-actions \
+            --jsonfile=/tmp/gotest.log \
+            --junitfile=/tmp/junit-report.xml \
+            -- \
+            -v -run "^(${TEST_NAME})$" -timeout "${TEST_TIMEOUT}" -count=1 -parallel=1 \
+            github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre
+
+      # - name: Produce JUnit XML from output
+      #   if: ${{ !cancelled() }}
+      #   shell: bash
+      #   run: |
+      #     echo "::startgroup::Install gotestsum"
+      #     go install gotest.tools/gotestsum@v1.12.3
+      #     echo "::endgroup::"
+
+      #     echo "::startgroup::Generate JUnit XML report"
+      #     # gotestsum consumes the output file and writes JUnit XML
+      #     #   - the /tmp/gotest.log file is created in the previous step and contains the combined stdout+stderr output
+      #     #     - during certain error scenarios, the output may contain non-json lines (errors produced outside of the test harness, ie. build errors)
+      #     #     - we use the --ignore-non-json-output-lines flag to ignore those lines, so that parsing can continue
+      #     gotestsum \
+      #       --ignore-non-json-output-lines \ # ignore any non-json lines in the input
+      #       --junitfile /tmp/junit-report.xml \ # write JUnit XML to this file
+      #       --format=standard-quiet \
+      #       --raw-command -- cat /tmp/gotest.log # read input from this file
+      #     echo "::endgroup::"
 
       # - name: Run branch-out-upload
       #   if: ${{ !cancelled() }}
@@ -255,7 +258,7 @@ jobs:
           done
 
       - name: Upload all artifacts as single package
-        # if: failure()
+        if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
           name: test-logs-${{ matrix.tests.test_name }}-${{ matrix.tests.topology }}
