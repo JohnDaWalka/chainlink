@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/flux_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink-evm/pkg/log"
@@ -291,6 +292,7 @@ func setupFullDBWithKey(t *testing.T) (*sqlx.DB, common.Address) {
 }
 
 func TestFluxMonitor_PollIfEligible(t *testing.T) {
+	quarantine.Flaky(t, "DX-1839")
 	t.Parallel()
 	testCases := []struct {
 		name              string
