@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana"
@@ -57,6 +58,7 @@ import (
 )
 
 func Test_ContractTransmitter_TransmitWithoutSignatures(t *testing.T) {
+	quarantine.Flaky(t, "DX-1859")
 	type testCase struct {
 		name                string
 		pluginType          uint8
