@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/flux_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink-evm/pkg/log"
@@ -824,6 +825,7 @@ func TestFluxMonitor_TriggerIdleTimeThreshold(t *testing.T) {
 }
 
 func TestFluxMonitor_HibernationTickerFiresMultipleTimes(t *testing.T) {
+	quarantine.Flaky(t, "DX-1849")
 	t.Parallel()
 
 	g := gomega.NewWithT(t)
