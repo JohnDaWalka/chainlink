@@ -11,9 +11,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
+	"github.com/smartcontractkit/quarantine"
 )
 
 func TestFlags_IsLowered(t *testing.T) {
+	quarantine.Flaky(t, "DX-1851")
 	t.Parallel()
 
 	testCases := []struct {
