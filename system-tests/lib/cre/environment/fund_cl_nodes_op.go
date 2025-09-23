@@ -11,12 +11,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	"github.com/gagliardetto/solana-go"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -65,6 +67,11 @@ var PrepareCLNodesFundingOp = operations.NewOperation[PrepareFundCLNodesOpInput,
 					continue
 				}
 
+				if bcOut.BlockchainOutput.Family == blockchain.FamilyTron {
+					requiredFundingPerChain[bcOut.ChainSelector] += input.FundingPerChainFamilyForEachNode["tron"] * uint64(len(metaDon.DON.Nodes))
+					continue
+				}
+
 				requiredFundingPerChain[bcOut.ChainSelector] += input.FundingPerChainFamilyForEachNode["evm"] * uint64(len(metaDon.DON.Nodes))
 			}
 		}
@@ -77,6 +84,8 @@ var PrepareCLNodesFundingOp = operations.NewOperation[PrepareFundCLNodesOpInput,
 			chainFamily := "evm"
 			if bcOut.SolChain != nil {
 				chainFamily = "solana"
+			} else if bcOut.BlockchainOutput.Family == blockchain.FamilyTron {
+				chainFamily = "tron"
 			}
 
 			switch chainFamily {
@@ -127,6 +136,9 @@ var PrepareCLNodesFundingOp = operations.NewOperation[PrepareFundCLNodesOpInput,
 
 					output.PrivateKeysPerChainFamily[chainFamily][bcOut.SolChain.ChainSelector] = private
 				}
+			case "tron":
+				// TRON uses its own built-in funding account, no preparation needed
+				continue
 			default:
 				return nil, fmt.Errorf("unsupported chain family %s", chainFamily)
 			}
@@ -184,6 +196,8 @@ var FundCLNodesOp = operations.NewOperation(
 					chainFamily := "evm"
 					if bcOut.SolChain != nil {
 						chainFamily = "solana"
+					} else if bcOut.BlockchainOutput.Family == blockchain.FamilyTron {
+						chainFamily = "tron"
 					}
 
 					fundingAmount, ok := input.FundingAmountPerChainFamily[chainFamily]
@@ -198,6 +212,11 @@ var FundCLNodesOp = operations.NewOperation(
 						}
 					case "solana":
 						if err := fundSolanaAddress(ctx, deps.TestLogger, node, fundingAmount, bcOut, input.PrivateKeyPerChainFamily); err != nil {
+							return nil, err
+						}
+					case "tron":
+						nodeAddress := getTronNodeAddress(node, bcOut)
+						if err := FundTronAddress(ctx, deps.TestLogger, nodeAddress, fundingAmount, bcOut, deps.Env); err != nil {
 							return nil, err
 						}
 					default:
@@ -259,6 +278,41 @@ func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node cre.
 		return fmt.Errorf("failed to fund Solana account for a node: %w", err)
 	}
 	testLogger.Info().Msgf("Successfully funded Solana account %s", recipient.String())
+
+	return nil
+}
+
+func getTronNodeAddress(node cre.Node, bcOut *cre.WrappedBlockchainOutput) common.Address {
+	nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
+	if nodeAddress == "" {
+		return common.Address{} // Skip nodes without addresses for this chain
+	}
+
+	return common.HexToAddress(nodeAddress)
+}
+
+func FundTronAddress(ctx context.Context, testLogger zerolog.Logger, nodeAddress common.Address, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, env *cldf.Environment) error {
+	receiverAddress := address.EVMAddressToAddress(nodeAddress)
+
+	testLogger.Info().Msgf("Attempting to fund TRON account %s", nodeAddress)
+
+	tronChains := env.BlockChains.TronChains()
+	tronChain, exists := tronChains[bcOut.ChainSelector]
+	if !exists {
+		return fmt.Errorf("TRON chain not found for selector %d", bcOut.ChainSelector)
+	}
+
+	tx, err := tronChain.Client.Transfer(tronChain.Address, receiverAddress, libc.MustSafeInt64(fundingAmount))
+	if err != nil {
+		return pkgerrors.Wrapf(err, "failed to create transfer transaction for TRON node %s", nodeAddress)
+	}
+
+	txInfo, err := tronChain.SendAndConfirm(ctx, tx, nil)
+	if err != nil {
+		return pkgerrors.Wrapf(err, "failed to send and confirm transfer to TRON node %s", nodeAddress)
+	}
+
+	testLogger.Info().Msgf("Successfully funded TRON account %s with %d SUN, txHash: %s", receiverAddress.String(), fundingAmount, txInfo.ID)
 
 	return nil
 }

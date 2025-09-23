@@ -2,14 +2,12 @@ package don
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-<<<<<<< Updated upstream
-
-=======
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -18,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	ctf_jd "github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
->>>>>>> Stashed changes
+
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
@@ -223,9 +221,6 @@ func NodeNeedsWebAPIGateway(nodeFlags []cre.CapabilityFlag) bool {
 		flags.HasFlag(nodeFlags, cre.WebAPITriggerCapability) ||
 		flags.HasFlag(nodeFlags, cre.WebAPITargetCapability)
 }
-<<<<<<< Updated upstream
-=======
-
 func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*cldf.Environment, []*cre.DON, error) {
 	if input == nil {
 		return nil, nil, errors.New("input is nil")
@@ -254,9 +249,13 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 		// 	return nil, nil, errors.Wrap(schErr, "failed to find supported chains for DON")
 		// }
 
-		supportedChainSelectors, schErr := FindSupportedChainSelectors(input.Topology.DonsMetadata[idx], input.BlockchainOutputs)
-		if schErr != nil {
-			return nil, nil, errors.Wrap(schErr, "failed to find supported chain selectors for DON")
+		supportedChainSelectors := make([]uint64, 0)
+		for _, bcOut := range input.BlockchainOutputs {
+			if len(input.Topology.DonsMetadata[idx].SupportedChains) > 0 && !slices.Contains(input.Topology.DonsMetadata[idx].SupportedChains, bcOut.ChainID) {
+				continue
+			}
+
+			supportedChainSelectors = append(supportedChainSelectors, bcOut.ChainSelector)
 		}
 
 		don, donErr := NewDON(ctx, nodeOutput.CLNodes, nodeOutput.Capabilities, input.Topology.DonsMetadata[idx], supportedChainSelectors)
@@ -519,4 +518,3 @@ func addOCRKeyLabelsToNodeMetadata(dons []*cre.DON, topology *cre.Topology) []*c
 
 	return dons
 }
->>>>>>> Stashed changes

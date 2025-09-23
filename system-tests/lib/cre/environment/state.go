@@ -6,8 +6,9 @@ import (
 	"os"
 
 	"github.com/cockroachdb/errors"
-	"github.com/gagliardetto/solana-go"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/gagliardetto/solana-go"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -35,7 +36,7 @@ import (
 // Artifact paths are recorded in `artifact_paths.json` in the environment
 // directory (typically `core/scripts/cre/environment`).
 // Returns the reconstructed CLDF environment, wrapped blockchain outputs, and an error.
-func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInput *envconfig.Config, envArtifact *EnvArtifact) (*cre.FullCLDEnvironmentOutput, []*cre.WrappedBlockchainOutput, error) {
+func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInput *envconfig.Config, envArtifact *EnvArtifact) (*cre.Environment, []*cre.WrappedBlockchainOutput, error) {
 	if cachedInput == nil {
 		return nil, nil, errors.New("cached input cannot be nil")
 	}
@@ -67,6 +68,16 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			wrappedBlockchainOutputs = append(wrappedBlockchainOutputs, w)
 			continue
 		}
+
+		if bc.Type == blockchain.FamilyTron {
+			w, err := wrapTron(&bc, bc.Out)
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "failed to wrap tron")
+			}
+			wrappedBlockchainOutputs = append(wrappedBlockchainOutputs, w)
+			continue
+		}
+
 		w, err := wrapEVM(bc.Out)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to wrap evm")
@@ -231,9 +242,9 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		blockChains,
 	)
 
-	return &cre.FullCLDEnvironmentOutput{
-		Environment: cldEnv,
-		DonTopology: &envArtifact.Topology,
+	return &cre.Environment{
+		CldfEnvironment: cldEnv,
+		DonTopology:     &envArtifact.Topology,
 	}, wrappedBlockchainOutputs, nil
 }
 
