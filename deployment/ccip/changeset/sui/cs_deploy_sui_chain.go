@@ -196,12 +196,14 @@ func (d DeploySuiChain) Apply(e cldf.Environment, config DeploySuiChainConfig) (
 				DestChainSelectors:  []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector}, // TODOD add this in input instead of hardcoding
 				// DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{true},
+				DestChainRouters:          []string{routerReport.Output.PackageId},
 			},
 			ApplyDestChainConfigureOnRampInput: onrampops.ApplyDestChainConfigureOnRampInput{
 				CCIPObjectRefId:   ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,
 				DestChainSelector: []uint64{config.ContractParamsPerChain[chainSel].DestChainSelector},
 				// DestChainEnabled:          []bool{true},
 				DestChainAllowListEnabled: []bool{false},
+				DestChainRouters:          []string{routerReport.Output.PackageId},
 			},
 			ApplyAllowListUpdatesInput: onrampops.ApplyAllowListUpdatesInput{
 				CCIPObjectRefId:               ccipSeqReport.Output.Objects.CCIPObjectRefObjectId,

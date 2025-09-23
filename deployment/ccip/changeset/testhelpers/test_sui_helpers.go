@@ -537,7 +537,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		&ccipSendEvent,
 	)
 	if err != nil {
-		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to query events", "error", err)
+		return &ccipclient.AnyMsgSentEvent{}, fmt.Errorf("failed to query events: %w", err)
 	}
 
 	if len(sequences) < 1 {
