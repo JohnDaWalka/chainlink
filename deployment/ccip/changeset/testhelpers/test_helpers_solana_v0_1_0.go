@@ -87,6 +87,11 @@ import (
 	solstate "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/state"
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/mock_ethusd_aggregator_wrapper"
@@ -553,7 +558,6 @@ func SendRequest(
 			SequenceNumber: seq,
 			RawEvent:       raw,
 		}, nil
-
 	default:
 		return nil, fmt.Errorf("send request: unsupported chain family: %v", family)
 	}
@@ -1075,6 +1079,7 @@ func MakeEVMExtraArgsV2(gasLimit uint64, allowOOO bool) []byte {
 func AddLane(
 	t *testing.T,
 	e *DeployedEnv,
+	state stateview.CCIPOnChainState,
 	from, to uint64,
 	isTestRouter bool,
 	gasPrices map[uint64]*big.Int,
@@ -1104,7 +1109,11 @@ func AddLane(
 		}
 		changesets = append(changesets, AddLaneAptosChangesets(t, from, to, gasPrices, aptosTokenPrices)...)
 	case chainsel.FamilyTon:
-		addLaneConfig := tonOps.AddLaneTONConfig(&e.Env, from, to, fromFamily, toFamily, gasPrices)
+		onRamp, err := state.GetOnRampAddressBytes(to)
+		if err != nil {
+			return err
+		}
+		addLaneConfig := tonOps.AddLaneTONConfig(&e.Env, onRamp, from, to, fromFamily, toFamily, gasPrices)
 		changesets = append(changesets, commoncs.Configure(tonOps.AddTonLanes{},
 			tonCfg.UpdateTonLanesConfig{
 				Lanes:      []tonCfg.LaneConfig{addLaneConfig},
@@ -1122,7 +1131,11 @@ func AddLane(
 	case chainsel.FamilyAptos:
 		changesets = append(changesets, AddLaneAptosChangesets(t, from, to, gasPrices, nil)...)
 	case chainsel.FamilyTon:
-		addLaneConfig := tonOps.AddLaneTONConfig(&e.Env, from, to, fromFamily, toFamily, gasPrices)
+		onRamp, err := state.GetOnRampAddressBytes(to)
+		if err != nil {
+			return err
+		}
+		addLaneConfig := tonOps.AddLaneTONConfig(&e.Env, onRamp, from, to, fromFamily, toFamily, gasPrices)
 		changesets = append(changesets, commoncs.Configure(tonOps.AddTonLanes{},
 			tonCfg.UpdateTonLanesConfig{
 				Lanes:      []tonCfg.LaneConfig{addLaneConfig},
@@ -1523,6 +1536,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 	err = AddLane(
 		t,
 		e,
+		state,
 		from, to,
 		isTestRouter,
 		gasPrices,
@@ -1560,6 +1574,7 @@ func AddLaneWithEnforceOutOfOrder(t *testing.T, e *DeployedEnv, state stateview.
 	AddLane(
 		t,
 		e,
+		state,
 		from, to,
 		isTestRouter,
 		gasPrices,
