@@ -12,9 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
 	fmmocks "github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2/mocks"
+	"github.com/smartcontractkit/quarantine"
 )
 
 func TestFluxAggregatorContractSubmitter_Submit(t *testing.T) {
+	quarantine.Flaky(t, "DX-1841")
 	t.Parallel()
 	var (
 		fluxAggregator    = mocks.NewFluxAggregator(t)
