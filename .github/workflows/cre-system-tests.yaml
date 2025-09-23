@@ -167,10 +167,17 @@ jobs:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
 
       # gotestloghelper gives us pretty test output
-      - name: Set Up gotestloghelper
+      - name: Set Up gotestloghelper / gotestsum
         shell: bash
-        run: go install
-          github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@v1.1.1
+        run: |
+          echo "::startgroup::Install gotestloghelper"
+          go install github.com/smartcontractkit/chainlink-testing-framework/tools/gotestloghelper@v1.1.1
+          echo "::endgroup::"
+
+          echo "::startgroup::Install gotestsum"
+          go install gotest.tools/gotestsum@v1.12.3
+          echo "::endgroup::"
+
 
       - name: Start local CRE
         shell: bash
@@ -192,19 +199,42 @@ jobs:
           fi
 
       - name: Run CRE system tests
+        id: run-tests
         shell: bash
         working-directory: system-tests/tests
         env:
           TEST_NAME: ${{ matrix.tests.test_name }}
-          # override chip ingress image to use remote image. We have added this env var here, instead of the "Start local CRE" step, because
-          # Beholder stack will be started only for the Beholder test
           CHIP_INGRESS_IMAGE: ${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/atlas-chip-ingress:bbac3c825b061546980fa9d7dc0f3e8c34347bcf
           BILLING_PLATFORM_SERVICE_IMAGE: ${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/billing-platform-service:v1.36.2-amd64
           TEST_TIMEOUT: 30m
         run: |
-          # Sleep to allow testcontainers to stop
-          # Before running it with flakeguard add this bit back: { go test... -json; exit_code=$?; ../../tools/ci/wait-for-containers-to-stop.sh 30; exit $exit_code; }
-          go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -v -run "^(${TEST_NAME})$" -timeout ${TEST_TIMEOUT} -count=1 -test.parallel=1 -json 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false
+          {
+            # Pipe stdout to save a clean copy of JSON output for gotestsum
+            go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre \
+              -v -run "^(${TEST_NAME})$" -timeout "${TEST_TIMEOUT}" -count=1 -parallel=1 -json \
+            | tee /tmp/gotest.json
+          } 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false
+
+      - name: Produce JUnit XML from saved JSON
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          # gotestsum consumes the JSON file and writes JUnit XML
+          gotestsum \
+            --junitfile /tmp/junit-report.xml \
+            --format=standard-quiet \
+            --raw-command -- cat /tmp/gotest.json
+
+      # - name: Run branch-out-upload
+      #   if: ${{ !cancelled() }}
+      #   uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/0.1.0
+      #   with:
+      #     junit-file-path: '/tmp/junit-report.xml'
+      #     trunk-org-slug: chainlink
+      #     trunk-token: ${{ secrets.TRUNK_API_KEY }}
+      #     trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
+      #     trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/jobs/{2}', github.repository, github.run_id, job.check_run_id) }}
+      #     trunk-upload-only: 'true'
 
       - name: Show Docker containers status
         if: failure()
@@ -229,3 +259,5 @@ jobs:
             ./system-tests/tests/smoke/cre/logs/
             ./system-tests/tests/load/cre/logs/
             /tmp/gotest.log
+            /tmp/gotest.json
+            /tmp/junit-report.xml
