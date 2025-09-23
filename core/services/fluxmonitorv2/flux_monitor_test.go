@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/flux_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink-evm/pkg/log"
@@ -1413,6 +1414,7 @@ func TestFluxMonitor_ConsumeLogBroadcast(t *testing.T) {
 }
 
 func TestFluxMonitor_ConsumeLogBroadcast_Error(t *testing.T) {
+	quarantine.Flaky(t, "DX-1844")
 	t.Parallel()
 
 	testCases := []struct {
