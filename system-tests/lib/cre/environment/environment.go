@@ -495,3 +495,46 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 	// append the jd output, so that later it can be stored in the cached output, so that we can use the environment again without running setup
 	input.JdInput.Out = jdOutput
 }
+<<<<<<< Updated upstream
+=======
+
+func newCreEnvironment(cldfEnv *cldf.Environment, dons []*cre.DON, topology *cre.Topology) *cre.Environment {
+	donTopology := &cre.DonTopology{
+		WorkflowDonID:           topology.WorkflowDONID,
+		HomeChainSelector:       topology.HomeChainSelector,
+		CapabilitiesPeeringData: topology.CapabilitiesPeeringData,
+		OCRPeeringData:          topology.OCRPeeringData,
+		GatewayConnectorOutput:  topology.GatewayConnectorOutput,
+	}
+
+	for i, donMetadata := range topology.DonsMetadata {
+		donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &cre.DonWithMetadata{
+			DON:         dons[i],
+			DonMetadata: donMetadata,
+		})
+	}
+
+	return &cre.Environment{
+		CldfEnvironment: cldfEnv,
+		DonTopology:     donTopology,
+	}
+}
+
+func newCldfEnvironment(ctx context.Context, singleFileLogger logger.Logger, cldfBlockchains map[uint64]cldf_chain.BlockChain) *cldf.Environment {
+	memoryDatastore := datastore.NewMemoryDataStore()
+	allChainsCLDEnvironment := &cldf.Environment{
+		Name:              "local CRE",
+		Logger:            singleFileLogger,
+		ExistingAddresses: cldf.NewMemoryAddressBook(),
+		DataStore:         memoryDatastore.Seal(),
+		GetContext: func() context.Context {
+			return ctx
+		},
+		BlockChains: cldf_chain.NewBlockChains(cldfBlockchains),
+		OCRSecrets:  focr.XXXGenerateTestOCRSecrets(),
+	}
+	allChainsCLDEnvironment.OperationsBundle = operations.NewBundle(allChainsCLDEnvironment.GetContext, singleFileLogger, operations.NewMemoryReporter())
+
+	return allChainsCLDEnvironment
+}
+>>>>>>> Stashed changes

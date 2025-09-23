@@ -18,7 +18,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -214,7 +213,7 @@ var FundCLNodesOp = operations.NewOperation(
 	},
 )
 
-func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, privateKeyPerChainFamily map[string]map[uint64][]byte) error {
+func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node cre.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, privateKeyPerChainFamily map[string]map[uint64][]byte) error {
 	nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
 	if nodeAddress == "" {
 		return nil // Skip nodes without addresses for this chain
@@ -246,7 +245,7 @@ func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.
 	return nil
 }
 
-func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, _ map[string]map[uint64][]byte) error {
+func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node cre.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, _ map[string]map[uint64][]byte) error {
 	funder := bcOut.SolChain.PrivateKey
 	recipient := solana.MustPublicKeyFromBase58(node.AccountAddr[bcOut.SolChain.ChainID])
 	testLogger.Info().Msgf("Attempting to fund Solana account %s", recipient.String())

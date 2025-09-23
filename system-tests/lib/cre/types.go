@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -33,6 +32,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
+	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client"
 
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
@@ -554,7 +556,7 @@ type ToplogyInput struct {
 }
 
 type DonWithMetadata struct {
-	DON *devenv.DON `toml:"-" json:"-"`
+	DON *DON `toml:"-" json:"-"`
 	*DonMetadata
 }
 
@@ -569,6 +571,18 @@ type DonMetadata struct {
 func (m *DonMetadata) RequiresOCR() bool {
 	return slices.Contains(m.Flags, ConsensusCapability) || slices.Contains(m.Flags, ConsensusCapabilityV2) ||
 		slices.Contains(m.Flags, VaultCapability) || slices.Contains(m.Flags, EVMCapability)
+}
+
+type DON struct {
+	Nodes []Node
+}
+
+func (don *DON) NodeIds() []string {
+	var nodeIds []string
+	for _, node := range don.Nodes {
+		nodeIds = append(nodeIds, node.NodeID)
+	}
+	return nodeIds
 }
 
 type Label struct {
@@ -1134,4 +1148,23 @@ type InstallableCapability interface {
 type PersistentConfig interface {
 	Load(absPath string) error
 	Store(absPath string) error
+}
+
+type Node struct {
+	PeerID                 string            // p2p peer id fetched from the node
+	NodeID                 string            // node id returned by job distributor after node is registered with it
+	JDId                   string            // job distributor id returned by node after Job distributor is created in node
+	Name                   string            // name of the node
+	AccountAddr            map[string]string // chain id to node's account address mapping for supported chains
+	ChainsOcr2KeyBundlesID map[string]string
+	GQLClient              client.Client             // graphql client to interact with the node
+	RestClient             *clclient.ChainlinkClient // rest client to interact with the node
+	JDLabels               []*ptypes.Label           // labels with which the node is registered with the job distributor
+	AdminAddr              string                    // admin address to send payments to, applicable only for non-bootstrap nodes
+	MultiAddr              string                    // multi address denoting node's FQN (needed for deriving P2PBootstrappers in OCR), applicable only for bootstrap nodes
+	CSAKey                 string                    // csa public key of the node
+
+	Capabilities            []string
+	Roles                   []string
+	SupportedChainSelectors []uint64
 }

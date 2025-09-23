@@ -7,7 +7,18 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+<<<<<<< Updated upstream
 
+=======
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc/credentials/insecure"
+
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/chainlink-deployments-framework/offchain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
+	ctf_jd "github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
+>>>>>>> Stashed changes
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
@@ -23,7 +34,7 @@ func CreateJobs(ctx context.Context, testLogger zerolog.Logger, input cre.Create
 
 	for _, don := range input.DonTopology.DonsWithMetadata {
 		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
-			createErr := jobs.Create(ctx, input.CldEnv.Offchain, jobSpecs)
+			createErr := jobs.Create(ctx, input.CldEnv.Offchain, don.DON.Nodes, jobSpecs)
 			if createErr != nil {
 				return errors.Wrapf(createErr, "failed to create jobs for DON %d", don.ID)
 			}
@@ -212,3 +223,300 @@ func NodeNeedsWebAPIGateway(nodeFlags []cre.CapabilityFlag) bool {
 		flags.HasFlag(nodeFlags, cre.WebAPITriggerCapability) ||
 		flags.HasFlag(nodeFlags, cre.WebAPITargetCapability)
 }
+<<<<<<< Updated upstream
+=======
+
+func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*cldf.Environment, []*cre.DON, error) {
+	if input == nil {
+		return nil, nil, errors.New("input is nil")
+	}
+	if err := input.Validate(); err != nil {
+		return nil, nil, errors.Wrap(err, "input validation failed")
+	}
+
+	dons := make([]*cre.DON, len(input.NodeSetOutput))
+	// var allNodesInfo []devenv.NodeInfo
+
+	for idx, nodeOutput := range input.NodeSetOutput {
+		// bootstrapNodes, err := node.FindManyWithLabel(input.Topology.DonsMetadata[idx].NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
+		// if err != nil {
+		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
+		// }
+
+		// nodeInfo, err := node.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, input.Topology.DonsMetadata[idx].ID, len(bootstrapNodes))
+		// if err != nil {
+		// 	return nil, nil, errors.Wrap(err, "failed to get node info")
+		// }
+		// allNodesInfo = append(allNodesInfo, nodeInfo...)
+
+		// supportedChains, schErr := findSupportedChainsForDON(input.Topology.DonsMetadata[idx], input.BlockchainOutputs)
+		// if schErr != nil {
+		// 	return nil, nil, errors.Wrap(schErr, "failed to find supported chains for DON")
+		// }
+
+		supportedChainSelectors, schErr := FindSupportedChainSelectors(input.Topology.DonsMetadata[idx], input.BlockchainOutputs)
+		if schErr != nil {
+			return nil, nil, errors.Wrap(schErr, "failed to find supported chain selectors for DON")
+		}
+
+		don, donErr := NewDON(ctx, nodeOutput.CLNodes, nodeOutput.Capabilities, input.Topology.DonsMetadata[idx], supportedChainSelectors)
+		if donErr != nil {
+			return nil, nil, fmt.Errorf("failed to create registered DON: %w", donErr)
+		}
+
+		var regErr error
+		dons[idx], regErr = configureJD(ctx, don, input.JdOutput)
+		if regErr != nil {
+			return nil, nil, fmt.Errorf("failed to configure JD for DON: %w", regErr)
+		}
+	}
+
+	var nodeIDs []string
+	for _, don := range dons {
+		nodeIDs = append(nodeIDs, don.NodeIds()...)
+	}
+
+	dons = addOCRKeyLabelsToNodeMetadata(dons, input.Topology)
+
+	// ctxWithTimeout, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	// defer cancel()
+
+	// jd, jdErr := devenv.NewJDClient(ctxWithTimeout, devenv.JDConfig{
+	// 	GRPC:     input.JdOutput.ExternalGRPCUrl,
+	// 	WSRPC:    input.JdOutput.InternalWSRPCUrl,
+	// 	Creds:    insecure.NewCredentials(),
+	// 	NodeInfo: allNodesInfo,
+	// })
+
+	// if jdErr != nil {
+	// 	return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
+	// }
+
+	jdConfig := jd.JDConfig{
+		GRPC:  input.JdOutput.ExternalGRPCUrl,
+		WSRPC: input.JdOutput.InternalWSRPCUrl,
+		Creds: insecure.NewCredentials(),
+	}
+
+	jdClient, jdErr := jd.NewJDClient(jdConfig)
+	if jdErr != nil {
+		return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
+	}
+
+	// donJDClient := &devenv.JobDistributor{
+	// 	JobDistributor: jdClient,
+	// }
+
+	// don, regErr := NewDON(ctx, nodeInfo, capabilities, roles, supportedChainSelectors)
+	// if regErr != nil {
+	// 	return nil, fmt.Errorf("failed to create registered DON: %w", regErr)
+	// }
+
+	allNodes := make([]cre.Node, 0)
+	for _, don := range dons {
+		allNodes = append(allNodes, don.Nodes...)
+	}
+
+	for idx, n := range allNodes {
+		updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, *jdClient)
+		if linkErr != nil {
+			return nil, nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
+		}
+		allNodes[idx] = *updatedNode
+	}
+
+	input.CldfEnvironment.Offchain = jdClient
+	input.CldfEnvironment.NodeIDs = nodeIDs
+
+	return input.CldfEnvironment, dons, nil
+}
+
+func NewDON(ctx context.Context, clNodes []*clnode.Output, capabilities []string, donMetadata *cre.DonMetadata, supportedChainSelectors []uint64) (*cre.DON, error) {
+	don := &cre.DON{
+		Nodes: make([]cre.Node, 0),
+	}
+
+	for idx, clNode := range clNodes {
+		nodeRoles := make([]string, 0)
+
+		nodeType, typeErr := node.FindLabelValue(donMetadata.NodesMetadata[idx], node.NodeTypeKey)
+		if typeErr != nil {
+			return nil, errors.Wrapf(typeErr, "failed to find node type for node index %d in DON %s", idx, donMetadata.Name)
+		}
+		nodeRoles = append(nodeRoles, nodeType)
+
+		if node.HasLabel(donMetadata.NodesMetadata[idx], node.ExtraRolesKey) {
+			role, rErr := node.FindLabelValue(donMetadata.NodesMetadata[idx], node.ExtraRolesKey)
+			if rErr != nil {
+				return nil, errors.Wrapf(rErr, "failed to find extra role for node index %d in DON %s", idx, donMetadata.Name)
+			}
+			nodeRoles = append(nodeRoles, role)
+		}
+
+		node, err := node.NewNode(ctx, clNode, capabilities, nodeRoles, supportedChainSelectors, donMetadata.Name, donMetadata.ID, idx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create node %d: %w", idx, err)
+		}
+
+		// if info.IsBootstrap {
+		// 	// create multi address for OCR2, applicable only for bootstrap nodes
+		// 	if info.MultiAddr == "" {
+		// 		node.multiAddr = fmt.Sprintf("%s:%s", info.CLConfig.InternalIP, info.P2PPort)
+		// 	} else {
+		// 		node.multiAddr = info.MultiAddr
+		// 	}
+		// 	// no need to set admin address for bootstrap nodes, as there will be no payment
+		// 	node.adminAddr = ""
+		// 	node.labels = append(node.labels, &ptypes.Label{
+		// 		Key:   LabelNodeTypeKey,
+		// 		Value: ptr(LabelNodeTypeValueBootstrap),
+		// 	})
+		// } else {
+		// 	// multi address is not applicable for non-bootstrap nodes
+		// 	// explicitly set it to empty string to denote that
+		// 	node.multiAddr = ""
+
+		// 	// set admin address for non-bootstrap nodes
+		// 	node.adminAddr = info.AdminAddr
+
+		// 	// capability registry requires non-null admin address; use arbitrary default value if node is not configured
+		// 	if info.AdminAddr == "" {
+		// 		node.adminAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+		// 	}
+
+		// 	node.labels = append(node.labels, &ptypes.Label{
+		// 		Key:   LabelNodeTypeKey,
+		// 		Value: ptr(LabelNodeTypeValuePlugin),
+		// 	})
+
+		// 	for key, val := range info.Labels {
+		// 		node.labels = append(node.labels, &ptypes.Label{
+		// 			Key:   key,
+		// 			Value: ptr(val),
+		// 		})
+		// 	}
+		// }
+		// Set up Job distributor in node and register node with the job distributor
+		// err = node.SetUpAndLinkJobDistributor(ctx, jd)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", info.Name, err)
+		// }
+
+		don.Nodes = append(don.Nodes, *node)
+	}
+	return don, nil
+}
+
+func CreateSupportedJobDistributorChains(ctx context.Context, don *cre.DON, jd offchain.Client) error {
+	g := new(errgroup.Group)
+	for i := range don.Nodes {
+		i := i
+		g.Go(func() error {
+			n := &don.Nodes[i]
+			if err := node.CreateJDChainConfig(ctx, n, jd); err != nil {
+				return err
+			}
+			don.Nodes[i] = *n
+			return nil
+		})
+	}
+	return g.Wait()
+}
+
+func configureJD(ctx context.Context, don *cre.DON, jdOutput *ctf_jd.Output) (*cre.DON, error) {
+	jdConfig := jd.JDConfig{
+		GRPC:  jdOutput.ExternalGRPCUrl,
+		WSRPC: jdOutput.InternalWSRPCUrl,
+		Creds: insecure.NewCredentials(),
+	}
+
+	jdClient, jdErr := jd.NewJDClient(jdConfig)
+	if jdErr != nil {
+		return nil, errors.Wrap(jdErr, "failed to create JD client")
+	}
+
+	// donJDClient := &devenv.JobDistributor{
+	// 	JobDistributor: jdClient,
+	// }
+
+	// don, regErr := NewDON(ctx, nodeInfo, capabilities, roles, supportedChainSelectors)
+	// if regErr != nil {
+	// 	return nil, fmt.Errorf("failed to create registered DON: %w", regErr)
+	// }
+
+	for idx, n := range don.Nodes {
+		updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, *jdClient)
+		if linkErr != nil {
+			return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
+		}
+		don.Nodes[idx] = *updatedNode
+	}
+
+	if err := CreateSupportedJobDistributorChains(ctx, don, jdClient); err != nil {
+		return nil, fmt.Errorf("failed to create supported chains: %w", err)
+	}
+
+	return don, nil
+}
+
+func FindSupportedChainSelectors(donMetadata *cre.DonMetadata, blockchainOutputs []*cre.WrappedBlockchainOutput) ([]uint64, error) {
+	selectors := make([]uint64, 0)
+
+	for _, bcOut := range blockchainOutputs {
+		if len(donMetadata.SupportedChains) > 0 && !slices.Contains(donMetadata.SupportedChains, bcOut.ChainID) {
+			continue
+		}
+
+		selectors = append(selectors, bcOut.ChainSelector)
+	}
+
+	return selectors, nil
+}
+
+// func findSupportedChainsForDON(donMetadata *cre.DonMetadata, blockchainOutputs []*cre.WrappedBlockchainOutput) ([]devenv.ChainConfig, error) {
+// 	chains := make([]devenv.ChainConfig, 0)
+
+// 	for chainSelector, bcOut := range blockchainOutputs {
+// 		if len(donMetadata.SupportedChains) > 0 && !slices.Contains(donMetadata.SupportedChains, bcOut.ChainID) {
+// 			continue
+// 		}
+
+// 		cfg, cfgErr := cre.ChainConfigFromWrapped(bcOut)
+// 		if cfgErr != nil {
+// 			return nil, errors.Wrapf(cfgErr, "failed to build chain config for chain selector %d", chainSelector)
+// 		}
+
+// 		chains = append(chains, cfg)
+// 	}
+
+// 	return chains, nil
+// }
+
+func addOCRKeyLabelsToNodeMetadata(dons []*cre.DON, topology *cre.Topology) []*cre.DON {
+	for i, don := range dons {
+		for j, donNode := range topology.DonsMetadata[i].NodesMetadata {
+			// required for job proposals, because they need to include the ID of the node in Job Distributor
+			donNode.Labels = append(donNode.Labels, &cre.Label{
+				Key:   node.NodeIDKey,
+				Value: don.NodeIds()[j],
+			})
+
+			ocrSupportedFamilies := make([]string, 0)
+			for family, key := range don.Nodes[j].ChainsOcr2KeyBundlesID {
+				donNode.Labels = append(donNode.Labels, &cre.Label{
+					Key:   node.CreateNodeOCR2KeyBundleIDKey(family),
+					Value: key,
+				})
+				ocrSupportedFamilies = append(ocrSupportedFamilies, family)
+			}
+
+			donNode.Labels = append(donNode.Labels, &cre.Label{
+				Key:   node.NodeOCRFamiliesKey,
+				Value: node.CreateNodeOCRFamiliesListValue(ocrSupportedFamilies),
+			})
+		}
+	}
+
+	return dons
+}
+>>>>>>> Stashed changes

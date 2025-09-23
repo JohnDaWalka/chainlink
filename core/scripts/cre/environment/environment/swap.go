@@ -23,6 +23,7 @@ import (
 
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	 crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
@@ -152,7 +153,7 @@ func swapCapability(ctx context.Context, capabilityFlag, binaryPath string, forc
 			}
 
 			framework.L.Info().Msgf("Cancelling matching job proposals for node %s", node.Name)
-			proposalIDs, cancelErr := node.CancelProposalsByExternalJobID(ctx, externalJobIDs)
+			proposalIDs, cancelErr := crenode.CancelProposalsByExternalJobID(ctx, node, externalJobIDs)
 			if cancelErr != nil {
 				return errors.Wrapf(cancelErr, "failed to cancel job proposals for node %s", node.Name)
 			}
@@ -249,7 +250,7 @@ func swapCapability(ctx context.Context, capabilityFlag, binaryPath string, forc
 			proposalIDs, ok := nodeIDToProposalIDs[node.NodeID]
 			if ok {
 				framework.L.Info().Msgf("Approving %d job proposals for node %s", len(proposalIDs), node.Name)
-				approveErr := node.ApproveProposals(ctx, proposalIDs)
+				approveErr :=  crenode.ApproveProposals(ctx, node, proposalIDs)
 				if approveErr != nil {
 					return errors.Wrapf(approveErr, "failed to approve job proposals for node %s", node.Name)
 				}

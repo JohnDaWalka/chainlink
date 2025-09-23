@@ -13,9 +13,10 @@ import (
 	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 )
 
-func Create(ctx context.Context, offChainClient cldf_offchain.Client, jobSpecs cre.DonJobs) error {
+func Create(ctx context.Context, offChainClient cldf_offchain.Client, nodes []cre.Node, jobSpecs cre.DonJobs) error {
 	if len(jobSpecs) == 0 {
 		return nil
 	}
@@ -29,7 +30,7 @@ func Create(ctx context.Context, offChainClient cldf_offchain.Client, jobSpecs c
 			timeout := time.Second * 60
 			ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
-			_, err := offChainClient.ProposeJob(ctxWithTimeout, jobReq)
+			res, err := offChainClient.ProposeJob(ctxWithTimeout, jobReq)
 			if err != nil {
 				// Workflow specs get auto approved
 				// TODO: Narrow down scope by checking type == workflow
@@ -40,6 +41,17 @@ func Create(ctx context.Context, offChainClient cldf_offchain.Client, jobSpecs c
 				fmt.Println(jobReq)
 				return errors.Wrapf(err, "failed to propose job for node %s", jobReq.NodeId)
 			}
+
+			for _, node := range nodes {
+				if node.NodeID != jobReq.NodeId {
+					continue
+				}
+				// TODO: is there a way to accept the job with proposal id?
+				if err := crenode.AcceptJob(ctx, node, res.Proposal.Spec); err != nil {
+					return fmt.Errorf("failed to accept job. err: %w", err)
+				}
+			}
+
 			if ctx.Err() != nil {
 				return errors.Wrapf(err, "timed out after %s proposing job for node %s", timeout.String(), jobReq.NodeId)
 			}
