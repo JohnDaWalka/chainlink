@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/quarantine"
 )
 
 /*
@@ -67,6 +68,7 @@ func Test_CRE_Suite(t *testing.T) {
 }
 
 func Test_CRE_Suite_EVM(t *testing.T) {
+	quarantine.Flaky(t, "DX-1861")
 	testEnv := SetupTestEnvironmentWithConfig(t, getDefaultTestConfig(t))
 
 	// TODO remove this when OCR works properly with multiple chains in Local CRE

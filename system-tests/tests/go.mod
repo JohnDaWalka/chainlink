@@ -55,6 +55,7 @@ require (
 	github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evm/evmread v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evm/evmread-negative v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d
+	github.com/smartcontractkit/quarantine v0.0.0-20250909213106-ece491bef618
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.16.0
