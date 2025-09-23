@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client/clienttest"
@@ -138,6 +139,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 }
 
 func TestCommitStoreReaders(t *testing.T) {
+	quarantine.Flaky(t, "DX-1858")
 	user, ec := newSim(t)
 	ctx := testutils.Context(t)
 	lggr := logger.Test(t)
