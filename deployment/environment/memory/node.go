@@ -664,7 +664,6 @@ func CreateKeys(t *testing.T,
 	}
 
 	if len(suichains) > 0 {
-
 		ctype := chaintype.Sui
 		err = app.GetKeyStore().OCR2().EnsureKeys(ctx, ctype)
 		require.NoError(t, err)
