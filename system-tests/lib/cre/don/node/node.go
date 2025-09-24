@@ -17,14 +17,11 @@ import (
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
-	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/clclient"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
-	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 )
 
@@ -104,49 +101,6 @@ func ToP2PID(node *cre.NodeMetadata, transformFn stringTransformer) (string, err
 	return "", errors.New("p2p label not found for node")
 }
 
-// copied from Bala's unmerged PR: https://github.com/smartcontractkit/chainlink/pull/15751
-// TODO: remove this once the PR is merged and import his function
-// IMPORTANT ADDITION: prefix to differentiate between the different DONs
-func GetNodeInfo(nodeOut *ns.Output, prefix string, donID uint64, bootstrapNodeCount int) ([]devenv.NodeInfo, error) {
-	var nodeInfo []devenv.NodeInfo
-	for i := 1; i <= len(nodeOut.CLNodes); i++ {
-		p2pURL, err := url.Parse(nodeOut.CLNodes[i-1].Node.InternalP2PUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse p2p url: %w", err)
-		}
-
-		info := devenv.NodeInfo{
-			P2PPort: p2pURL.Port(),
-			CLConfig: nodeclient.ChainlinkConfig{
-				URL:        nodeOut.CLNodes[i-1].Node.ExternalURL,
-				Email:      nodeOut.CLNodes[i-1].Node.APIAuthUser,
-				Password:   nodeOut.CLNodes[i-1].Node.APIAuthPassword,
-				InternalIP: nodeOut.CLNodes[i-1].Node.InternalIP,
-			},
-			Labels: map[string]string{
-				"don-" + prefix: "true",
-				ProductKey:      "keystone",
-				EnvironmentKey:  "local",
-				DONIDKey:        strconv.FormatUint(donID, 10),
-				DONNameKey:      prefix,
-			},
-		}
-
-		if i <= bootstrapNodeCount {
-			info.IsBootstrap = true
-			info.Name = fmt.Sprintf("%s_bootstrap-%d", prefix, i)
-			info.Labels[NodeTypeKey] = cre.BootstrapNode
-		} else {
-			info.IsBootstrap = false
-			info.Name = fmt.Sprintf("%s_node-%d", prefix, i)
-			info.Labels[NodeTypeKey] = cre.WorkerNode
-		}
-
-		nodeInfo = append(nodeInfo, info)
-	}
-	return nodeInfo, nil
-}
-
 func FindOneWithLabel(nodes []*cre.NodeMetadata, wantedLabel *cre.Label, labelMatcherFn labelMatcherFn) (*cre.NodeMetadata, error) {
 	if wantedLabel == nil {
 		return nil, errors.New("label is nil")
@@ -211,11 +165,6 @@ func LabelContains(first, second string) bool {
 	return strings.Contains(first, second)
 }
 
-type SupportedChains struct {
-	Family string
-	ID     uint64
-}
-
 func NewNode(ctx context.Context, clNode *clnode.Output, capablities, roles []string, supportedChainSelectors []uint64, donName string, donID uint64, nodeIndex int) (*cre.Node, error) {
 	gqlClient, err := client.NewWithContext(ctx, clNode.Node.ExternalURL, client.Credentials{
 		Email:    clNode.Node.APIAuthUser,
@@ -224,6 +173,7 @@ func NewNode(ctx context.Context, clNode *clnode.Output, capablities, roles []st
 	if err != nil {
 		return nil, fmt.Errorf("failed to create node graphql client: %w", err)
 	}
+
 	chainlinkClient, err := clclient.NewChainlinkClient(&clclient.Config{
 		URL:         clNode.Node.ExternalURL,
 		Email:       clNode.Node.APIAuthUser,
@@ -254,37 +204,58 @@ func NewNode(ctx context.Context, clNode *clnode.Output, capablities, roles []st
 		Roles:                   roles,
 		SupportedChainSelectors: supportedChainSelectors, // TODO this should actually be on DON-level (probably)
 	}
-	if slices.Contains(roles, cre.BootstrapNode) {
-		// create multi address for OCR2, applicable only for bootstrap nodes
-		p2pURL, err := url.Parse(clNode.Node.InternalP2PUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse p2p url: %w", err)
-		}
-		node.MultiAddr = fmt.Sprintf("%s:%s", clNode.Node.InternalIP, p2pURL.Port())
 
-		// no need to set admin address for bootstrap nodes, as there will be no payment
-		node.AdminAddr = ""
-		node.JDLabels = append(node.JDLabels, &ptypes.Label{
-			Key:   devenv.LabelNodeTypeKey,
-			Value: ptr.Ptr(devenv.LabelNodeTypeValueBootstrap),
-		})
-	} else {
-		// multi address is not applicable for non-bootstrap nodes
-		// explicitly set it to empty string to denote that
-		node.MultiAddr = ""
-
-		// set admin address for non-bootstrap nodes (capability registry requires non-null admin address; use arbitrary default value if node is not configured)
-		node.AdminAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-
-		node.JDLabels = append(node.JDLabels, &ptypes.Label{
-			Key:   devenv.LabelNodeTypeKey,
-			Value: ptr.Ptr(devenv.LabelNodeTypeValuePlugin),
-		})
+	if slices.Contains(roles, cre.WorkerNode) && slices.Contains(roles, cre.BootstrapNode) {
+		return nil, fmt.Errorf("node cannot be both worker and bootstrap")
 	}
 
-	node, fetchErr := FetchData(ctx, node)
-	if fetchErr != nil {
-		return nil, fmt.Errorf("failed to fetch node data: %w", fetchErr)
+	node, err = fetchBasicNodeData(ctx, node)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, role := range roles {
+		var fetchErr error
+		switch role {
+		case cre.WorkerNode:
+			// multi address is not applicable for non-bootstrap nodes
+			// explicitly set it to empty string to denote that
+			node.MultiAddr = ""
+
+			// set admin address for non-bootstrap nodes (capability registry requires non-null admin address; use arbitrary default value if node is not configured)
+			node.AdminAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+			node.JDLabels = append(node.JDLabels, &ptypes.Label{
+				Key:   devenv.LabelNodeTypeKey,
+				Value: ptr.Ptr(devenv.LabelNodeTypeValuePlugin),
+			})
+
+			node, fetchErr = fetchWorkerNodeData(ctx, node)
+		case cre.BootstrapNode:
+			// create multi address for OCR2, applicable only for bootstrap nodes
+			p2pURL, err := url.Parse(clNode.Node.InternalP2PUrl)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse p2p url: %w", err)
+			}
+			node.MultiAddr = fmt.Sprintf("%s:%s", clNode.Node.InternalIP, p2pURL.Port())
+
+			// no need to set admin address for bootstrap nodes, as there will be no payment
+			node.AdminAddr = ""
+			node.JDLabels = append(node.JDLabels, &ptypes.Label{
+				Key:   devenv.LabelNodeTypeKey,
+				Value: ptr.Ptr(devenv.LabelNodeTypeValueBootstrap),
+			})
+
+			node, fetchErr = fetchBootstrapNodeData(ctx, node)
+		case cre.GatewayNode:
+			// nothing to fetch for gateway node
+		default:
+			return nil, fmt.Errorf("unknown node role: %s", role)
+		}
+
+		if fetchErr != nil {
+			return nil, fetchErr
+		}
 	}
 
 	return node, nil
@@ -292,26 +263,73 @@ func NewNode(ctx context.Context, clNode *clnode.Output, capablities, roles []st
 
 const LabelCSAKey = "csa_key"
 
-// type Node struct {
-// 	PeerID                 string            // p2p peer id fetched from the node
-// 	NodeID                 string            // node id returned by job distributor after node is registered with it
-// 	JDId                   string            // job distributor id returned by node after Job distributor is created in node
-// 	Name                   string            // name of the node
-// 	AccountAddr            map[string]string // chain id to node's account address mapping for supported chains
-// 	ChainsOcr2KeyBundlesID map[string]string
-// 	GQLClient              client.Client             // graphql client to interact with the node
-// 	RestClient             *clclient.ChainlinkClient // rest client to interact with the node
-// 	JDLabels               []*ptypes.Label           // labels with which the node is registered with the job distributor
-// 	AdminAddr              string                    // admin address to send payments to, applicable only for non-bootstrap nodes
-// 	MultiAddr              string                    // multi address denoting node's FQN (needed for deriving P2PBootstrappers in OCR), applicable only for bootstrap nodes
-// 	CSAKey                 string                    // csa public key of the node
+func fetchBasicNodeData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
+	// Get the public CSA key of the node (every node has to have one)
+	csaKeyRes, err := n.GQLClient.FetchCSAPublicKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if csaKeyRes == nil {
+		return nil, fmt.Errorf("no csa key found for node %s", n.Name)
+	}
+	n.CSAKey = strings.TrimPrefix(*csaKeyRes, "csa_")
 
-// 	Capabilities            []string
-// 	Roles                   []string
-// 	SupportedChainSelectors []uint64
-// }
+	return n, nil
+}
 
-func FetchData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
+func fetchWorkerNodeData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
+	n, err := fetchP2PID(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err = fetchChainData(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+
+	return n, nil
+}
+
+func fetchBootstrapNodeData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
+	n, err := fetchP2PID(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err = fetchChainData(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+
+	return n, nil
+}
+
+func fetchP2PID(ctx context.Context, n *cre.Node) (*cre.Node, error) {
+	if n.PeerID != "" {
+		return n, nil
+	}
+
+	peerID, err := n.GQLClient.FetchP2PPeerID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch peer id for node %s: %w", n.Name, err)
+	}
+
+	if peerID == nil {
+		return nil, fmt.Errorf("no peer id found for node %s", n.Name)
+	}
+
+	n.PeerID = *peerID
+
+	n.JDLabels = append(n.JDLabels, &ptypes.Label{
+		Key:   devenv.LabelNodeP2PIDKey,
+		Value: &n.PeerID,
+	})
+
+	return n, nil
+}
+
+func fetchChainData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
 	for _, selector := range n.SupportedChainSelectors {
 		if n.AccountAddr == nil {
 			n.AccountAddr = make(map[string]string)
@@ -320,6 +338,10 @@ func FetchData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
 		chainID, chainFamily, chErr := selectorToIDAndFamily(selector)
 		if chErr != nil {
 			return nil, fmt.Errorf("failed to get chain id and chain family from selector %d: %w", selector, chErr)
+		}
+
+		if _, ok := n.AccountAddr[chainID]; ok {
+			continue
 		}
 
 		// TODO: maybe this should be done by write-evm/evm and write-solana capabilities?
@@ -346,46 +368,18 @@ func FetchData(ctx context.Context, n *cre.Node) (*cre.Node, error) {
 			return nil, fmt.Errorf("unsupported chain family %s", chainFamily)
 		}
 
-		// TODO: Maybe this should be part of the capability code? I.e. check if the node has these key bundles set and if not fetch them?
-		// fetch OCR2 key bundle id only if the node has any capabilities that require OCR2
-		// TODO: use don.RequiresOCR()
-		if flags.HasFlagForAnyChain(n.Capabilities, cre.ConsensusCapability) || flags.HasFlagForAnyChain(n.Capabilities, cre.ConsensusCapabilityV2) || flags.HasFlagForAnyChain(n.Capabilities, cre.VaultCapability) || flags.HasFlagForAnyChain(n.Capabilities, cre.EVMCapability) {
-			ocr2BundleId, err := n.GQLClient.FetchOCR2KeyBundleID(ctx, strings.ToUpper(chainFamily))
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch OCR2 key bundle id for node %s: %w", n.Name, err)
-			}
-			if ocr2BundleId == "" {
-				return nil, fmt.Errorf("no OCR2 key bundle id found for node %s", n.Name)
-			}
-
-			n.ChainsOcr2KeyBundlesID[chainFamily] = ocr2BundleId
-		}
-	}
-
-	// TODO: part of capability or role?
-	// if the node is only a gateway and nothing else, then skip fetching peer id, since it doesn't have p2p
-	if (slices.Contains(n.Roles, cre.GatewayNode) && len(n.Roles) > 1) || !slices.Contains(n.Roles, cre.GatewayNode) {
-		peerID, err := n.GQLClient.FetchP2PPeerID(ctx)
+		// We need to fetch this data for all nodes, even if they do not have OCR-based capabilities, because it is required in order to create the JobDistributorChainConfig in JD
+		// which is later treated as data source for various changesets (e.g. they read P2PIDs from there)
+		ocr2BundleId, err := n.GQLClient.FetchOCR2KeyBundleID(ctx, strings.ToUpper(chainFamily))
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch peer id for node %s: %w", n.Name, err)
+			return nil, fmt.Errorf("failed to fetch OCR2 key bundle id for node %s: %w", n.Name, err)
+		}
+		if ocr2BundleId == "" {
+			return nil, fmt.Errorf("no OCR2 key bundle id found for node %s", n.Name)
 		}
 
-		if peerID == nil {
-			return nil, fmt.Errorf("no peer id found for node %s", n.Name)
-		}
-
-		n.PeerID = *peerID
+		n.ChainsOcr2KeyBundlesID[chainFamily] = ocr2BundleId
 	}
-
-	// Get the public CSA key of the node (every node has to have one)
-	csaKeyRes, err := n.GQLClient.FetchCSAPublicKey(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if csaKeyRes == nil {
-		return nil, fmt.Errorf("no csa key found for node %s", n.Name)
-	}
-	n.CSAKey = strings.TrimPrefix(*csaKeyRes, "csa_")
 
 	return n, nil
 }
@@ -444,6 +438,11 @@ func CreateJDChainConfig(ctx context.Context, n *cre.Node, jd offchain.Client) e
 				}
 			}
 
+			ocr2BundleId, ok := n.ChainsOcr2KeyBundlesID[chainFamily]
+			if !ok {
+				return fmt.Errorf("no ocr2 key bundle id found for node %s and chain family %s", n.Name, chainFamily)
+			}
+
 			// TODO probably capabilities should be able to modify this config according to their needs (like adding OCR2 keys)
 			config := client.JobDistributorChainConfigInput{
 				JobDistributorID: n.JDId,
@@ -451,20 +450,13 @@ func CreateJDChainConfig(ctx context.Context, n *cre.Node, jd offchain.Client) e
 				ChainType:        strings.ToUpper(chainFamily),
 				AccountAddr:      address,
 				AdminAddr:        n.AdminAddr,
-			}
-
-			if flags.HasFlagForAnyChain(n.Capabilities, cre.ConsensusCapability) || flags.HasFlagForAnyChain(n.Capabilities, cre.ConsensusCapabilityV2) || flags.HasFlagForAnyChain(n.Capabilities, cre.VaultCapability) || flags.HasFlagForAnyChain(n.Capabilities, cre.EVMCapability) {
-				ocr2BundleId, ok := n.ChainsOcr2KeyBundlesID[chainFamily]
-				if !ok {
-					return fmt.Errorf("no ocr2 key bundle id found for node %s and chain family %s", n.Name, chainFamily)
-				}
-
-				config.Ocr2Enabled = true
-				config.Ocr2KeyBundleID = ocr2BundleId
-				config.Ocr2IsBootstrap = slices.Contains(n.Roles, cre.BootstrapNode)
-				config.Ocr2Multiaddr = n.MultiAddr
-				config.Ocr2P2PPeerID = n.PeerID
-				config.Ocr2Plugins = `{"commit":true,"execute":true,"median":false,"mercury":false}` // TODO: should this be configurable? Do we even need this?
+				Ocr2Enabled:      true,
+				Ocr2KeyBundleID:  ocr2BundleId,
+				Ocr2IsBootstrap:  slices.Contains(n.Roles, cre.BootstrapNode),
+				Ocr2Multiaddr:    n.MultiAddr,
+				Ocr2P2PPeerID:    n.PeerID,
+				// Ocr2Plugins:      `{"commit":true,"execute":true,"median":false,"mercury":false}` // TODO: should this be configurable? Do we even need this?
+				Ocr2Plugins: `{}`, // TODO: should this be configurable? Do we even need this?
 			}
 
 			// JD silently fails to update nodeChainConfig. Therefore, we fetch the node config and
@@ -489,39 +481,7 @@ func CreateJDChainConfig(ctx context.Context, n *cre.Node, jd offchain.Client) e
 
 // RegisterNodeToJobDistributor fetches the CSA public key of the node and registers the node with the job distributor
 // it sets the node id returned by JobDistributor as a result of registration in the node struct
-func RegisterNodeToJobDistributor(ctx context.Context, n cre.Node, jd jd.JobDistributor) (*cre.Node, error) {
-	// Get the public key of the node
-	// csaKeyRes, err := n.GQLClient.FetchCSAPublicKey(ctx)
-	// if err != nil {
-	// 	return err
-	// }
-	// if csaKeyRes == nil {
-	// 	return fmt.Errorf("no csa key found for node %s", n.Name)
-	// }
-	// csaKey := strings.TrimPrefix(*csaKeyRes, "csa_")
-
-	// // tag nodes with p2p_id for easy lookup
-	// peerID, err := n.GQLClient.FetchP2PPeerID(ctx)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to fetch peer id for node %s: %w", n.Name, err)
-	// }
-	// if peerID == nil {
-	// 	return fmt.Errorf("no peer id found for node %s", n.Name)
-	// }
-
-	// not every node has p2p, e.g. gateway only nodes
-	if n.PeerID != "" {
-		n.JDLabels = append(n.JDLabels, &ptypes.Label{
-			Key:   devenv.LabelNodeP2PIDKey,
-			Value: &n.PeerID,
-		})
-	}
-
-	// n.JDLabels = append(n.JDLabels, &ptypes.Label{
-	// 	Key:   LabelCSAKey,
-	// 	Value: &n.CSAKey,
-	// })
-
+func RegisterNodeToJobDistributor(ctx context.Context, n cre.Node, jd *jd.JobDistributor) (*cre.Node, error) {
 	// register the node in the job distributor
 	registerResponse, err := jd.RegisterNode(ctx, &nodev1.RegisterNodeRequest{
 		PublicKey: n.CSAKey,
@@ -533,13 +493,6 @@ func RegisterNodeToJobDistributor(ctx context.Context, n cre.Node, jd jd.JobDist
 	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
 		nodesResponse, err := jd.ListNodes(ctx, &nodev1.ListNodesRequest{
 			Filter: &nodev1.ListNodesRequest_Filter{
-				// Selectors: []*ptypes.Selector{
-				// 	{
-				// 		Key:   LabelCSAKey,
-				// 		Op:    ptypes.SelectorOp_EQ,
-				// 		Value: &n.CSAKey,
-				// 	},
-				// },
 				PublicKeys: []string{n.CSAKey},
 			},
 		})
@@ -565,7 +518,7 @@ func RegisterNodeToJobDistributor(ctx context.Context, n cre.Node, jd jd.JobDist
 
 // CreateJobDistributor fetches the keypairs from the job distributor and creates the job distributor in the node
 // and returns the job distributor id
-func CreateJobDistributor(ctx context.Context, n cre.Node, jd jd.JobDistributor) (string, error) {
+func CreateJobDistributor(ctx context.Context, n cre.Node, jd *jd.JobDistributor) (string, error) {
 	csaKey, csaErr := jd.GetCSAPublicKey(ctx)
 	if csaErr != nil {
 		return "", fmt.Errorf("failed to get csa public key from job distributor: %w", csaErr)
@@ -594,7 +547,7 @@ func CreateJobDistributor(ctx context.Context, n cre.Node, jd jd.JobDistributor)
 
 // SetUpAndLinkJobDistributor sets up the job distributor in the node and registers the node with the job distributor
 // it sets the job distributor id for node
-func SetUpAndLinkJobDistributor(ctx context.Context, n cre.Node, jd jd.JobDistributor) (*cre.Node, error) {
+func SetUpAndLinkJobDistributor(ctx context.Context, n cre.Node, jd *jd.JobDistributor) (*cre.Node, error) {
 	// register the node in the job distributor
 	updatedNode, err := RegisterNodeToJobDistributor(ctx, n, jd)
 	if err != nil {

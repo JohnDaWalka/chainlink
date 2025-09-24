@@ -94,7 +94,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		}
 	}
 
-	// allNodeInfo := make([]deployment_devenv.NodeInfo, 0)
 	allNodeIDs := make([]string, 0)
 
 	for idx, don := range envArtifact.DONs {
@@ -107,27 +106,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			allNodeIDs = append(allNodeIDs, id)
 		}
 
-		// bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.DonsWithMetadata[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
-		// if err != nil {
-		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
-		// }
-
-		// nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, don.DonID, len(bootstrapNodes))
-		// if err != nil {
-		// 	return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
-		// }
-
-		// offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
-		// 	WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
-		// 	GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
-		// 	Creds:    insecure.NewCredentials(),
-		// 	NodeInfo: nodeInfo,
-		// })
-
-		// if offChainErr != nil {
-		// 	return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", don.DonName)
-		// }
-
 		jdConfig := jd.JDConfig{
 			GRPC:  envArtifact.JdConfig.ExternalGRPCUrl,
 			WSRPC: envArtifact.JdConfig.InternalWSRPCUrl,
@@ -138,24 +116,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		if jdErr != nil {
 			return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
 		}
-
-		// jd, ok := offChain.(*deployment_devenv.JobDistributor)
-		// if !ok {
-		// 	return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", don.DonName)
-		// }
-		// registeredDon, donErr := deployment_devenv.NewRegisteredDON(ctx, nodeInfo, *jd)
-		// if donErr != nil {
-		// 	return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
-		// }
-
-		// donJDClient := &devenv.JobDistributor{
-		// 	JobDistributor: jdClient,
-		// }
-
-		// don, regErr := NewDON(ctx, nodeInfo, capabilities, roles, supportedChainSelectors)
-		// if regErr != nil {
-		// 	return nil, fmt.Errorf("failed to create registered DON: %w", regErr)
-		// }
 
 		supportedChainSelectors, schErr := credon.FindSupportedChainSelectors(envArtifact.Topology.DonsWithMetadata[idx].DonMetadata, wrappedBlockchainOutputs)
 		if schErr != nil {
@@ -168,7 +128,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		}
 
 		for idx, n := range registeredDon.Nodes {
-			updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, *jdClient)
+			updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, jdClient)
 			if linkErr != nil {
 				return nil, nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
 			}
@@ -176,19 +136,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		}
 
 		envArtifact.Topology.DonsWithMetadata[idx].DON = registeredDon
-		// allNodeInfo = append(allNodeInfo, nodeInfo...)
 	}
-
-	// offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
-	// 	WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
-	// 	GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
-	// 	Creds:    insecure.NewCredentials(),
-	// 	NodeInfo: allNodeInfo,
-	// })
-
-	// if offChainErr != nil {
-	// 	return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client")
-	// }
 
 	jdConfig := jd.JDConfig{
 		GRPC:  envArtifact.JdConfig.ExternalGRPCUrl,
@@ -207,7 +155,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 	}
 
 	for idx, n := range allNodes {
-		updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, *jdClient)
+		updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, jdClient)
 		if linkErr != nil {
 			return nil, nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
 		}

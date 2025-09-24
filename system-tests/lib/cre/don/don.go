@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
-	ctf_jd "github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -230,25 +229,19 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 	}
 
 	dons := make([]*cre.DON, len(input.NodeSetOutput))
-	// var allNodesInfo []devenv.NodeInfo
+
+	jdConfig := jd.JDConfig{
+		GRPC:  input.JdOutput.ExternalGRPCUrl,
+		WSRPC: input.JdOutput.InternalWSRPCUrl,
+		Creds: insecure.NewCredentials(),
+	}
+
+	jdClient, jdErr := jd.NewJDClient(jdConfig)
+	if jdErr != nil {
+		return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
+	}
 
 	for idx, nodeOutput := range input.NodeSetOutput {
-		// bootstrapNodes, err := node.FindManyWithLabel(input.Topology.DonsMetadata[idx].NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
-		// if err != nil {
-		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
-		// }
-
-		// nodeInfo, err := node.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, input.Topology.DonsMetadata[idx].ID, len(bootstrapNodes))
-		// if err != nil {
-		// 	return nil, nil, errors.Wrap(err, "failed to get node info")
-		// }
-		// allNodesInfo = append(allNodesInfo, nodeInfo...)
-
-		// supportedChains, schErr := findSupportedChainsForDON(input.Topology.DonsMetadata[idx], input.BlockchainOutputs)
-		// if schErr != nil {
-		// 	return nil, nil, errors.Wrap(schErr, "failed to find supported chains for DON")
-		// }
-
 		supportedChainSelectors := make([]uint64, 0)
 		for _, bcOut := range input.BlockchainOutputs {
 			if len(input.Topology.DonsMetadata[idx].SupportedChains) > 0 && !slices.Contains(input.Topology.DonsMetadata[idx].SupportedChains, bcOut.ChainID) {
@@ -264,7 +257,7 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 		}
 
 		var regErr error
-		dons[idx], regErr = configureJD(ctx, don, input.JdOutput)
+		dons[idx], regErr = configureJD(ctx, don, jdClient)
 		if regErr != nil {
 			return nil, nil, fmt.Errorf("failed to configure JD for DON: %w", regErr)
 		}
@@ -276,53 +269,6 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 	}
 
 	dons = addOCRKeyLabelsToNodeMetadata(dons, input.Topology)
-
-	// ctxWithTimeout, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	// defer cancel()
-
-	// jd, jdErr := devenv.NewJDClient(ctxWithTimeout, devenv.JDConfig{
-	// 	GRPC:     input.JdOutput.ExternalGRPCUrl,
-	// 	WSRPC:    input.JdOutput.InternalWSRPCUrl,
-	// 	Creds:    insecure.NewCredentials(),
-	// 	NodeInfo: allNodesInfo,
-	// })
-
-	// if jdErr != nil {
-	// 	return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
-	// }
-
-	jdConfig := jd.JDConfig{
-		GRPC:  input.JdOutput.ExternalGRPCUrl,
-		WSRPC: input.JdOutput.InternalWSRPCUrl,
-		Creds: insecure.NewCredentials(),
-	}
-
-	jdClient, jdErr := jd.NewJDClient(jdConfig)
-	if jdErr != nil {
-		return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
-	}
-
-	// donJDClient := &devenv.JobDistributor{
-	// 	JobDistributor: jdClient,
-	// }
-
-	// don, regErr := NewDON(ctx, nodeInfo, capabilities, roles, supportedChainSelectors)
-	// if regErr != nil {
-	// 	return nil, fmt.Errorf("failed to create registered DON: %w", regErr)
-	// }
-
-	allNodes := make([]cre.Node, 0)
-	for _, don := range dons {
-		allNodes = append(allNodes, don.Nodes...)
-	}
-
-	for idx, n := range allNodes {
-		updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, *jdClient)
-		if linkErr != nil {
-			return nil, nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
-		}
-		allNodes[idx] = *updatedNode
-	}
 
 	input.CldfEnvironment.Offchain = jdClient
 	input.CldfEnvironment.NodeIDs = nodeIDs
@@ -357,50 +303,6 @@ func NewDON(ctx context.Context, clNodes []*clnode.Output, capabilities []string
 			return nil, fmt.Errorf("failed to create node %d: %w", idx, err)
 		}
 
-		// if info.IsBootstrap {
-		// 	// create multi address for OCR2, applicable only for bootstrap nodes
-		// 	if info.MultiAddr == "" {
-		// 		node.multiAddr = fmt.Sprintf("%s:%s", info.CLConfig.InternalIP, info.P2PPort)
-		// 	} else {
-		// 		node.multiAddr = info.MultiAddr
-		// 	}
-		// 	// no need to set admin address for bootstrap nodes, as there will be no payment
-		// 	node.adminAddr = ""
-		// 	node.labels = append(node.labels, &ptypes.Label{
-		// 		Key:   LabelNodeTypeKey,
-		// 		Value: ptr(LabelNodeTypeValueBootstrap),
-		// 	})
-		// } else {
-		// 	// multi address is not applicable for non-bootstrap nodes
-		// 	// explicitly set it to empty string to denote that
-		// 	node.multiAddr = ""
-
-		// 	// set admin address for non-bootstrap nodes
-		// 	node.adminAddr = info.AdminAddr
-
-		// 	// capability registry requires non-null admin address; use arbitrary default value if node is not configured
-		// 	if info.AdminAddr == "" {
-		// 		node.adminAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-		// 	}
-
-		// 	node.labels = append(node.labels, &ptypes.Label{
-		// 		Key:   LabelNodeTypeKey,
-		// 		Value: ptr(LabelNodeTypeValuePlugin),
-		// 	})
-
-		// 	for key, val := range info.Labels {
-		// 		node.labels = append(node.labels, &ptypes.Label{
-		// 			Key:   key,
-		// 			Value: ptr(val),
-		// 		})
-		// 	}
-		// }
-		// Set up Job distributor in node and register node with the job distributor
-		// err = node.SetUpAndLinkJobDistributor(ctx, jd)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", info.Name, err)
-		// }
-
 		don.Nodes = append(don.Nodes, *node)
 	}
 	return don, nil
@@ -422,37 +324,27 @@ func CreateSupportedJobDistributorChains(ctx context.Context, don *cre.DON, jd o
 	return g.Wait()
 }
 
-func configureJD(ctx context.Context, don *cre.DON, jdOutput *ctf_jd.Output) (*cre.DON, error) {
-	jdConfig := jd.JDConfig{
-		GRPC:  jdOutput.ExternalGRPCUrl,
-		WSRPC: jdOutput.InternalWSRPCUrl,
-		Creds: insecure.NewCredentials(),
-	}
-
-	jdClient, jdErr := jd.NewJDClient(jdConfig)
-	if jdErr != nil {
-		return nil, errors.Wrap(jdErr, "failed to create JD client")
-	}
-
-	// donJDClient := &devenv.JobDistributor{
-	// 	JobDistributor: jdClient,
-	// }
-
-	// don, regErr := NewDON(ctx, nodeInfo, capabilities, roles, supportedChainSelectors)
-	// if regErr != nil {
-	// 	return nil, fmt.Errorf("failed to create registered DON: %w", regErr)
-	// }
-
+func configureJD(ctx context.Context, don *cre.DON, jdClient *jd.JobDistributor) (*cre.DON, error) {
+	// todo parallelize each node
 	for idx, n := range don.Nodes {
-		updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, *jdClient)
-		if linkErr != nil {
-			return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
-		}
-		don.Nodes[idx] = *updatedNode
-	}
+		for _, role := range n.Roles {
+			switch role {
+			case cre.BootstrapNode, cre.WorkerNode:
+				updatedNode, linkErr := node.SetUpAndLinkJobDistributor(ctx, n, jdClient)
+				if linkErr != nil {
+					return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", n.Name, linkErr)
+				}
 
-	if err := CreateSupportedJobDistributorChains(ctx, don, jdClient); err != nil {
-		return nil, fmt.Errorf("failed to create supported chains: %w", err)
+				if err := node.CreateJDChainConfig(ctx, updatedNode, jdClient); err != nil {
+					return nil, err
+				}
+				don.Nodes[idx] = *updatedNode
+			case cre.GatewayNode:
+				// nothing to do for gateway nodes
+			default:
+				return nil, fmt.Errorf("unknown node role: %s", role)
+			}
+		}
 	}
 
 	return don, nil
