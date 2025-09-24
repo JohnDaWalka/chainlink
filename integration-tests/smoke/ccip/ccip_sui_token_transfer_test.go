@@ -47,7 +47,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	// SUI FeeToken
 	// mint link token to use as feeToken
 	_, feeTokenOutput, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
 			ChainSelector:  sourceChain,
 			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
@@ -63,7 +63,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	// SUI TransferToken
 	// mint link token to use as Transfer Token
 	_, transferTokenOutput, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
 			ChainSelector:  sourceChain,
 			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,

@@ -61,7 +61,7 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 	// SUI FeeToken
 	// mint link token to use as feeToken
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.MintSuiToken{}, sui_cs.MintSuiTokenConfig{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
 			ChainSelector:  sourceChain,
 			TokenPackageId: suiState[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  suiState[sourceChain].LinkTokenTreasuryCapId,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
@@ -40,42 +41,29 @@ type SuiTokenAmount struct {
 	Amount uint64
 }
 
-type suiCtx struct {
-	Deps                suideps.SuiDeps
-	CCIPObjectRefID     string
-	CCIPPackageID       string
-	OnRampPackageID     string
-	OnRampStateObjectID string
-	LinkTokenPkgID      string
-	LinkTokenMetaID     string
-	LinkTokenCapID      string
-	SignerAddr          string
-	PubKeyBytes         []byte
-}
-
 type RampMessageHeader struct {
-	MessageId           []byte
-	SourceChainSelector uint64
-	DestChainSelector   uint64
-	SequenceNumber      uint64
-	Nonce               uint64
+	MessageId           []byte `json:"message_id"`
+	SourceChainSelector string `json:"source_chain_selector"`
+	DestChainSelector   string `json:"dest_chain_selector"`
+	SequenceNumber      string `json:"sequence_number"`
+	Nonce               string `json:"nonce"`
 }
 
 type Sui2AnyRampMessage struct {
-	Header         RampMessageHeader
-	Sender         string
-	Data           []byte
-	Receiver       []byte
-	ExtraArgs      []byte
-	FeeToken       string
-	FeeTokenAmount uint64
-	FeeValueJuels  uint64
+	Header         RampMessageHeader `json:"header"`
+	Sender         string            `json:"sender"`
+	Data           []byte            `json:"data"`
+	Receiver       []byte            `json:"receiver"`
+	ExtraArgs      []byte            `json:"extra_args"`
+	FeeToken       string            `json:"fee_token"`
+	FeeTokenAmount string            `json:"fee_token_amount"`
+	FeeValueJuels  string            `json:"fee_value_juels"`
 }
 
 type CCIPMessageSent struct {
-	DestChainSelector uint64
-	SequenceNumber    uint64
-	Message           Sui2AnyRampMessage
+	DestChainSelector string             `json:"dest_chain_selector"`
+	SequenceNumber    string             `json:"sequence_number"`
+	Message           Sui2AnyRampMessage `json:"message"`
 }
 
 func baseCCIPConfig(
@@ -236,6 +224,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 			GetCallOpts: func() *suiBind.CallOpts {
 				b := uint64(400_000_000)
 				return &suiBind.CallOpts{
+					Signer:           suiChain.Signer,
 					WaitForExecution: true,
 					GasBudget:        &b,
 				}
@@ -364,8 +353,8 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 
 	onRampContract, err := suiBind.NewBoundContract(
 		onRampPackageId,
-		"ccip",
-		"ccip_send",
+		"ccip_onramp",
+		"onramp",
 		client,
 	)
 	if err != nil {
@@ -423,12 +412,29 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 		return nil, fmt.Errorf("failed to encode receiver call: %w", err)
 	}
 
-	receiverCommandResult, err := onRampContract.AppendPTB(ctx, deps.SuiChain.GetCallOpts(), ptb, encodedOnRampCCIPSendCall)
+	_, err = onRampContract.AppendPTB(ctx, deps.SuiChain.GetCallOpts(), ptb, encodedOnRampCCIPSendCall)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build PTB (receiver call) using bindings: %w", err)
 	}
 
-	fmt.Println("RECIEVER COMMAND RESULT: ", *receiverCommandResult)
+	executeCCIPSend, err := suiBind.ExecutePTB(ctx, deps.SuiChain.GetCallOpts(), client, ptb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute ccip_send with err: %w", err)
+	}
+
+	if len(executeCCIPSend.Events) == 0 {
+		return nil, fmt.Errorf("no events returned from Sui CCIPSend")
+	}
+
+	suiEvent := executeCCIPSend.Events[0].ParsedJson
+
+	seqStr, _ := suiEvent["sequence_number"].(string)
+	seq, _ := strconv.ParseUint(seqStr, 10, 64)
+
+	return &ccipclient.AnyMsgSentEvent{
+		SequenceNumber: seq,
+		RawEvent:       suiEvent, // just dump raw
+	}, nil
 
 	// onRamp, err := module_onramp.NewOnramp(onRampPackageId, client)
 	// if err != nil {
