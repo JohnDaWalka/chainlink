@@ -97,7 +97,7 @@ jobs:
              ]
               }'}
           PER_TEST_MODE=${PER_TEST_MODE:-append}
-          
+
           # If regression tests flag is true, include regression tests in the matrix
           # Otherwise, only include smoke tests
           if [[ "$WITH_REGRESSION" == 'true' ]]; then
@@ -110,7 +110,7 @@ jobs:
             echo "Including only smoke tests in the matrix"
             test_names=$(go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -list . | grep -v 'ok' | grep -v '^$')
           fi
-            
+
           tests=$(echo "$test_names" | jq -R -s \
             --argjson tops "$TOPOLOGIES_JSON" \
             --argjson per  "$PER_TEST_TOPOLOGIES_JSON" \
@@ -155,6 +155,7 @@ jobs:
     environment: "integration"
     timeout-minutes: 60
     env:
+      ENABLE_AUTO_QUARANTINE: 'true'
       # override chip ingress image to use remote image. We have added this env var here, instead of the "Start local CRE" step, because
       # Beholder stack will be started only for the Beholder test
       CHIP_INGRESS_IMAGE: ${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/atlas-chip-ingress:bbac3c825b061546980fa9d7dc0f3e8c34347bcf
@@ -196,6 +197,13 @@ jobs:
         env:
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
 
+      - name: Set up gotestsum
+        shell: bash
+        run: |
+          echo "::startgroup::Install gotestsum"
+          go install gotest.tools/gotestsum@v1.12.3
+          echo "::endgroup::"
+
       - name: Start local CRE
         shell: bash
         id: start-local-cre
@@ -216,13 +224,33 @@ jobs:
           fi
 
       - name: Run CRE Smoke system tests
+        id: run-tests
         shell: bash
         working-directory: system-tests/tests
+        continue-on-error: ${{ env.ENABLE_AUTO_QUARANTINE == 'true' }}
         env:
           TEST_NAME: ${{ matrix.tests.test_name }}
           TEST_TIMEOUT: 30m
         run: |
-          go test github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre -v -run "^(${TEST_NAME})$" -timeout ${TEST_TIMEOUT} -count=1 -test.parallel=1 2>&1 | tee /tmp/gotest.log
+          gotestsum \
+            --jsonfile=/tmp/gotest.log \
+            --junitfile=/tmp/junit-report.xml \
+            --format=github-actions \
+            -- \
+            -v -run "^(${TEST_NAME})$" -timeout "${TEST_TIMEOUT}" -count=1 -parallel=1 \
+            github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre
+
+      - name: Run branch-out-upload
+        if: ${{ !cancelled() }}
+        uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/0.1.0
+        with:
+          junit-file-path: '/tmp/junit-report.xml'
+          trunk-org-slug: chainlink
+          trunk-token: ${{ secrets.TRUNK_API_KEY }}
+          trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
+          trunk-job-url: ${{ format('https://github.com/{0}/actions/runs/{1}/jobs/{2}', github.repository, github.run_id, job.check_run_id) }}
+          # when auto-quarantine is enabled, allow this to determine test failures
+          trunk-upload-only: ${{ env.ENABLE_AUTO_QUARANTINE != 'true' }}
 
       - name: Run CRE Regression system tests
         if: ${{ inputs.with_regression }}
@@ -232,8 +260,12 @@ jobs:
           TEST_NAME: ${{ matrix.tests.test_name }}
           TEST_TIMEOUT: 200m
         run: |
-          go test github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre -v -run "^(${TEST_NAME})$" -timeout ${TEST_TIMEOUT} -count=1 -test.parallel=1 2>&1 | tee /tmp/gotest.log
-
+          gotestsum \
+            --jsonfile=/tmp/gotest-regression.log \
+            --format=github-actions \
+            -- \
+            -v -run "^(${TEST_NAME})$" -timeout ${TEST_TIMEOUT} -count=1 -parallel=1 \
+            github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre
 
       - name: Show Docker containers status
         if: failure()
@@ -270,3 +302,5 @@ jobs:
             ./system-tests/tests/smoke/cre/logs/
             ./system-tests/tests/load/cre/logs/
             /tmp/gotest.log
+            /tmp/gotest-regression.log
+            /tmp/junit-report.xml
