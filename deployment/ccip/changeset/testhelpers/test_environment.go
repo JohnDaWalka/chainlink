@@ -20,6 +20,7 @@ import (
 	solanago "github.com/gagliardetto/solana-go"
 	ops "github.com/smartcontractkit/chainlink-ton/deployment/ccip"
 	tonOperation "github.com/smartcontractkit/chainlink-ton/deployment/ccip/operation"
+	tonUtils "github.com/smartcontractkit/chainlink-ton/deployment/utils"
 
 	mcmstypes "github.com/smartcontractkit/mcms/types"
 
@@ -1086,10 +1087,10 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 
 	if len(tonChains) != 0 {
 		// Currently only one ton chain is supported in test environment
-		_, err := memory.GetTONSha()
+		var contractVersion string
+		//contractVersion := "8be0359fbce5"
+		contractVersion, err = tonUtils.GetContractBuildSHA()
 		require.NoError(t, err, "failed to get TON commit sha")
-		// TODO replace the hardcoded commit sha with the one fetched from memory.GetTONSha()
-		contractVersion := "8be0359fbce5"
 		// Allow overriding with a custom version, it's set to "loal" on chainlink-ton CI
 		if version := os.Getenv("CCIP_CONTRACTS_TON_VERSION"); version != "" {
 			contractVersion = version
