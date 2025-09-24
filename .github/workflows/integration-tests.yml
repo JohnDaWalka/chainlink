@@ -5,7 +5,7 @@ run-name: Integration Tests ${{ inputs.distinct_run_name && inputs.distinct_run_
 on:
   merge_group:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened]
   push:
     tags:
       - "*"
