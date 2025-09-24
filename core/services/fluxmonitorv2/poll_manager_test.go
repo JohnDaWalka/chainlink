@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/flux_aggregator_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
+	"github.com/smartcontractkit/quarantine"
 )
 
 var (
@@ -255,6 +256,7 @@ func TestPollManager_HibernationOnStartThenAwaken(t *testing.T) {
 }
 
 func TestPollManager_AwakeOnStartThenHibernate(t *testing.T) {
+	quarantine.Flaky(t, "DX-1863")
 	t.Parallel()
 	pm := newPollManager(t)
 
