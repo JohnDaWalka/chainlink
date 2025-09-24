@@ -690,7 +690,6 @@ func CreateKeys(t *testing.T,
 
 			err = FundSuiAccount(chain.FaucetURL, "0x"+transmitter.Account())
 			require.NoError(t, err)
-
 		}
 	}
 

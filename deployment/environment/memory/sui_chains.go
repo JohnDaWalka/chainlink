@@ -12,10 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	suichain "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf_sui_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui/provider"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
