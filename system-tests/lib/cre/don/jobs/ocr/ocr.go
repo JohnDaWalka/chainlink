@@ -155,9 +155,14 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				}
 				transmitterAddress := ethKey.PublicAddress.Hex()
 
-				keyBundle, kErr := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
-				if kErr != nil {
-					return nil, errors.Wrap(kErr, "failed to get key bundle id from worker node labels")
+				bundlesPerFamily, kbErr := node.ExtractBundleKeysPerFamily(workerNode)
+				if kbErr != nil {
+					return nil, errors.Wrap(kbErr, "failed to get ocr families bundle id from worker node labels")
+				}
+
+				keyBundle, ok := bundlesPerFamily["evm"] // we can always expect evm bundle key id present since evm is registry chain
+				if !ok {
+					return nil, errors.New("failed to get key bundle id for evm family")
 				}
 
 				nodeAddress := transmitterAddress
@@ -165,9 +170,13 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 
 				bootstrapPeers := make([]string, len(internalHostsBS))
 				for i, workflowName := range internalHostsBS {
-					bootstrapPeers[i] = fmt.Sprintf("%s@%s:5001", bootstrapNode.Keys.CleansedPeerID(), workflowName)
+					bootstrapPeers[i] = fmt.Sprintf("%s@%s:%d", bootstrapNode.Keys.CleansedPeerID(), workflowName, cre.OCRPeeringPort)
 				}
 
+				strategyName := "single-chain"
+				if len(bundlesPerFamily) > 1 {
+					strategyName = "multi-chain"
+				}
 				oracleFactoryConfigInstance := job.OracleFactoryConfig{
 					Enabled:            true,
 					ChainID:            chainIDStr,
@@ -176,8 +185,8 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					OCRKeyBundleID:     keyBundle,
 					TransmitterID:      transmitterAddress,
 					OnchainSigning: job.OnchainSigningStrategy{
-						StrategyName: "single-chain",
-						Config:       map[string]string{"evm": keyBundle},
+						StrategyName: strategyName,
+						Config:       bundlesPerFamily,
 					},
 				}
 

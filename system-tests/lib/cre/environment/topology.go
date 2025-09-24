@@ -76,6 +76,7 @@ func PrepareConfiguration(
 			return nil, nil, errors.Wrap(addKeysErr, "failed to add keys to topology")
 		}
 	*/
+
 	bt, err := topology.BootstrapNode()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to find bootstrap node")
@@ -152,29 +153,47 @@ func PrepareConfiguration(
 		// generate secrets only if they are not provided
 		if secretsFound == 0 {
 			/*
-				secretsInput := &cre.GenerateSecretsInput{
-					DonMetadata: donMetadata,
-				}
+								secretsInput := &cre.GenerateSecretsInput{
+									DonMetadata: donMetadata,
+								}
 
-				if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
-					secretsInput.EVMKeys = evmKeys
-				}
+								if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
+									secretsInput.EVMKeys = evmKeys
+								}
 
-				if solKeys, ok := keys.SolKeys[donMetadata.ID]; ok {
-					secretsInput.SolKeys = solKeys
-				}
+								if solKeys, ok := keys.SolKeys[donMetadata.ID]; ok {
+									secretsInput.SolKeys = solKeys
+								}
 
-				if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
-					secretsInput.P2PKeys = p2pKeys
-				}
+				<<<<<<< HEAD
+								if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
+									secretsInput.P2PKeys = p2pKeys
+								}
+				=======
+							if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
+								secretsInput.P2PKeys = p2pKeys
+							}
 
-				// EVM, Solana and P2P keys will be provided to nodes as secrets
-				secrets, secretsErr := cresecrets.GenerateSecrets(
-					secretsInput,
-				)
-				if secretsErr != nil {
-					return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
-				}
+							if dkgKeys, ok := keys.DKGRecipientKeys[donMetadata.ID]; ok {
+								secretsInput.DKGRecipientKeys = dkgKeys
+							}
+
+							// EVM, Solana and P2P keys will be provided to nodes as secrets
+							secrets, secretsErr := cresecrets.GenerateSecrets(
+								secretsInput,
+							)
+							if secretsErr != nil {
+								return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
+							}
+				>>>>>>> develop
+
+								// EVM, Solana and P2P keys will be provided to nodes as secrets
+								secrets, secretsErr := cresecrets.GenerateSecrets(
+									secretsInput,
+								)
+								if secretsErr != nil {
+									return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
+								}
 			*/
 			for j := range donMetadata.NodesMetadata {
 				wnode := donMetadata.NodesMetadata[j]

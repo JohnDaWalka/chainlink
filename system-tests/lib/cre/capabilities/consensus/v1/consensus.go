@@ -98,6 +98,8 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
 			}
+
+			// TODO take this from DON instead of generating a new one
 			_, ocrPeeringCfg, err := cre.PeeringCfgs(bootstrapNode)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get peering configs")
@@ -122,12 +124,21 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainID)
 				}
 
-				ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
-				if ocr2Err != nil {
-					return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
+				ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
+				if ocr2kbErr != nil {
+					return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
 				}
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, ocrPeeringCfg, chainID))
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, ocrPeeringCfg, chainID))
+
+				// TODO use constant for the EVM family
+				// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
+				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["EVM"]
+				if !ok {
+					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for EVM", nodeID)
+				}
+
+				// we pass here bundles for all chains to enable multi-chain signing
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringCfg, chainID))
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringCfg, chainID))
 			}
 		}
 

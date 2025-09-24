@@ -155,11 +155,10 @@ func setupLoadTestEnvironment(
 		Logger:                    testLogger,
 		SingleFileLogger:          singleFileLogger,
 		HomeChainBlockchainOutput: universalSetupOutput.BlockchainOutput[0].BlockchainOutput,
-		AddressBook:               universalSetupOutput.CldEnvironment.ExistingAddresses, //nolint:staticcheck // will not migrate now
 		JobSpecFactoryFunctions:   []cretypes.JobSpecFn{workflowJobsFn},
-		FullCLDEnvOutput: &cretypes.FullCLDEnvironmentOutput{
-			Environment: universalSetupOutput.CldEnvironment,
-			DonTopology: universalSetupOutput.DonTopology,
+		CreEnvironment: &cretypes.Environment{
+			CldfEnvironment: universalSetupOutput.CldEnvironment,
+			DonTopology:     universalSetupOutput.DonTopology,
 		},
 	}
 
@@ -349,7 +348,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	for _, don := range setupOutput.donTopology.DonsWithMetadata {
 		if flags.HasFlag(don.Flags, cretypes.MockCapability) {
 			for _, n := range don.DON.Nodes {
-				key, err2 := n.ExportOCR2Keys(n.Ocr2KeyBundleID)
+				key, err2 := n.ExportOCR2Keys(n.ChainsOcr2KeyBundlesID["evm"])
 				if err2 == nil {
 					b, err3 := json.Marshal(key)
 					require.NoError(t, err3, "could not marshal OCR2 key")
@@ -1213,12 +1212,20 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 					return nil, fmt.Errorf("node %s does not have an eth key for chainID %d", nodeID, chainID)
 				}
 
-				ocr2KeyBundleID, ocr2Err := node.FindLabelValue(workerNode, node.NodeOCR2KeyBundleIDKey)
-				if ocr2Err != nil {
-					return nil, errors.Wrap(ocr2Err, "failed to get ocr2 key bundle id from labels")
+				ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
+				if ocr2kbErr != nil {
+					return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
 				}
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, ocrPeeringData, chainID))
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), ocr2KeyBundleID, ocrPeeringData, chainID))
+
+				// TODO use constant for the EVM family
+				// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
+				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["EVM"]
+				if !ok {
+					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for EVM", nodeID)
+				}
+
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringData, chainID))
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringData, chainID))
 			}
 		}
 
