@@ -57,13 +57,16 @@ const (
 					// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
 					bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
 					// bytes4(keccak256("CCIP ChainFamilySelector SVM"));
-		  		bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
+		  			bytes4 public constant CHAIN_FAMILY_SELECTOR_SVM = 0x1e10bdc4;
+					// bytes4(keccak256("CCIP ChainFamilySelector Sui"))
+					bytes4(keccak256("CCIP ChainFamilySelector Sui")) = 0xc4e05953
 				```
 	*/
 	EVMFamilySelector   = "2812d52c"
 	SVMFamilySelector   = "1e10bdc4"
 	AptosFamilySelector = "ac77ffec"
 	TVMFamilySelector   = "647e2ba9"
+	SuiFamilySelector   = "c4e05953"
 )
 
 var (

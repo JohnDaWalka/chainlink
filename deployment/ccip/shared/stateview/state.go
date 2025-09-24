@@ -30,7 +30,11 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/link_token"
 
+	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
+	suistate "github.com/smartcontractkit/chainlink-sui/deployment"
+
 	tonstate "github.com/smartcontractkit/chainlink-ton/deployment/state"
+
 	ccipshared "github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	aptosstate "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/evm"
@@ -108,6 +112,7 @@ type CCIPOnChainState struct {
 	Chains      map[uint64]evm.CCIPChainState
 	SolChains   map[uint64]solana.CCIPChainState
 	AptosChains map[uint64]aptosstate.CCIPChainState
+	SuiChains   map[uint64]suistate.CCIPChainState
 	TonChains   map[uint64]tonstate.CCIPChainState
 	evmMu       *sync.RWMutex
 }
@@ -400,6 +405,9 @@ func (c CCIPOnChainState) SupportedChains() map[uint64]struct{} {
 	for chain := range c.TonChains {
 		chains[chain] = struct{}{}
 	}
+	for chain := range c.SuiChains {
+		chains[chain] = struct{}{}
+	}
 	return chains
 }
 
@@ -657,6 +665,15 @@ func (c CCIPOnChainState) GetOffRampAddressBytes(chainSelector uint64) ([]byte, 
 		or := c.TonChains[chainSelector].OffRamp
 		rawBytes := codec.ToRawAddr(&or)
 		offRampAddress = rawBytes[:]
+	case chain_selectors.FamilySui:
+		offRampAddr := c.SuiChains[chainSelector].OffRampAddress
+
+		normalizedAddr, err := suiutil.ConvertStringToAddressBytes(offRampAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		offRampAddress = normalizedAddr[:]
 
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
@@ -696,6 +713,18 @@ func (c CCIPOnChainState) GetOnRampAddressBytes(chainSelector uint64) ([]byte, e
 		}
 		rawAddress := codec.ToRawAddr(&ramp)
 		onRampAddressBytes = rawAddress[:]
+	case chain_selectors.FamilySui:
+		onRampAddress := c.SuiChains[chainSelector].OnRampAddress
+		if onRampAddress == "" {
+			return nil, fmt.Errorf("no ccip address found in the state for Aptos chain %d", chainSelector)
+		}
+
+		normalizedAddr, err := suiutil.ConvertStringToAddressBytes(onRampAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		onRampAddressBytes = normalizedAddr[:]
 
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
@@ -772,7 +801,8 @@ func (c CCIPOnChainState) ValidateRamp(chainSelector uint64, rampType cldf.Contr
 		default:
 			return fmt.Errorf("unknown ramp type %s", rampType)
 		}
-
+	case chain_selectors.FamilySui:
+		// no-op right now
 	default:
 		return fmt.Errorf("unknown chain family %s", family)
 	}
@@ -813,11 +843,17 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 		return CCIPOnChainState{}, err
 	}
 
+	suiChains, err := suistate.LoadOnchainStatesui(e)
+	if err != nil {
+		return CCIPOnChainState{}, err
+	}
+
 	state := CCIPOnChainState{
 		Chains:      make(map[uint64]evm.CCIPChainState),
 		SolChains:   solanaState.SolChains,
 		AptosChains: aptosChains,
 		TonChains:   tonChains,
+		SuiChains:   suiChains,
 		evmMu:       &sync.RWMutex{},
 	}
 	for chainSelector, chain := range e.BlockChains.EVMChains() {
@@ -1430,6 +1466,15 @@ func ValidateChain(env cldf.Environment, state CCIPOnChainState, chainSel uint64
 			return fmt.Errorf("%s does not exist in state", chain)
 		}
 		// TODO validate ton mcms after implemented
+	case chain_selectors.FamilySui:
+		chain, ok := env.BlockChains.SuiChains()[chainSel]
+		if !ok {
+			return fmt.Errorf("sui chain with selector %d does not exist in environment", chainSel)
+		}
+		_, ok = state.SuiChains[chainSel]
+		if !ok {
+			return fmt.Errorf("%s does not exist in state", chain)
+		}
 	default:
 		return fmt.Errorf("%s family not support", family)
 	}

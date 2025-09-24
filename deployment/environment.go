@@ -410,6 +410,8 @@ func chainToDetails(c *nodev1.Chain) (chain_selectors.ChainDetails, error) {
 		family = chain_selectors.FamilySolana
 	case nodev1.ChainType_CHAIN_TYPE_STARKNET:
 		family = chain_selectors.FamilyStarknet
+	case nodev1.ChainType_CHAIN_TYPE_SUI:
+		family = chain_selectors.FamilySui
 	case nodev1.ChainType_CHAIN_TYPE_TON:
 		family = chain_selectors.FamilyTon
 	case nodev1.ChainType_CHAIN_TYPE_TRON:
@@ -459,6 +461,8 @@ func detailsToChain(details chain_selectors.ChainDetails) (*nodev1.Chain, error)
 		t = nodev1.ChainType_CHAIN_TYPE_TRON
 	case chain_selectors.FamilyStarknet:
 		t = nodev1.ChainType_CHAIN_TYPE_STARKNET
+	case chain_selectors.FamilySui:
+		t = nodev1.ChainType_CHAIN_TYPE_SUI
 	default:
 		return nil, fmt.Errorf("unsupported chain family %s", family)
 	}

@@ -26,6 +26,7 @@ import (
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm/provider"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
 
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
+	sui_cs_core "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	ccipops "github.com/smartcontractkit/chainlink/deployment/ccip/operation/evm/v1_6"
 	ccipseq "github.com/smartcontractkit/chainlink/deployment/ccip/sequence/evm/v1_6"
@@ -71,6 +73,8 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+
+	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 )
 
 const (
@@ -102,6 +106,7 @@ type TestConfigs struct {
 	V1_5Cfg                    changeset.V1_5DeploymentConfig
 	Chains                     int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	SolChains                  int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
+	SuiChains                  int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	AptosChains                int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	TonChains                  int      // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
 	ChainIDs                   []uint64 // only used in memory mode, for docker mode, this is determined by the integration-test config toml input
@@ -330,6 +335,12 @@ func WithAptosChains(numChains int) TestOps {
 	}
 }
 
+func WithSuiChains(numChains int) TestOps {
+	return func(testCfg *TestConfigs) {
+		testCfg.SuiChains = numChains
+	}
+}
+
 func WithTonChains(numChains int) TestOps {
 	return func(testCfg *TestConfigs) {
 		testCfg.TonChains = numChains
@@ -395,6 +406,7 @@ type MemoryEnvironment struct {
 	Chains      map[uint64]cldf_evm.Chain
 	SolChains   map[uint64]cldf_solana.Chain
 	AptosChains map[uint64]cldf_aptos.Chain
+	SuiChains   map[uint64]cldf_sui.Chain
 	TonChains   map[uint64]cldf_ton.Chain
 }
 
@@ -452,12 +464,14 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 	solChains := memory.NewMemoryChainsSol(t, tc.SolChains, commitSha)
 
 	aptosChains := memory.NewMemoryChainsAptos(t, tc.AptosChains)
+	suiChains := memory.NewMemoryChainsSui(t, tc.SuiChains)
 	tonChains := memory.NewMemoryChainsTon(t, tc.TonChains)
 	// if we have Aptos and Solana chains, we need to set their chain selectors on the wrapper
 	// environment, so we have to convert it back to the concrete type. This needs to be refactored
 	m.AptosChains = cldf_chain.NewBlockChainsFromSlice(aptosChains).AptosChains()
 	m.SolChains = cldf_chain.NewBlockChainsFromSlice(solChains).SolanaChains()
 	m.TonChains = cldf_chain.NewBlockChainsFromSlice(tonChains).TonChains()
+	m.SuiChains = cldf_chain.NewBlockChainsFromSlice(suiChains).SuiChains()
 
 	blockChains := map[uint64]cldf_chain.BlockChain{}
 	for selector, ch := range m.Chains {
@@ -470,6 +484,10 @@ func (m *MemoryEnvironment) StartChains(t *testing.T) {
 		blockChains[ch.ChainSelector()] = ch
 	}
 	for selector, ch := range m.TonChains {
+		blockChains[selector] = ch
+	}
+
+	for selector, ch := range m.SuiChains {
 		blockChains[selector] = ch
 	}
 
@@ -746,10 +764,12 @@ func NewEnvironmentWithJobsAndContracts(t *testing.T, tEnv TestEnvironment) Depl
 	solChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySolana))
 	aptosChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyAptos))
 	tonChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyTon))
+	suiChains := e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilySui))
 	//nolint:gocritic // we need to segregate EVM and Solana chains
 	allChains := append(evmChains, solChains...)
 	allChains = append(allChains, aptosChains...)
 	allChains = append(allChains, tonChains...)
+	allChains = append(allChains, suiChains...)
 	mcmsCfg := make(map[uint64]commontypes.MCMSWithTimelockConfig)
 
 	for _, c := range e.Env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM)) {
@@ -1012,7 +1032,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 	evmContractParams := make(map[uint64]ccipseq.ChainContractParams)
 
 	var (
-		evmChains, solChains, aptosChains, tonChains []uint64
+		evmChains, solChains, aptosChains, suiChains, tonChains []uint64
 	)
 	for _, chain := range allChains {
 		if _, ok := e.Env.BlockChains.EVMChains()[chain]; ok {
@@ -1026,6 +1046,9 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		}
 		if _, ok := e.Env.BlockChains.TonChains()[chain]; ok {
 			tonChains = append(tonChains, chain)
+		}
+		if _, ok := e.Env.BlockChains.SuiChains()[chain]; ok {
+			suiChains = append(suiChains, chain)
 		}
 	}
 
@@ -1082,6 +1105,29 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		aptosCs := DeployChainContractsToAptosCS(t, e, aptosChains[0])
 		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{aptosCs})
 		require.NoError(t, err)
+	}
+
+	// Currently only one sui chain is supported in test environment
+	if len(suiChains) != 0 {
+		// Deploy Link Token
+		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+			commonchangeset.Configure(sui_cs.DeployLinkToken{}, sui_cs.DeployLinkTokenConfig{
+				ChainSelector: suiChains[0],
+			}),
+		})
+		require.NoError(t, err)
+
+		state, err := stateview.LoadOnchainState(e.Env)
+		require.NoError(t, err)
+
+		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
+			commonchangeset.Configure(sui_cs.DeploySuiChain{}, sui_cs.DeploySuiChainConfig{
+				SuiChainSelector:              suiChains[0],
+				DestChainSelector:             evmChains[0],
+				DestChainOnRampAddressBytes:   state.MustGetEVMChainState(e.HomeChainSel).OnRamp.Address().Bytes(),
+				LinkTokenCoinMetadataObjectId: state.SuiChains[suiChains[0]].LinkTokenCoinMetadataId,
+			}),
+		})
 	}
 
 	if len(tonChains) != 0 {
@@ -1266,6 +1312,25 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		}
 	}
 
+	for _, chain := range suiChains {
+		// TODO(sui): update this for token transfers
+		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
+		tokenInfo[cciptypes.UnknownEncodedAddress(state.SuiChains[chain].LinkTokenAddress)] = tokenConfig.TokenSymbolToInfo[shared.LinkSymbol]
+		ocrOverride := tc.OCRConfigOverride
+		commitOCRConfigs[chain] = v1_6.DeriveOCRParamsForCommit(v1_6.SimulationTest, e.FeedChainSel, tokenInfo, ocrOverride)
+		execOCRConfigs[chain] = v1_6.DeriveOCRParamsForExec(v1_6.SimulationTest, tokenDataProviders, ocrOverride)
+		chainConfigs[chain] = v1_6.ChainConfig{
+			Readers: nodeInfo.NonBootstraps().PeerIDs(),
+			// #nosec G115 - Overflow is not a concern in this test scenario
+			FChain: uint8(len(nodeInfo.NonBootstraps().PeerIDs()) / 3),
+			EncodableChainConfig: chainconfig.ChainConfig{
+				GasPriceDeviationPPB:    cciptypes.BigInt{Int: big.NewInt(DefaultGasPriceDeviationPPB)},
+				DAGasPriceDeviationPPB:  cciptypes.BigInt{Int: big.NewInt(DefaultDAGasPriceDeviationPPB)},
+				OptimisticConfirmations: globals.OptimisticConfirmations,
+			},
+		}
+	}
+
 	for _, chain := range aptosChains {
 		tokenInfo := map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{}
 		linkTokenAddress := state.AptosChains[chain].LinkTokenAddress
@@ -1391,6 +1456,17 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				MCMS: mcmsConfig,
 			},
 		))
+		if len(suiChains) > 0 {
+			apps = append(apps, commonchangeset.Configure(
+				// Enable the OCR config on the remote chains.
+				sui_cs_core.SetOCR3Offramp{},
+				v1_6.SetOCR3OffRampConfig{
+					HomeChainSel:       e.HomeChainSel,
+					RemoteChainSels:    suiChains,
+					CCIPHomeConfigType: globals.ConfigTypeActive,
+				},
+			))
+		}
 		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
 			cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),
@@ -1400,6 +1476,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				CCIPHomeConfigType: globals.ConfigTypeActive,
 			},
 		))
+
 		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
 			aptoscs.SetOCR3Offramp{},

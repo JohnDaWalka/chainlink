@@ -235,6 +235,78 @@ func validateOCR3Config(chainSel uint64, configForOCR3 ccip_home.CCIPHomeOCR3Con
 	return nil
 }
 
+// we can't use the EVM one because we need string transmitter address
+type MultiOCR3BaseOCRConfigArgsSui struct {
+	ConfigDigest                   [32]byte
+	OcrPluginType                  byte
+	F                              byte
+	IsSignatureVerificationEnabled bool
+	Signers                        [][]byte
+	Transmitters                   []string
+}
+
+// BuildSetOCR3ConfigArgsSui builds OCR3 config for Sui chains
+func BuildSetOCR3ConfigArgsSui(
+	donID uint32,
+	ccipHome *ccip_home.CCIPHome,
+	destSelector uint64,
+	configType globals.ConfigType,
+) ([]MultiOCR3BaseOCRConfigArgsSui, error) {
+	chainCfg, err := ccipHome.GetChainConfig(nil, destSelector)
+	if err != nil {
+		return nil, fmt.Errorf("error getting chain config for chain selector %d it must be set before OCR3Config set up: %w", destSelector, err)
+	}
+	var offrampOCR3Configs []MultiOCR3BaseOCRConfigArgsSui
+	for _, pluginType := range []types.PluginType{types.PluginTypeCCIPCommit, types.PluginTypeCCIPExec} {
+		ocrConfig, err2 := ccipHome.GetAllConfigs(&bind.CallOpts{
+			Context: context.Background(),
+		}, donID, uint8(pluginType))
+		if err2 != nil {
+			return nil, err2
+		}
+
+		configForOCR3 := ocrConfig.ActiveConfig
+		// we expect only an active config
+		switch configType {
+		case globals.ConfigTypeActive:
+			if ocrConfig.ActiveConfig.ConfigDigest == [32]byte{} {
+				return nil, fmt.Errorf("invalid OCR3 config state, expected active config, donID: %d, activeConfig: %v, candidateConfig: %v",
+					donID, hexutil.Encode(ocrConfig.ActiveConfig.ConfigDigest[:]), hexutil.Encode(ocrConfig.CandidateConfig.ConfigDigest[:]))
+			}
+		case globals.ConfigTypeCandidate:
+			if ocrConfig.CandidateConfig.ConfigDigest == [32]byte{} {
+				return nil, fmt.Errorf("invalid OCR3 config state, expected candidate config, donID: %d, activeConfig: %v, candidateConfig: %v",
+					donID, hexutil.Encode(ocrConfig.ActiveConfig.ConfigDigest[:]), hexutil.Encode(ocrConfig.CandidateConfig.ConfigDigest[:]))
+			}
+			configForOCR3 = ocrConfig.CandidateConfig
+		}
+
+		if err := validateOCR3Config(destSelector, configForOCR3.Config, &chainCfg); err != nil {
+			return nil, err
+		}
+
+		var signerAddresses [][]byte
+		var transmitterAddresses []string
+		for _, node := range configForOCR3.Config.Nodes {
+
+			signerAddresses = append(signerAddresses, node.SignerKey)
+
+			transmitterAddress := "0x" + hex.EncodeToString(node.TransmitterKey)
+			transmitterAddresses = append(transmitterAddresses, transmitterAddress)
+		}
+
+		offrampOCR3Configs = append(offrampOCR3Configs, MultiOCR3BaseOCRConfigArgsSui{
+			ConfigDigest:                   configForOCR3.ConfigDigest,
+			OcrPluginType:                  uint8(pluginType),
+			F:                              configForOCR3.Config.FRoleDON,
+			IsSignatureVerificationEnabled: pluginType == types.PluginTypeCCIPCommit,
+			Signers:                        signerAddresses,
+			Transmitters:                   transmitterAddresses,
+		})
+	}
+	return offrampOCR3Configs, nil
+}
+
 // https://github.com/smartcontractkit/chainlink-ccip/blob/bdbfcc588847d70817333487a9883e94c39a332e/chains/solana/gobindings/ccip_router/SetOcrConfig.go#L23
 type MultiOCR3BaseOCRConfigArgsSolana struct {
 	ConfigDigest                   [32]byte
@@ -568,6 +640,11 @@ func BuildOCR3ConfigForCCIPHome(
 				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to decode Aptos address '%s': %w", transmitter, err)
+				}
+			case chain_selectors.FamilySui:
+				parsed, err = hex.DecodeString(strings.TrimPrefix(string(transmitter), "0x"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode SUI address '%s': %w", transmitter, err)
 				}
 			}
 

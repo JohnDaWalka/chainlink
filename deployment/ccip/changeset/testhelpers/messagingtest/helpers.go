@@ -192,6 +192,13 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 			FeeToken:     feeToken,
 			TokenAmounts: nil,
 		}
+	case chain_selectors.FamilySui:
+		msg = testhelpers.SuiSendRequest{
+			Data:      tc.MsgData,
+			Receiver:  common.LeftPadBytes(tc.Receiver, 32),
+			ExtraArgs: tc.ExtraArgs,
+			FeeToken:  tc.FeeToken,
+		}
 	case chain_selectors.FamilyTon:
 		feeToken := ops.TonTokenAddr
 		if len(tc.FeeToken) > 0 {
@@ -304,6 +311,10 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		// TON does only support out-of-order execution
 		case chain_selectors.FamilyTon:
 			unorderedExec = true
+		// Sui does only support out-of-order execution
+		case chain_selectors.FamilySui:
+			unorderedExec = true
+
 		}
 
 		// TODO investigate TON nonce management, getLatestNonce is mocked to increase by 1 for now

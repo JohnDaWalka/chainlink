@@ -29,6 +29,7 @@ type MemoryEnvironmentConfig struct {
 	SolChains          int
 	AptosChains        int
 	ZkChains           int
+	SuiChains          int
 	TonChains          int
 	TronChains         int
 	NumOfUsersPerChain int
@@ -103,6 +104,10 @@ func NewMemoryChainsAptos(t *testing.T, numChains int) []cldf_chain.BlockChain {
 
 func NewMemoryChainsZk(t *testing.T, numChains int) []cldf_chain.BlockChain {
 	return GenerateChainsZk(t, numChains)
+}
+
+func NewMemoryChainsSui(t *testing.T, numChains int) []cldf_chain.BlockChain {
+	return GenerateChainsSui(t, numChains)
 }
 
 func NewMemoryChainsTon(t *testing.T, numChains int) []cldf_chain.BlockChain {
@@ -217,11 +222,12 @@ func NewMemoryEnvironment(
 	solChains := NewMemoryChainsSol(t, config.SolChains, solanaCommitSha)
 	aptosChains := NewMemoryChainsAptos(t, config.AptosChains)
 	zkChains := NewMemoryChainsZk(t, config.ZkChains)
+	suiChains := NewMemoryChainsSui(t, config.SuiChains)
 	tonChains := NewMemoryChainsTon(t, config.TonChains)
 	tronChains := NewMemoryChainsTron(t, config.TronChains)
 
 	chains := cldf_chain.NewBlockChainsFromSlice(
-		slices.Concat(evmChains, solChains, aptosChains, zkChains, tonChains, tronChains),
+		slices.Concat(evmChains, solChains, aptosChains, suiChains, zkChains, tonChains, tronChains),
 	)
 
 	c := NewNodesConfig{

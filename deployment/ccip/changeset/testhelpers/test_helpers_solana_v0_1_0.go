@@ -34,12 +34,12 @@ import (
 
 	aptos_fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/helpers"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/base_token_pool"
@@ -205,6 +205,9 @@ func WaitForEventFilterRegistration(t *testing.T, oc cldf_offchain.Client, chain
 	case chainsel.FamilyAptos:
 		// Aptos is not using LogPoller
 		return nil
+	case chainsel.FamilySui:
+		// Sui is not using LogPoller
+		return nil
 	default:
 		return fmt.Errorf("unsupported chain family; %v", family)
 	}
@@ -305,6 +308,14 @@ func LatestBlock(ctx context.Context, env cldf.Environment, chainSelector uint64
 			return 0, fmt.Errorf("failed to get chain info for chain %d: %w", chainSelector, err)
 		}
 		return chainInfo.LedgerVersion(), nil
+	case chainsel.FamilySui:
+		suiClient := env.BlockChains.SuiChains()[chainSelector].Client
+		seqNum, err := suiClient.SuiGetLatestCheckpointSequenceNumber(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get sui latest checkpoint: %w", err)
+		}
+
+		return seqNum, nil
 	default:
 		return 0, errors.New("unsupported chain family")
 	}
@@ -317,6 +328,8 @@ func LatestBlocksByChain(ctx context.Context, env cldf.Environment) (map[uint64]
 	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.EVMChains()))
 	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.SolanaChains()))
 	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.AptosChains()))
+	chains = slices.AppendSeq(chains, maps.Keys(env.BlockChains.SuiChains()))
+
 	for _, selector := range chains {
 		block, err := LatestBlock(ctx, env, selector)
 		if err != nil {
@@ -511,6 +524,8 @@ func SendRequest(
 		return SendRequestSol(e, state, cfg)
 	case chainsel.FamilyAptos:
 		return SendRequestAptos(e, state, cfg)
+	case chainsel.FamilySui:
+		return SendRequestSui(e, state, cfg)
 	case chainsel.FamilyTon:
 		seq, raw, err := tonOps.SendTonRequest(e, state.TonChains[cfg.SourceChain], cfg.SourceChain, cfg.DestChain, cfg.Message.(tonOps.TonSendRequest))
 		if err != nil {
@@ -571,6 +586,14 @@ func SendRequestEVM(
 		SequenceNumber: it.Event.SequenceNumber,
 		RawEvent:       it.Event,
 	}, nil
+}
+
+func SendRequestSui(
+	e cldf.Environment,
+	state stateview.CCIPOnChainState,
+	cfg *ccipclient.CCIPSendReqConfig,
+) (*ccipclient.AnyMsgSentEvent, error) {
+	return SendSuiRequestViaChainWriter(e, cfg)
 }
 
 func SendRequestSol(
@@ -1158,6 +1181,27 @@ func AddEVMDestChangesets(e *DeployedEnv, to, from uint64, isTestRouter bool) []
 		),
 	}
 	return evmDstChangesets
+}
+
+func AddSuiDestChangeset(e *DeployedEnv, to, from uint64, isTestRouter bool) []commoncs.ConfiguredChangeSet {
+	suiDstChangesets := []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(
+			cldf.CreateLegacyChangeSet(v1_6.UpdateOffRampSourcesChangeset),
+			v1_6.UpdateOffRampSourcesConfig{
+				UpdatesByChain: map[uint64]map[uint64]v1_6.OffRampSourceUpdate{
+					to: {
+						from: {
+							IsEnabled:                 true,
+							TestRouter:                isTestRouter,
+							IsRMNVerificationDisabled: !e.RmnEnabledSourceChains[from],
+						},
+					},
+				},
+			},
+		),
+	}
+
+	return suiDstChangesets
 }
 
 func AddLaneAptosChangesets(t *testing.T, srcChainSelector, destChainSelector uint64, gasPrices map[uint64]*big.Int, tokenPrices map[aptos.AccountAddress]*big.Int) []commoncs.ConfiguredChangeSet {
@@ -1945,6 +1989,14 @@ func Transfer(
 			FeeToken:     feeTokenAddr,
 			TokenAmounts: tokens.([]AptosTokenAmount),
 		}
+	case chainsel.FamilySui:
+		msg = SuiSendRequest{
+			Data:         data,
+			Receiver:     common.LeftPadBytes(receiver, 32),
+			ExtraArgs:    extraArgs,
+			FeeToken:     feeToken,
+			TokenAmounts: tokens.([]SuiTokenAmount),
+		}
 	default:
 		t.Errorf("unsupported source chain: %v", family)
 	}
@@ -1963,6 +2015,7 @@ type TestTransferRequest struct {
 	Tokens                []router.ClientEVMTokenAmount
 	SolTokens             []solRouter.SVMTokenAmount
 	AptosTokens           []AptosTokenAmount
+	SuiTokens             []SuiTokenAmount
 	Data                  []byte
 	ExtraArgs             []byte
 	ExpectedTokenBalances []ExpectedBalance
@@ -2033,6 +2086,9 @@ func TransferMultiple(
 				expectedTokenBalances.add(tt.DestChain, tt.Receiver, tt.ExpectedTokenBalances)
 			case chainsel.FamilyAptos:
 				tokens = tt.AptosTokens
+				expectedTokenBalances.add(tt.DestChain, tt.Receiver, tt.ExpectedTokenBalances)
+			case chainsel.FamilySui:
+				tokens = tt.SuiTokens
 				expectedTokenBalances.add(tt.DestChain, tt.Receiver, tt.ExpectedTokenBalances)
 			default:
 				t.Errorf("unsupported source chain: %v", family)

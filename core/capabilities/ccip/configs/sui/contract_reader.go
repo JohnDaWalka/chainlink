@@ -143,6 +143,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required:   true,
 							},
 						},
+						ResultTupleToStruct: []string{"max_fee_juels_per_msg, link_token, token_price_staleness_threshold"},
 					},
 					"GetDestinationChainGasPrice": {
 						Name:          "get_dest_chain_gas_price",
@@ -365,7 +366,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 								Required: true,
 							},
 						},
-						ResultTupleToStruct: []string{"isEnabled", "sequenceNumber", "allowListEnabled", "allowedSenders"},
+						ResultTupleToStruct: []string{"sequenceNumber", "allowListEnabled", "router"},
 					},
 					"GetExpectedNextSequenceNumber": {
 						Name:          "get_expected_next_sequence_number",
