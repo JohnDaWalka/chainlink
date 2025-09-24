@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 // SMOKE TESTS target happy path and sanity checks, all other tests (e.g. edge cases, negative conditions) should go to a `regression` package.
@@ -21,6 +22,7 @@ Inside `core/scripts/cre/environment` directory
     `export  CTF_CONFIGS=../../../../core/scripts/cre/environment/configs/<topology>.toml; go test -timeout 15m -run ^Test_CRE_Suite$`.
 */
 func Test_CRE_Suite(t *testing.T) {
+	quarantine.Flaky(t, "DX-1868")
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t))
 	// WARNING: currently we can't run these tests in parallel, because each test rebuilds environment structs and that includes
 	// logging into CL node with GraphQL API, which allows only 1 session per user at a time.
