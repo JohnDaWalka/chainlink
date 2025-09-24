@@ -20,9 +20,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
 )

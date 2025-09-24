@@ -16,7 +16,7 @@ import (
 	focr "github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	deployment_devenv "github.com/smartcontractkit/chainlink/deployment/environment/devenv"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
@@ -92,7 +92,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		}
 	}
 
-	allNodeInfo := make([]deployment_devenv.NodeInfo, 0)
+	allNodeInfo := make([]devenv.NodeInfo, 0)
 	allNodeIDs := make([]string, 0)
 
 	for idx, don := range envArtifact.DONs {
@@ -114,7 +114,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
 		}
-		offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
+		offChain, offChainErr := devenv.NewJDClient(ctx, devenv.JDConfig{
 			WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
 			GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
 			Creds:    insecure.NewCredentials(),
@@ -124,11 +124,11 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", don.DonName)
 		}
 
-		jd, ok := offChain.(*deployment_devenv.JobDistributor)
+		jd, ok := offChain.(*devenv.JobDistributor)
 		if !ok {
 			return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", don.DonName)
 		}
-		registeredDon, donErr := deployment_devenv.NewRegisteredDON(ctx, nodeInfo, *jd)
+		registeredDon, donErr := devenv.NewRegisteredDON(ctx, nodeInfo, *jd)
 		if donErr != nil {
 			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
 		}
@@ -137,7 +137,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		allNodeInfo = append(allNodeInfo, nodeInfo...)
 	}
 
-	offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
+	offChain, offChainErr := devenv.NewJDClient(ctx, devenv.JDConfig{
 		WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
 		GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
 		Creds:    insecure.NewCredentials(),
@@ -147,7 +147,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client")
 	}
 
-	chainConfigs := make([]deployment_devenv.ChainConfig, 0, len(wrappedBlockchainOutputs))
+	chainConfigs := make([]devenv.ChainConfig, 0, len(wrappedBlockchainOutputs))
 	for _, output := range wrappedBlockchainOutputs {
 		cfg, cfgErr := cre.ChainConfigFromWrapped(output)
 		if cfgErr != nil {
@@ -156,7 +156,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		chainConfigs = append(chainConfigs, cfg)
 	}
 
-	blockChains, chainErr := deployment_devenv.NewChains(cldLogger, chainConfigs)
+	blockChains, chainErr := devenv.NewChains(cldLogger, chainConfigs)
 	if chainErr != nil {
 		return nil, nil, errors.Wrapf(chainErr, "failed to create block chains")
 	}

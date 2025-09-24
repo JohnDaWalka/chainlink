@@ -14,9 +14,9 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
 	ctf_jd "github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -257,7 +257,7 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 
 	var nodeIDs []string
 	for _, don := range dons {
-		nodeIDs = append(nodeIDs, don.NodeIds()...)
+		nodeIDs = append(nodeIDs, don.NodeIDs()...)
 	}
 
 	dons = addOCRKeyLabelsToNodeMetadata(dons, input.Topology)
@@ -335,7 +335,7 @@ func addOCRKeyLabelsToNodeMetadata(dons []*devenv.DON, topology *cre.Topology) [
 			// required for job proposals, because they need to include the ID of the node in Job Distributor
 			donNode.Labels = append(donNode.Labels, &cre.Label{
 				Key:   node.NodeIDKey,
-				Value: don.NodeIds()[j],
+				Value: don.NodeIDs()[j],
 			})
 
 			ocrSupportedFamilies := make([]string, 0)

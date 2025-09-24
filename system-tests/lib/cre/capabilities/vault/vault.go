@@ -228,6 +228,9 @@ func encryptPrivateShare(offchain cldf_offchain.Client, nodeID string, sk *tdh2e
 	return hex.EncodeToString(sealed), nil
 }
 
+// just to satisfy linter
+var _ = encryptPrivateShare
+
 func dkgKeys(n, t int) (string, []*tdh2easy.PrivateShare, error) {
 	instanceID, recipCfg, recipSecKeys, err := dummydkg.NewDKGSetup(n, t, "REPLACE_ME_WITH_RANDOM_SEED")
 	if err != nil {
@@ -264,6 +267,9 @@ func dkgKeys(n, t int) (string, []*tdh2easy.PrivateShare, error) {
 	framework.L.Info().Msg("Generated MasterPublicKey for n=" + strconv.Itoa(n) + ", t=" + strconv.Itoa(t) + ". Key = " + pks)
 	return pks, shares, nil
 }
+
+// just to satisfy linter
+var _ = dkgKeys
 
 func registerWithV1(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig
