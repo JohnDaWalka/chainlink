@@ -71,7 +71,8 @@ func Test_CRE_Suite_EVM(t *testing.T) {
 	})
 
 	t.Run("[v2] EVM Read happy path test", func(t *testing.T) {
-		ExecuteEVMReadTest(t, testEnv)
+		t.Fail() // example failure
+		// ExecuteEVMReadTest(t, testEnv)
 	})
 }
 
