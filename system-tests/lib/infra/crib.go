@@ -2,6 +2,7 @@ package infra
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Type = string
@@ -20,11 +21,11 @@ type Provider struct {
 }
 
 func (i *Provider) IsCRIB() bool {
-	return i.Type == CRIB
+	return strings.EqualFold(i.Type, CRIB)
 }
 
 func (i *Provider) IsDocker() bool {
-	return i.Type == Docker
+	return strings.EqualFold(i.Type, Docker)
 }
 
 // Unfortunately, we need to construct some of these URLs before any environment is created, because they are used

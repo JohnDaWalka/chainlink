@@ -37,18 +37,18 @@ type Topology struct {
 	GatewayConnectorOutput  *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
-func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Provider) (*Topology, error) {
+func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provider) (*Topology, error) {
 	// TODO this setup is awkward, consider an withInfra opt to constructor
 	dm := make([]*DonMetadata, len(nodeSetInput))
 	for i := range nodeSetInput {
 		// TODO take more care about the ID assignment, it should match what the capabilities registry will assign
 		// currently we optimistically set the id to the that which the capabilities registry will assign it
 		d := NewDonMetadata(nodeSetInput[i], libc.MustSafeUint64FromInt(i+1))
-		d.labelNodes(infraInput)
+		d.labelNodes(provider)
 		dm[i] = d
 	}
 
-	donsMetadata, err := NewDonsMetadata(dm, infraInput)
+	donsMetadata, err := NewDonsMetadata(dm, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DONs metadata: %w", err)
 	}
@@ -67,8 +67,9 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Prov
 	}
 
 	topology := &Topology{
-		WorkflowDONID:           wfDon.ID,
-		DonsMetadata:            dm,
+		WorkflowDONID: wfDon.ID,
+		DonsMetadata:  dm,
+		// TODO move to DON level
 		CapabilitiesPeeringData: capPeeringCfg,
 		OCRPeeringData:          ocrPeeringCfg,
 	}
@@ -76,8 +77,8 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Prov
 	if donsMetadata.GatewayRequired() {
 		topology.GatewayConnectorOutput = NewGatewayConnectorOutput()
 		for _, d := range donsMetadata.List() {
-			if d.IsGateway() {
-				gc, err := d.GatewayConfig(infraInput)
+			if d.ContainsGatewayNode() {
+				gc, err := d.GatewayConfig(provider)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get gateway config for DON %s: %w", d.Name, err)
 				}

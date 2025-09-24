@@ -594,7 +594,7 @@ func (m *DonMetadata) labelNodes(infraInput infra.Provider) {
 		m.NodesMetadata[i] = &nodeWithLabels
 	}
 
-	if m.IsGateway() {
+	if m.ContainsGatewayNode() {
 		i := m.ns.GatewayNodeIndex
 		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
 			Key:   ExtraRolesKey,
@@ -604,7 +604,7 @@ func (m *DonMetadata) labelNodes(infraInput infra.Provider) {
 }
 
 func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration, error) {
-	if m.IsGateway() {
+	if m.ContainsGatewayNode() {
 		i := m.ns.GatewayNodeIndex
 		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
 			Key:   ExtraRolesKey,
@@ -637,7 +637,7 @@ func (m *DonMetadata) RequiresOCR() bool {
 		slices.Contains(m.Flags, VaultCapability) || slices.Contains(m.Flags, EVMCapability)
 }
 
-func (m *DonMetadata) IsGateway() bool {
+func (m *DonMetadata) ContainsGatewayNode() bool {
 	return m.ns.GatewayNodeIndex != -1 // don't use flag here b/c may not be set
 }
 
@@ -735,7 +735,7 @@ func (m DonsMetadata) FindByID(id uint64) (*DonMetadata, error) {
 
 func (m DonsMetadata) FindByName(name string) (*DonMetadata, error) {
 	for _, don := range m.dons {
-		if don.Name == name {
+		if strings.EqualFold(don.Name, name) {
 			return don, nil
 		}
 	}
@@ -780,7 +780,7 @@ func (m DonsMetadata) GetWorkflowDON() (*DonMetadata, error) {
 
 func (m DonsMetadata) GatewayEnabled() bool {
 	for _, don := range m.dons {
-		if don.IsGateway() {
+		if don.ContainsGatewayNode() {
 			return true
 		}
 	}
@@ -789,7 +789,7 @@ func (m DonsMetadata) GatewayEnabled() bool {
 
 func (m DonsMetadata) GetGatewayDON() (*DonMetadata, error) {
 	for _, don := range m.dons {
-		if don.IsGateway() {
+		if don.ContainsGatewayNode() {
 			return don, nil
 		}
 	}
