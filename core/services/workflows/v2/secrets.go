@@ -290,23 +290,23 @@ func (s *secretsFetcher) decryptSecret(lggr logger.Logger, encryptedSecretBytes 
 	for i, encryptedDecryptionShare := range encryptedDecryptionShares {
 		encryptedDecryptionShareBytes, err := hex.DecodeString(encryptedDecryptionShare)
 		if err != nil {
-			lggr.Debugw("failed to hex decode the encryptedDecryptionShare", "index", i, "encryptedDecryptionShare", encryptedDecryptionShare, "err", err)
+			lggr.Debugw("failed to hex decode the encryptedDecryptionShare", "index", i)
 			continue
 		}
 		decryptionShareBytes, err := s.workflowEncryptionKey.Decrypt(encryptedDecryptionShareBytes)
 		if err != nil {
-			lggr.Debugw("failed to decrypt the encryptedDecryptionShare", "index", i, "encryptedDecryptionShare", encryptedDecryptionShare, "err", err)
+			lggr.Debugw("failed to decrypt the encryptedDecryptionShare", "index", i)
 			continue
 		}
 		decryptionShare := &tdh2easy.DecryptionShare{}
 		err = decryptionShare.Unmarshal(decryptionShareBytes)
 		if err != nil {
-			lggr.Debugw("failed to unmarshal decryption share", "index", i, "encryptedDecryptionShare", encryptedDecryptionShare, "err", err)
+			lggr.Debugw("failed to unmarshal decryption share", "index", i)
 			continue
 		}
 		err = tdh2easy.VerifyShare(cipherText, vaultPublicKey, decryptionShare)
 		if err != nil {
-			lggr.Debugw("failed to verify decryption share", "index", i, "encryptedDecryptionShare", encryptedDecryptionShare, "err", err)
+			lggr.Debugw("failed to verify decryption share", "index", i)
 			continue
 		}
 		decryptionShares = append(decryptionShares, decryptionShare)
