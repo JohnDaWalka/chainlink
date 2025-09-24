@@ -9,9 +9,9 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
-replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
+// replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 
@@ -496,7 +496,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250912140847-cbfb1710ac76 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250910230900-fa42dad2d413 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250923223205-27aea378b64f // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250924031702-fe214ca62f83 // indirect
 	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20250923223205-27aea378b64f // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
