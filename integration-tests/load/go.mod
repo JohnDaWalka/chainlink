@@ -9,9 +9,9 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
-// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
-// replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
+replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
 
 // replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
 
