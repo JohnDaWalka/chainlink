@@ -1,5 +1,81 @@
 # Changelog Chainlink Core
 
+## 2.30.0
+
+### Minor Changes
+
+- [#19445](https://github.com/smartcontractkit/chainlink/pull/19445) [`db4c600`](https://github.com/smartcontractkit/chainlink/commit/db4c6003b74f3280aecbcf1403adab1204c1631e) - #internal Add regression system-tests package
+
+### Patch Changes
+
+- [#19460](https://github.com/smartcontractkit/chainlink/pull/19460) [`4f1f2d9`](https://github.com/smartcontractkit/chainlink/commit/4f1f2d991cb73061665fdcba81a3d22c0bff5364) - #fix Workflow Registry Syncer V1 handles delete events first and handles orphaned pending events
+
+- [#19519](https://github.com/smartcontractkit/chainlink/pull/19519) [`7bb659b`](https://github.com/smartcontractkit/chainlink/commit/7bb659bbf3defc24542f17fbeaa58f852f3ac24c) - #internal #bugfix Cancels sync routines if contract reader fails to construct
+
+## 2.29.0
+
+### Minor Changes
+
+- [#19309](https://github.com/smartcontractkit/chainlink/pull/19309) [`7300625`](https://github.com/smartcontractkit/chainlink/commit/730062558d8185f17b19ba1af8f0d85a9b88ad5d) - bump sdk version to 0.7.0 #updated
+
+- [#19206](https://github.com/smartcontractkit/chainlink/pull/19206) [`5521ee4`](https://github.com/smartcontractkit/chainlink/commit/5521ee425d856ba93392da9cd4eed190e5df37ee) - #fix flaky test, bump go-ethereum
+
+- [#19280](https://github.com/smartcontractkit/chainlink/pull/19280) [`ef3a381`](https://github.com/smartcontractkit/chainlink/commit/ef3a381f0f3613b4b77c711b90fb5cb476051dff) - #updated CCIP DeployPrerequsitesChangeset to deploy token pool contracts
+
+- [#18833](https://github.com/smartcontractkit/chainlink/pull/18833) [`ea85386`](https://github.com/smartcontractkit/chainlink/commit/ea8538636d0a69a4093ce2a82695db5b9f84d217) - #internal Tron CRE E2E tests
+
+- [#19301](https://github.com/smartcontractkit/chainlink/pull/19301) [`2fb90db`](https://github.com/smartcontractkit/chainlink/commit/2fb90dbdb1d3b9ed2067761a1de027413e55883b) - #added DKG to local CRE
+
+- [#19162](https://github.com/smartcontractkit/chainlink/pull/19162) [`728267c`](https://github.com/smartcontractkit/chainlink/commit/728267c473f1019c8bd878d01943cb79cd308554) - #added DKGResult database
+
+- [#19161](https://github.com/smartcontractkit/chainlink/pull/19161) [`58aa943`](https://github.com/smartcontractkit/chainlink/commit/58aa943b6341168b5652c8d2032d938cf3fb8455) - #added P256 DKGRecipient key to keystore
+
+- [#19262](https://github.com/smartcontractkit/chainlink/pull/19262) [`03478ed`](https://github.com/smartcontractkit/chainlink/commit/03478edcd69f6634c925c245854ca981bef795ea) - #added GetJobRuns to Job Distributor
+
+- [#19458](https://github.com/smartcontractkit/chainlink/pull/19458) [`fae1588`](https://github.com/smartcontractkit/chainlink/commit/fae1588e6b9a4c1ae05fea1b3050343d33287fec) - #bug use on-chain config in vault plugin
+
+- [#19186](https://github.com/smartcontractkit/chainlink/pull/19186) [`c256437`](https://github.com/smartcontractkit/chainlink/commit/c256437f4683be352374f769453586e52f5ce026) - #changed change FixtureChainID
+
+- [#19160](https://github.com/smartcontractkit/chainlink/pull/19160) [`71bcea4`](https://github.com/smartcontractkit/chainlink/commit/71bcea4d84e71b66e3e712186bfbb07951558d07) - #changed vault plugin to use dkg result database
+
+- [#19445](https://github.com/smartcontractkit/chainlink/pull/19445) [`db4c600`](https://github.com/smartcontractkit/chainlink/commit/db4c6003b74f3280aecbcf1403adab1204c1631e) - #internal Add regression system-tests package
+
+- [#19301](https://github.com/smartcontractkit/chainlink/pull/19301) [`2fb90db`](https://github.com/smartcontractkit/chainlink/commit/2fb90dbdb1d3b9ed2067761a1de027413e55883b) - #added DKG integration with Vault plugin
+
+- [#19214](https://github.com/smartcontractkit/chainlink/pull/19214) [`774a7d6`](https://github.com/smartcontractkit/chainlink/commit/774a7d61324ad91373826568eb452e2291debd20) - CCIP OCR2 beholder metrics #nops
+
+### Patch Changes
+
+- [#19354](https://github.com/smartcontractkit/chainlink/pull/19354) [`5b3c6a4`](https://github.com/smartcontractkit/chainlink/commit/5b3c6a41274511e40ed16d4716eddd2d4433158d) - #removed Secure Mint functionality
+
+- [#19346](https://github.com/smartcontractkit/chainlink/pull/19346) [`bad8917`](https://github.com/smartcontractkit/chainlink/commit/bad8917904065e7471ee512476ff6dee31a6c51c) - #internal #bugfix Links worker to a dummy org in V2 wf registry and fixes deadlock in wf reg syncer v2
+
+- [#19460](https://github.com/smartcontractkit/chainlink/pull/19460) [`4f1f2d9`](https://github.com/smartcontractkit/chainlink/commit/4f1f2d991cb73061665fdcba81a3d22c0bff5364) - #fix Workflow Registry Syncer V1 handles delete events first and handles orphaned pending events
+
+- [#19233](https://github.com/smartcontractkit/chainlink/pull/19233) [`bded0f7`](https://github.com/smartcontractkit/chainlink/commit/bded0f7a31310926ada48de6ce2005562d934b73) - #internal deploys V2 registries in local CRE
+
+- [#19519](https://github.com/smartcontractkit/chainlink/pull/19519) [`7bb659b`](https://github.com/smartcontractkit/chainlink/commit/7bb659bbf3defc24542f17fbeaa58f852f3ac24c) - #internal #bugfix Cancels sync routines if contract reader fails to construct
+
+- [#19193](https://github.com/smartcontractkit/chainlink/pull/19193) [`64a8b3b`](https://github.com/smartcontractkit/chainlink/commit/64a8b3b90e869c088e2bfe437a8fae2832dc2443) - #added Sui keystore and relayer plugin basic integration
+
+- [#19102](https://github.com/smartcontractkit/chainlink/pull/19102) [`6684594`](https://github.com/smartcontractkit/chainlink/commit/6684594b237900103d95fca0cf52c94d26857209) - #added Support capabilities that are both Triggers and Executables
+
+- [#19241](https://github.com/smartcontractkit/chainlink/pull/19241) [`5115b4d`](https://github.com/smartcontractkit/chainlink/commit/5115b4d031a81769230e3cba526db4ad942d6c7f) - #added Dispatcher per-method receivers
+
+- [#19031](https://github.com/smartcontractkit/chainlink/pull/19031) [`3b53839`](https://github.com/smartcontractkit/chainlink/commit/3b53839e726f3fafa461aa4b02c750cb1be7b1f8) - #added smoke tests for DON Time in CRE Local Environment. #internal
+
+- [#19370](https://github.com/smartcontractkit/chainlink/pull/19370) [`b7dd012`](https://github.com/smartcontractkit/chainlink/commit/b7dd012a4b3c0b92f2188fd0ec9bdeef1148797e) - #updated chain selectors
+
+- [#19149](https://github.com/smartcontractkit/chainlink/pull/19149) [`9e1f207`](https://github.com/smartcontractkit/chainlink/commit/9e1f207f936d2ea35b03511f26e3109fc9c51c8f) - #internal changeset support for Solana CCIP attestation signer registry contract
+
+- [#19398](https://github.com/smartcontractkit/chainlink/pull/19398) [`90d78e6`](https://github.com/smartcontractkit/chainlink/commit/90d78e69c9e3e5fd898da0c52e1248e0bea1f3ec) - #internal fix test flake on integration test with evm relayer and wf reg v2 syncer
+
+- [#19326](https://github.com/smartcontractkit/chainlink/pull/19326) [`03bb186`](https://github.com/smartcontractkit/chainlink/commit/03bb18649401e9bee4483734d256f561161f9cdb) - Tidy go.mod and go.sum across submodules to fix missing chain-selectors entry
+
+  #bugfix
+
+- [#19020](https://github.com/smartcontractkit/chainlink/pull/19020) [`75a42c7`](https://github.com/smartcontractkit/chainlink/commit/75a42c777916f41984be031aa9f5b22c96136a32) - #added Integrate SharedPeer with Launcher and Dispatcher
+
 ## 2.28.0 - 2025-09-10
 
 ### Minor Changes
