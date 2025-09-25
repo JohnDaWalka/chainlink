@@ -37,7 +37,7 @@ type Topology struct {
 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
-func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Input) (*Topology, error) {
+func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provider) (*Topology, error) {
 	// TODO this setup is awkward, consider an withInfra opt to constructor
 	dm := make([]*DonMetadata, len(nodeSetInput))
 	for i := range nodeSetInput {
@@ -47,14 +47,14 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DON metadata: %w", err)
 		}
-		labelErr := d.labelNodes(infraInput)
+		labelErr := d.labelNodes(provider)
 		if labelErr != nil {
 			return nil, fmt.Errorf("failed to label nodes for DON %s: %w", d.Name, labelErr)
 		}
 		dm[i] = d
 	}
 
-	donsMetadata, err := NewDonsMetadata(dm, infraInput)
+	donsMetadata, err := NewDonsMetadata(dm, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DONs metadata: %w", err)
 	}
@@ -72,8 +72,8 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 	if donsMetadata.GatewayRequired() {
 		topology.GatewayConnectorOutput = NewGatewayConnectorOutput()
 		for _, d := range donsMetadata.List() {
-			if d.IsGateway() {
-				gc, err := d.GatewayConfig(infraInput)
+			if d.ContainsGatewayNode() {
+				gc, err := d.GatewayConfig(provider)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get gateway config for DON %s: %w", d.Name, err)
 				}

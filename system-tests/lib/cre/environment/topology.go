@@ -17,11 +17,13 @@ import (
 	creconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	cresecrets "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	creflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
 func PrepareConfiguration(
 	registryChainSelector uint64,
-	topology *cre.Topology,
+	nodeSets []*cre.CapabilitiesAwareNodeSet,
+	infraInput infra.Provider,
 	blockchainOutputs []*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	datastore datastore.DataStore,
@@ -29,6 +31,11 @@ func PrepareConfiguration(
 	capabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
+	topology, tErr := cre.NewTopology(nodeSets, infraInput)
+	if tErr != nil {
+		return nil, nil, errors.Wrap(tErr, "failed to create topology")
+	}
+
 	localNodeSets := topology.CapabilitiesAwareNodeSets()
 	evmChainIDs := make([]int, 0)
 	solChainIDs := make([]string, 0)

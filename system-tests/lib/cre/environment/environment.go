@@ -54,7 +54,7 @@ type SetupOutput struct {
 	BlockchainOutput                    []*cre.WrappedBlockchainOutput
 	DonTopology                         *cre.DonTopology
 	NodeOutput                          []*cre.WrappedNodeOutput
-	InfraInput                          infra.Input
+	InfraInput                          infra.Provider
 	S3ProviderOutput                    *s3provider.Output
 }
 
@@ -62,7 +62,7 @@ type SetupInput struct {
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
 	BlockchainsInput          []blockchain.Input
 	JdInput                   *jd.Input
-	InfraInput                infra.Input
+	InfraInput                infra.Provider
 	ContractVersions          map[string]string
 	WithV2Registries          bool
 	OCR3Config                *keystone_changeset.OracleConfig
@@ -142,11 +142,6 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(bcOutErr, "failed to start blockchains")
 	}
 
-	topology, err := cre.NewTopology(input.CapabilitiesAwareNodeSets, input.InfraInput)
-	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to create topology")
-	}
-
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Blockchains started in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Deploying Keystone contracts")))
 
@@ -171,7 +166,8 @@ func SetupTestEnvironment(
 
 	topology, updatedNodeSets, topoErr := PrepareConfiguration(
 		startBlockchainsOutput.RegistryChain().ChainSelector,
-		topology,
+		input.CapabilitiesAwareNodeSets,
+		input.InfraInput,
 		startBlockchainsOutput.BlockChainOutputs,
 		deployKeystoneContractsOutput.Env.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		deployKeystoneContractsOutput.Env.DataStore,

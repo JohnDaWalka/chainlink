@@ -2,36 +2,35 @@ package infra
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Type = string
 type CribProvider = string
 
 const (
-	CRIB                Type         = "crib"
-	Docker              Type         = "docker"
-	AWS                 CribProvider = "aws"
-	Kind                CribProvider = "kind"
-	gatewayIncomingPort              = 5002
-	gatewayOutgoingPort              = 5003
+	CRIB   Type         = "crib"
+	Docker Type         = "docker"
+	AWS    CribProvider = "aws"
+	Kind   CribProvider = "kind"
 )
 
-type Input struct {
+type Provider struct {
 	Type string     `toml:"type" validate:"oneof=crib docker"`
 	CRIB *CRIBInput `toml:"crib"`
 }
 
-func (i *Input) IsCRIB() bool {
-	return i.Type == CRIB
+func (i *Provider) IsCRIB() bool {
+	return strings.EqualFold(i.Type, CRIB)
 }
 
-func (i *Input) IsDocker() bool {
-	return i.Type == Docker
+func (i *Provider) IsDocker() bool {
+	return strings.EqualFold(i.Type, Docker)
 }
 
 // Unfortunately, we need to construct some of these URLs before any environment is created, because they are used
 // in CL node configs. This introduces a coupling between Helm charts used by CRIB and Docker container names used by CTFv2.
-func (i *Input) InternalHost(nodeIndex int, isBootstrap bool, donName string) string {
+func (i *Provider) InternalHost(nodeIndex int, isBootstrap bool, donName string) string {
 	if i.IsCRIB() {
 		if isBootstrap {
 			return fmt.Sprintf("%s-bt-%d", donName, nodeIndex)
@@ -42,7 +41,7 @@ func (i *Input) InternalHost(nodeIndex int, isBootstrap bool, donName string) st
 	return fmt.Sprintf("%s-node%d", donName, nodeIndex)
 }
 
-func (i *Input) InternalGatewayHost(nodeIndex int, isBootstrap bool, donName string) string {
+func (i *Provider) InternalGatewayHost(nodeIndex int, isBootstrap bool, donName string) string {
 	if i.IsCRIB() {
 		host := fmt.Sprintf("%s-%d", donName, nodeIndex)
 		if isBootstrap {
@@ -56,7 +55,7 @@ func (i *Input) InternalGatewayHost(nodeIndex int, isBootstrap bool, donName str
 	return fmt.Sprintf("%s-node%d", donName, nodeIndex)
 }
 
-func (i *Input) ExternalGatewayHost() string {
+func (i *Provider) ExternalGatewayHost() string {
 	if i.IsCRIB() {
 		return i.CRIB.Namespace + "-gateway.main.stage.cldev.sh"
 	}
@@ -64,57 +63,12 @@ func (i *Input) ExternalGatewayHost() string {
 	return "localhost"
 }
 
-func (i *Input) ExternalGatewayPort(dockerPort int) int {
+func (i *Provider) ExternalGatewayPort(dockerPort int) int {
 	if i.IsCRIB() {
 		return 80
 	}
 
 	return dockerPort
-}
-
-func (i *Input) GatewayConfig(id int, isBootstrap bool, donName string) *GatewayConfiguration {
-	return NewGateway(
-		Outgoing{
-			Path: "/node",
-			Port: gatewayOutgoingPort,
-			Host: i.InternalGatewayHost(id, isBootstrap, donName),
-		},
-		Incoming{
-			Protocol:     "http",
-			Path:         "/",
-			InternalPort: gatewayIncomingPort,
-			ExternalPort: i.ExternalGatewayPort(gatewayIncomingPort),
-		},
-		"cre-gateway",
-	)
-}
-
-type GatewayConfiguration struct {
-	Outgoing      Outgoing `toml:"outgoing" json:"outgoing"`
-	Incoming      Incoming `toml:"incoming" json:"incoming"`
-	AuthGatewayID string   `toml:"auth_gateway_id" json:"auth_gateway_id"`
-}
-
-type Outgoing struct {
-	Host string `toml:"host" json:"host"` // do not set, it will be set dynamically
-	Path string `toml:"path" json:"path"`
-	Port int    `toml:"port" json:"port"`
-}
-
-type Incoming struct {
-	Protocol     string `toml:"protocol" json:"protocol"` // do not set, it will be set dynamically
-	Host         string `toml:"host" json:"host"`         // do not set, it will be set dynamically
-	Path         string `toml:"path" json:"path"`
-	InternalPort int    `toml:"internal_port" json:"internal_port"`
-	ExternalPort int    `toml:"external_port" json:"external_port"`
-}
-
-func NewGateway(outgoing Outgoing, incoming Incoming, authGatewayID string) *GatewayConfiguration {
-	return &GatewayConfiguration{
-		Outgoing:      outgoing,
-		Incoming:      incoming,
-		AuthGatewayID: authGatewayID,
-	}
 }
 
 type CRIBInput struct {

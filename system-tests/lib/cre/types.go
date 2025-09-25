@@ -370,7 +370,7 @@ func (c *CreateJobsInput) Validate() error {
 type DebugInput struct {
 	DebugDons        []*DebugDon
 	BlockchainOutput *blockchain.Output
-	InfraInput       *infra.Input
+	InfraInput       *infra.Provider
 }
 
 type DebugDon struct {
@@ -468,18 +468,18 @@ type GatewayConnectorDons struct {
 	Handlers            map[string]string
 }
 type GatewayConnectorOutput struct {
-	Configurations []*GatewayConfiguration `toml:"configurations" json:"configurations"`
+	Configurations []*DonGatewayConfiguration `toml:"configurations" json:"configurations"`
 }
 
 func NewGatewayConnectorOutput() *GatewayConnectorOutput {
 	return &GatewayConnectorOutput{
-		Configurations: make([]*GatewayConfiguration, 0),
+		Configurations: make([]*DonGatewayConfiguration, 0),
 	}
 }
 
-type GatewayConfiguration struct {
+type DonGatewayConfiguration struct {
 	Dons []GatewayConnectorDons `toml:"dons" json:"dons"` // do not set, it will be set dynamically
-	infra.GatewayConfiguration
+	*GatewayConfiguration
 }
 
 type NodeConfigTransformerFn = func(input GenerateConfigsInput, existingConfigs NodeIndexToConfigOverride) (NodeIndexToConfigOverride, error)
@@ -598,7 +598,7 @@ func AddressKeyFromSelector(chainSelector uint64) string {
 	return strconv.FormatUint(chainSelector, 10) + "_public_address"
 }
 
-func (m *DonMetadata) labelNodes(infraInput infra.Input) error {
+func (m *DonMetadata) labelNodes(infraInput infra.Provider) error {
 	for i, meta := range m.NodesMetadata {
 		labels := make([]*Label, 0)
 		nodeType := WorkerNode
@@ -638,7 +638,7 @@ func (m *DonMetadata) labelNodes(infraInput infra.Input) error {
 		m.NodesMetadata[i].Labels = labels
 	}
 
-	if m.IsGateway() {
+	if m.ContainsGatewayNode() {
 		i := m.ns.GatewayNodeIndex
 		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
 			Key:   ExtraRolesKey,
@@ -649,17 +649,17 @@ func (m *DonMetadata) labelNodes(infraInput infra.Input) error {
 	return nil
 }
 
-func (m *DonMetadata) GatewayConfig(infraInput infra.Input) (*GatewayConfiguration, error) {
-	if m.IsGateway() {
+func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration, error) {
+	if m.ContainsGatewayNode() {
 		i := m.ns.GatewayNodeIndex
 		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
 			Key:   ExtraRolesKey,
 			Value: GatewayNode,
 		})
 		isBootstrapNode := (m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex)
-		return &GatewayConfiguration{
+		return &DonGatewayConfiguration{
 			Dons:                 make([]GatewayConnectorDons, 0),
-			GatewayConfiguration: *infraInput.GatewayConfig(i, isBootstrapNode, m.Name),
+			GatewayConfiguration: NewGatewayConfig(p, i, isBootstrapNode, m.Name),
 		}, nil
 	}
 
@@ -687,7 +687,7 @@ func (m *DonMetadata) RequiresOCR() bool {
 		slices.Contains(m.Flags, VaultCapability) || slices.Contains(m.Flags, EVMCapability)
 }
 
-func (m *DonMetadata) IsGateway() bool {
+func (m *DonMetadata) ContainsGatewayNode() bool {
 	return m.ns.GatewayNodeIndex != -1 // don't use flag here b/c may not be set
 }
 
@@ -756,10 +756,10 @@ func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
 
 type DonsMetadata struct {
 	dons  []*DonMetadata
-	infra infra.Input
+	infra infra.Provider
 }
 
-func NewDonsMetadata(dons []*DonMetadata, infra infra.Input) (*DonsMetadata, error) {
+func NewDonsMetadata(dons []*DonMetadata, infra infra.Provider) (*DonsMetadata, error) {
 	if dons == nil {
 		dons = make([]*DonMetadata, 0)
 	}
@@ -834,7 +834,7 @@ func (m DonsMetadata) FindByID(id uint64) (*DonMetadata, error) {
 
 func (m DonsMetadata) FindByName(name string) (*DonMetadata, error) {
 	for _, don := range m.dons {
-		if don.Name == name {
+		if strings.EqualFold(don.Name, name) {
 			return don, nil
 		}
 	}
@@ -879,7 +879,7 @@ func (m DonsMetadata) GetWorkflowDON() (*DonMetadata, error) {
 
 func (m DonsMetadata) GatewayEnabled() bool {
 	for _, don := range m.dons {
-		if don.IsGateway() {
+		if don.ContainsGatewayNode() {
 			return true
 		}
 	}
@@ -888,7 +888,7 @@ func (m DonsMetadata) GatewayEnabled() bool {
 
 func (m DonsMetadata) GetGatewayDON() (*DonMetadata, error) {
 	for _, don := range m.dons {
-		if don.IsGateway() {
+		if don.ContainsGatewayNode() {
 			return don, nil
 		}
 	}
@@ -1496,7 +1496,7 @@ func (d *DeployCribBlockchainInput) Validate() error {
 }
 
 type StartNixShellInput struct {
-	InfraInput     *infra.Input
+	InfraInput     *infra.Provider
 	CribConfigsDir string
 	ExtraEnvVars   map[string]string
 	PurgeNamespace bool
@@ -1521,7 +1521,7 @@ type JobSpecInput struct {
 	CldEnvironment            *cldf.Environment
 	BlockchainOutput          *blockchain.Output
 	DonTopology               *DonTopology
-	InfraInput                infra.Input
+	InfraInput                infra.Provider
 	CapabilityConfigs         map[string]CapabilityConfig
 	Capabilities              []InstallableCapability
 	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet

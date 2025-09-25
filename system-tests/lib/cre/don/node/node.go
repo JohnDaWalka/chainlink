@@ -21,6 +21,7 @@ var (
 	ExtraRolesKey          = cre.ExtraRolesKey
 	NodeIDKey              = cre.NodeIDKey
 	NodeOCR2KeyBundleIDKey = cre.NodeOCR2KeyBundleIDKey
+	NodeOCRFamiliesKey     = cre.NodeOCRFamiliesKey
 	NodeP2PIDKey           = cre.NodeP2PIDKey
 	DONIDKey               = cre.DONIDKey
 	EnvironmentKey         = cre.EnvironmentKey
