@@ -400,6 +400,7 @@ func GetChainReaderConfig(pubKeyStr string) (map[string]any, error) {
 						},
 					},
 				},
+				// specify the MessageSent from Circle, look for EVM implementation
 			},
 		},
 		"EventSyncInterval": 12 * time.Second,
