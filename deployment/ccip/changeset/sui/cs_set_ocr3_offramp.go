@@ -112,6 +112,7 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			commitTransmitters = append(commitTransmitters, addr)
 		}
 
+		fmt.Println("OFFRAMPADDRRR", suiState[remoteSelector].OffRampAddress, suiState[remoteSelector].OffRampStateObjectId, suiState[remoteSelector].OffRampOwnerCapId, suiState[remoteSelector].CCIPObjectRef)
 		setOCR3ConfigCommitInput := offrampops.SetOCR3ConfigInput{
 			OffRampPackageId: suiState[remoteSelector].OffRampAddress,
 			OffRampStateId:   suiState[remoteSelector].OffRampStateObjectId,
