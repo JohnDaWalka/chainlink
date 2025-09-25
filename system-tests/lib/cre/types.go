@@ -549,11 +549,11 @@ type DonWithMetadata struct {
 }
 
 type DonMetadata struct {
-	NodesMetadata      []*NodeMetadata `toml:"nodes_metadata" json:"nodes_metadata"`
-	Flags              []string        `toml:"flags" json:"flags"`
-	ID                 uint64          `toml:"id" json:"id"`
-	Name               string          `toml:"name" json:"name"`
-	EnabledEVMChainIDs []uint64        `toml:"enabled_evm_chains" json:"enabled_evm_chains"` // chain IDs that the DON supports, empty means all chains
+	NodesMetadata []*NodeMetadata `toml:"nodes_metadata" json:"nodes_metadata"`
+	Flags         []string        `toml:"flags" json:"flags"`
+	ID            uint64          `toml:"id" json:"id"`
+	Name          string          `toml:"name" json:"name"`
+	// EnabledEVMChainIDs []uint64        `toml:"enabled_evm_chains" json:"enabled_evm_chains"` // chain IDs that the DON supports, empty means all chains
 
 	ns CapabilitiesAwareNodeSet // computed field, not serialized
 }
@@ -572,7 +572,7 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error
 				Password:        "dev-password",
 				ImportedSecrets: nodeSpec.Node.TestSecretsOverrides,
 			},
-			Host: "",
+			Host: "", // will be auto-generated later based on infra provider
 		}
 
 		cfgs[i] = cfg

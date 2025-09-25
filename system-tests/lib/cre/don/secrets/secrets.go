@@ -447,10 +447,6 @@ func ImportNodeKeys(secretsToml string) (*NodeKeys, error) {
 		keys.DKGKey.PubKey = dkgRecipientPubKey
 	}
 
-	if len(sSecrets.EVM.Keys) == 0 {
-		return nil, fmt.Errorf("no EVM keys found in secrets")
-	}
-
 	for _, evmKey := range sSecrets.EVM.Keys {
 		if evmKey.JSON == nil || evmKey.Password == nil || evmKey.ID == nil {
 			return nil, fmt.Errorf("EVM key or password or ID is nil")
