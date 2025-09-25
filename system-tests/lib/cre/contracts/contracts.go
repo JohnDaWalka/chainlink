@@ -363,7 +363,8 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 
 		donPeerIDs := make([]string, len(workerNodes))
 		for i, node := range workerNodes {
-			donPeerIDs[i] = node.Keys.CleansedPeerID()
+			// donPeerIDs[i] = node.Keys.CleansedPeerID()
+			donPeerIDs[i] = node.Keys.P2PKey.PeerID.String()
 		}
 
 		forwarderF := (len(workerNodes) - 1) / 3

@@ -711,13 +711,21 @@ func (m *DonMetadata) RequiresWebAPI() bool {
 }
 
 func (m *DonMetadata) IsWorkflowDON() bool {
+	// is there a case where flags are not set yet?
+	if len(m.Flags) == 0 && len(m.ns.DONTypes) != 0 {
+		return slices.Contains(m.ns.DONTypes, WorkflowDON)
+	}
+
+	return slices.Contains(m.Flags, WorkflowDON)
+
+	// return slices.Contains(m.ns.DONTypes, WorkflowDON)
 	// TODO enum type for DON types
-	return slices.Contains(m.ns.DONTypes, WorkflowDON)
+	// return slices.Contains(m.ns.DONTypes, WorkflowDON)
 }
 
 // TODO remove later on
 type Dons struct {
-	donMetadata []*DonMetadata
+	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
 	dons        []*devenv.DON
 	// infra       infra.Input
 }
@@ -727,7 +735,7 @@ func (d *Dons) List() []*devenv.DON {
 }
 
 func (d *Dons) Metadata() []*DonMetadata {
-	return d.donMetadata
+	return d.DonMetadata
 }
 
 func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
@@ -740,7 +748,7 @@ func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
 	}
 
 	return &Dons{
-		donMetadata: donsMetadata.List(),
+		DonMetadata: donsMetadata.List(),
 		dons:        dons,
 		// infra:       infraInput,
 	}, nil

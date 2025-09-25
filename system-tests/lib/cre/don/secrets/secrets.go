@@ -436,8 +436,10 @@ func ImportNodeKeys(secretsToml string) (*NodeKeys, error) {
 	}
 
 	if sSecrets.DKGRecipientKey.JSON != nil {
-		keys.DKGKey.EncryptedJSON = []byte(*sSecrets.DKGRecipientKey.JSON)
-		keys.DKGKey.Password = *sSecrets.DKGRecipientKey.Password
+		keys.DKGKey = &crypto.DKGRecipientKey{
+			EncryptedJSON: []byte(*sSecrets.DKGRecipientKey.JSON),
+			Password:      *sSecrets.DKGRecipientKey.Password,
+		}
 		dkgRecipientPubKey, err := publicDKGRecipientKeyFromEncryptedJSON(*sSecrets.DKGRecipientKey.JSON)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get public DKG recipient key from encrypted JSON")
