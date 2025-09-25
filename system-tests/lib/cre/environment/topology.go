@@ -29,7 +29,6 @@ func PrepareConfiguration(
 	capabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
-
 	localNodeSets := topology.CapabilitiesAwareNodeSets()
 	evmChainIDs := make([]int, 0)
 	solChainIDs := make([]string, 0)
@@ -197,7 +196,7 @@ func PrepareConfiguration(
 			*/
 			for j := range donMetadata.NodesMetadata {
 				wnode := donMetadata.NodesMetadata[j]
-				nodeSecret := cresecrets.NewNodeSecret(wnode)
+				nodeSecret := cresecrets.NewNodeSecret(wnode.Keys)
 				toml, err := nodeSecret.Toml()
 				if err != nil {
 					return nil, nil, errors.Wrap(err, "failed to marshal node secrets")

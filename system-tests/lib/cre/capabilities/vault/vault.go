@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
@@ -81,13 +80,13 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 		}
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
-		donMetadata := make([]*cre.DonMetadata, 0)
-		for _, don := range input.DonTopology.DonsWithMetadata {
-			donMetadata = append(donMetadata, don.DonMetadata)
-		}
+		// donMetadata := make([]*cre.DonMetadata, 0)
+		// for _, metadata := range input.DonTopology.Dons.Metadata() {
+		// 	donMetadata = append(donMetadata, metadata)
+		// }
 
 		// return early if no DON has the vault capability
-		if !don.AnyDonHasCapability(donMetadata, flag) {
+		if !don.AnyDonHasCapability(input.DonTopology.Dons.Metadata(), flag) {
 			return donToJobSpecs, nil
 		}
 
@@ -113,40 +112,50 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			return nil, errors.Wrap(err, "failed to get DKG address")
 		}
 
-		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
+		for _, donWithMetadata := range input.DonTopology.Dons.Metadata() {
 			if !flags.HasFlag(donWithMetadata.Flags, flag) {
 				continue
 			}
 
 			// create job specs for the worker nodes
-			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 			if err != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err, "failed to find worker nodes")
 			}
 
 			// look for boostrap node and then for required values in its labels
-			bootstrapNode, bootErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
-			if bootErr != nil {
-				// if there is no bootstrap node in this DON, we need to use the global bootstrap node
-				for _, don := range input.DonTopology.DonsWithMetadata {
-					for _, n := range don.NodesMetadata {
-						p2pValue, p2pErr := node.FindLabelValue(n, node.NodeP2PIDKey)
-						if p2pErr != nil {
-							continue
-						}
+			// bootstrapNode, bootErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
+			// if bootErr != nil {
+			// 	// if there is no bootstrap node in this DON, we need to use the global bootstrap node
+			// 	for _, don := range input.DonTopology.DonsWithMetadata {
+			// 		for _, n := range don.NodesMetadata {
+			// 			p2pValue, p2pErr := node.FindLabelValue(n, node.NodeP2PIDKey)
+			// 			if p2pErr != nil {
+			// 				continue
+			// 			}
 
-						if strings.Contains(p2pValue, input.DonTopology.OCRPeeringData.OCRBootstraperPeerID) {
-							bootstrapNode = n
-							break
-						}
-					}
-				}
+			// 			if strings.Contains(p2pValue, input.DonTopology.OCRPeeringData.OCRBootstraperPeerID) {
+			// 				bootstrapNode = n
+			// 				break
+			// 			}
+			// 		}
+			// 	}
+			// }
+
+			bootstrapNode, bootErr := input.DonTopology.BootstrapNode()
+			if bootErr != nil {
+				return nil, errors.Wrap(bootErr, "failed to find bootstrap node")
 			}
 
 			bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
 			if nodeIDErr != nil {
 				return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
+			}
+
+			_, ocrPeeringData, peeringErr := cre.PeeringCfgs(bootstrapNode)
+			if peeringErr != nil {
+				return nil, errors.Wrap(peeringErr, "failed to find peering data")
 			}
 
 			// create job specs for the bootstrap node
@@ -158,7 +167,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				ethKey, ok := workerNode.Keys.EVM[int(chainID)]
+				ethKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
 					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainID)
 				}
@@ -173,7 +182,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.New("key bundle ID for evm family is not found")
 				}
 
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerVaultOCR3(nodeID, vaultCapabilityAddress.Address, dkgAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, input.DonTopology.OCRPeeringData, chainID))
+				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerVaultOCR3(nodeID, vaultCapabilityAddress.Address, dkgAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringData, chainID))
 			}
 		}
 

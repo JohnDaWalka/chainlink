@@ -198,7 +198,7 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(donJDErr, "failed to start DONs or Job Distributor")
 	}
 
-	linkDonsToJD := &cre.LinkDonsToJDInput{
+	linkDonsToJDInput := &cre.LinkDonsToJDInput{
 		JdOutput:          jdOutput,
 		BlockchainOutputs: startBlockchainsOutput.BlockChainOutputs,
 		NodeSetOutput:     nodeSetOutput,
@@ -206,7 +206,7 @@ func SetupTestEnvironment(
 		Topology:          topology,
 	}
 
-	cldfEnvironment, dons, cldErr := libdon.LinkToJobDistributor(ctx, linkDonsToJD)
+	cldfEnvironment, dons, cldErr := libdon.LinkToJobDistributor(ctx, linkDonsToJDInput)
 	if cldErr != nil {
 		return nil, pkgerrors.Wrap(cldErr, "failed to link DONs to Job Distributor")
 	}
@@ -499,24 +499,29 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 }
 
 func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*devenv.DON, topology *cre.Topology) *cre.Environment {
-	donTopology := &cre.DonTopology{
-		WorkflowDonID:           topology.WorkflowDONID,
-		HomeChainSelector:       registryChainSelector,
-		CapabilitiesPeeringData: topology.CapabilitiesPeeringData,
-		OCRPeeringData:          topology.OCRPeeringData,
-		GatewayConnectorOutput:  topology.GatewayConnectorOutput,
-	}
+	// donTopology := &cre.DonTopology{
+	// 	WorkflowDonID:     topology.WorkflowDONID,
+	// 	HomeChainSelector: registryChainSelector,
+	// 	// CapabilitiesPeeringData: topology.CapabilitiesPeeringData,
+	// 	// OCRPeeringData:          topology.OCRPeeringData,
+	// 	GatewayConnectorOutput: topology.GatewayConnectorOutput,
+	// }
 
-	for i, donMetadata := range topology.DonsMetadata.List() {
-		donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &cre.DonWithMetadata{
-			DON:         dons[i],
-			DonMetadata: donMetadata,
-		})
+	// for i, donMetadata := range topology.DonsMetadata.List() {
+	// 	donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &cre.DonWithMetadata{
+	// 		DON:         dons[i],
+	// 		DonMetadata: donMetadata,
+	// 	})
+	// }
+
+	creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
+	if donsErr != nil {
+		panic(donsErr)
 	}
 
 	return &cre.Environment{
 		CldfEnvironment: cldfEnv,
-		DonTopology:     donTopology,
+		DonTopology:     cre.NewDonTopology(registryChainSelector, topology, creDons),
 	}
 }
 

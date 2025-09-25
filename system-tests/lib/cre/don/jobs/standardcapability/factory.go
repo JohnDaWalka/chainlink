@@ -28,7 +28,7 @@ type CommandBuilder func(input *cre.JobSpecInput, capabilityConfig cre.Capabilit
 type JobNamer func(chainID uint64, flag cre.CapabilityFlag) string
 
 // CapabilityEnabler determines if a capability is enabled for a given DON.
-type CapabilityEnabler func(donWithMetadata *cre.DonWithMetadata, nodeSet *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
+type CapabilityEnabler func(donMetadata *cre.DonMetadata, nodeSet *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
 
 // EnabledChainsProvider provides the list of enabled chains for a given capability.
 type EnabledChainsProvider func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64
@@ -112,12 +112,12 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
-		for donIdx, donWithMetadata := range input.DonTopology.DonsWithMetadata {
+		for donIdx, donMetadata := range input.DonTopology.ToDonMetadata() {
 			if donIdx >= len(input.CapabilitiesAwareNodeSets) || input.CapabilitiesAwareNodeSets[donIdx] == nil {
 				continue
 			}
 
-			if f.capabilityEnabler != nil && !f.capabilityEnabler(donWithMetadata, input.CapabilitiesAwareNodeSets[donIdx], capabilityFlag) {
+			if f.capabilityEnabler != nil && !f.capabilityEnabler(donMetadata, input.CapabilitiesAwareNodeSets[donIdx], capabilityFlag) {
 				continue
 			}
 
@@ -132,8 +132,8 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 			}
 
 			workflowNodeSet, setErr := crenode.FindManyWithLabel(
-				donWithMetadata.NodesMetadata,
-				&cre.Label{Key: crenode.NodeTypeKey, Value: cre.WorkerNode},
+				donMetadata.NodesMetadata,
+				&cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode},
 				crenode.EqualLabels,
 			)
 
@@ -182,7 +182,7 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 
 					jobSpec := jobs.WorkerStandardCapability(nodeID, f.jobNamer(chainIDUint64, capabilityFlag), command, configStr, "")
 					jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: &capabilityFlag}}
-					donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobSpec)
+					donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobSpec)
 				}
 			}
 		}

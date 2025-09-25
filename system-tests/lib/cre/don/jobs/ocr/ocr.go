@@ -63,7 +63,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 
 	logger := framework.L
 
-	for donIdx, donWithMetadata := range donTopology.DonsWithMetadata {
+	for donIdx, donMetadata := range donTopology.ToDonMetadata() {
 		if !capabilityEnabler(nodeSetInput[donIdx], flag) {
 			continue
 		}
@@ -80,13 +80,18 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 
 		binaryPath := filepath.Join(containerPath, filepath.Base(capabilityConfig.BinaryPath))
 
-		workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+		workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find worker nodes")
 		}
 
-		donName := donWithMetadata.Name
-		bootstrapNode, err := donWithMetadata.DonMetadata.GetBootstrapNode()
+		donName := donMetadata.Name
+		// bootstrapNode, err := donMetadata.GetBootstrapNode()
+		// if err != nil {
+		// 	return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
+		// }
+
+		bootstrapNode, err := donTopology.BootstrapNode()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
 		}
@@ -135,12 +140,12 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				return nil, errors.Wrap(err, "failed to get EVM capability address")
 			}
 
-			if _, ok := donToJobSpecs[donWithMetadata.ID]; !ok {
-				donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)
+			if _, ok := donToJobSpecs[donMetadata.ID]; !ok {
+				donToJobSpecs[donMetadata.ID] = make(cre.DonJobs, 0)
 			}
 
 			// create job specs for the bootstrap node
-			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, contractName, ocr3ConfigContractAddress.Address, chainIDUint64))
+			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, contractName, ocr3ConfigContractAddress.Address, chainIDUint64))
 			logger.Debug().Msgf("Found deployed '%s' OCR3 contract on chain %d at %s", contractName, chainIDUint64, ocr3ConfigContractAddress.Address)
 
 			for _, workerNode := range workflowNodeSet {
@@ -149,7 +154,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				ethKey, ok := workerNode.Keys.EVM[int(chainIDUint64)]
+				ethKey, ok := workerNode.Keys.EVM[chainIDUint64]
 				if !ok {
 					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainIDUint64)
 				}
@@ -202,7 +207,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				}
 				oracleStr := strings.ReplaceAll(oracleBuffer.String(), "\n", "\n\t")
 
-				logger.Debug().Msgf("Creating %s Capability job spec for chainID: %d, selector: %d, DON:%q, node:%q", flag, chainIDUint64, chain.Selector, donWithMetadata.Name, nodeID)
+				logger.Debug().Msgf("Creating %s Capability job spec for chainID: %d, selector: %d, DON:%q, node:%q", flag, chainIDUint64, chain.Selector, donMetadata.Name, nodeID)
 
 				jobConfig, cErr := jobConfigGenerator(logger, chainIDUint64, nodeAddress, mergedConfig)
 				if cErr != nil {
@@ -217,11 +222,11 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				jobSpec := jobs.WorkerStandardCapability(nodeID, jobName, binaryPath, jobConfig, oracleStr)
 				jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: &flag}}
 
-				if _, ok := donToJobSpecs[donWithMetadata.ID]; !ok {
-					donToJobSpecs[donWithMetadata.ID] = make(cre.DonJobs, 0)
+				if _, ok := donToJobSpecs[donMetadata.ID]; !ok {
+					donToJobSpecs[donMetadata.ID] = make(cre.DonJobs, 0)
 				}
 
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobSpec)
+				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobSpec)
 			}
 		}
 	}

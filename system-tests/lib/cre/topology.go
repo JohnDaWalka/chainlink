@@ -33,7 +33,7 @@ var (
 
 type Topology struct {
 	WorkflowDONID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
-	DonsMetadata           *DonsMetadata           `toml:"dons_metadata", json:"dons_metadata"` //[]*DonMetadata          `toml:"dons_metadata" json:"dons_metadata"`
+	DonsMetadata           *DonsMetadata           `toml:"dons_metadata" json:"dons_metadata"` //[]*DonMetadata          `toml:"dons_metadata" json:"dons_metadata"`
 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
@@ -47,7 +47,10 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, infraInput infra.Inpu
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DON metadata: %w", err)
 		}
-		d.labelNodes(infraInput)
+		labelErr := d.labelNodes(infraInput)
+		if labelErr != nil {
+			return nil, fmt.Errorf("failed to label nodes for DON %s: %w", d.Name, labelErr)
+		}
 		dm[i] = d
 	}
 

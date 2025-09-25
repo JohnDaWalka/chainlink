@@ -16,6 +16,7 @@ import (
 	focr "github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	deployment_devenv "github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -94,6 +95,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 
 	allNodeInfo := make([]deployment_devenv.NodeInfo, 0)
 	allNodeIDs := make([]string, 0)
+	devenvDons := make([]*devenv.DON, 0, len(envArtifact.DONs))
 
 	for idx, don := range envArtifact.DONs {
 		_, ok := envArtifact.Nodes[don.DonName]
@@ -105,7 +107,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			allNodeIDs = append(allNodeIDs, id)
 		}
 
-		bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.DonsWithMetadata[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
+		bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.ToDonMetadata()[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
 		}
@@ -133,8 +135,19 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
 		}
 
-		envArtifact.Topology.DonsWithMetadata[idx].DON = registeredDon
+		// envArtifact.Topology.Dons.Metadata()[idx].DON = registeredDon
+		devenvDons = append(devenvDons, registeredDon)
 		allNodeInfo = append(allNodeInfo, nodeInfo...)
+	}
+
+	donsMetadata, metaErr := cre.NewDonsMetadata(envArtifact.Topology.ToDonMetadata(), *cachedInput.Infra)
+	if metaErr != nil {
+		return nil, nil, errors.Wrapf(metaErr, "failed to recreate dons metadata from artifact")
+	}
+
+	dons, donsErr := cre.NewDons(donsMetadata, devenvDons)
+	if donsErr != nil {
+		return nil, nil, errors.Wrapf(donsErr, "failed to create Dons from metadata")
 	}
 
 	offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
@@ -175,9 +188,14 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		blockChains,
 	)
 
+	topology, tErr := cre.NewTopology(cachedInput.NodeSets, *cachedInput.Infra)
+	if tErr != nil {
+		return nil, nil, errors.Wrap(tErr, "failed to recreate topology from artifact")
+	}
+
 	return &cre.Environment{
 		CldfEnvironment: cldEnv,
-		DonTopology:     &envArtifact.Topology,
+		DonTopology:     cre.NewDonTopology(envArtifact.Topology.HomeChainSelector, topology, dons),
 	}, wrappedBlockchainOutputs, nil
 }
 

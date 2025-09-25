@@ -55,7 +55,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 
 	for nodeIdx, nodeMetadata := range input.DonMetadata.NodesMetadata {
 		var roles []string
-		nodeType, typeErr := node.FindLabelValue(nodeMetadata, node.NodeTypeKey)
+		nodeType, typeErr := node.FindLabelValue(nodeMetadata, cre.NodeTypeKey)
 		if typeErr != nil {
 			return nil, errors.Wrap(typeErr, "failed to find node type")
 		}
@@ -66,8 +66,8 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 			return nil, fmt.Errorf("node at index %d in DON %s cannot be both a bootstrap node and a worker node", nodeIdx, input.DonMetadata.Name)
 		}
 
-		if node.HasLabel(nodeMetadata, node.ExtraRolesKey) {
-			extraRoles, extraErr := node.FindLabelValue(nodeMetadata, node.ExtraRolesKey)
+		if node.HasLabel(nodeMetadata, cre.ExtraRolesKey) {
+			extraRoles, extraErr := node.FindLabelValue(nodeMetadata, cre.ExtraRolesKey)
 			if extraErr != nil {
 				return nil, errors.Wrap(extraErr, "failed to check for extra roles")
 			}
@@ -294,7 +294,7 @@ func addWorkerNodeConfig(
 
 		if nodeEthAddr == "" {
 			// load from keys
-			k, ok := m.Keys.EVM[int(commonInputs.registryChainID)]
+			k, ok := m.Keys.EVM[commonInputs.registryChainID]
 			if !ok {
 				return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
 			}

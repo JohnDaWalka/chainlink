@@ -82,19 +82,24 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			return nil, errors.Wrap(err, "failed to get DON Time address")
 		}
 
-		for _, donWithMetadata := range input.DonTopology.DonsWithMetadata {
-			if !flags.HasFlag(donWithMetadata.Flags, flag) {
+		for _, donMetadata := range input.DonTopology.ToDonMetadata() {
+			if !flags.HasFlag(donMetadata.Flags, flag) {
 				continue
 			}
 
 			// create job specs for the worker nodes
-			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 			if err != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err, "failed to find worker nodes")
 			}
 
-			bootstrapNode, err := donWithMetadata.DonMetadata.GetBootstrapNode()
+			// bootstrapNode, err := donMetadata.GetBootstrapNode()
+			// if err != nil {
+			// 	return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
+			// }
+
+			bootstrapNode, err := input.DonTopology.BootstrapNode()
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
 			}
@@ -111,7 +116,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			}
 
 			// create job specs for the bootstrap node
-			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "ocr3-capability", ocr3CapabilityAddress.Address, chainID))
+			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "ocr3-capability", ocr3CapabilityAddress.Address, chainID))
 
 			for _, workerNode := range workflowNodeSet {
 				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
@@ -119,7 +124,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				ethKey, ok := workerNode.Keys.EVM[int(chainID)]
+				ethKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
 					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainID)
 				}
@@ -131,14 +136,14 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 
 				// TODO use constant for the EVM family
 				// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
-				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["EVM"]
+				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["evm"]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for EVM", nodeID)
+					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for evm", nodeID)
 				}
 
 				// we pass here bundles for all chains to enable multi-chain signing
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringCfg, chainID))
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringCfg, chainID))
+				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringCfg, chainID))
+				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringCfg, chainID))
 			}
 		}
 

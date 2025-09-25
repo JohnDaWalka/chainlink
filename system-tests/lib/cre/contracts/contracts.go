@@ -353,7 +353,7 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 		}
 
 		workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
-			Key:   crenode.NodeTypeKey,
+			Key:   cre.NodeTypeKey,
 			Value: cre.WorkerNode,
 		}, crenode.EqualLabels)
 
@@ -793,7 +793,7 @@ func DKGReportingPluginConfig(topology *cre.Topology, nodeSets []*cre.Capabiliti
 	}
 
 	vaultIndex := -1
-	for i, don := range topology.DonsMetadata {
+	for i, don := range topology.DonsMetadata.List() {
 		if flags.HasFlag(don.Flags, cre.VaultCapability) {
 			vaultIndex = i
 			break
@@ -803,18 +803,20 @@ func DKGReportingPluginConfig(topology *cre.Topology, nodeSets []*cre.Capabiliti
 		return nil, errors.New("no vault DON found in the topology")
 	}
 
-	for i, nmd := range topology.DonsMetadata[vaultIndex].NodesMetadata {
+	for i, nmd := range topology.DonsMetadata.List()[vaultIndex].NodesMetadata {
 		if i == nodeSets[vaultIndex].BootstrapNodeIndex {
 			continue
 		}
-		dkgRecipientKeyStr, err := crenode.FindLabelValue(nmd, crenode.NodeDKGRecipientKey)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to find DKG recipient key label")
-		}
-		pubKey, err := hex.DecodeString(dkgRecipientKeyStr)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode DKG recipient key")
-		}
+		// dkgRecipientKeyStr, err := crenode.FindLabelValue(nmd, cre.NodeDKGRecipientKey)
+		// if err != nil {
+		// 	return nil, errors.Wrap(err, "failed to find DKG recipient key label")
+		// }
+		// pubKey, err := hex.DecodeString(dkgRecipientKeyStr)
+		// if err != nil {
+		// 	return nil, errors.Wrap(err, "failed to decode DKG recipient key")
+		// }
+
+		pubKey := nmd.Keys.DKGKey.PubKey
 		cfg.DealerPublicKeys = append(cfg.DealerPublicKeys, pubKey)
 		cfg.RecipientPublicKeys = append(cfg.RecipientPublicKeys, pubKey)
 	}
@@ -1093,7 +1095,7 @@ func configureTronForwarders(env *cldf.Environment, registryChainSelector uint64
 	triggerOptions.FeeLimit = 1_000_000_000
 
 	var wfNodeIDs []string
-	for _, donMetadata := range topology.DonsMetadata {
+	for _, donMetadata := range topology.DonsMetadata.List() {
 		if flags.HasOnlyOneFlag(donMetadata.Flags, cre.GatewayDON) {
 			continue
 		}

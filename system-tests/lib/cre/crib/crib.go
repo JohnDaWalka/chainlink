@@ -189,7 +189,7 @@ func DeployDons(input *cre.DeployCribDonsInput) ([]*cre.CapabilitiesAwareNodeSet
 }
 
 func getNodeSpecForNode(nodeMetadata *cre.NodeMetadata, donIndex int, input *cre.DeployCribDonsInput, donMetadata *cre.DonMetadata) (*clnode.Input, error) {
-	nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, libnode.IndexKey)
+	nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, cre.IndexKey)
 	if findErr != nil {
 		return nil, errors.Wrapf(findErr, "failed to find node index in nodeset %s", donMetadata.Name)
 	}

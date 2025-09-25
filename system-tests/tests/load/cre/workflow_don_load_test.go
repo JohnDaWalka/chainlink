@@ -1207,7 +1207,7 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 				if nodeIDErr != nil {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
-				ethKey, ok := workerNode.Keys.EVM[int(chainID)]
+				ethKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
 					return nil, fmt.Errorf("node %s does not have an eth key for chainID %d", nodeID, chainID)
 				}

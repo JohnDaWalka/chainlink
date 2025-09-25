@@ -23,10 +23,10 @@ type EVMKey struct {
 	EncryptedJSON []byte
 	PublicAddress common.Address
 	Password      string
-	ChainID       int
+	ChainID       uint64
 }
 
-func NewEVMKey(password string, chainID int) (*EVMKey, error) {
+func NewEVMKey(password string, chainID uint64) (*EVMKey, error) {
 	key, addr, err := clclient.NewETHKey(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new EVM key: %w", err)

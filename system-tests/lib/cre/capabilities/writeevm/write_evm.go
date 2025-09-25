@@ -125,7 +125,7 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			}
 			evmData.ForwarderAddress = forwarderAddress.Hex()
 
-			k, ok := wnode.Keys.EVM[int(chainID)]
+			k, ok := wnode.Keys.EVM[chainID]
 			if !ok {
 				return nil, fmt.Errorf("failed to get ETH address for chainID %d selector %d for node at index %d", chainID, chain.Selector, nodeIdx)
 			}

@@ -248,7 +248,7 @@ func GenerateArtifact(
 		Topology:      donTopology,
 	}
 
-	for i, don := range donTopology.DonsWithMetadata {
+	for i, don := range donTopology.ToDonMetadata() {
 		donArtifact := DonArtifact{
 			DonName:        don.Name,
 			DonID:          don.ID,
@@ -259,7 +259,7 @@ func GenerateArtifact(
 		}
 
 		workerNodes, workerNodesErr := crenode.FindManyWithLabel(don.NodesMetadata, &cre.Label{
-			Key:   crenode.NodeTypeKey,
+			Key:   cre.NodeTypeKey,
 			Value: cre.WorkerNode,
 		}, crenode.EqualLabels)
 		if workerNodesErr != nil {
@@ -297,7 +297,7 @@ func GenerateArtifact(
 		}
 
 		var nodeIDs []string
-		for _, node := range don.DON.Nodes {
+		for _, node := range donTopology.Dons.List()[i].Nodes {
 			nodeIDs = append(nodeIDs, node.NodeID)
 		}
 

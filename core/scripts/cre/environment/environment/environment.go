@@ -435,8 +435,8 @@ func startCmd() *cobra.Command {
 					keystone_changeset.WorkflowRegistry.String())
 
 				var workflowDonID uint32
-				for idx, don := range output.DonTopology.DonsWithMetadata {
-					if flags.HasFlag(don.Flags, cre.WorkflowDON) {
+				for idx, donMetadata := range output.DonTopology.ToDonMetadata() {
+					if flags.HasFlag(donMetadata.Flags, cre.WorkflowDON) {
 						workflowDonID = libc.MustSafeUint32(idx + 1)
 						break
 					}
