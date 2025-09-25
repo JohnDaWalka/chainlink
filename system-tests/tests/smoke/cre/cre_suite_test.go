@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 //////////// SMOKE TESTS /////////////
@@ -62,6 +63,7 @@ To execute tests with v2 contracts start the local CRE first:
     `export  CTF_CONFIGS=../../../../core/scripts/cre/environment/configs/<topology>.toml; go test -timeout 15m -run ^Test_CRE_Suite$`.
 */
 func Test_CRE_Suite_V2(t *testing.T) {
+	quarantine.Flaky(t, "DX-1871")
 	flags := []string{"--with-contracts-version", "v2"}
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
 
