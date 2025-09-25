@@ -13,7 +13,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/smdkg/dkgocr/dkgocrtypes"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -568,7 +567,13 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provi
 				Password:        "dev-password",
 				ImportedSecrets: nodeSpec.Node.TestSecretsOverrides,
 			},
-			Host: provider.InternalHost(i, nodeType == BootstrapNode, c.Name),
+			Host:  provider.InternalHost(i, nodeType == BootstrapNode, c.Name),
+			Roles: []string{nodeType},
+			Index: i,
+		}
+
+		if slices.Contains(c.DONTypes, GatewayDON) && c.GatewayNodeIndex != -1 && i == c.GatewayNodeIndex {
+			cfg.Roles = append(cfg.Roles, GatewayNode)
 		}
 
 		cfgs[i] = cfg
@@ -589,75 +594,120 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provi
 }
 
 // copied from node.go to avoid circular import
-func AddressKeyFromSelector(chainSelector uint64) string {
-	return strconv.FormatUint(chainSelector, 10) + "_public_address"
-}
+// func AddressKeyFromSelector(chainSelector uint64) string {
+// 	return strconv.FormatUint(chainSelector, 10) + "_public_address"
+// }
 
-func (m *DonMetadata) labelNodes() error {
-	for i, meta := range m.NodesMetadata {
-		labels := make([]*Label, 0)
-		nodeType := WorkerNode
-		if m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex {
-			nodeType = BootstrapNode
-		}
-		labels = append(labels, &Label{
-			Key:   NodeTypeKey,
-			Value: nodeType,
-		})
+// func (m *DonMetadata) labelNodes() error {
+// 	for i := range m.NodesMetadata {
+// 		labels := make([]*Label, 0)
+// nodeType := WorkerNode
+// if m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex {
+// 	nodeType = BootstrapNode
+// }
+// labels = append(labels, &Label{
+// 	Key:   NodeTypeKey,
+// 	Value: nodeType,
+// })
 
-		labels = append(labels, &Label{
-			Key:   IndexKey,
-			Value: strconv.Itoa(i),
-		})
+// labels = append(labels, &Label{
+// 	Key:   IndexKey,
+// 	Value: strconv.Itoa(i),
+// })
 
-		for chainID, key := range meta.Keys.EVM {
-			selector, selErr := chainselectors.SelectorFromChainId(chainID)
-			if selErr != nil {
-				return fmt.Errorf("failed to get selector from chain ID %d: %w", chainID, selErr)
-			}
+// for chainID, key := range meta.Keys.EVM {
+// 	selector, selErr := chainselectors.SelectorFromChainId(chainID)
+// 	if selErr != nil {
+// 		return fmt.Errorf("failed to get selector from chain ID %d: %w", chainID, selErr)
+// 	}
 
-			labels = append(labels, &Label{
-				Key:   AddressKeyFromSelector(selector),
-				Value: key.PublicAddress.Hex(),
-			})
-		}
-		m.NodesMetadata[i].Labels = labels
-	}
+// 	labels = append(labels, &Label{
+// 		Key:   AddressKeyFromSelector(selector),
+// 		Value: key.PublicAddress.Hex(),
+// 	})
+// }
 
-	if m.ContainsGatewayNode() {
-		i := m.ns.GatewayNodeIndex
-		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
-			Key:   ExtraRolesKey,
-			Value: GatewayNode,
-		})
-	}
+// m.NodesMetadata[i].Labels = labels
+// }
 
-	return nil
-}
+// if m.ContainsGatewayNode() {
+// 	i := m.ns.GatewayNodeIndex
+// 	m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
+// 		Key:   ExtraRolesKey,
+// 		Value: GatewayNode,
+// 	})
+// }
+
+// return nil
+// }
 
 func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration, error) {
 	if m.ContainsGatewayNode() {
-		i := m.ns.GatewayNodeIndex
-		m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
-			Key:   ExtraRolesKey,
-			Value: GatewayNode,
-		})
-		isBootstrapNode := (m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex)
+		// i := m.ns.GatewayNodeIndex
+		// m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
+		// 	Key:   ExtraRolesKey,
+		// 	Value: GatewayNode,
+		// })
+		gatewayNode, gErr := m.GatewayNode()
+		if gErr != nil {
+			return nil, fmt.Errorf("failed to get gateway node: %w", gErr)
+		}
+
+		isBootstrapNode := gatewayNode.HasRole(BootstrapNode)
 		return &DonGatewayConfiguration{
 			Dons:                 make([]GatewayConnectorDons, 0),
-			GatewayConfiguration: NewGatewayConfig(p, i, isBootstrapNode, m.Name),
+			GatewayConfiguration: NewGatewayConfig(p, gatewayNode.Index, isBootstrapNode, m.Name),
 		}, nil
 	}
 
 	return nil, errors.New("don does not have the gateway flag or gateway node index not set")
 }
 
+func (m *DonMetadata) WorkerNodes() ([]*NodeMetadata, error) {
+	workers := make([]*NodeMetadata, 0)
+	for _, node := range m.NodesMetadata {
+		if slices.Contains(node.Roles, WorkerNode) {
+			workers = append(workers, node)
+		}
+	}
+
+	if len(workers) == 0 {
+		return nil, errors.New("don does not contain any worker nodes")
+	}
+
+	return workers, nil
+}
+
 // Currently only one bootstrap node is supported.
-func (m *DonMetadata) GetBootstrapNode() (*NodeMetadata, error) {
+func (m *DonMetadata) BootstrapNode() (*NodeMetadata, error) {
 	if !m.ContainsBootstrapNode() {
 		return nil, errors.New("don does not contain a bootstrap node")
 	}
+
+	for _, node := range m.NodesMetadata {
+		if slices.Contains(node.Roles, BootstrapNode) {
+			return node, nil
+		}
+	}
+
+	// fallback, should not happen
 	return m.NodesMetadata[m.ns.BootstrapNodeIndex], nil
+}
+
+// For now we support only one gateway node per DON
+func (m *DonMetadata) GatewayNode() (*NodeMetadata, error) {
+	if !m.ContainsGatewayNode() {
+		return nil, errors.New("don does not contain a gateway node")
+	}
+
+	for _, node := range m.NodesMetadata {
+		if slices.Contains(node.Roles, GatewayNode) {
+			return node, nil
+		}
+	}
+
+	// fallback, should not happen
+	return m.NodesMetadata[m.ns.GatewayNodeIndex], nil
 }
 
 func (m *DonMetadata) CapabilitiesAwareNodeSet() *CapabilitiesAwareNodeSet {
@@ -674,11 +724,25 @@ func (m *DonMetadata) RequiresOCR() bool {
 }
 
 func (m *DonMetadata) ContainsGatewayNode() bool {
-	return m.ns.GatewayNodeIndex != -1 // don't use flag here b/c may not be set
+	// return m.ns.GatewayNodeIndex != -1 // don't use flag here b/c may not be set
+	for _, node := range m.NodesMetadata {
+		if slices.Contains(node.Roles, GatewayNode) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (m *DonMetadata) ContainsBootstrapNode() bool {
-	return m.ns.BootstrapNodeIndex != -1 // don't use flag here b/c may not be set
+	// return m.ns.BootstrapNodeIndex != -1 // don't use flag here b/c may not be set
+	for _, node := range m.NodesMetadata {
+		if slices.Contains(node.Roles, BootstrapNode) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (m *DonMetadata) RequiresGateway() bool {
@@ -705,7 +769,8 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 	return slices.Contains(m.Flags, WorkflowDON)
 }
 
-// TODO remove later on
+// TODO remove later on or rething it. Probably when we move devenv.DON here
+// we could add to it all the metadata we need and avoid this struct altogether
 type Dons struct {
 	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
 	dons        []*devenv.DON
@@ -783,7 +848,7 @@ func (m DonsMetadata) validate() error {
 func (m DonsMetadata) BootstrapNode() (*NodeMetadata, error) {
 	for _, don := range m.dons {
 		if don.ContainsBootstrapNode() {
-			return don.GetBootstrapNode()
+			return don.BootstrapNode()
 		}
 	}
 	return nil, errors.New("no don contains a bootstrap node")
@@ -889,12 +954,20 @@ type NodeMetadata struct {
 	Labels []*Label          `toml:"labels" json:"labels"`
 	Keys   *secrets.NodeKeys `toml:"keys" json:"keys"`
 	Host   string            `toml:"host" json:"host"`
+	Roles  []string          `toml:"roles" json:"roles"`
+	Index  int               `toml:"index" json:"index"` // hopefully we can remove it later, but for now we need it to construct urls in CRIB
+}
+
+func (n *NodeMetadata) HasRole(role string) bool {
+	return slices.Contains(n.Roles, role)
 }
 
 type NodeMetadataConfig struct {
 	Labels []*Label
 	Keys   NodeKeyInput
 	Host   string
+	Roles  []string
+	Index  int
 }
 
 func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
@@ -902,14 +975,18 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	labels := c.Labels
 	if labels == nil {
 		labels = make([]*Label, 0)
 	}
+
 	return &NodeMetadata{
 		Labels: labels,
 		Keys:   keys,
 		Host:   c.Host,
+		Roles:  c.Roles,
+		Index:  c.Index,
 	}, nil
 }
 
@@ -947,7 +1024,7 @@ type DonTopology struct {
 func (t *DonTopology) BootstrapNode() (*NodeMetadata, error) {
 	for _, don := range t.Dons.DonMetadata {
 		if don.ContainsBootstrapNode() {
-			return don.GetBootstrapNode()
+			return don.BootstrapNode()
 		}
 	}
 	return nil, errors.New("no don contains a bootstrap node")

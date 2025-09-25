@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -28,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 )
 
@@ -89,22 +87,23 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		return nil, errors.New("additional capabilities configs are nil, but are required to configure the write-evm capability")
 	}
 
-	workflowNodeSet, wErr := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+	// workerNodes, wErr := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+	workerNodes, wErr := input.DonMetadata.WorkerNodes()
 	if wErr != nil {
 		return nil, errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
-	for nodeIdx, wnode := range workflowNodeSet {
-		var nodeIndex int
-		for _, label := range workflowNodeSet[nodeIdx].Labels {
-			if label.Key == node.IndexKey {
-				var nErr error
-				nodeIndex, nErr = strconv.Atoi(label.Value)
-				if nErr != nil {
-					return nil, errors.Wrap(nErr, "failed to convert node index to int")
-				}
-			}
-		}
+	for _, workerNode := range workerNodes {
+		// var nodeIndex int
+		// for _, label := range workerNodes[nodeIdx].Labels {
+		// 	if label.Key == node.IndexKey {
+		// 		var nErr error
+		// 		nodeIndex, nErr = strconv.Atoi(label.Value)
+		// 		if nErr != nil {
+		// 			return nil, errors.Wrap(nErr, "failed to convert node index to int")
+		// 		}
+		// 	}
+		// }
 
 		// // get all the forwarders and add workflow config (FromAddress + Forwarder) for chains that have write-evm enabled
 		data := []writeEVMData{}
@@ -125,9 +124,9 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			}
 			evmData.ForwarderAddress = forwarderAddress.Hex()
 
-			k, ok := wnode.Keys.EVM[chainID]
+			k, ok := workerNode.Keys.EVM[chainID]
 			if !ok {
-				return nil, fmt.Errorf("failed to get ETH address for chainID %d selector %d for node at index %d", chainID, chain.Selector, nodeIdx)
+				return nil, fmt.Errorf("failed to get ETH address for chainID %d selector %d for node at index %d", chainID, chain.Selector, workerNode.Index)
 			}
 			evmData.FromAddress = k.PublicAddress
 
@@ -140,25 +139,24 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			data = append(data, evmData)
 		}
 
-		if len(existingConfigs) < nodeIndex+1 {
-			return nil, errors.Errorf("missing config for node index %d", nodeIndex)
+		if len(existingConfigs) < workerNode.Index+1 {
+			return nil, errors.Errorf("missing config for node index %d", workerNode.Index)
 		}
 
-		currentConfig := existingConfigs[nodeIndex]
+		currentConfig := existingConfigs[workerNode.Index]
 
 		var typedConfig corechainlink.Config
 		unmarshallErr := toml.Unmarshal([]byte(currentConfig), &typedConfig)
 		if unmarshallErr != nil {
-			return nil, errors.Wrapf(unmarshallErr, "failed to unmarshal config for node index %d", nodeIndex)
+			return nil, errors.Wrapf(unmarshallErr, "failed to unmarshal config for node index %d", workerNode.Index)
 		}
 
 		if len(typedConfig.EVM) < len(data) {
-			return nil, fmt.Errorf("not enough EVM chains configured in node index %d to add write-evm config. Expected at least %d chains, but found %d", nodeIndex, len(data), len(typedConfig.EVM))
+			return nil, fmt.Errorf("not enough EVM chains configured in node index %d to add write-evm config. Expected at least %d chains, but found %d", workerNode.Index, len(data), len(typedConfig.EVM))
 		}
 
 		for _, writeEVMInput := range data {
 			chainFound := false
-		INNER:
 			for idx, evmChain := range typedConfig.EVM {
 				chainIDIsEqual := evmChain.ChainID.Cmp(chainlinkbig.New(big.NewInt(libc.MustSafeInt64(writeEVMInput.ChainID)))) == 0
 				if chainIDIsEqual {
@@ -171,39 +169,39 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 					typedConfig.EVM[idx].Transactions.ForwardersEnabled = ptr.Ptr(true)
 
 					chainFound = true
-					break INNER
+					break
 				}
 			}
 
 			if !chainFound {
-				return nil, fmt.Errorf("failed to find EVM chain with ID %d in the config of node index %d to add write-evm config", writeEVMInput.ChainID, nodeIndex)
+				return nil, fmt.Errorf("failed to find EVM chain with ID %d in the config of node index %d to add write-evm config", writeEVMInput.ChainID, workerNode.Index)
 			}
 		}
 
 		stringifiedConfig, mErr := toml.Marshal(typedConfig)
 		if mErr != nil {
-			return nil, errors.Wrapf(mErr, "failed to marshal config for node index %d", nodeIndex)
+			return nil, errors.Wrapf(mErr, "failed to marshal config for node index %d", workerNode.Index)
 		}
 
-		existingConfigs[nodeIndex] = string(stringifiedConfig)
+		existingConfigs[workerNode.Index] = string(stringifiedConfig)
 	}
 
 	return existingConfigs, nil
 }
 
-func findNodeEthAddressAddress(chainSelector uint64, nodeLabels []*cre.Label) (*common.Address, error) {
-	expectedAddressKey := node.AddressKeyFromSelector(chainSelector)
-	for _, label := range nodeLabels {
-		if label.Key == expectedAddressKey {
-			if label.Value == "" {
-				return nil, errors.Errorf("%s label value is empty", expectedAddressKey)
-			}
-			return ptr.Ptr(common.HexToAddress(label.Value)), nil
-		}
-	}
+// func findNodeEthAddressAddress(chainSelector uint64, nodeLabels []*cre.Label) (*common.Address, error) {
+// 	expectedAddressKey := node.AddressKeyFromSelector(chainSelector)
+// 	for _, label := range nodeLabels {
+// 		if label.Key == expectedAddressKey {
+// 			if label.Value == "" {
+// 				return nil, errors.Errorf("%s label value is empty", expectedAddressKey)
+// 			}
+// 			return ptr.Ptr(common.HexToAddress(label.Value)), nil
+// 		}
+// 	}
 
-	return nil, errors.Errorf("failed to get from address for chain %d", chainSelector)
-}
+// 	return nil, errors.Errorf("failed to get from address for chain %d", chainSelector)
+// }
 
 func findForwarderAddress(chain chain_selectors.Chain, addressBook deployment.AddressBook) (*common.Address, error) {
 	addrsForChains, addErr := addressBook.AddressesForChain(chain.Selector)

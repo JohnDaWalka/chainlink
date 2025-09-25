@@ -131,14 +131,15 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 				return nil, errors.Wrap(cmdErr, "failed to get capability command")
 			}
 
-			workflowNodeSet, setErr := crenode.FindManyWithLabel(
-				donMetadata.NodesMetadata,
-				&cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode},
-				crenode.EqualLabels,
-			)
+			// workflowNodeSet, setErr := crenode.FindManyWithLabel(
+			// 	donMetadata.NodesMetadata,
+			// 	&cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode},
+			// 	crenode.EqualLabels,
+			// )
 
-			if setErr != nil {
-				return nil, errors.Wrap(setErr, "failed to find worker nodes")
+			workerNodes, wErr := donMetadata.WorkerNodes()
+			if wErr != nil {
+				return nil, errors.Wrap(wErr, "failed to find worker nodes")
 			}
 
 			// Generate job specs for each enabled chain
@@ -152,7 +153,7 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 				}
 
 				// Create job specs for each worker node
-				for _, workerNode := range workflowNodeSet {
+				for _, workerNode := range workerNodes {
 					nodeID, nodeIDErr := crenode.FindLabelValue(workerNode, crenode.NodeIDKey)
 					if nodeIDErr != nil {
 						return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")

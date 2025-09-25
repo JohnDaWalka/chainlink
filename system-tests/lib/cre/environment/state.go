@@ -107,12 +107,17 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			allNodeIDs = append(allNodeIDs, id)
 		}
 
-		bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.ToDonMetadata()[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
+		// bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.ToDonMetadata()[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
+		// if err != nil {
+		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
+		// }
+
+		bootstrapNodesCount := 0
+		if envArtifact.Topology.ToDonMetadata()[idx].ContainsBootstrapNode() {
+			bootstrapNodesCount = 1
 		}
 
-		nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, don.DonID, len(bootstrapNodes))
+		nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, don.DonID, bootstrapNodesCount)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
 		}

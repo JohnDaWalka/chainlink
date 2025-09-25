@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -21,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/jd"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	libnode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
@@ -189,17 +187,17 @@ func DeployDons(input *cre.DeployCribDonsInput) ([]*cre.CapabilitiesAwareNodeSet
 }
 
 func getNodeSpecForNode(nodeMetadata *cre.NodeMetadata, donIndex int, input *cre.DeployCribDonsInput, donMetadata *cre.DonMetadata) (*clnode.Input, error) {
-	nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, cre.IndexKey)
-	if findErr != nil {
-		return nil, errors.Wrapf(findErr, "failed to find node index in nodeset %s", donMetadata.Name)
-	}
+	// nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, cre.IndexKey)
+	// if findErr != nil {
+	// 	return nil, errors.Wrapf(findErr, "failed to find node index in nodeset %s", donMetadata.Name)
+	// }
 
-	nodeIndex, convErr := strconv.Atoi(nodeIndexStr)
-	if convErr != nil {
-		return nil, errors.Wrapf(convErr, "failed to convert node index '%s' to int in nodeset %s", nodeIndexStr, donMetadata.Name)
-	}
+	// nodeIndex, convErr := strconv.Atoi(nodeIndexStr)
+	// if convErr != nil {
+	// 	return nil, errors.Wrapf(convErr, "failed to convert node index '%s' to int in nodeset %s", nodeIndexStr, donMetadata.Name)
+	// }
 
-	nodeSpec := input.NodeSetInputs[donIndex].NodeSpecs[nodeIndex]
+	nodeSpec := input.NodeSetInputs[donIndex].NodeSpecs[nodeMetadata.Index]
 	return nodeSpec, nil
 }
 

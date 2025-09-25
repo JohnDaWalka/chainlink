@@ -41,20 +41,25 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 				continue
 			}
 
-			workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to find worker nodes")
+			// workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+			// if err != nil {
+			// 	return nil, errors.Wrap(err, "failed to find worker nodes")
+			// }
+
+			workerNode, wErr := donMetadata.WorkerNodes()
+			if wErr != nil {
+				return nil, errors.Wrap(wErr, "failed to find worker nodes")
 			}
 
-			ethAddresses := make([]string, len(workflowNodeSet))
+			ethAddresses := make([]string, len(workerNode))
 			chainID, err := chainselectors.ChainIdFromSelector(input.DonTopology.HomeChainSelector)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get home chain id from selector")
 			}
-			for i, n := range workflowNodeSet {
-				k, ok := n.Keys.EVM[chainID]
+			for i, workerNode := range workerNode {
+				k, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", n.Host, chainID)
+					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", workerNode.Host, chainID)
 				}
 				ethAddresses[i] = k.PublicAddress.Hex()
 			}
@@ -101,7 +106,8 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 				continue
 			}
 
-			gatewayNode, nodeErr := node.FindOneWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.ExtraRolesKey, Value: cre.GatewayNode}, node.LabelContains)
+			// gatewayNode, nodeErr := node.FindOneWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.ExtraRolesKey, Value: cre.GatewayNode}, node.LabelContains)
+			gatewayNode, nodeErr := donMetadata.GatewayNode()
 			if nodeErr != nil {
 				return nil, errors.Wrap(nodeErr, "failed to find gateway node")
 			}

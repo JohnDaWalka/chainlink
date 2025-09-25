@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	corechainlink "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -88,37 +87,46 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		break
 	}
 
-	workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to find worker nodes")
+	// workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+	workerNodes, wErr := input.DonMetadata.WorkerNodes()
+	if wErr != nil {
+		return nil, errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
-	for i := range workflowNodeSet {
-		var nodeIndex int
-		for _, label := range workflowNodeSet[i].Labels {
-			if label.Key == node.IndexKey {
-				nodeIndex, err = strconv.Atoi(label.Value)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to convert node index to int")
-				}
-			}
+	for _, workerNode := range workerNodes {
+		// var nodeIndex int
+		// var err error
+		// for _, label := range workerNode.Labels {
+		// 	if label.Key == node.IndexKey {
+		// 		nodeIndex, err = strconv.Atoi(label.Value)
+		// 		if err != nil {
+		// 			return nil, errors.Wrap(err, "failed to convert node index to int")
+		// 		}
+		// 	}
+		// }
+
+		key, ok := workerNode.Keys.Solana[strconv.FormatUint(data.ChainSelector, 10)]
+		if !ok {
+			return nil, errors.Errorf("missing Solana key for chain selector %d on node index %d", data.ChainSelector, workerNode.Index)
 		}
+
+		data.FromAddress = key.PublicAddress
 
 		// find node's Solana address
-		expectedAddressKey := node.AddressKeyFromSelector(data.ChainSelector)
-		for _, label := range workflowNodeSet[i].Labels {
-			if label.Key == expectedAddressKey {
-				if label.Value == "" {
-					return nil, errors.Errorf("%s label value is empty", expectedAddressKey)
-				}
-				data.FromAddress = solana.MustPublicKeyFromBase58(label.Value)
-				break
-			}
-		}
+		// expectedAddressKey := node.AddressKeyFromSelector(data.ChainSelector)
+		// for _, label := range workflowNodeSet[i].Labels {
+		// 	if label.Key == expectedAddressKey {
+		// 		if label.Value == "" {
+		// 			return nil, errors.Errorf("%s label value is empty", expectedAddressKey)
+		// 		}
+		// 		data.FromAddress = solana.MustPublicKeyFromBase58(label.Value)
+		// 		break
+		// 	}
+		// }
 
-		if data.FromAddress.IsZero() {
-			return nil, errors.Errorf("failed to get from address for Solana chain %d", data.ChainSelector)
-		}
+		// if data.FromAddress.IsZero() {
+		// 	return nil, errors.Errorf("failed to get from address for Solana chain %d", data.ChainSelector)
+		// }
 
 		if input.CapabilityConfigs == nil {
 			return nil, errors.New("additional capabilities configs are nil, but are required to configure the write-solana capability")
@@ -146,24 +154,24 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			fmt.Println("sol config not found")
 		}
 
-		if len(existingConfigs) < nodeIndex+1 {
-			return nil, errors.Errorf("missing config for node index %d", nodeIndex)
+		if len(existingConfigs) < workerNode.Index+1 {
+			return nil, errors.Errorf("missing config for node index %d", workerNode.Index)
 		}
 
-		currentConfig := existingConfigs[nodeIndex]
+		currentConfig := existingConfigs[workerNode.Index]
 
 		var typedConfig corechainlink.Config
 		unmarshallErr := toml.Unmarshal([]byte(currentConfig), &typedConfig)
 		if unmarshallErr != nil {
-			return nil, errors.Wrapf(unmarshallErr, "failed to unmarshal config for node index %d", nodeIndex)
+			return nil, errors.Wrapf(unmarshallErr, "failed to unmarshal config for node index %d", workerNode.Index)
 		}
 
 		if len(typedConfig.Solana) != 1 {
-			return nil, errors.Wrapf(err, "only 1 Solana chain is supported, but found %d for node at index %d", len(typedConfig.Solana), nodeIndex)
+			return nil, fmt.Errorf("only 1 Solana chain is supported, but found %d for node at index %d", len(typedConfig.Solana), workerNode.Index)
 		}
 
 		if typedConfig.Solana[0].ChainID == nil {
-			return nil, errors.Wrapf(err, "Solana chainID is nil for node at index %d", nodeIndex)
+			return nil, fmt.Errorf("Solana chainID is nil for node at index %d", workerNode.Index)
 		}
 
 		var solCfg solcfg.WorkflowConfig
@@ -193,10 +201,10 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 
 		marshalledConfig, mErr := toml.Marshal(typedConfig)
 		if mErr != nil {
-			return nil, errors.Wrapf(mErr, "failed to marshal config for node index %d", nodeIndex)
+			return nil, errors.Wrapf(mErr, "failed to marshal config for node index %d", workerNode.Index)
 		}
 
-		existingConfigs[nodeIndex] = string(marshalledConfig)
+		existingConfigs[workerNode.Index] = string(marshalledConfig)
 	}
 
 	return existingConfigs, nil

@@ -16,24 +16,24 @@ const (
 )
 
 var (
-	NodeTypeKey            = "type"
-	HostLabelKey           = "host"
+	NodeTypeKey = "type"
+	// HostLabelKey           = "host"
 	IndexKey               = "node_index"
 	ExtraRolesKey          = "extra_roles"
 	NodeIDKey              = "node_id"
 	NodeOCRFamiliesKey     = "node_ocr_families"
 	NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
-	NodeP2PIDKey           = "p2p_id"
-	NodeDKGRecipientKey    = "dkg_recipient_key"
-	DONIDKey               = "don_id"
-	EnvironmentKey         = "environment"
-	ProductKey             = "product"
-	DONNameKey             = "don_name"
+	// NodeP2PIDKey           = "p2p_id"
+	// NodeDKGRecipientKey    = "dkg_recipient_key"
+	DONIDKey       = "don_id"
+	EnvironmentKey = "environment"
+	ProductKey     = "product"
+	DONNameKey     = "don_name"
 )
 
 type Topology struct {
 	WorkflowDONID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
-	DonsMetadata           *DonsMetadata           `toml:"dons_metadata" json:"dons_metadata"` //[]*DonMetadata          `toml:"dons_metadata" json:"dons_metadata"`
+	DonsMetadata           *DonsMetadata           `toml:"dons_metadata" json:"dons_metadata"`
 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
@@ -47,10 +47,10 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provid
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DON metadata: %w", err)
 		}
-		labelErr := d.labelNodes()
-		if labelErr != nil {
-			return nil, fmt.Errorf("failed to label nodes for DON %s: %w", d.Name, labelErr)
-		}
+		// labelErr := d.labelNodes()
+		// if labelErr != nil {
+		// 	return nil, fmt.Errorf("failed to label nodes for DON %s: %w", d.Name, labelErr)
+		// }
 		dm[i] = d
 	}
 

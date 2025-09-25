@@ -49,7 +49,6 @@ import (
 
 	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
 	cap_reg_v2_seq "github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/sequences"
-	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	syncer_v2 "github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer/v2"
 )
 
@@ -352,13 +351,14 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 			capabilities = append(capabilities, enabledCapabilities...)
 		}
 
-		workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
-			Key:   cre.NodeTypeKey,
-			Value: cre.WorkerNode,
-		}, crenode.EqualLabels)
+		// workerNodes, wErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
+		// 	Key:   cre.NodeTypeKey,
+		// 	Value: cre.WorkerNode,
+		// }, crenode.EqualLabels)
 
-		if workerNodesErr != nil {
-			return nil, errors.Wrap(workerNodesErr, "failed to find worker nodes")
+		workerNodes, wErr := donMetadata.WorkerNodes()
+		if wErr != nil {
+			return nil, errors.Wrap(wErr, "failed to find worker nodes")
 		}
 
 		donPeerIDs := make([]string, len(workerNodes))
@@ -744,13 +744,14 @@ func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig
 
 	for _, metaDon := range topology.DonsMetadata.List() {
 		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
-			workerNodes, workerNodesErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
-				Key:   crenode.NodeTypeKey,
-				Value: cre.WorkerNode,
-			}, crenode.EqualLabels)
+			// workerNodes, wErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
+			// 	Key:   crenode.NodeTypeKey,
+			// 	Value: cre.WorkerNode,
+			// }, crenode.EqualLabels)
 
-			if workerNodesErr != nil {
-				return nil, errors.Wrap(workerNodesErr, "failed to find worker nodes")
+			workerNodes, wErr := metaDon.WorkerNodes()
+			if wErr != nil {
+				return nil, errors.Wrap(wErr, "failed to find worker nodes")
 			}
 
 			// this schedule makes sure that all worker nodes are transmitting OCR3 reports
@@ -1094,12 +1095,13 @@ func configureTronForwarders(env *cldf.Environment, registryChainSelector uint64
 			continue
 		}
 
-		workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
-			Key:   crenode.NodeTypeKey,
-			Value: cre.WorkerNode,
-		}, crenode.EqualLabels)
-		if workerNodesErr != nil {
-			return fmt.Errorf("failed to find worker nodes for Tron configuration: %w", workerNodesErr)
+		// workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
+		// 	Key:   crenode.NodeTypeKey,
+		// 	Value: cre.WorkerNode,
+		// }, crenode.EqualLabels)
+		workerNodes, wErr := donMetadata.WorkerNodes()
+		if wErr != nil {
+			return fmt.Errorf("failed to find worker nodes for Tron configuration: %w", wErr)
 		}
 
 		for _, node := range workerNodes {

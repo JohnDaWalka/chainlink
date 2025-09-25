@@ -76,12 +76,17 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 	var allNodesInfo []devenv.NodeInfo
 
 	for idx, nodeOutput := range input.NodeSetOutput {
-		bootstrapNodes, err := node.FindManyWithLabel(input.Topology.DonsMetadata.List()[idx].NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
+		// bootstrapNodes, err := node.FindManyWithLabel(input.Topology.DonsMetadata.List()[idx].NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
+		// if err != nil {
+		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
+		// }
+
+		bootstrapNodeCount := 0
+		if input.Topology.DonsMetadata.List()[idx].ContainsBootstrapNode() {
+			bootstrapNodeCount = 1
 		}
 
-		nodeInfo, err := node.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, input.Topology.DonsMetadata.List()[idx].ID, len(bootstrapNodes))
+		nodeInfo, err := node.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, input.Topology.DonsMetadata.List()[idx].ID, bootstrapNodeCount)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to get node info")
 		}

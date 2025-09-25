@@ -80,12 +80,13 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 
 		binaryPath := filepath.Join(containerPath, filepath.Base(capabilityConfig.BinaryPath))
 
-		workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to find worker nodes")
+		// workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+		workerNodes, wErr := donMetadata.WorkerNodes()
+		if wErr != nil {
+			return nil, errors.Wrap(wErr, "failed to find worker nodes")
 		}
 
-		donName := donMetadata.Name
+		// donName := donMetadata.Name
 		// bootstrapNode, err := donMetadata.GetBootstrapNode()
 		// if err != nil {
 		// 	return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
@@ -101,10 +102,10 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 		}
 
-		internalHostsBS, err := getBoostrapWorkflowNames(bootstrapNode, donName, infraInput)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate bootstrap node host for DON %s: %w", donName, err)
-		}
+		// internalHostsBS, err := getBoostrapWorkflowNames(bootstrapNode, donName, infraInput)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("couldn't generate bootstrap node host for DON %s: %w", donName, err)
+		// }
 
 		chainIDs, err := enabledChainsProvider(donTopology, nodeSetInput[donIdx], flag)
 		if err != nil {
@@ -148,7 +149,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, contractName, ocr3ConfigContractAddress.Address, chainIDUint64))
 			logger.Debug().Msgf("Found deployed '%s' OCR3 contract on chain %d at %s", contractName, chainIDUint64, ocr3ConfigContractAddress.Address)
 
-			for _, workerNode := range workflowNodeSet {
+			for _, workerNode := range workerNodes {
 				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
 				if nodeIDErr != nil {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
@@ -173,10 +174,10 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 				nodeAddress := transmitterAddress
 				logger.Debug().Msgf("Deployed node on chain %d/%d at %s", chainIDUint64, chain.Selector, nodeAddress)
 
-				bootstrapPeers := make([]string, len(internalHostsBS))
-				for i, workflowName := range internalHostsBS {
-					bootstrapPeers[i] = fmt.Sprintf("%s@%s:%d", bootstrapNode.Keys.CleansedPeerID(), workflowName, cre.OCRPeeringPort)
-				}
+				bootstrapPeers := []string{fmt.Sprintf("%s@%s:%d", bootstrapNode.Keys.CleansedPeerID(), bootstrapNode.Host, cre.OCRPeeringPort)}
+				// for i, workflowName := range internalHostsBS {
+				// 	bootstrapPeers[i] = fmt.Sprintf("%s@%s:%d", bootstrapNode.Keys.CleansedPeerID(), workflowName, cre.OCRPeeringPort)
+				// }
 
 				strategyName := "single-chain"
 				if len(bundlesPerFamily) > 1 {
@@ -234,20 +235,20 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 	return donToJobSpecs, nil
 }
 
-func getBoostrapWorkflowNames(bootstrapNode *cre.NodeMetadata, donName string, infraInput infra.Provider) ([]string, error) {
-	nodeIndexStr, nErr := node.FindLabelValue(bootstrapNode, node.IndexKey)
-	if nErr != nil {
-		return nil, errors.Wrap(nErr, "failed to find index label")
-	}
+// func getBoostrapWorkflowNames(bootstrapNode *cre.NodeMetadata, donName string, infraInput infra.Provider) ([]string, error) {
+// 	nodeIndexStr, nErr := node.FindLabelValue(bootstrapNode, node.IndexKey)
+// 	if nErr != nil {
+// 		return nil, errors.Wrap(nErr, "failed to find index label")
+// 	}
 
-	nodeIndex, nIErr := strconv.Atoi(nodeIndexStr)
-	if nIErr != nil {
-		return nil, errors.Wrap(nIErr, "failed to convert index label value to int")
-	}
+// 	nodeIndex, nIErr := strconv.Atoi(nodeIndexStr)
+// 	if nIErr != nil {
+// 		return nil, errors.Wrap(nIErr, "failed to convert index label value to int")
+// 	}
 
-	internalHostBS := infraInput.InternalHost(nodeIndex, true, donName)
-	return []string{internalHostBS}, nil
-}
+// 	internalHostBS := infraInput.InternalHost(nodeIndex, true, donName)
+// 	return []string{internalHostBS}, nil
+// }
 
 // ConfigMerger merges default config with overrides (either on DON or chain level)
 type ConfigMerger func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error)

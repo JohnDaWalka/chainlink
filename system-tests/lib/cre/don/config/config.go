@@ -35,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
@@ -54,29 +53,29 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 	}
 
 	for nodeIdx, nodeMetadata := range input.DonMetadata.NodesMetadata {
-		var roles []string
-		nodeType, typeErr := node.FindLabelValue(nodeMetadata, cre.NodeTypeKey)
-		if typeErr != nil {
-			return nil, errors.Wrap(typeErr, "failed to find node type")
-		}
+		// var roles []string
+		// nodeType, typeErr := node.FindLabelValue(nodeMetadata, cre.NodeTypeKey)
+		// if typeErr != nil {
+		// 	return nil, errors.Wrap(typeErr, "failed to find node type")
+		// }
 
-		roles = append(roles, nodeType)
+		// roles = append(roles, nodeType)
 
-		if slices.Contains(roles, cre.BootstrapNode) && slices.Contains(roles, cre.WorkerNode) {
-			return nil, fmt.Errorf("node at index %d in DON %s cannot be both a bootstrap node and a worker node", nodeIdx, input.DonMetadata.Name)
-		}
+		// if slices.Contains(roles, cre.BootstrapNode) && slices.Contains(roles, cre.WorkerNode) {
+		// 	return nil, fmt.Errorf("node at index %d in DON %s cannot be both a bootstrap node and a worker node", nodeIdx, input.DonMetadata.Name)
+		// }
 
-		if node.HasLabel(nodeMetadata, cre.ExtraRolesKey) {
-			extraRoles, extraErr := node.FindLabelValue(nodeMetadata, cre.ExtraRolesKey)
-			if extraErr != nil {
-				return nil, errors.Wrap(extraErr, "failed to check for extra roles")
-			}
+		// if node.HasLabel(nodeMetadata, cre.ExtraRolesKey) {
+		// 	extraRoles, extraErr := node.FindLabelValue(nodeMetadata, cre.ExtraRolesKey)
+		// 	if extraErr != nil {
+		// 		return nil, errors.Wrap(extraErr, "failed to check for extra roles")
+		// 	}
 
-			roles = append(roles, strings.Split(extraRoles, ",")...)
-		}
+		// 	roles = append(roles, strings.Split(extraRoles, ",")...)
+		// }
 
 		nodeConfig := defaultNodeConfigGenerator()
-		for _, role := range roles {
+		for _, role := range nodeMetadata.Roles {
 			switch role {
 			case cre.BootstrapNode:
 				var cErr error
@@ -98,7 +97,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 				}
 			default:
 				supportedRoles := []string{cre.BootstrapNode, cre.WorkerNode, cre.GatewayNode}
-				return nil, fmt.Errorf("unsupported node type %s found for node at index %d in DON %s. Supported roles: %s", nodeType, nodeIdx, input.DonMetadata.Name, strings.Join(supportedRoles, ", "))
+				return nil, fmt.Errorf("unsupported node type %s found for node at index %d in DON %s. Supported roles: %s", role, nodeIdx, input.DonMetadata.Name, strings.Join(supportedRoles, ", "))
 			}
 		}
 
@@ -283,23 +282,23 @@ func addWorkerNodeConfig(
 
 	if flags.HasFlag(donFlags, cre.WorkflowDON) || don.NodeNeedsAnyGateway(donFlags) {
 		// find node's ETH address on the registry chain
-		var nodeEthAddr string
-		expectedAddressKey := node.AddressKeyFromSelector(commonInputs.registryChainSelector)
-		for _, label := range m.Labels {
-			if label.Key == expectedAddressKey {
-				nodeEthAddr = label.Value
-				break
-			}
-		}
+		// var nodeEthAddr string
+		// expectedAddressKey := node.AddressKeyFromSelector(commonInputs.registryChainSelector)
+		// for _, label := range m.Labels {
+		// 	if label.Key == expectedAddressKey {
+		// 		nodeEthAddr = label.Value
+		// 		break
+		// 	}
+		// }
 
-		if nodeEthAddr == "" {
-			// load from keys
-			k, ok := m.Keys.EVM[commonInputs.registryChainID]
-			if !ok {
-				return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
-			}
-			nodeEthAddr = k.PublicAddress.Hex()
+		// if nodeEthAddr == "" {
+		// load from keys
+		k, ok := m.Keys.EVM[commonInputs.registryChainID]
+		if !ok {
+			return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
 		}
+		nodeEthAddr := k.PublicAddress.Hex()
+		// }
 
 		gateways := []coretoml.ConnectorGateway{}
 		if gatewayConnector != nil && len(gatewayConnector.Configurations) > 0 {

@@ -113,10 +113,11 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			}
 
 			// create job specs for the worker nodes
-			workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-			if err != nil {
+			// workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
+			workerNodes, wErr := donWithMetadata.WorkerNodes()
+			if wErr != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
-				return nil, errors.Wrap(err, "failed to find worker nodes")
+				return nil, errors.Wrap(wErr, "failed to find worker nodes")
 			}
 
 			bootstrapNode, bootErr := input.DonTopology.BootstrapNode()
@@ -137,7 +138,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			// create job specs for the bootstrap node
 			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "vault-capability", vaultCapabilityAddress.Address, chainID))
 
-			for _, workerNode := range workflowNodeSet {
+			for _, workerNode := range workerNodes {
 				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
 				if nodeIDErr != nil {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
