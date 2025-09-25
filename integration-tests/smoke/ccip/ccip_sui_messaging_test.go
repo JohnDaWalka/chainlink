@@ -37,7 +37,8 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
-	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	require.NoError(t, err)
 
 	suiSenderAddr, err := e.Env.BlockChains.SuiChains()[sourceChain].Signer.GetAddress()
 	require.NoError(t, err)
@@ -65,7 +66,7 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 
 	var (
 		nonce  uint64
-		sender = common.LeftPadBytes(suiSenderByte[:], 32)
+		sender = common.LeftPadBytes(suiSenderByte, 32)
 
 		setup = messagingtest.NewTestSetupWithDeployedEnv(
 			t,
@@ -93,5 +94,4 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 			},
 		)
 	})
-
 }
