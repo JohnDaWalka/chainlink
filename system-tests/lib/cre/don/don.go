@@ -158,7 +158,7 @@ func findSupportedChainsForDON(donMetadata *cre.DonMetadata, blockchainOutputs [
 	chains := make([]devenv.ChainConfig, 0)
 
 	for chainSelector, bcOut := range blockchainOutputs {
-		if len(donMetadata.EnabledEVMChainIDs) > 0 && !slices.Contains(donMetadata.EnabledEVMChainIDs, bcOut.ChainID) {
+		if !slices.Contains(donMetadata.EVMChains(), bcOut.ChainID) {
 			continue
 		}
 
