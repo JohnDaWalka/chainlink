@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 //////////// SMOKE TESTS /////////////
@@ -96,6 +97,7 @@ func Test_CRE_Suite_V2(t *testing.T) {
 }
 
 func Test_CRE_Suite_V2_EVM(t *testing.T) {
+	quarantine.Flaky(t, "DX-1879")
 	flags := []string{"--with-contracts-version", "v2"}
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
 
