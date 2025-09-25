@@ -552,9 +552,14 @@ type DonMetadata struct {
 	ns CapabilitiesAwareNodeSet // computed field, not serialized
 }
 
-func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error) {
+func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provider) (*DonMetadata, error) {
 	cfgs := make([]NodeMetadataConfig, len(c.NodeSpecs))
 	for i, nodeSpec := range c.NodeSpecs {
+		nodeType := WorkerNode
+		if c.BootstrapNodeIndex != -1 && i == c.BootstrapNodeIndex {
+			nodeType = BootstrapNode
+		}
+
 		cfg := NodeMetadataConfig{
 			Labels: []*Label{},
 			Keys: NodeKeyInput{
@@ -563,7 +568,7 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error
 				Password:        "dev-password",
 				ImportedSecrets: nodeSpec.Node.TestSecretsOverrides,
 			},
-			Host: "", // will be auto-generated later based on infra provider
+			Host: provider.InternalHost(i, nodeType == BootstrapNode, c.Name),
 		}
 
 		cfgs[i] = cfg
@@ -588,7 +593,7 @@ func AddressKeyFromSelector(chainSelector uint64) string {
 	return strconv.FormatUint(chainSelector, 10) + "_public_address"
 }
 
-func (m *DonMetadata) labelNodes(infraInput infra.Provider) error {
+func (m *DonMetadata) labelNodes() error {
 	for i, meta := range m.NodesMetadata {
 		labels := make([]*Label, 0)
 		nodeType := WorkerNode
@@ -616,15 +621,6 @@ func (m *DonMetadata) labelNodes(infraInput infra.Provider) error {
 				Value: key.PublicAddress.Hex(),
 			})
 		}
-
-		//TODO add solana keys?
-
-		internalHost := infraInput.InternalHost(i, nodeType == BootstrapNode, m.Name)
-
-		labels = append(labels, &Label{
-			Key:   HostLabelKey,
-			Value: internalHost,
-		})
 		m.NodesMetadata[i].Labels = labels
 	}
 
@@ -913,7 +909,7 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 	return &NodeMetadata{
 		Labels: labels,
 		Keys:   keys,
-		Host:   "", // we set the host later when we have the infra input
+		Host:   c.Host,
 	}, nil
 }
 
@@ -1195,35 +1191,6 @@ func (c *CapabilitiesAwareNodeSet) MaxFaultyNodes() (uint32, error) {
 	return uint32((c.Nodes - 1) / 3), nil //nolint:gosec // disable G115
 }
 
-type GenerateKeysInput struct {
-	EVMChainIDs              []uint64
-	SolanaChainIDs           []string
-	GenerateP2PKeys          bool
-	GenerateDKGRecipientKeys bool
-	Topology                 *Topology
-	Password                 string
-	Out                      *GenerateKeysOutput
-}
-
-func (g *GenerateKeysInput) Validate() error {
-	if g.Topology == nil {
-		return errors.New("topology not set")
-	}
-	if len(g.Topology.DonsMetadata.List()) == 0 {
-		return errors.New("metadata not set")
-	}
-	if g.Topology.WorkflowDONID == 0 {
-		return errors.New("workflow don id not set")
-	}
-	return nil
-}
-
-// chainID -> EVMKeys
-type ChainIDToEVMKeys = map[uint64]*crypto.EVMKeys
-
-// chainID -> SolKeys
-type ChainIDToSolKeys = map[string]*crypto.SolKeys
-
 type NodeKeyInput struct {
 	EVMChainIDs    []uint64
 	SolanaChainIDs []string
@@ -1253,7 +1220,7 @@ func NewNodeKeys(input NodeKeyInput) (*secrets.NodeKeys, error) {
 	}
 	out.P2PKey = p2pKey
 
-	dkgKey, err := crypto.GenerateDKGRecipientKey(input.Password)
+	dkgKey, err := crypto.NewDKGRecipientKey(input.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate DKG recipient keys")
 	}
@@ -1278,76 +1245,6 @@ func NewNodeKeys(input NodeKeyInput) (*secrets.NodeKeys, error) {
 		out.Solana[chainID] = k
 	}
 	return out, nil
-}
-
-// donID -> chainID -> EVMKeys
-type DonsToEVMKeys = map[uint64]ChainIDToEVMKeys
-
-// donID -> chainID -> SolKeys
-type DonsToSolKeys = map[uint64]ChainIDToSolKeys
-
-// donID -> P2PKeys
-type DonsToP2PKeys = map[uint64]*crypto.P2PKeys
-
-// donID -> DKGRecipientKeys
-type DonsToDKGRecipientKeys = map[uint64]*crypto.DKGRecipientKeys
-
-type GenerateKeysOutput struct {
-	EVMKeys          DonsToEVMKeys
-	SolKeys          DonsToSolKeys
-	P2PKeys          DonsToP2PKeys
-	DKGRecipientKeys DonsToDKGRecipientKeys
-}
-
-type GenerateSecretsInput struct {
-	DonMetadata      *DonMetadata
-	EVMKeys          ChainIDToEVMKeys
-	SolKeys          ChainIDToSolKeys
-	P2PKeys          *crypto.P2PKeys
-	DKGRecipientKeys *crypto.DKGRecipientKeys
-}
-
-func (g *GenerateSecretsInput) Validate() error {
-	if g.DonMetadata == nil {
-		return errors.New("don metadata not set")
-	}
-	if g.EVMKeys != nil {
-		if len(g.EVMKeys) == 0 {
-			return errors.New("chain ids not set")
-		}
-		for chainID, evmKeys := range g.EVMKeys {
-			if len(evmKeys.EncryptedJSONs) == 0 {
-				return errors.New("encrypted jsons not set")
-			}
-			if len(evmKeys.PublicAddresses) == 0 {
-				return errors.New("public addresses not set")
-			}
-			if len(evmKeys.EncryptedJSONs) != len(evmKeys.PublicAddresses) {
-				return errors.New("encrypted jsons and public addresses must have the same length")
-			}
-			if chainID == 0 {
-				return errors.New("chain id 0 not allowed")
-			}
-		}
-	}
-	if g.P2PKeys != nil {
-		if len(g.P2PKeys.Keys) == 0 {
-			return errors.New("P2P keys not set")
-		}
-	}
-	if g.DKGRecipientKeys != nil {
-		if len(g.DKGRecipientKeys.EncryptedJSONs) == 0 {
-			return errors.New("encrypted jsons not set")
-		}
-		if len(g.DKGRecipientKeys.PubKeys) == 0 {
-			return errors.New("public keys not set")
-		}
-		if len(g.DKGRecipientKeys.EncryptedJSONs) != len(g.DKGRecipientKeys.PubKeys) {
-			return errors.New("encrypted jsons and public keys must have the same length")
-		}
-	}
-
-	return nil
 }
 
 type LinkDonsToJDInput struct {

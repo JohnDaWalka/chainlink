@@ -39,21 +39,6 @@ func NewEVMKey(password string, chainID uint64) (*EVMKey, error) {
 	}, nil
 }
 
-func GenerateEVMKeys(password string, n int) (*EVMKeys, error) {
-	result := &EVMKeys{
-		Password: password,
-	}
-	for range n {
-		key, addr, err := clclient.NewETHKey(password)
-		if err != nil {
-			return result, fmt.Errorf("failed to create new EVM key: %w", err)
-		}
-		result.EncryptedJSONs = append(result.EncryptedJSONs, key)
-		result.PublicAddresses = append(result.PublicAddresses, addr)
-	}
-	return result, nil
-}
-
 /*
 Generates new private and public key pair
 

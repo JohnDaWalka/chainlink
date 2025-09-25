@@ -396,6 +396,7 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 			flags:           donMetadata.Flags,
 		}
 	}
+
 	return dons, nil
 }
 
@@ -808,14 +809,6 @@ func DKGReportingPluginConfig(topology *cre.Topology, nodeSets []*cre.Capabiliti
 		if i == nodeSets[vaultIndex].BootstrapNodeIndex {
 			continue
 		}
-		// dkgRecipientKeyStr, err := crenode.FindLabelValue(nmd, cre.NodeDKGRecipientKey)
-		// if err != nil {
-		// 	return nil, errors.Wrap(err, "failed to find DKG recipient key label")
-		// }
-		// pubKey, err := hex.DecodeString(dkgRecipientKeyStr)
-		// if err != nil {
-		// 	return nil, errors.Wrap(err, "failed to decode DKG recipient key")
-		// }
 
 		pubKey := nmd.Keys.DKGKey.PubKey
 		cfg.DealerPublicKeys = append(cfg.DealerPublicKeys, pubKey)
@@ -1110,10 +1103,6 @@ func configureTronForwarders(env *cldf.Environment, registryChainSelector uint64
 		}
 
 		for _, node := range workerNodes {
-			// p2pID, err := crenode.ToP2PID(node, crenode.NoOpTransformFn)
-			// if err != nil {
-			// 	return fmt.Errorf("failed to get p2p id for node: %w", err)
-			// }
 			wfNodeIDs = append(wfNodeIDs, node.Keys.P2PKey.PeerID.String())
 		}
 	}

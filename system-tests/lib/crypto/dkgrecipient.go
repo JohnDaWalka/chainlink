@@ -13,13 +13,7 @@ type DKGRecipientKey struct {
 	Password      string
 }
 
-type DKGRecipientKeys struct {
-	EncryptedJSONs [][]byte
-	PubKeys        []dkgocrtypes.P256ParticipantPublicKey
-	Password       string
-}
-
-func GenerateDKGRecipientKey(password string) (*DKGRecipientKey, error) {
+func NewDKGRecipientKey(password string) (*DKGRecipientKey, error) {
 	result := &DKGRecipientKey{
 		Password: password,
 	}
@@ -35,25 +29,5 @@ func GenerateDKGRecipientKey(password string) (*DKGRecipientKey, error) {
 	result.EncryptedJSON = d
 	result.PubKey = key.PublicKey()
 
-	return result, nil
-}
-
-func GenerateDKGRecipientKeys(password string, n int) (*DKGRecipientKeys, error) {
-	result := &DKGRecipientKeys{
-		Password: password,
-	}
-	for i := 0; i < n; i++ {
-		key, err := dkgrecipientkey.New()
-		if err != nil {
-			return nil, err
-		}
-		d, err := key.ToEncryptedJSON(password, utils.DefaultScryptParams)
-		if err != nil {
-			return nil, err
-		}
-
-		result.EncryptedJSONs = append(result.EncryptedJSONs, d)
-		result.PubKeys = append(result.PubKeys, key.PublicKey())
-	}
 	return result, nil
 }

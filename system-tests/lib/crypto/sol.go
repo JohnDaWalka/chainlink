@@ -34,28 +34,3 @@ func NewSolKey(password, chainID string) (*SolKey, error) {
 		ChainID:       chainID,
 	}, nil
 }
-
-type SolKeys struct {
-	EncryptedJSONs  [][]byte
-	PublicAddresses []solana.PublicKey
-	Password        string
-	ChainID         string
-}
-
-func GenerateSolKeys(password string, n int, chainID string) (*SolKeys, error) {
-	result := &SolKeys{
-		Password: password,
-		ChainID:  chainID,
-	}
-	for range n {
-		key, err := NewSolKey(password, chainID)
-		if err != nil {
-			return nil, fmt.Errorf("err create solkey: %w", err)
-		}
-
-		result.EncryptedJSONs = append(result.EncryptedJSONs, key.EncryptedJSON)
-		result.PublicAddresses = append(result.PublicAddresses, key.PublicAddress)
-	}
-
-	return result, nil
-}

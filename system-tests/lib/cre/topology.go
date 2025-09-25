@@ -43,11 +43,11 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provid
 	for i := range nodeSetInput {
 		// TODO take more care about the ID assignment, it should match what the capabilities registry will assign
 		// currently we optimistically set the id to the that which the capabilities registry will assign it
-		d, err := NewDonMetadata(nodeSetInput[i], libc.MustSafeUint64FromInt(i+1))
+		d, err := NewDonMetadata(nodeSetInput[i], libc.MustSafeUint64FromInt(i+1), provider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DON metadata: %w", err)
 		}
-		labelErr := d.labelNodes(provider)
+		labelErr := d.labelNodes()
 		if labelErr != nil {
 			return nil, fmt.Errorf("failed to label nodes for DON %s: %w", d.Name, labelErr)
 		}
