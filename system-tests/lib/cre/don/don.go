@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"google.golang.org/grpc/credentials/insecure"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -159,7 +161,7 @@ func findSupportedChainsForDON(donMetadata *cre.DonMetadata, blockchainOutputs [
 	chains := make([]devenv.ChainConfig, 0)
 
 	for chainSelector, bcOut := range blockchainOutputs {
-		if !slices.Contains(donMetadata.EVMChains(), bcOut.ChainID) {
+		if !slices.Contains(donMetadata.EVMChains(), bcOut.ChainID) && !(flags.HasFlagForAnyChain(donMetadata.Flags, cre.WriteSolanaCapability) && strings.EqualFold(bcOut.BlockchainOutput.Family, chainselectors.FamilySolana)) {
 			continue
 		}
 
