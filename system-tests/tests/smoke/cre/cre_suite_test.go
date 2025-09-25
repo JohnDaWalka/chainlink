@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 //////////// SMOKE TESTS /////////////
@@ -57,6 +58,7 @@ func Test_CRE_Suite_V1_SecureMint(t *testing.T) {
 }
 
 func Test_CRE_Suite_Billing(t *testing.T) {
+	quarantine.Flaky(t, "DX-1888")
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t))
 
 	// TODO remove this when OCR works properly with multiple chains in Local CRE
