@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -105,9 +105,14 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		// 	}
 		// }
 
-		key, ok := workerNode.Keys.Solana[strconv.FormatUint(data.ChainSelector, 10)]
+		chainID, chErr := chainselectors.SolanaChainIdFromSelector(data.ChainSelector)
+		if chErr != nil {
+			return nil, errors.Wrapf(chErr, "failed to get Solana chain ID from selector %d", data.ChainSelector)
+		}
+
+		key, ok := workerNode.Keys.Solana[chainID]
 		if !ok {
-			return nil, errors.Errorf("missing Solana key for chain selector %d on node index %d", data.ChainSelector, workerNode.Index)
+			return nil, errors.Errorf("missing Solana key for chainID %s on node index %d", chainID, workerNode.Index)
 		}
 
 		data.FromAddress = key.PublicAddress
