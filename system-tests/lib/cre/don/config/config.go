@@ -53,28 +53,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 	}
 
 	for nodeIdx, nodeMetadata := range input.DonMetadata.NodesMetadata {
-		// var roles []string
-		// nodeType, typeErr := node.FindLabelValue(nodeMetadata, cre.NodeTypeKey)
-		// if typeErr != nil {
-		// 	return nil, errors.Wrap(typeErr, "failed to find node type")
-		// }
-
-		// roles = append(roles, nodeType)
-
-		// if slices.Contains(roles, cre.BootstrapNode) && slices.Contains(roles, cre.WorkerNode) {
-		// 	return nil, fmt.Errorf("node at index %d in DON %s cannot be both a bootstrap node and a worker node", nodeIdx, input.DonMetadata.Name)
-		// }
-
-		// if node.HasLabel(nodeMetadata, cre.ExtraRolesKey) {
-		// 	extraRoles, extraErr := node.FindLabelValue(nodeMetadata, cre.ExtraRolesKey)
-		// 	if extraErr != nil {
-		// 		return nil, errors.Wrap(extraErr, "failed to check for extra roles")
-		// 	}
-
-		// 	roles = append(roles, strings.Split(extraRoles, ",")...)
-		// }
-
-		nodeConfig := defaultNodeConfigGenerator()
+		nodeConfig := baseNodeConfig()
 		for _, role := range nodeMetadata.Roles {
 			switch role {
 			case cre.BootstrapNode:
@@ -128,7 +107,7 @@ func Generate(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeC
 	return configOverrides, nil
 }
 
-func defaultNodeConfigGenerator() corechainlink.Config {
+func baseNodeConfig() corechainlink.Config {
 	return corechainlink.Config{
 		Core: coretoml.Core{
 			Feature: coretoml.Feature{
@@ -190,7 +169,7 @@ func addBootstrapNodeConfig(
 			Enabled: ptr.Ptr(true),
 			ChainID: ptr.Ptr(commonInputs.solanaChain.ChainID),
 			Nodes: []*solcfg.Node{
-				&solcfg.Node{
+				{
 					Name: &commonInputs.solanaChain.Name,
 					URL:  commonconfig.MustParseURL(commonInputs.solanaChain.NodeURL),
 				},
@@ -281,24 +260,11 @@ func addWorkerNodeConfig(
 	}
 
 	if flags.HasFlag(donFlags, cre.WorkflowDON) || don.NodeNeedsAnyGateway(donFlags) {
-		// find node's ETH address on the registry chain
-		// var nodeEthAddr string
-		// expectedAddressKey := node.AddressKeyFromSelector(commonInputs.registryChainSelector)
-		// for _, label := range m.Labels {
-		// 	if label.Key == expectedAddressKey {
-		// 		nodeEthAddr = label.Value
-		// 		break
-		// 	}
-		// }
-
-		// if nodeEthAddr == "" {
-		// load from keys
-		k, ok := m.Keys.EVM[commonInputs.registryChainID]
+		ethKey, ok := m.Keys.EVM[commonInputs.registryChainID]
 		if !ok {
 			return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
 		}
-		nodeEthAddr := k.PublicAddress.Hex()
-		// }
+		nodeEthAddr := ethKey.PublicAddress.Hex()
 
 		gateways := []coretoml.ConnectorGateway{}
 		if gatewayConnector != nil && len(gatewayConnector.Configurations) > 0 {

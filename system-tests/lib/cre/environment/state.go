@@ -107,11 +107,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			allNodeIDs = append(allNodeIDs, id)
 		}
 
-		// bootstrapNodes, err := crenode.FindManyWithLabel(envArtifact.Topology.ToDonMetadata()[idx].NodesMetadata, &cre.Label{Key: crenode.NodeTypeKey, Value: cre.BootstrapNode}, crenode.EqualLabels)
-		// if err != nil {
-		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
-		// }
-
+		// a maximum of 1 bootstrap is supported due to environment constraints
 		bootstrapNodesCount := 0
 		if envArtifact.Topology.ToDonMetadata()[idx].ContainsBootstrapNode() {
 			bootstrapNodesCount = 1

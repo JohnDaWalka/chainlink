@@ -131,12 +131,6 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 				return nil, errors.Wrap(cmdErr, "failed to get capability command")
 			}
 
-			// workflowNodeSet, setErr := crenode.FindManyWithLabel(
-			// 	donMetadata.NodesMetadata,
-			// 	&cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode},
-			// 	crenode.EqualLabels,
-			// )
-
 			workerNodes, wErr := donMetadata.WorkerNodes()
 			if wErr != nil {
 				return nil, errors.Wrap(wErr, "failed to find worker nodes")

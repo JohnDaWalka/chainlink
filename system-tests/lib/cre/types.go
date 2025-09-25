@@ -366,46 +366,6 @@ func (c *CreateJobsInput) Validate() error {
 	return nil
 }
 
-type DebugInput struct {
-	DebugDons        []*DebugDon
-	BlockchainOutput *blockchain.Output
-	InfraInput       *infra.Provider
-}
-
-type DebugDon struct {
-	Flags          []string
-	ContainerNames []string
-	NodesMetadata  []*NodeMetadata
-}
-
-func (d *DebugInput) Validate() error {
-	if d.DebugDons == nil {
-		return errors.New("don topology not set")
-	}
-	if len(d.DebugDons) == 0 {
-		return errors.New("debug don not set")
-	}
-	for _, don := range d.DebugDons {
-		if len(don.ContainerNames) == 0 {
-			return errors.New("container names not set")
-		}
-		if len(don.NodesMetadata) == 0 {
-			return errors.New("nodes metadata not set")
-		}
-		if len(don.Flags) == 0 {
-			return errors.New("flags not set")
-		}
-	}
-	if d.BlockchainOutput == nil {
-		return errors.New("blockchain output not set")
-	}
-	if d.InfraInput == nil {
-		return errors.New("infra input not set")
-	}
-
-	return nil
-}
-
 type ConfigureKeystoneInput struct {
 	ChainSelector               uint64
 	Topology                    *Topology
@@ -593,61 +553,8 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provi
 	return out, nil
 }
 
-// copied from node.go to avoid circular import
-// func AddressKeyFromSelector(chainSelector uint64) string {
-// 	return strconv.FormatUint(chainSelector, 10) + "_public_address"
-// }
-
-// func (m *DonMetadata) labelNodes() error {
-// 	for i := range m.NodesMetadata {
-// 		labels := make([]*Label, 0)
-// nodeType := WorkerNode
-// if m.ns.BootstrapNodeIndex != -1 && i == m.ns.BootstrapNodeIndex {
-// 	nodeType = BootstrapNode
-// }
-// labels = append(labels, &Label{
-// 	Key:   NodeTypeKey,
-// 	Value: nodeType,
-// })
-
-// labels = append(labels, &Label{
-// 	Key:   IndexKey,
-// 	Value: strconv.Itoa(i),
-// })
-
-// for chainID, key := range meta.Keys.EVM {
-// 	selector, selErr := chainselectors.SelectorFromChainId(chainID)
-// 	if selErr != nil {
-// 		return fmt.Errorf("failed to get selector from chain ID %d: %w", chainID, selErr)
-// 	}
-
-// 	labels = append(labels, &Label{
-// 		Key:   AddressKeyFromSelector(selector),
-// 		Value: key.PublicAddress.Hex(),
-// 	})
-// }
-
-// m.NodesMetadata[i].Labels = labels
-// }
-
-// if m.ContainsGatewayNode() {
-// 	i := m.ns.GatewayNodeIndex
-// 	m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
-// 		Key:   ExtraRolesKey,
-// 		Value: GatewayNode,
-// 	})
-// }
-
-// return nil
-// }
-
 func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration, error) {
 	if m.ContainsGatewayNode() {
-		// i := m.ns.GatewayNodeIndex
-		// m.NodesMetadata[i].Labels = append(m.NodesMetadata[i].Labels, &Label{
-		// 	Key:   ExtraRolesKey,
-		// 	Value: GatewayNode,
-		// })
 		gatewayNode, gErr := m.GatewayNode()
 		if gErr != nil {
 			return nil, fmt.Errorf("failed to get gateway node: %w", gErr)
@@ -724,7 +631,6 @@ func (m *DonMetadata) RequiresOCR() bool {
 }
 
 func (m *DonMetadata) ContainsGatewayNode() bool {
-	// return m.ns.GatewayNodeIndex != -1 // don't use flag here b/c may not be set
 	for _, node := range m.NodesMetadata {
 		if slices.Contains(node.Roles, GatewayNode) {
 			return true
@@ -735,7 +641,6 @@ func (m *DonMetadata) ContainsGatewayNode() bool {
 }
 
 func (m *DonMetadata) ContainsBootstrapNode() bool {
-	// return m.ns.BootstrapNodeIndex != -1 // don't use flag here b/c may not be set
 	for _, node := range m.NodesMetadata {
 		if slices.Contains(node.Roles, BootstrapNode) {
 			return true

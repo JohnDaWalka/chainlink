@@ -87,24 +87,12 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		break
 	}
 
-	// workflowNodeSet, err := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 	workerNodes, wErr := input.DonMetadata.WorkerNodes()
 	if wErr != nil {
 		return nil, errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
 	for _, workerNode := range workerNodes {
-		// var nodeIndex int
-		// var err error
-		// for _, label := range workerNode.Labels {
-		// 	if label.Key == node.IndexKey {
-		// 		nodeIndex, err = strconv.Atoi(label.Value)
-		// 		if err != nil {
-		// 			return nil, errors.Wrap(err, "failed to convert node index to int")
-		// 		}
-		// 	}
-		// }
-
 		chainID, chErr := chainselectors.SolanaChainIdFromSelector(data.ChainSelector)
 		if chErr != nil {
 			return nil, errors.Wrapf(chErr, "failed to get Solana chain ID from selector %d", data.ChainSelector)
@@ -114,24 +102,7 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		if !ok {
 			return nil, errors.Errorf("missing Solana key for chainID %s on node index %d", chainID, workerNode.Index)
 		}
-
 		data.FromAddress = key.PublicAddress
-
-		// find node's Solana address
-		// expectedAddressKey := node.AddressKeyFromSelector(data.ChainSelector)
-		// for _, label := range workflowNodeSet[i].Labels {
-		// 	if label.Key == expectedAddressKey {
-		// 		if label.Value == "" {
-		// 			return nil, errors.Errorf("%s label value is empty", expectedAddressKey)
-		// 		}
-		// 		data.FromAddress = solana.MustPublicKeyFromBase58(label.Value)
-		// 		break
-		// 	}
-		// }
-
-		// if data.FromAddress.IsZero() {
-		// 	return nil, errors.Errorf("failed to get from address for Solana chain %d", data.ChainSelector)
-		// }
 
 		if input.CapabilityConfigs == nil {
 			return nil, errors.New("additional capabilities configs are nil, but are required to configure the write-solana capability")

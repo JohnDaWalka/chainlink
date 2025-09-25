@@ -9,6 +9,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/tdh2/go/tdh2/lib/group/nist"
 	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 	"golang.org/x/crypto/nacl/box"
@@ -154,7 +155,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
 				}
 
-				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["evm"]
+				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily[chainselectors.FamilyEVM]
 				if !ok {
 					return nil, errors.New("key bundle ID for evm family is not found")
 				}

@@ -238,7 +238,6 @@ func waitForAllNodesToHaveExpectedFiltersRegistered(singeFileLogger logger.Logge
 			continue
 		}
 
-		// workderNodes, workersErr := node.FindManyWithLabel(don.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 		workerNodes, wErr := don.WorkerNodes()
 		if wErr != nil {
 			return errors.Wrap(wErr, "failed to find worker nodes")
@@ -260,16 +259,6 @@ func waitForAllNodesToHaveExpectedFiltersRegistered(singeFileLogger logger.Logge
 				}
 
 				for _, workerNode := range workerNodes {
-					// nodeIndex, nodeIndexErr := node.FindLabelValue(workerNode, node.IndexKey)
-					// if nodeIndexErr != nil {
-					// 	return errors.Wrap(nodeIndexErr, "failed to find node index")
-					// }
-
-					// nodeIndexInt, nodeIdxErr := strconv.Atoi(nodeIndex)
-					// if nodeIdxErr != nil {
-					// 	return errors.Wrap(nodeIdxErr, "failed to convert node index to int")
-					// }
-
 					if _, ok := results[workerNode.Index]; ok {
 						continue
 					}

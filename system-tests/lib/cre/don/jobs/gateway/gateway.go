@@ -41,11 +41,6 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 				continue
 			}
 
-			// workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-			// if err != nil {
-			// 	return nil, errors.Wrap(err, "failed to find worker nodes")
-			// }
-
 			workerNode, wErr := donMetadata.WorkerNodes()
 			if wErr != nil {
 				return nil, errors.Wrap(wErr, "failed to find worker nodes")
@@ -106,7 +101,6 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 				continue
 			}
 
-			// gatewayNode, nodeErr := node.FindOneWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.ExtraRolesKey, Value: cre.GatewayNode}, node.LabelContains)
 			gatewayNode, nodeErr := donMetadata.GatewayNode()
 			if nodeErr != nil {
 				return nil, errors.Wrap(nodeErr, "failed to find gateway node")

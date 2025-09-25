@@ -76,11 +76,7 @@ func LinkToJobDistributor(ctx context.Context, input *cre.LinkDonsToJDInput) (*c
 	var allNodesInfo []devenv.NodeInfo
 
 	for idx, nodeOutput := range input.NodeSetOutput {
-		// bootstrapNodes, err := node.FindManyWithLabel(input.Topology.DonsMetadata.List()[idx].NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
-		// if err != nil {
-		// 	return nil, nil, errors.Wrap(err, "failed to find bootstrap nodes")
-		// }
-
+		// a maximum of 1 bootstrap is supported due to environment constraints
 		bootstrapNodeCount := 0
 		if input.Topology.DonsMetadata.List()[idx].ContainsBootstrapNode() {
 			bootstrapNodeCount = 1

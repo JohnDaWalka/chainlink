@@ -102,31 +102,28 @@ func DeployDons(input *cre.DeployCribDonsInput) ([]*cre.CapabilitiesAwareNodeSet
 
 	componentFuncs := make([]crib.ComponentFunc, 0)
 
-	for j, donMetadata := range input.Topology.DonsMetadata.List() {
-		imageName, imageTag, err := imageNameAndTag(input, j)
+	for donIdx, donMetadata := range input.Topology.DonsMetadata.List() {
+		imageName, imageTag, err := imageNameAndTag(input, donIdx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to get image name and tag for %s", donMetadata.Name)
 		}
 
-		for i, nodeMetadata := range donMetadata.NodesMetadata {
-			configToml, secrets, confSecretsErr := getConfigAndSecretsForNode(nodeMetadata, j, input, donMetadata)
+		for nodeIdx, nodeMetadata := range donMetadata.NodesMetadata {
+			configToml, secrets, confSecretsErr := getConfigAndSecretsForNode(nodeMetadata, donIdx, input, donMetadata)
 			if confSecretsErr != nil {
 				return nil, confSecretsErr
 			}
-			nodeSpec, confSecretsErr := getNodeSpecForNode(nodeMetadata, j, input, donMetadata)
-			if confSecretsErr != nil {
-				return nil, errors.Wrapf(confSecretsErr, "failed to get node spec for %s", donMetadata.Name)
-			}
+
 			cFunc := nodev1.Component(&nodev1.Props{
 				Namespace:       input.Namespace,
 				Image:           fmt.Sprintf("%s:%s", imageName, imageTag),
-				AppInstanceName: fmt.Sprintf("%s-%d", donMetadata.Name, i),
+				AppInstanceName: fmt.Sprintf("%s-%d", donMetadata.Name, nodeIdx),
 				// passing as config not as override
 				Config: *configToml,
 				SecretsOverrides: map[string]string{
 					"overrides": *secrets,
 				},
-				EnvVars: nodeSpec.Node.EnvVars,
+				EnvVars: input.NodeSetInputs[donIdx].NodeSpecs[nodeMetadata.Index].Node.EnvVars,
 			})
 			componentFuncs = append(componentFuncs, cFunc)
 		}
@@ -186,26 +183,9 @@ func DeployDons(input *cre.DeployCribDonsInput) ([]*cre.CapabilitiesAwareNodeSet
 	return input.NodeSetInputs, nil
 }
 
-func getNodeSpecForNode(nodeMetadata *cre.NodeMetadata, donIndex int, input *cre.DeployCribDonsInput, donMetadata *cre.DonMetadata) (*clnode.Input, error) {
-	// nodeIndexStr, findErr := libnode.FindLabelValue(nodeMetadata, cre.IndexKey)
-	// if findErr != nil {
-	// 	return nil, errors.Wrapf(findErr, "failed to find node index in nodeset %s", donMetadata.Name)
-	// }
-
-	// nodeIndex, convErr := strconv.Atoi(nodeIndexStr)
-	// if convErr != nil {
-	// 	return nil, errors.Wrapf(convErr, "failed to convert node index '%s' to int in nodeset %s", nodeIndexStr, donMetadata.Name)
-	// }
-
-	nodeSpec := input.NodeSetInputs[donIndex].NodeSpecs[nodeMetadata.Index]
-	return nodeSpec, nil
-}
-
 func getConfigAndSecretsForNode(nodeMetadata *cre.NodeMetadata, donIndex int, input *cre.DeployCribDonsInput, donMetadata *cre.DonMetadata) (*string, *string, error) {
-	nodeSpec, err := getNodeSpecForNode(nodeMetadata, donIndex, input, donMetadata)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get node spec")
-	}
+	nodeSpec := input.NodeSetInputs[donIndex].NodeSpecs[nodeMetadata.Index]
+
 	cleanedToml, tomlErr := cleanToml(nodeSpec.Node.TestConfigOverrides)
 	if tomlErr != nil {
 		return nil, nil, errors.Wrap(tomlErr, "failed to clean TOML")

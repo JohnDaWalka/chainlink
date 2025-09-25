@@ -16,19 +16,16 @@ const (
 )
 
 var (
-	NodeTypeKey = "type"
-	// HostLabelKey           = "host"
+	NodeTypeKey            = "type"
 	IndexKey               = "node_index"
 	ExtraRolesKey          = "extra_roles"
 	NodeIDKey              = "node_id"
 	NodeOCRFamiliesKey     = "node_ocr_families"
 	NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
-	// NodeP2PIDKey           = "p2p_id"
-	// NodeDKGRecipientKey    = "dkg_recipient_key"
-	DONIDKey       = "don_id"
-	EnvironmentKey = "environment"
-	ProductKey     = "product"
-	DONNameKey     = "don_name"
+	DONIDKey               = "don_id"
+	EnvironmentKey         = "environment"
+	ProductKey             = "product"
+	DONNameKey             = "don_name"
 )
 
 type Topology struct {
@@ -47,10 +44,6 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provid
 		if err != nil {
 			return nil, fmt.Errorf("failed to create DON metadata: %w", err)
 		}
-		// labelErr := d.labelNodes()
-		// if labelErr != nil {
-		// 	return nil, fmt.Errorf("failed to label nodes for DON %s: %w", d.Name, labelErr)
-		// }
 		dm[i] = d
 	}
 

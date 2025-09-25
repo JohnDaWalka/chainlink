@@ -351,11 +351,6 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 			capabilities = append(capabilities, enabledCapabilities...)
 		}
 
-		// workerNodes, wErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
-		// 	Key:   cre.NodeTypeKey,
-		// 	Value: cre.WorkerNode,
-		// }, crenode.EqualLabels)
-
 		workerNodes, wErr := donMetadata.WorkerNodes()
 		if wErr != nil {
 			return nil, errors.Wrap(wErr, "failed to find worker nodes")
@@ -363,7 +358,7 @@ func toDons(input cre.ConfigureKeystoneInput) (*dons, error) {
 
 		donPeerIDs := make([]string, len(workerNodes))
 		for i, node := range workerNodes {
-			// donPeerIDs[i] = node.Keys.CleansedPeerID()
+			// we need to use p2pID here with the "p2p_" prefix
 			donPeerIDs[i] = node.Keys.P2PKey.PeerID.String()
 		}
 
@@ -744,11 +739,6 @@ func DefaultOCR3Config(topology *cre.Topology) (*keystone_changeset.OracleConfig
 
 	for _, metaDon := range topology.DonsMetadata.List() {
 		if flags.HasFlag(metaDon.Flags, cre.ConsensusCapability) || flags.HasFlag(metaDon.Flags, cre.ConsensusCapabilityV2) {
-			// workerNodes, wErr := crenode.FindManyWithLabel(metaDon.NodesMetadata, &cre.Label{
-			// 	Key:   crenode.NodeTypeKey,
-			// 	Value: cre.WorkerNode,
-			// }, crenode.EqualLabels)
-
 			workerNodes, wErr := metaDon.WorkerNodes()
 			if wErr != nil {
 				return nil, errors.Wrap(wErr, "failed to find worker nodes")
@@ -1095,10 +1085,6 @@ func configureTronForwarders(env *cldf.Environment, registryChainSelector uint64
 			continue
 		}
 
-		// workerNodes, workerNodesErr := crenode.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{
-		// 	Key:   crenode.NodeTypeKey,
-		// 	Value: cre.WorkerNode,
-		// }, crenode.EqualLabels)
 		workerNodes, wErr := donMetadata.WorkerNodes()
 		if wErr != nil {
 			return fmt.Errorf("failed to find worker nodes for Tron configuration: %w", wErr)

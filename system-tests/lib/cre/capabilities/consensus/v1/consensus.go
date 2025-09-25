@@ -6,6 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -87,25 +88,16 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 				continue
 			}
 
-			// create job specs for the worker nodes
-			// workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 			workerNodes, wErr := donMetadata.WorkerNodes()
 			if wErr != nil {
-				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(wErr, "failed to find worker nodes")
 			}
-
-			// bootstrapNode, err := donMetadata.GetBootstrapNode()
-			// if err != nil {
-			// 	return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
-			// }
 
 			bootstrapNode, err := input.DonTopology.BootstrapNode()
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
 			}
 
-			// TODO take this from DON instead of generating a new one
 			_, ocrPeeringCfg, err := cre.PeeringCfgs(bootstrapNode)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get peering configs")
@@ -116,7 +108,6 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 				return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
 			}
 
-			// create job specs for the bootstrap node
 			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "ocr3-capability", ocr3CapabilityAddress.Address, chainID))
 
 			for _, workerNode := range workerNodes {
@@ -135,9 +126,8 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
 				}
 
-				// TODO use constant for the EVM family
 				// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
-				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["evm"]
+				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily[chainselectors.FamilyEVM]
 				if !ok {
 					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for evm", nodeID)
 				}

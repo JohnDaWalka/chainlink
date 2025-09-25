@@ -257,14 +257,6 @@ func GenerateArtifact(
 			Capabilities:   make([]DONCapabilityArtifact, 0),
 		}
 
-		// workerNodes, workerNodesErr := crenode.FindManyWithLabel(don.NodesMetadata, &cre.Label{
-		// 	Key:   cre.NodeTypeKey,
-		// 	Value: cre.WorkerNode,
-		// }, crenode.EqualLabels)
-		// if workerNodesErr != nil {
-		// 	return nil, pkgerrors.Wrap(workerNodesErr, "failed to find worker nodes")
-		// }
-
 		workerNodes, wErr := don.WorkerNodes()
 		if wErr != nil {
 			return nil, pkgerrors.Wrap(wErr, "failed to find worker nodes")

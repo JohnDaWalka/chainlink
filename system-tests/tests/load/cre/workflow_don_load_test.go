@@ -23,6 +23,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"github.com/shopspring/decimal"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -1166,27 +1167,38 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 			}
 
 			// create job specs for the worker nodes
-			workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			// workflowNodeSet, err := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			workerNodes, wErr := donMetadata.WorkerNodes()
+			if wErr != nil {
+				return nil, errors.Wrap(wErr, "failed to get worker nodes from DON metadata")
+			}
 			if err != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err, "failed to find worker nodes")
 			}
 
 			// look for boostrap node and then for required values in its labels
-			bootstrapNode, bootErr := node.FindOneWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.BootstrapNode}, node.EqualLabels)
+			// bootstrapNode, bootErr := node.FindOneWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.BootstrapNode}, node.EqualLabels)
+			// if bootErr != nil {
+			// 	return nil, errors.Wrap(bootErr, "failed to find bootstrap node")
+			// }
+
+			bootstrapNode, bootErr := donMetadata.BootstrapNode()
 			if bootErr != nil {
-				return nil, errors.Wrap(bootErr, "failed to find bootstrap node")
+				return nil, errors.Wrap(bootErr, "failed to get bootstrap node from DON metadata")
 			}
 
-			donBootstrapNodePeerID, pIDErr := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
-			if pIDErr != nil {
-				return nil, errors.Wrap(pIDErr, "failed to get bootstrap node peer ID")
-			}
+			bootstrapNode.Keys.CleansedPeerID()
 
-			donBootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
-			if hostErr != nil {
-				return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
-			}
+			// donBootstrapNodePeerID, pIDErr := node.ToP2PID(bootstrapNode, node.KeyExtractingTransformFn)
+			// if pIDErr != nil {
+			// 	return nil, errors.Wrap(pIDErr, "failed to get bootstrap node peer ID")
+			// }
+
+			// donBootstrapNodeHost, hostErr := node.FindLabelValue(bootstrapNode, node.HostLabelKey)
+			// if hostErr != nil {
+			// 	return nil, errors.Wrap(hostErr, "failed to get bootstrap node host from labels")
+			// }
 
 			bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
 			if nodeIDErr != nil {
@@ -1197,12 +1209,12 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "ocr3-capability", ocr3CapabilityAddress.Address, chainID))
 
 			ocrPeeringData := cretypes.OCRPeeringData{
-				OCRBootstraperPeerID: donBootstrapNodePeerID,
-				OCRBootstraperHost:   donBootstrapNodeHost,
+				OCRBootstraperPeerID: bootstrapNode.Keys.CleansedPeerID(),
+				OCRBootstraperHost:   bootstrapNode.Host,
 				Port:                 don.OCRPeeringPort,
 			}
 
-			for _, workerNode := range workflowNodeSet {
+			for _, workerNode := range workerNodes {
 				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
 				if nodeIDErr != nil {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
@@ -1217,9 +1229,8 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 					return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
 				}
 
-				// TODO use constant for the EVM family
 				// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
-				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily["EVM"]
+				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily[chainselectors.FamilyEVM]
 				if !ok {
 					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for EVM", nodeID)
 				}

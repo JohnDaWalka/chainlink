@@ -283,12 +283,6 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 	}
 
 	for _, workerNode := range workerNodes {
-		// TODO stop using indexes, instead use node name or some unique id (e.g. uuid)
-		// nodeIndex, err := getNodeIndex(workerNodes, nodeIdx)
-		// if err != nil {
-		// 	return nil, errors.Wrap(wErr, "failed to find node index")
-		// }
-
 		chainsFromAddress, err := findNodeAddressPerChain(input, workerNode)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get chains with from address")
@@ -347,49 +341,3 @@ func findNodeAddressPerChain(input cre.GenerateConfigsInput, workerNode *cre.Nod
 
 	return data, nil
 }
-
-// func findNodeAddressPerChain(input cre.GenerateConfigsInput, metadata *cre.NodeMetadata, nodeIdx int) (map[uint64]common.Address, error) {
-// 	// get all the forwarders and add workflow config (FromAddress) for chains that have evm enabled
-// 	data := make(map[uint64]common.Address)
-// 	for _, chainID := range input.NodeSet.ChainCapabilities[flag].EnabledChains {
-// 		chain, exists := chainselectors.ChainByEvmChainID(chainID)
-// 		if !exists {
-// 			return nil, errors.Errorf("failed to find selector for chain ID %d", chainID)
-// 		}
-
-// 		ethAddress, addrErr := findNodeEthAddressAddress(chain.Selector, metadata.Labels)
-// 		if addrErr != nil {
-// 			return nil, errors.Wrapf(addrErr, "failed to get ETH address for chain %d for node at index %d", chain.Selector, nodeIdx)
-// 		}
-// 		data[chainID] = *ethAddress
-// 	}
-// 	return data, nil
-// }
-
-// func getNodeIndex(workflowNodeSet []*cre.NodeMetadata, nodeIdx int) (int, error) {
-// 	var nodeIndex int
-// 	for _, label := range workflowNodeSet[nodeIdx].Labels {
-// 		if label.Key == node.IndexKey {
-// 			var nErr error
-// 			nodeIndex, nErr = strconv.Atoi(label.Value)
-// 			if nErr != nil {
-// 				return 0, errors.Wrap(nErr, "failed to convert node index to int")
-// 			}
-// 		}
-// 	}
-// 	return nodeIndex, nil
-// }
-
-// func findNodeEthAddressAddress(chainSelector uint64, nodeLabels []*cre.Label) (*common.Address, error) {
-// 	expectedAddressKey := node.AddressKeyFromSelector(chainSelector)
-// 	for _, label := range nodeLabels {
-// 		if label.Key == expectedAddressKey {
-// 			if label.Value == "" {
-// 				return nil, errors.Errorf("%s label value is empty", expectedAddressKey)
-// 			}
-// 			return ptr.Ptr(common.HexToAddress(label.Value)), nil
-// 		}
-// 	}
-
-// 	return nil, errors.Errorf("failed to get from address for chain %d", chainSelector)
-// }
