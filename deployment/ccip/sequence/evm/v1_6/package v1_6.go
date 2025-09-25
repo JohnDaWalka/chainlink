@@ -54,7 +54,7 @@ var (
 	DeployFeeQuoterOp = opsutil.NewEVMDeployOperation(
 		"DeployFeeQuoter",
 		semver.MustParse("1.0.0"),
-		"Deploys FeeQuoter 1.6 contract on the specified evm chain",
+		"Deploys FeeQuoter 1.6.3 contract on the specified evm chain",
 		cldf.NewTypeAndVersion(shared.FeeQuoter, deployment.Version1_6_0),
 		opsutil.VMDeployers[DeployFeeQInput]{
 			DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, *types.Transaction, error) {
