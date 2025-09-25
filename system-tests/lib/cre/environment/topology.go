@@ -2,7 +2,6 @@ package environment
 
 import (
 	"fmt"
-	"maps"
 	"os"
 
 	"github.com/pkg/errors"
@@ -11,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 
-	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	creconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
@@ -36,53 +34,6 @@ func PrepareConfiguration(
 		return nil, nil, errors.Wrap(tErr, "failed to create topology")
 	}
 
-	localNodeSets := topology.CapabilitiesAwareNodeSets()
-	evmChainIDs := make([]int, 0)
-	solChainIDs := make([]string, 0)
-	chainPerSelector := make(map[uint64]*cre.WrappedBlockchainOutput)
-	for _, bcOut := range blockchainOutputs {
-		if bcOut.SolChain != nil {
-			sel := bcOut.SolChain.ChainSelector
-			chainPerSelector[sel] = bcOut
-			chainPerSelector[sel].ChainSelector = sel
-			chainPerSelector[sel].SolChain = bcOut.SolChain
-			chainPerSelector[sel].SolChain.ArtifactsDir = bcOut.SolChain.ArtifactsDir
-			solChainIDs = append(solChainIDs, bcOut.SolChain.ChainID)
-			continue
-		}
-		chainPerSelector[bcOut.ChainSelector] = bcOut
-		evmChainIDs = append(evmChainIDs, libc.MustSafeInt(bcOut.ChainID))
-	}
-	/*
-		// Generate EVM and P2P keys or read them from the config
-		// That way we can pass them final configs and do away with restarting the nodes
-		var keys *cre.GenerateKeysOutput
-
-		keysOutput, keysOutputErr := cresecrets.KeysOutputFromConfig(localNodeSets)
-		if keysOutputErr != nil {
-			return nil, nil, errors.Wrap(keysOutputErr, "failed to generate keys output")
-		}
-
-
-		generateKeysInput := &cre.GenerateKeysInput{
-			EVMChainIDs:     evmChainIDs,
-			SolanaChainIDs:  solChainIDs,
-			GenerateP2PKeys: true,
-			Topology:        topology,
-			Password:        "", // since the test runs on private ephemeral blockchain we don't use real keys and do not care a lot about the password
-			Out:             keysOutput,
-		}
-		keys, keysErr := cresecrets.GenerateKeys(generateKeysInput)
-		if keysErr != nil {
-			return nil, nil, errors.Wrap(keysErr, "failed to generate keys")
-		}
-
-		topology, addKeysErr := cresecrets.AddKeysToTopology(topology, keys)
-		if addKeysErr != nil {
-			return nil, nil, errors.Wrap(addKeysErr, "failed to add keys to topology")
-		}
-	*/
-
 	bt, err := topology.BootstrapNode()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to find bootstrap node")
@@ -93,8 +44,19 @@ func PrepareConfiguration(
 		return nil, nil, errors.Wrap(peeringErr, "failed to find peering data")
 	}
 
-	//topology.CapabilitiesPeeringData = capabilitiesPeeringData
-	//topology.OCRPeeringData = ocrPeeringData
+	localNodeSets := topology.CapabilitiesAwareNodeSets()
+	chainPerSelector := make(map[uint64]*cre.WrappedBlockchainOutput)
+	for _, bcOut := range blockchainOutputs {
+		if bcOut.SolChain != nil {
+			sel := bcOut.SolChain.ChainSelector
+			chainPerSelector[sel] = bcOut
+			chainPerSelector[sel].ChainSelector = sel
+			chainPerSelector[sel].SolChain = bcOut.SolChain
+			chainPerSelector[sel].SolChain.ArtifactsDir = bcOut.SolChain.ArtifactsDir
+			continue
+		}
+		chainPerSelector[bcOut.ChainSelector] = bcOut
+	}
 
 	for i, donMetadata := range topology.DonsMetadata.List() {
 		configsFound := 0
@@ -158,49 +120,6 @@ func PrepareConfiguration(
 
 		// generate secrets only if they are not provided
 		if secretsFound == 0 {
-			/*
-								secretsInput := &cre.GenerateSecretsInput{
-									DonMetadata: donMetadata,
-								}
-
-								if evmKeys, ok := keys.EVMKeys[donMetadata.ID]; ok {
-									secretsInput.EVMKeys = evmKeys
-								}
-
-								if solKeys, ok := keys.SolKeys[donMetadata.ID]; ok {
-									secretsInput.SolKeys = solKeys
-								}
-
-				<<<<<<< HEAD
-								if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
-									secretsInput.P2PKeys = p2pKeys
-								}
-				=======
-							if p2pKeys, ok := keys.P2PKeys[donMetadata.ID]; ok {
-								secretsInput.P2PKeys = p2pKeys
-							}
-
-							if dkgKeys, ok := keys.DKGRecipientKeys[donMetadata.ID]; ok {
-								secretsInput.DKGRecipientKeys = dkgKeys
-							}
-
-							// EVM, Solana and P2P keys will be provided to nodes as secrets
-							secrets, secretsErr := cresecrets.GenerateSecrets(
-								secretsInput,
-							)
-							if secretsErr != nil {
-								return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
-							}
-				>>>>>>> develop
-
-								// EVM, Solana and P2P keys will be provided to nodes as secrets
-								secrets, secretsErr := cresecrets.GenerateSecrets(
-									secretsInput,
-								)
-								if secretsErr != nil {
-									return nil, nil, errors.Wrap(secretsErr, "failed to generate secrets")
-								}
-			*/
 			for j := range donMetadata.NodesMetadata {
 				wnode := donMetadata.NodesMetadata[j]
 				nodeSecret := cresecrets.NewNodeSecret(wnode.Keys)
@@ -272,65 +191,4 @@ func PrepareConfiguration(
 	}
 
 	return topology, localNodeSets, nil
-}
-
-func copyCapabilityAwareNodeSets(
-	nodeSets []*cre.CapabilitiesAwareNodeSet,
-) []*cre.CapabilitiesAwareNodeSet {
-	copiedNodeSets := make([]*cre.CapabilitiesAwareNodeSet, len(nodeSets))
-	for i, originalNs := range nodeSets {
-		if originalNs == nil {
-			copiedNodeSets[i] = nil
-			continue
-		}
-
-		newNs := &cre.CapabilitiesAwareNodeSet{
-			BootstrapNodeIndex: originalNs.BootstrapNodeIndex,
-			GatewayNodeIndex:   originalNs.GatewayNodeIndex,
-		}
-
-		if originalNs.Input != nil {
-			inputCopy := *originalNs.Input
-			newNs.Input = &inputCopy
-		}
-
-		if originalNs.Capabilities != nil {
-			newNs.Capabilities = make([]string, len(originalNs.Capabilities))
-			copy(newNs.Capabilities, originalNs.Capabilities)
-		}
-
-		if originalNs.ComputedCapabilities != nil {
-			newNs.ComputedCapabilities = make([]string, len(originalNs.ComputedCapabilities))
-			copy(newNs.ComputedCapabilities, originalNs.ComputedCapabilities)
-		}
-
-		if originalNs.DONTypes != nil {
-			newNs.DONTypes = make([]string, len(originalNs.DONTypes))
-			copy(newNs.DONTypes, originalNs.DONTypes)
-		}
-
-		if originalNs.SupportedChains != nil {
-			newNs.SupportedChains = make([]uint64, len(originalNs.SupportedChains))
-			copy(newNs.SupportedChains, originalNs.SupportedChains)
-		}
-
-		if originalNs.EnvVars != nil {
-			newNs.EnvVars = make(map[string]string, len(originalNs.EnvVars))
-			maps.Copy(newNs.EnvVars, originalNs.EnvVars)
-		}
-
-		if originalNs.ChainCapabilities != nil {
-			newNs.ChainCapabilities = make(map[string]*cre.ChainCapabilityConfig, len(originalNs.ChainCapabilities))
-			maps.Copy(newNs.ChainCapabilities, originalNs.ChainCapabilities)
-		}
-
-		if originalNs.SupportedSolChains != nil {
-			newNs.SupportedSolChains = make([]string, len(originalNs.SupportedSolChains))
-			copy(newNs.SupportedSolChains, originalNs.SupportedSolChains)
-		}
-
-		copiedNodeSets[i] = newNs
-	}
-
-	return copiedNodeSets
 }

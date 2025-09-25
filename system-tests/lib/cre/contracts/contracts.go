@@ -1110,13 +1110,12 @@ func configureTronForwarders(env *cldf.Environment, registryChainSelector uint64
 		}
 
 		for _, node := range workerNodes {
-			p2pID, err := crenode.ToP2PID(node, crenode.NoOpTransformFn)
-			if err != nil {
-				return fmt.Errorf("failed to get p2p id for node: %w", err)
-			}
-			wfNodeIDs = append(wfNodeIDs, p2pID)
+			// p2pID, err := crenode.ToP2PID(node, crenode.NoOpTransformFn)
+			// if err != nil {
+			// 	return fmt.Errorf("failed to get p2p id for node: %w", err)
+			// }
+			wfNodeIDs = append(wfNodeIDs, node.Keys.P2PKey.PeerID.String())
 		}
-		break
 	}
 
 	configChangeset := commonchangeset.Configure(tronchangeset.ConfigureForwarder{}, &tronchangeset.ConfigureForwarderRequest{

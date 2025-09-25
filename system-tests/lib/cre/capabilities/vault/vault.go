@@ -80,13 +80,8 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 		}
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
-		// donMetadata := make([]*cre.DonMetadata, 0)
-		// for _, metadata := range input.DonTopology.Dons.Metadata() {
-		// 	donMetadata = append(donMetadata, metadata)
-		// }
-
 		// return early if no DON has the vault capability
-		if !don.AnyDonHasCapability(input.DonTopology.Dons.Metadata(), flag) {
+		if !don.AnyDonHasCapability(input.DonTopology.Dons.DonMetadata, flag) {
 			return donToJobSpecs, nil
 		}
 
@@ -112,7 +107,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			return nil, errors.Wrap(err, "failed to get DKG address")
 		}
 
-		for _, donWithMetadata := range input.DonTopology.Dons.Metadata() {
+		for _, donWithMetadata := range input.DonTopology.Dons.DonMetadata {
 			if !flags.HasFlag(donWithMetadata.Flags, flag) {
 				continue
 			}
@@ -123,25 +118,6 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err, "failed to find worker nodes")
 			}
-
-			// look for boostrap node and then for required values in its labels
-			// bootstrapNode, bootErr := node.FindOneWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.BootstrapNode}, node.EqualLabels)
-			// if bootErr != nil {
-			// 	// if there is no bootstrap node in this DON, we need to use the global bootstrap node
-			// 	for _, don := range input.DonTopology.DonsWithMetadata {
-			// 		for _, n := range don.NodesMetadata {
-			// 			p2pValue, p2pErr := node.FindLabelValue(n, node.NodeP2PIDKey)
-			// 			if p2pErr != nil {
-			// 				continue
-			// 			}
-
-			// 			if strings.Contains(p2pValue, input.DonTopology.OCRPeeringData.OCRBootstraperPeerID) {
-			// 				bootstrapNode = n
-			// 				break
-			// 			}
-			// 		}
-			// 	}
-			// }
 
 			bootstrapNode, bootErr := input.DonTopology.BootstrapNode()
 			if bootErr != nil {
@@ -238,6 +214,9 @@ func encryptPrivateShare(offchain cldf_offchain.Client, nodeID string, sk *tdh2e
 	return hex.EncodeToString(sealed), nil
 }
 
+// satisfy unused lint
+var _ = encryptPrivateShare
+
 func dkgKeys(n, t int) (string, []*tdh2easy.PrivateShare, error) {
 	instanceID, recipCfg, recipSecKeys, err := dummydkg.NewDKGSetup(n, t, "REPLACE_ME_WITH_RANDOM_SEED")
 	if err != nil {
@@ -274,6 +253,9 @@ func dkgKeys(n, t int) (string, []*tdh2easy.PrivateShare, error) {
 	framework.L.Info().Msg("Generated MasterPublicKey for n=" + strconv.Itoa(n) + ", t=" + strconv.Itoa(t) + ". Key = " + pks)
 	return pks, shares, nil
 }
+
+// satisfy unused lint
+var _ = dkgKeys
 
 func registerWithV1(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error) {
 	var capabilities []keystone_changeset.DONCapabilityWithConfig

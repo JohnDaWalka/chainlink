@@ -495,21 +495,6 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 }
 
 func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*devenv.DON, topology *cre.Topology) *cre.Environment {
-	// donTopology := &cre.DonTopology{
-	// 	WorkflowDonID:     topology.WorkflowDONID,
-	// 	HomeChainSelector: registryChainSelector,
-	// 	// CapabilitiesPeeringData: topology.CapabilitiesPeeringData,
-	// 	// OCRPeeringData:          topology.OCRPeeringData,
-	// 	GatewayConnectorOutput: topology.GatewayConnectorOutput,
-	// }
-
-	// for i, donMetadata := range topology.DonsMetadata.List() {
-	// 	donTopology.DonsWithMetadata = append(donTopology.DonsWithMetadata, &cre.DonWithMetadata{
-	// 		DON:         dons[i],
-	// 		DonMetadata: donMetadata,
-	// 	})
-	// }
-
 	creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
 	if donsErr != nil {
 		panic(donsErr)

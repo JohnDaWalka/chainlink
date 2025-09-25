@@ -543,17 +543,11 @@ type ToplogyInput struct {
 	DonToEthAddress map[uint32][]common.Address
 }
 
-type DonWithMetadata struct {
-	DON *devenv.DON `toml:"-" json:"-"`
-	*DonMetadata
-}
-
 type DonMetadata struct {
 	NodesMetadata []*NodeMetadata `toml:"nodes_metadata" json:"nodes_metadata"`
 	Flags         []string        `toml:"flags" json:"flags"`
 	ID            uint64          `toml:"id" json:"id"`
 	Name          string          `toml:"name" json:"name"`
-	// EnabledEVMChainIDs []uint64        `toml:"enabled_evm_chains" json:"enabled_evm_chains"` // chain IDs that the DON supports, empty means all chains
 
 	ns CapabilitiesAwareNodeSet // computed field, not serialized
 }
@@ -563,12 +557,9 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error
 	for i, nodeSpec := range c.NodeSpecs {
 		cfg := NodeMetadataConfig{
 			Labels: []*Label{},
-			// we should only generated these keys if they are not provided in the TOML config
 			Keys: NodeKeyInput{
-				EVMChainIDs:    c.EVMChains(),
-				SolanaChainIDs: c.SupportedSolChains,
-				// GenerateP2PKeys:          true,
-				// GenerateDKGRecipientKeys: true,
+				EVMChainIDs:     c.EVMChains(),
+				SolanaChainIDs:  c.SupportedSolChains,
 				Password:        "dev-password",
 				ImportedSecrets: nodeSpec.Node.TestSecretsOverrides,
 			},
@@ -587,8 +578,7 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64) (*DonMetadata, error
 		Flags:         c.Flags(),
 		NodesMetadata: nodes,
 		Name:          c.Name,
-		//		EVMChainIDs:   c.SupportedChains,
-		ns: *c,
+		ns:            *c,
 	}
 	return out, nil
 }
@@ -627,7 +617,7 @@ func (m *DonMetadata) labelNodes(infraInput infra.Provider) error {
 			})
 		}
 
-		//TODO add solona keys, add p2p id?
+		//TODO add solana keys?
 
 		internalHost := infraInput.InternalHost(i, nodeType == BootstrapNode, m.Name)
 
@@ -717,25 +707,16 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 	}
 
 	return slices.Contains(m.Flags, WorkflowDON)
-
-	// return slices.Contains(m.ns.DONTypes, WorkflowDON)
-	// TODO enum type for DON types
-	// return slices.Contains(m.ns.DONTypes, WorkflowDON)
 }
 
 // TODO remove later on
 type Dons struct {
 	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
 	dons        []*devenv.DON
-	// infra       infra.Input
 }
 
 func (d *Dons) List() []*devenv.DON {
 	return d.dons
-}
-
-func (d *Dons) Metadata() []*DonMetadata {
-	return d.DonMetadata
 }
 
 func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
@@ -750,7 +731,6 @@ func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
 	return &Dons{
 		DonMetadata: donsMetadata.List(),
 		dons:        dons,
-		// infra:       infraInput,
 	}, nil
 }
 
@@ -960,11 +940,8 @@ func NewDonTopology(registryChainSelector uint64, topology *Topology, dons *Dons
 
 // TODO make a constructor from Topology and find better names. It should expose some of the same methods as Topology does, e.g. GetWorkflowDON, GetBootstrapNode, etc.
 type DonTopology struct {
-	WorkflowDonID     uint64 `toml:"workflow_don_id" json:"workflow_don_id"`
-	HomeChainSelector uint64 `toml:"home_chain_selector" json:"home_chain_selector"`
-	// CapabilitiesPeeringData CapabilitiesPeeringData `toml:"capabilities_peering_data" json:"capabilities_peering_data"`
-	// OCRPeeringData          OCRPeeringData          `toml:"ocr_peering_data" json:"ocr_peering_data"`
-	// DonsWithMetadata       []*DonWithMetadata      `toml:"dons_with_metadata" json:"dons_with_metadata"`
+	WorkflowDonID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
+	HomeChainSelector      uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`
 	Dons                   *Dons                   `toml:"dons" json:"dons"`
 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
@@ -972,7 +949,7 @@ type DonTopology struct {
 // BootstrapNode returns the metadata for the node that should be used as the bootstrap node for P2P peering
 // Currently only one bootstrap is supported.
 func (t *DonTopology) BootstrapNode() (*NodeMetadata, error) {
-	for _, don := range t.Dons.Metadata() {
+	for _, don := range t.Dons.DonMetadata {
 		if don.ContainsBootstrapNode() {
 			return don.GetBootstrapNode()
 		}
@@ -982,9 +959,8 @@ func (t *DonTopology) BootstrapNode() (*NodeMetadata, error) {
 
 func (t *DonTopology) ToDonMetadata() []*DonMetadata {
 	metadata := []*DonMetadata{}
-	for _, donMetadata := range t.Dons.Metadata() {
-		metadata = append(metadata, donMetadata)
-	}
+	metadata = append(metadata, t.Dons.DonMetadata...)
+
 	return metadata
 }
 
@@ -993,8 +969,8 @@ type CapabilitiesAwareNodeSet struct {
 	*ns.Input
 	Capabilities []string `toml:"capabilities"` // global capabilities that have no chain-specific configuration (like cron, web-api-target, web-api-trigger, etc.)
 	DONTypes     []string `toml:"don_types"`
-	// SupportedChains is filter. Use EVMChains() to get the actual list of chains supported by the nodeset.
-	SupportedChains []uint64 `toml:"supported_chains"` // chain IDs that the DON supports, empty means all chains
+	// SupportedEVMChains is filter. Use EVMChains() to get the actual list of chains supported by the nodeset.
+	SupportedEVMChains []uint64 `toml:"supported_evm_chains"` // chain IDs that the DON supports, empty means all chains
 	// TODO separate out bootstrap as a concept rather than index
 	BootstrapNodeIndex   int               `toml:"bootstrap_node_index"` // -1 -> no bootstrap, only used if the DON doesn't hae the GatewayDON flag
 	GatewayNodeIndex     int               `toml:"gateway_node_index"`   // -1 -> no gateway, only used if the DON has the GatewayDON flag
@@ -1021,10 +997,14 @@ func (c *CapabilitiesAwareNodeSet) Flags() []string {
 	return append(stringCaps, append(c.ComputedCapabilities, c.DONTypes...)...)
 }
 
+// EVMChains returns the list of EVM chain IDs that the nodeset supports. If SupportedChains is set, it is returned directly.
+// Otherwise, the chain IDs are computed from the ChainCapabilities map by collecting all EnabledChains from each capability.
+// The returned list is deduplicated and sorted.
 func (c *CapabilitiesAwareNodeSet) EVMChains() []uint64 {
-	if len(c.SupportedChains) != 0 {
-		return c.SupportedChains
+	if len(c.SupportedEVMChains) != 0 {
+		return c.SupportedEVMChains
 	}
+
 	t := make(map[uint64]struct{})
 	for _, cc := range c.ChainCapabilities {
 		if cc != nil {
@@ -1033,12 +1013,14 @@ func (c *CapabilitiesAwareNodeSet) EVMChains() []uint64 {
 			}
 		}
 	}
+
 	// deduplicate
 	var out []uint64
 	for chainID := range t {
 		out = append(out, chainID)
 	}
 	slices.Sort(out)
+
 	return out
 }
 
@@ -1242,29 +1224,12 @@ type ChainIDToEVMKeys = map[uint64]*crypto.EVMKeys
 // chainID -> SolKeys
 type ChainIDToSolKeys = map[string]*crypto.SolKeys
 
-// type NodeKeys struct {
-// 	EVM    map[uint64]*crypto.EVMKey
-// 	Solana map[string]*crypto.SolKey
-// 	P2PKey *crypto.P2PKey
-// 	DKGKey *crypto.DKGRecipientKey
-// }
-
-// // returns the PeerID without the "p2p_" prefix, or an empty string if P2PKey is nil
-// func (n NodeKeys) CleansedPeerID() string {
-// 	if n.P2PKey == nil {
-// 		return ""
-// 	}
-// 	return strings.TrimPrefix(string(n.P2PKey.PeerID.String()), "p2p_")
-// }
-
 type NodeKeyInput struct {
 	EVMChainIDs    []uint64
 	SolanaChainIDs []string
-	// GenerateP2PKeys          bool
-	// GenerateDKGRecipientKeys bool
-	Password string
+	Password       string
 
-	ImportedSecrets string // secrets that come from the TOML config, not generated
+	ImportedSecrets string // raw JSON string of secrets to import (usually from a previous run)
 }
 
 func NewNodeKeys(input NodeKeyInput) (*secrets.NodeKeys, error) {
@@ -1274,35 +1239,25 @@ func NewNodeKeys(input NodeKeyInput) (*secrets.NodeKeys, error) {
 	}
 
 	if input.ImportedSecrets != "" {
-		imported, err := secrets.ImportNodeKeys(input.ImportedSecrets)
+		importedKeys, err := secrets.ImportNodeKeys(input.ImportedSecrets)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse imported secrets")
 		}
 
-		// Merge imported keys with the new node keys, to be removed once import cycle is broken
-		maps.Copy(out.EVM, imported.EVM)
-		maps.Copy(out.Solana, imported.Solana)
-		out.P2PKey = imported.P2PKey
-		out.DKGKey = imported.DKGKey
-
-		return out, nil
+		return importedKeys, nil
 	}
 
-	// if input.GenerateP2PKeys {
 	p2pKey, err := crypto.NewP2PKey(input.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate P2P keys")
 	}
 	out.P2PKey = p2pKey
-	// }
 
-	// if input.GenerateDKGRecipientKeys {
 	dkgKey, err := crypto.GenerateDKGRecipientKey(input.Password)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate DKG recipient keys")
 	}
 	out.DKGKey = dkgKey
-	// }
 
 	if len(input.EVMChainIDs) > 0 {
 		for _, chainID := range input.EVMChainIDs {
