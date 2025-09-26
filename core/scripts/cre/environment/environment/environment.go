@@ -628,7 +628,7 @@ func StartCLIEnvironment(
 		ContractVersions:          env.ContractVersions(),
 		WithV2Registries:          env.WithV2Registries(),
 		JdInput:                   in.JD,
-		InfraInput:                *in.Infra,
+		Provider:                  *in.Infra,
 		S3ProviderInput:           in.S3ProviderInput,
 		CapabilityConfigs:         in.CapabilityConfigs,
 		CopyCapabilityBinaries:    withPluginsDockerImageFlag == "", // do not copy any binaries to the containers, if we are using plugins image (they already have them)

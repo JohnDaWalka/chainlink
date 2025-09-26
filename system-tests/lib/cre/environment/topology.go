@@ -16,14 +16,14 @@ import (
 func PrepareNodeTOMLConfigurations(
 	registryChainSelector uint64,
 	nodeSets []*cre.CapabilitiesAwareNodeSet,
-	infraInput infra.Provider,
+	provider infra.Provider,
 	blockchainOutputs []*cre.WrappedBlockchainOutput,
 	addressBook deployment.AddressBook,
 	datastore datastore.DataStore,
 	capabilities []cre.InstallableCapability,
 	capabilityConfigs cre.CapabilityConfigs,
 ) (*cre.Topology, []*cre.CapabilitiesAwareNodeSet, error) {
-	topology, tErr := cre.NewTopology(nodeSets, infraInput)
+	topology, tErr := cre.NewTopology(nodeSets, provider)
 	if tErr != nil {
 		return nil, nil, errors.Wrap(tErr, "failed to create topology")
 	}

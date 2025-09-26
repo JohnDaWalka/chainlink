@@ -550,6 +550,7 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provi
 		Name:          c.Name,
 		ns:            *c,
 	}
+
 	return out, nil
 }
 
@@ -749,7 +750,7 @@ func (m DonsMetadata) validate() error {
 	return nil
 }
 
-// Get the bootstrap node from the first DON that contains one. Currently only one bootstrap node is supported.
+// BootstrapNode returns the bootstrap node from the first DON that contains one. Currently only one bootstrap node is supported.
 func (m DonsMetadata) BootstrapNode() (*NodeMetadata, error) {
 	for _, don := range m.dons {
 		if don.ContainsBootstrapNode() {
@@ -861,7 +862,6 @@ func newNodes(cfgs []NodeMetadataConfig) ([]*NodeMetadata, error) {
 	for i := range nodes {
 		node, err := NewNodeMetadata(cfgs[i])
 		if err != nil {
-			return nil, err
 		}
 		nodes[i] = node
 	}

@@ -36,6 +36,7 @@ require (
 	github.com/prometheus/common v0.65.0
 	github.com/rs/zerolog v1.33.0
 	github.com/shopspring/decimal v1.4.0
+	github.com/smartcontractkit/chain-selectors v1.0.71
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250917190204-8817bb81d880
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.49.0
@@ -529,7 +530,6 @@ require (
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.71 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250916164650-970686360fbf // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250911201806-5a095deaeb52 // indirect
@@ -549,7 +549,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20250916193659-4becc28a467f // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.14 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework/framework/components/dockercompose v0.1.14-0.20250918200130-426cdc905d74 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250923115307-8be0359fbce5 // indirect

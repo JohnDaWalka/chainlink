@@ -63,7 +63,7 @@ type SetupInput struct {
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
 	BlockchainsInput          []blockchain.Input
 	JdInput                   *jd.Input
-	InfraInput                infra.Provider
+	Provider                  infra.Provider
 	ContractVersions          map[string]string
 	WithV2Registries          bool
 	OCR3Config                *keystone_changeset.OracleConfig
@@ -118,8 +118,8 @@ func SetupTestEnvironment(
 		return nil, pkgerrors.Wrap(err, "input validation failed")
 	}
 
-	if input.InfraInput.Type == infra.CRIB {
-		cribErr := crib.Bootstrap(input.InfraInput)
+	if input.Provider.Type == infra.CRIB {
+		cribErr := crib.Bootstrap(input.Provider)
 		if cribErr != nil {
 			return nil, pkgerrors.Wrap(cribErr, "failed to bootstrap CRIB")
 		}
@@ -136,7 +136,7 @@ func SetupTestEnvironment(
 		lggr:       testLogger,
 		singleFile: singleFileLogger,
 	}, BlockchainsInput{
-		infra:            input.InfraInput,
+		infra:            input.Provider,
 		blockchainsInput: input.BlockchainsInput,
 	})
 	if bcOutErr != nil {
@@ -168,7 +168,7 @@ func SetupTestEnvironment(
 	topology, updatedNodeSets, topoErr := PrepareNodeTOMLConfigurations(
 		startBlockchainsOutput.RegistryChain().ChainSelector,
 		input.CapabilitiesAwareNodeSets,
-		input.InfraInput,
+		input.Provider,
 		startBlockchainsOutput.BlockChainOutputs,
 		deployKeystoneContractsOutput.Env.ExistingAddresses, //nolint:staticcheck // won't migrate now
 		deployKeystoneContractsOutput.Env.DataStore,
@@ -188,7 +188,7 @@ func SetupTestEnvironment(
 		input.JdInput,
 		startBlockchainsOutput.RegistryChain().BlockchainOutput,
 		topology,
-		input.InfraInput,
+		input.Provider,
 		input.CapabilityConfigs,
 		input.CopyCapabilityBinaries,
 		updatedNodeSets,
@@ -209,7 +209,10 @@ func SetupTestEnvironment(
 	if cldErr != nil {
 		return nil, pkgerrors.Wrap(cldErr, "failed to link DONs to Job Distributor")
 	}
-	creEnvironment := newCreEnvironment(startBlockchainsOutput.RegistryChain().ChainSelector, cldfEnvironment, dons, topology)
+	creEnvironment, creErr := newCreEnvironment(startBlockchainsOutput.RegistryChain().ChainSelector, cldfEnvironment, dons, topology)
+	if creErr != nil {
+		return nil, pkgerrors.Wrap(creErr, "failed to create CRE environment")
+	}
 
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("DONs and Job Distributor started and linked in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Creating Jobs with Job Distributor")))
@@ -229,7 +232,7 @@ func SetupTestEnvironment(
 		JobSpecFactoryFunctions:   jobSpecFactoryFunctions,
 		CreEnvironment:            creEnvironment,
 		CapabilitiesAwareNodeSets: input.CapabilitiesAwareNodeSets,
-		InfraInput:                input.InfraInput,
+		InfraInput:                input.Provider,
 		CapabilitiesConfigs:       input.CapabilityConfigs,
 		Capabilities:              input.Capabilities,
 	}
@@ -320,7 +323,7 @@ func SetupTestEnvironment(
 			// There are no filters registered with the V2 WF Registry Syncer
 			return wfOutput, nil
 		default:
-			return wfOutput, workflow.WaitForWorkflowRegistryFiltersRegistration(testLogger, singleFileLogger, input.InfraInput.Type, startBlockchainsOutput.RegistryChain().ChainID, creEnvironment.DonTopology, updatedNodeSets)
+			return wfOutput, workflow.WaitForWorkflowRegistryFiltersRegistration(testLogger, singleFileLogger, input.Provider.Type, startBlockchainsOutput.RegistryChain().ChainID, creEnvironment.DonTopology, updatedNodeSets)
 		}
 	})
 
@@ -497,16 +500,16 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 	input.JdInput.Out = jdOutput
 }
 
-func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*devenv.DON, topology *cre.Topology) *cre.Environment {
+func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*devenv.DON, topology *cre.Topology) (*cre.Environment, error) {
 	creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
 	if donsErr != nil {
-		panic(donsErr)
+		return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")
 	}
 
 	return &cre.Environment{
 		CldfEnvironment: cldfEnv,
 		DonTopology:     cre.NewDonTopology(registryChainSelector, topology, creDons),
-	}
+	}, nil
 }
 
 func newCldfEnvironment(ctx context.Context, singleFileLogger logger.Logger, cldfBlockchains map[uint64]cldf_chain.BlockChain) *cldf.Environment {
