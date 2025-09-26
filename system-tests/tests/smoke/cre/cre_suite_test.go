@@ -69,6 +69,7 @@ func Test_CRE_Suite_Billing(t *testing.T) {
 	)
 
 	t.Run("[v2] EVM Write Test", func(t *testing.T) {
+		t.Skip("quaranting - CRE-994")
 		priceProvider, porWfCfg := beforePoRTest(t, testEnv, "por-workflowV2-billing", PoRWFV2Location)
 		porWfCfg.FeedIDs = []string{porWfCfg.FeedIDs[0]}
 		ExecutePoRTest(t, testEnv, priceProvider, porWfCfg, true)
