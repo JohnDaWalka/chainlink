@@ -337,7 +337,8 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				ExtendedReaders:   extendedReaders,
 				ContractWriters:   chainWriters,
 				RmnPeerClient:     rmnPeerClient,
-				RmnCrypto:         pluginConfig.RMNCrypto})
+				RmnCrypto:         pluginConfig.RMNCrypto,
+			})
 		factory = promwrapper.NewReportingPluginFactory(
 			factory,
 			i.lggr,
@@ -491,9 +492,13 @@ func (i *pluginOracleCreator) createChainAccessorsAndContractTransmitters(
 		var provider types.CCIPProvider
 		ccipProviderSupported, ok := pluginServices.CCIPProviderSupported[relayID.Network]
 		if ccipProviderSupported && ok {
+			offRampAddr, err := cciptypes.NewUnknownAddressFromHex(offrampAddrStr)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create unknown address from hex %s: %w", offrampAddrStr, err)
+			}
 			provider, err = relayer.NewCCIPProvider(ctx, types.CCIPProviderArgs{
-				OffRampAddress: offrampAddrStr,
-				PluginType:     uint32(pluginType),
+				OffRampAddress: offRampAddr,
+				PluginType:     cciptypes.PluginType(pluginType),
 			})
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create CCIP provider for relay ID %s: %w", relayID, err)
@@ -525,7 +530,7 @@ func (i *pluginOracleCreator) createChainAccessorsAndContractTransmitters(
 }
 
 func (i *pluginOracleCreator) getTransmitterFromPublicConfig(publicConfig ocr3confighelper.PublicConfig) (ocrtypes.Account, error) {
-	var myIndex = -1
+	myIndex := -1
 	for idx, identity := range publicConfig.OracleIdentities {
 		if identity.PeerID == strings.TrimPrefix(i.p2pID.PeerID().String(), "p2p_") {
 			myIndex = idx

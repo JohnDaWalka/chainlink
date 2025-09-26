@@ -285,6 +285,7 @@ const reportSchema = `{
         { "name": "payload", "type": { "vec": { "defined": "DecimalReport" } } }
       ]
     }`
+
 const definedTypes = `
      [
       {
@@ -515,7 +516,7 @@ func (f *fakeTrigger) createReport() (*values.Map, error) {
 	return event, nil
 }
 
-func createFakeTrigger(t *testing.T, s *setup, dons *cre.DonTopology) *fakeTrigger {
+func createFakeTrigger(t *testing.T, s *setup, _ *cre.DonTopology) *fakeTrigger {
 	client := createMockClient(t)
 	framework.L.Info().Msg("Successfully exported ocr2 keys")
 
