@@ -6,6 +6,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 // REGRESSION TESTS target edge cases, negative conditions, etc., all happy path and sanity checks should go to a `smoke` package.
@@ -36,6 +37,7 @@ func Test_CRE_Suite_V2_Regression(t *testing.T) {
 }
 
 func Test_CRE_Suite_V2_EVM_Regression(t *testing.T) {
+	quarantine.Flaky(t, "DX-1891")
 	flags := []string{"--with-contracts-version", "v2"}
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
 	// TODO remove this when OCR works properly with multiple chains in Local CRE
