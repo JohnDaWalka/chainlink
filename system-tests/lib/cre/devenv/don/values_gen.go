@@ -6,14 +6,14 @@ import (
 
 // ChainlinkValuesConfig represents the complete Helm values configuration for Chainlink deployment
 type ChainlinkValuesConfig struct {
-	BootNodeCount    int                  `yaml:"bootNodeCount"`
-	NodeCount        int                  `yaml:"nodeCount"`
-	FullnameOverride string               `yaml:"fullnameOverride"`
-	NetworkPolicy    NetworkPolicyConfig  `yaml:"networkPolicy"`
-	Common           CommonConfig         `yaml:"common"`
-	Overrides        []NodeOverrideConfig `yaml:"overrides"`
-	Rollout          RolloutConfig        `yaml:"rollout"`
-	ServiceAccount   ServiceAccountConfig `yaml:"serviceAccount"`
+	BootNodeCount    int                  `yaml:"bootNodeCount,omitempty"`
+	NodeCount        int                  `yaml:"nodeCount,omitempty"`
+	FullnameOverride string               `yaml:"fullnameOverride,omitempty"`
+	NetworkPolicy    NetworkPolicyConfig  `yaml:"networkPolicy,omitempty"`
+	Common           CommonConfig         `yaml:"common,omitempty"`
+	Overrides        []NodeOverrideConfig `yaml:"overrides,omitempty"`
+	Rollout          RolloutConfig        `yaml:"rollout,omitempty"`
+	ServiceAccount   ServiceAccountConfig `yaml:"serviceAccount,omitempty"`
 }
 
 // NodeValuesConfig represents configuration for individual nodes
@@ -28,176 +28,176 @@ type NodeValuesConfig struct {
 
 // NetworkPolicyConfig represents network policy settings
 type NetworkPolicyConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled *bool `yaml:"enabled,omitempty"`
 }
 
 // RolloutConfig represents rollout settings
 type RolloutConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled *bool `yaml:"enabled,omitempty"`
 }
 
 // ServiceAccountConfig represents service account settings
 type ServiceAccountConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Name    string `yaml:"name"`
+	Enabled *bool  `yaml:"enabled,omitempty"`
+	Name    string `yaml:"name,omitempty"`
 }
 
 // CommonConfig represents shared configuration for all nodes
 type CommonConfig struct {
-	Affinity           map[string]interface{} `yaml:"affinity"`
-	Chainlink          ChainlinkConfig        `yaml:"chainlink"`
-	ChainlinkNode      ChainlinkNodeConfig    `yaml:"chainlinkNode"`
-	Image              ImageConfig            `yaml:"image"`
-	ImagePullSecrets   []ImagePullSecret      `yaml:"imagePullSecrets"`
-	Ingress            IngressConfig          `yaml:"ingress"`
-	NodeSelector       map[string]interface{} `yaml:"nodeSelector"`
-	PodSecurityContext PodSecurityContext     `yaml:"podSecurityContext"`
-	RequiredLabels     map[string]string      `yaml:"requiredLabels"`
-	Resources          ResourcesConfig        `yaml:"resources"`
-	Service            ServiceConfig          `yaml:"service"`
-	ServiceMonitor     ServiceMonitorConfig   `yaml:"servicemonitor"`
-	Tolerations        []interface{}          `yaml:"tolerations"`
+	Affinity           map[string]interface{} `yaml:"affinity,omitempty"`
+	Chainlink          ChainlinkConfig        `yaml:"chainlink,omitempty"`
+	ChainlinkNode      ChainlinkNodeConfig    `yaml:"chainlinkNode,omitempty"`
+	Image              ImageConfig            `yaml:"image,omitempty"`
+	ImagePullSecrets   []ImagePullSecret      `yaml:"imagePullSecrets,omitempty"`
+	Ingress            IngressConfig          `yaml:"ingress,omitempty"`
+	NodeSelector       map[string]interface{} `yaml:"nodeSelector,omitempty"`
+	PodSecurityContext PodSecurityContext     `yaml:"podSecurityContext,omitempty"`
+	RequiredLabels     map[string]string      `yaml:"requiredLabels,omitempty"`
+	Resources          ResourcesConfig        `yaml:"resources,omitempty"`
+	Service            ServiceConfig          `yaml:"service,omitempty"`
+	ServiceMonitor     ServiceMonitorConfig   `yaml:"servicemonitor,omitempty"`
+	Tolerations        []interface{}          `yaml:"tolerations,omitempty"`
 }
 
 // ChainlinkConfig represents Chainlink v2 configuration
 type ChainlinkConfig struct {
-	V2Config map[string]string `yaml:"v2Config"`
+	V2Config map[string]string `yaml:"v2Config,omitempty"`
 }
 
 // ChainlinkNodeConfig represents Chainlink node specific configuration
 type ChainlinkNodeConfig struct {
-	Enabled  bool                  `yaml:"enabled"`
-	Metadata ChainlinkNodeMetadata `yaml:"metadata"`
-	Spec     ChainlinkNodeSpec     `yaml:"spec"`
+	Enabled  *bool                 `yaml:"enabled,omitempty"`
+	Metadata ChainlinkNodeMetadata `yaml:"metadata,omitempty"`
+	Spec     ChainlinkNodeSpec     `yaml:"spec,omitempty"`
 }
 
 // ChainlinkNodeMetadata represents node metadata
 type ChainlinkNodeMetadata struct {
-	Annotations map[string]string `yaml:"annotations"`
+	Annotations map[string]string `yaml:"annotations,omitempty"`
 }
 
 // ChainlinkNodeSpec represents node specification
 type ChainlinkNodeSpec struct {
-	Credentials CredentialsConfig `yaml:"credentials"`
-	Database    DatabaseConfig    `yaml:"database"`
+	Credentials CredentialsConfig `yaml:"credentials,omitempty"`
+	Database    DatabaseConfig    `yaml:"database,omitempty"`
 }
 
 // CredentialsConfig represents node credentials
 type CredentialsConfig struct {
-	Config CredentialDetails `yaml:"config"`
+	Config CredentialDetails `yaml:"config,omitempty"`
 }
 
 // CredentialDetails represents credential details
 type CredentialDetails struct {
-	API      APICredential      `yaml:"api"`
-	Keystore KeystoreCredential `yaml:"keystore"`
-	VRF      VRFCredential      `yaml:"vrf"`
+	API      APICredential      `yaml:"api,omitempty"`
+	Keystore KeystoreCredential `yaml:"keystore,omitempty"`
+	VRF      VRFCredential      `yaml:"vrf,omitempty"`
 }
 
 // APICredential represents API credentials
 type APICredential struct {
-	Key      string `yaml:"key"`
-	Password string `yaml:"password"`
-	User     string `yaml:"user"`
+	Key      string `yaml:"key,omitempty"`
+	Password string `yaml:"password,omitempty"`
+	User     string `yaml:"user,omitempty"`
 }
 
 // KeystoreCredential represents keystore credentials
 type KeystoreCredential struct {
-	Key      string `yaml:"key"`
-	Password string `yaml:"password"`
+	Key      string `yaml:"key,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 // VRFCredential represents VRF credentials
 type VRFCredential struct {
-	Key      string `yaml:"key"`
-	Password string `yaml:"password"`
+	Key      string `yaml:"key,omitempty"`
+	Password string `yaml:"password,omitempty"`
 }
 
 // DatabaseConfig represents database configuration
 type DatabaseConfig struct {
-	Config DatabaseDetails `yaml:"config"`
+	Config DatabaseDetails `yaml:"config,omitempty"`
 }
 
 // DatabaseDetails represents database connection details
 type DatabaseDetails struct {
-	Database string      `yaml:"database"`
-	Host     interface{} `yaml:"host"`
-	Password string      `yaml:"password"`
-	Port     string      `yaml:"port"`
-	User     string      `yaml:"user"`
+	Database string      `yaml:"database,omitempty"`
+	Host     interface{} `yaml:"host,omitempty"`
+	Password string      `yaml:"password,omitempty"`
+	Port     string      `yaml:"port,omitempty"`
+	User     string      `yaml:"user,omitempty"`
 }
 
 // ImageConfig represents Docker image configuration
 type ImageConfig struct {
-	PullPolicy string `yaml:"pullPolicy"`
-	Repository string `yaml:"repository"`
-	Tag        string `yaml:"tag"`
+	PullPolicy string `yaml:"pullPolicy,omitempty"`
+	Repository string `yaml:"repository,omitempty"`
+	Tag        string `yaml:"tag,omitempty"`
 }
 
 // ImagePullSecret represents image pull secret
 type ImagePullSecret struct {
-	Name string `yaml:"name"`
+	Name string `yaml:"name,omitempty"`
 }
 
 // IngressConfig represents ingress configuration
 type IngressConfig struct {
-	Annotations      map[string]string `yaml:"annotations"`
-	Enabled          bool              `yaml:"enabled"`
-	Hosts            []IngressHost     `yaml:"hosts"`
-	IngressClassName string            `yaml:"ingressClassName"`
+	Annotations      map[string]string `yaml:"annotations,omitempty"`
+	Enabled          *bool             `yaml:"enabled,omitempty"`
+	Hosts            []IngressHost     `yaml:"hosts,omitempty"`
+	IngressClassName string            `yaml:"ingressClassName,omitempty"`
 }
 
 // IngressHost represents ingress host configuration
 type IngressHost struct {
-	Host        string        `yaml:"host"`
-	Paths       []IngressPath `yaml:"paths"`
-	UseNodeName bool          `yaml:"useNodeName"`
+	Host        string        `yaml:"host,omitempty"`
+	Paths       []IngressPath `yaml:"paths,omitempty"`
+	UseNodeName *bool         `yaml:"useNodeName,omitempty"`
 }
 
 // IngressPath represents ingress path configuration
 type IngressPath struct {
-	Path     string `yaml:"path"`
-	PathType string `yaml:"pathType"`
+	Path     string `yaml:"path,omitempty"`
+	PathType string `yaml:"pathType,omitempty"`
 }
 
 // PodSecurityContext represents pod security context
 type PodSecurityContext struct {
-	RunAsGroup   int  `yaml:"runAsGroup"`
-	RunAsNonRoot bool `yaml:"runAsNonRoot"`
-	RunAsUser    int  `yaml:"runAsUser"`
+	RunAsGroup   int   `yaml:"runAsGroup,omitempty"`
+	RunAsNonRoot *bool `yaml:"runAsNonRoot,omitempty"`
+	RunAsUser    int   `yaml:"runAsUser,omitempty"`
 }
 
 // ResourcesConfig represents resource constraints
 type ResourcesConfig struct {
-	Limits   ResourceLimits   `yaml:"limits"`
-	Requests ResourceRequests `yaml:"requests"`
+	Limits   ResourceLimits   `yaml:"limits,omitempty"`
+	Requests ResourceRequests `yaml:"requests,omitempty"`
 }
 
 // ResourceLimits represents resource limits
 type ResourceLimits struct {
-	CPU    string `yaml:"cpu"`
-	Memory string `yaml:"memory"`
+	CPU    string `yaml:"cpu,omitempty"`
+	Memory string `yaml:"memory,omitempty"`
 }
 
 // ResourceRequests represents resource requests
 type ResourceRequests struct {
-	CPU    string `yaml:"cpu"`
-	Memory string `yaml:"memory"`
+	CPU    string `yaml:"cpu,omitempty"`
+	Memory string `yaml:"memory,omitempty"`
 }
 
 // ServiceConfig represents service configuration
 type ServiceConfig struct {
-	Private ServicePrivate `yaml:"private"`
+	Private ServicePrivate `yaml:"private,omitempty"`
 }
 
 // ServicePrivate represents private service configuration
 type ServicePrivate struct {
-	Type string `yaml:"type"`
+	Type string `yaml:"type,omitempty"`
 }
 
 // ServiceMonitorConfig represents service monitor configuration
 type ServiceMonitorConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled *bool `yaml:"enabled,omitempty"`
 }
 
 // NodeOverrideConfig represents per-node override configuration
@@ -209,17 +209,22 @@ type NodeOverrideConfig struct {
 
 // ChainlinkNodeOverride represents node-specific overrides
 type ChainlinkNodeOverride struct {
-	Spec ChainlinkNodeOverrideSpec `yaml:"spec"`
+	Spec ChainlinkNodeOverrideSpec `yaml:"spec,omitempty"`
 }
 
 // ChainlinkNodeOverrideSpec represents node override spec
 type ChainlinkNodeOverrideSpec struct {
-	Database DatabaseConfig `yaml:"database"`
+	Database DatabaseConfig `yaml:"database,omitempty"`
 }
 
 // ChainlinkOverride represents Chainlink-specific overrides
 type ChainlinkOverride struct {
-	V2Config map[string]string `yaml:"v2Config"`
+	V2Config map[string]string `yaml:"v2Config,omitempty"`
+}
+
+// BoolPtr is a helper function to get a pointer to a boolean value
+func BoolPtr(b bool) *bool {
+	return &b
 }
 
 // NewChainlinkClusterValuesConfig creates a new ChainlinkValuesConfig with default values
@@ -229,7 +234,7 @@ func NewChainlinkClusterValuesConfig() *ChainlinkValuesConfig {
 		NodeCount:        0,
 		FullnameOverride: "base",
 		NetworkPolicy: NetworkPolicyConfig{
-			Enabled: false,
+			Enabled: BoolPtr(false),
 		},
 		Common: CommonConfig{
 			Affinity: make(map[string]interface{}),
@@ -237,7 +242,7 @@ func NewChainlinkClusterValuesConfig() *ChainlinkValuesConfig {
 				V2Config: make(map[string]string),
 			},
 			ChainlinkNode: ChainlinkNodeConfig{
-				Enabled: false,
+				Enabled: BoolPtr(false),
 				Metadata: ChainlinkNodeMetadata{
 					Annotations: map[string]string{
 						"chainlinknode.k8s.chain.link/disable-tls": "false",
@@ -279,7 +284,7 @@ func NewChainlinkClusterValuesConfig() *ChainlinkValuesConfig {
 			NodeSelector: make(map[string]interface{}),
 			PodSecurityContext: PodSecurityContext{
 				RunAsGroup:   14933,
-				RunAsNonRoot: true,
+				RunAsNonRoot: BoolPtr(true),
 				RunAsUser:    14933,
 			},
 			RequiredLabels: map[string]string{
@@ -306,15 +311,15 @@ func NewChainlinkClusterValuesConfig() *ChainlinkValuesConfig {
 				},
 			},
 			ServiceMonitor: ServiceMonitorConfig{
-				Enabled: false,
+				Enabled: BoolPtr(false),
 			},
 			Tolerations: []interface{}{},
 		},
 		Rollout: RolloutConfig{
-			Enabled: false,
+			Enabled: BoolPtr(false),
 		},
 		ServiceAccount: ServiceAccountConfig{
-			Enabled: false,
+			Enabled: BoolPtr(false),
 			Name:    "default",
 		},
 	}

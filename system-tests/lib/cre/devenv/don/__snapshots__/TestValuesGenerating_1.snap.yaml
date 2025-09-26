@@ -4,9 +4,6 @@ fullnameOverride: base
 networkPolicy:
     enabled: false
 common:
-    affinity: {}
-    chainlink:
-        v2Config: {}
     chainlinkNode:
         enabled: false
         metadata:
@@ -28,7 +25,6 @@ common:
             database:
                 config:
                     database: chainlink
-                    host: null
                     password: JGVgp7M2Emcg7Av8KKVUgMZb
                     port: "5432"
                     user: chainlink
@@ -36,13 +32,6 @@ common:
         pullPolicy: Always
         repository: image:latest
         tag: develop
-    imagePullSecrets: []
-    ingress:
-        annotations: {}
-        enabled: false
-        hosts: []
-        ingressClassName: ""
-    nodeSelector: {}
     podSecurityContext:
         runAsGroup: 14933
         runAsNonRoot: true
@@ -66,17 +55,12 @@ common:
             type: ClusterIP
     servicemonitor:
         enabled: false
-    tolerations: []
 overrides:
     - chainlinkNode:
         spec:
             database:
                 config:
-                    database: ""
                     host: base-db-bt-0
-                    password: ""
-                    port: ""
-                    user: ""
     - chainlink:
         v2Config:
             99-config-override.toml: |-
@@ -108,11 +92,7 @@ overrides:
         spec:
             database:
                 config:
-                    database: ""
                     host: base-db-0
-                    password: ""
-                    port: ""
-                    user: ""
     - chainlink:
         v2Config:
             99-config-override.toml: |-
