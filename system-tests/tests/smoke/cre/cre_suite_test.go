@@ -3,9 +3,10 @@ package cre
 import (
 	"testing"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
-	"github.com/smartcontractkit/quarantine"
 )
 
 // SMOKE TESTS target happy path and sanity checks, all other tests (e.g. edge cases, negative conditions) should go to a `regression` package.
