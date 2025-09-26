@@ -9,8 +9,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/zksync-sdk/zksync2-go/accounts"
-	"github.com/zksync-sdk/zksync2-go/clients"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
@@ -62,49 +60,15 @@ var (
 						LinkToken:                    input.LinkAddr,
 						TokenPriceStalenessThreshold: input.Params.TokenPriceStalenessThreshold,
 					},
-					input.PriceUpdaters,
-					[]common.Address{input.WethAddr, input.LinkAddr}, // fee tokens
-					input.Params.TokenPriceFeedUpdates,
-					input.Params.TokenTransferFeeConfigArgs,
-					append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
-						{
-							PremiumMultiplierWeiPerEth: input.Params.LinkPremiumMultiplierWeiPerEth,
-							Token:                      input.LinkAddr,
-						},
-						{
-							PremiumMultiplierWeiPerEth: input.Params.WethPremiumMultiplierWeiPerEth,
-							Token:                      input.WethAddr,
-						},
-					}, input.Params.MorePremiumMultiplierWeiPerEth...),
-					input.Params.DestChainConfigArgs,
-				)
-				return addr, tx, err
-			},
-			DeployZksyncVM: func(opts *accounts.TransactOpts, client *clients.Client, wallet *accounts.Wallet, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, error) {
-				addr, _, _, err := fee_quoter.DeployFeeQuoterZk(opts, client, wallet, backend,
-					fee_quoter.FeeQuoterStaticConfig{
-						MaxFeeJuelsPerMsg:            input.Params.MaxFeeJuelsPerMsg,
-						LinkToken:                    input.LinkAddr,
-						TokenPriceStalenessThreshold: input.Params.TokenPriceStalenessThreshold,
+					{
+						PremiumMultiplierWeiPerEth: input.Params.WethPremiumMultiplierWeiPerEth,
+						Token:                      input.WethAddr,
 					},
-					input.PriceUpdaters,
-					[]common.Address{input.WethAddr, input.LinkAddr}, // fee tokens
-					input.Params.TokenPriceFeedUpdates,
-					input.Params.TokenTransferFeeConfigArgs,
-					append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
-						{
-							PremiumMultiplierWeiPerEth: input.Params.LinkPremiumMultiplierWeiPerEth,
-							Token:                      input.LinkAddr,
-						},
-						{
-							PremiumMultiplierWeiPerEth: input.Params.WethPremiumMultiplierWeiPerEth,
-							Token:                      input.WethAddr,
-						},
-					}, input.Params.MorePremiumMultiplierWeiPerEth...),
-					input.Params.DestChainConfigArgs)
-				return addr, err
-			},
-		})
+				}, input.Params.MorePremiumMultiplierWeiPerEth...),
+				[]fee_quoter.FeeQuoterDestChainConfigArgs{},
+			}
+		},
+	)
 
 	FeeQApplyAuthorizedCallerOp = opsutil.NewEVMCallOperation(
 		"FeeQApplyAuthorizedCallerOp",
