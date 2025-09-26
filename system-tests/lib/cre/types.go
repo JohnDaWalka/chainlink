@@ -21,7 +21,6 @@ import (
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -344,28 +343,28 @@ type SolChain struct {
 	ArtifactsDir  string
 }
 
-type CreateJobsInput struct {
-	CldEnv        *cldf.Environment
-	DonTopology   *DonTopology
-	DonToJobSpecs DonsToJobSpecs
-}
+// type CreateJobsInput struct {
+// 	CldEnv        *cldf.Environment
+// 	DonTopology   *DonTopology
+// 	DonToJobSpecs DonsToJobSpecs
+// }
 
-func (c *CreateJobsInput) Validate() error {
-	if c.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
-	if c.DonTopology == nil {
-		return errors.New("don topology not set")
-	}
-	if len(c.DonTopology.Dons.List()) == 0 {
-		return errors.New("topology dons not set")
-	}
-	if len(c.DonToJobSpecs) == 0 {
-		return errors.New("don to job specs not set")
-	}
+// func (c *CreateJobsInput) Validate() error {
+// 	if c.CldEnv == nil {
+// 		return errors.New("chainlink deployment env not set")
+// 	}
+// 	if c.DonTopology == nil {
+// 		return errors.New("don topology not set")
+// 	}
+// 	if len(c.DonTopology.Dons.List()) == 0 {
+// 		return errors.New("topology dons not set")
+// 	}
+// 	if len(c.DonToJobSpecs) == 0 {
+// 		return errors.New("don to job specs not set")
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 type ConfigureKeystoneInput struct {
 	ChainSelector               uint64
@@ -670,31 +669,31 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 	return slices.Contains(m.Flags, WorkflowDON)
 }
 
-// TODO Refactor later on. Probably when we introduce our own DON struct
-// we could add to it all the metadata we need and avoid this wrapper struct altogether
-type Dons struct {
-	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
-	dons        []*devenv.DON
-}
+// // TODO Refactor later on. Probably when we introduce our own DON struct
+// // we could add to it all the metadata we need and avoid this wrapper struct altogether
+// type Dons struct {
+// 	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
+// 	dons        []*devenv.DON
+// }
 
-func (d *Dons) List() []*devenv.DON {
-	return d.dons
-}
+// func (d *Dons) List() []*devenv.DON {
+// 	return d.dons
+// }
 
-func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
-	if donsMetadata == nil {
-		return nil, errors.New("donsMetadata is required")
-	}
+// func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
+// 	if donsMetadata == nil {
+// 		return nil, errors.New("donsMetadata is required")
+// 	}
 
-	if len(dons) != len(donsMetadata.List()) {
-		return nil, errors.New("dons and donsMetadata must have the same length")
-	}
+// 	if len(dons) != len(donsMetadata.List()) {
+// 		return nil, errors.New("dons and donsMetadata must have the same length")
+// 	}
 
-	return &Dons{
-		DonMetadata: donsMetadata.List(),
-		dons:        dons,
-	}, nil
-}
+// 	return &Dons{
+// 		DonMetadata: donsMetadata.List(),
+// 		dons:        dons,
+// 	}, nil
+// }
 
 type DonsMetadata struct {
 	dons  []*DonMetadata
@@ -866,41 +865,41 @@ func newNodes(cfgs []NodeMetadataConfig) ([]*NodeMetadata, error) {
 	return nodes, nil
 }
 
-func NewDonTopology(registryChainSelector uint64, topology *Topology, dons *Dons) *DonTopology {
-	return &DonTopology{
-		WorkflowDonID:          topology.WorkflowDONID,
-		HomeChainSelector:      registryChainSelector,
-		Dons:                   dons,
-		GatewayConnectorOutput: topology.GatewayConnectorOutput,
-	}
-}
+// func NewDonTopology(registryChainSelector uint64, topology *Topology, dons *Dons) *DonTopology {
+// 	return &DonTopology{
+// 		WorkflowDonID:          topology.WorkflowDONID,
+// 		HomeChainSelector:      registryChainSelector,
+// 		Dons:                   dons,
+// 		GatewayConnectorOutput: topology.GatewayConnectorOutput,
+// 	}
+// }
 
-// TODO refactor it to only contain []DON, once we have our own DON struct
-// and maybe the GatewayConnectorOutput
-type DonTopology struct {
-	WorkflowDonID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
-	HomeChainSelector      uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`
-	Dons                   *Dons                   `toml:"dons" json:"dons"`
-	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
-}
+// // TODO refactor it to only contain []DON, once we have our own DON struct
+// // and maybe the GatewayConnectorOutput
+// type DonTopology struct {
+// 	WorkflowDonID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
+// 	HomeChainSelector      uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`
+// 	Dons                   *Dons                   `toml:"dons" json:"dons"`
+// 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
+// }
 
-// BootstrapNode returns the metadata for the node that should be used as the bootstrap node for P2P peering
-// Currently only one bootstrap is supported.
-func (t *DonTopology) BootstrapNode() (*NodeMetadata, error) {
-	for _, don := range t.Dons.DonMetadata {
-		if don.ContainsBootstrapNode() {
-			return don.BootstrapNode()
-		}
-	}
-	return nil, errors.New("no don contains a bootstrap node")
-}
+// // BootstrapNode returns the metadata for the node that should be used as the bootstrap node for P2P peering
+// // Currently only one bootstrap is supported.
+// func (t *DonTopology) BootstrapNode() (*NodeMetadata, error) {
+// 	for _, don := range t.Dons.DonMetadata {
+// 		if don.ContainsBootstrapNode() {
+// 			return don.BootstrapNode()
+// 		}
+// 	}
+// 	return nil, errors.New("no don contains a bootstrap node")
+// }
 
-func (t *DonTopology) ToDonMetadata() []*DonMetadata {
-	metadata := []*DonMetadata{}
-	metadata = append(metadata, t.Dons.DonMetadata...)
+// func (t *DonTopology) ToDonMetadata() []*DonMetadata {
+// 	metadata := []*DonMetadata{}
+// 	metadata = append(metadata, t.Dons.DonMetadata...)
 
-	return metadata
-}
+// 	return metadata
+// }
 
 // CapabilitiesAwareNodeSet is the serialized form that declares nodesets in a topology.
 type CapabilitiesAwareNodeSet struct {
@@ -1228,10 +1227,10 @@ func (f *LinkDonsToJDInput) Validate() error {
 	return nil
 }
 
-type Environment struct {
-	CldfEnvironment *cldf.Environment
-	DonTopology     *DonTopology
-}
+// type Environment struct {
+// 	CldfEnvironment *cldf.Environment
+// 	DonTopology     *DonTopology
+// }
 
 type DeployCribDonsInput struct {
 	Topology       *Topology
@@ -1290,48 +1289,48 @@ func (d *DeployCribBlockchainInput) Validate() error {
 
 type (
 	CapabilityRegistryConfigFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error)
-	JobSpecFn                  = func(input *JobSpecInput) (DonsToJobSpecs, error)
+	// JobSpecFn                  = func(input *JobSpecInput) (DonsToJobSpecs, error)
 )
 
-type JobSpecInput struct {
-	CldEnvironment            *cldf.Environment
-	BlockchainOutput          *blockchain.Output
-	DonTopology               *DonTopology
-	InfraInput                infra.Provider
-	CapabilityConfigs         map[string]CapabilityConfig
-	Capabilities              []InstallableCapability
-	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet
-}
+// type JobSpecInput struct {
+// 	CldEnvironment            *cldf.Environment
+// 	BlockchainOutput          *blockchain.Output
+// 	DonTopology               *DonTopology
+// 	InfraInput                infra.Provider
+// 	CapabilityConfigs         map[string]CapabilityConfig
+// 	Capabilities              []InstallableCapability
+// 	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet
+// }
 
 // InstallableCapability defines the interface for capabilities that can be dynamically
 // registered and deployed across DONs. This interface enables plug-and-play capability
 // extension without modifying core infrastructure code.
-type InstallableCapability interface {
-	// Flag returns the unique identifier used in TOML configurations and internal references
-	Flag() CapabilityFlag
+// type InstallableCapability interface {
+// 	// Flag returns the unique identifier used in TOML configurations and internal references
+// 	Flag() CapabilityFlag
 
-	// JobSpecFn returns a function that generates job specifications for this capability
-	// based on the provided input configuration and topology. Most capabilities need this.
-	// Exceptions include capabilities that are configured via the node config, like write-evm, aptos, tron or solana.
-	JobSpecFn() JobSpecFn
+// 	// JobSpecFn returns a function that generates job specifications for this capability
+// 	// based on the provided input configuration and topology. Most capabilities need this.
+// 	// Exceptions include capabilities that are configured via the node config, like write-evm, aptos, tron or solana.
+// 	JobSpecFn() JobSpecFn
 
-	// NodeConfigTransformerFn returns a function to modify node-level configuration,
-	// or nil if node config modification is not needed. Most capabilities don't need this.
-	NodeConfigTransformerFn() NodeConfigTransformerFn
+// 	// NodeConfigTransformerFn returns a function to modify node-level configuration,
+// 	// or nil if node config modification is not needed. Most capabilities don't need this.
+// 	NodeConfigTransformerFn() NodeConfigTransformerFn
 
-	// GatewayJobHandlerConfigFn returns a function to configure gateway handlers in the gateway jobspec,
-	// or nil if no gateway handler configuration is required for this capability. Only capabilities
-	// that need to connect to external resources might need this.
-	GatewayJobHandlerConfigFn() GatewayHandlerConfigFn
+// 	// GatewayJobHandlerConfigFn returns a function to configure gateway handlers in the gateway jobspec,
+// 	// or nil if no gateway handler configuration is required for this capability. Only capabilities
+// 	// that need to connect to external resources might need this.
+// 	GatewayJobHandlerConfigFn() GatewayHandlerConfigFn
 
-	// CapabilityRegistryV1ConfigFn returns a function to generate capability registry
-	// configuration for the v1 registry format
-	CapabilityRegistryV1ConfigFn() CapabilityRegistryConfigFn
+// 	// CapabilityRegistryV1ConfigFn returns a function to generate capability registry
+// 	// configuration for the v1 registry format
+// 	CapabilityRegistryV1ConfigFn() CapabilityRegistryConfigFn
 
-	// CapabilityRegistryV2ConfigFn returns a function to generate capability registry
-	// configuration for the v2 registry format
-	CapabilityRegistryV2ConfigFn() CapabilityRegistryConfigFn
-}
+// 	// CapabilityRegistryV2ConfigFn returns a function to generate capability registry
+// 	// configuration for the v2 registry format
+// 	CapabilityRegistryV2ConfigFn() CapabilityRegistryConfigFn
+// }
 
 type PersistentConfig interface {
 	Load(absPath string) error

@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 )
 
 var ConfigMerger = func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesAwareNodeSet, chainIDUint64 uint64, capabilityConfig cre.CapabilityConfig) (map[string]any, bool, error) {
@@ -31,7 +32,7 @@ var CapabilityEnabler = func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cr
 	return true
 }
 
-var EnabledChainsProvider = func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) ([]uint64, error) {
+var EnabledChainsProvider = func(donTopology *topology.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) ([]uint64, error) {
 	if nodeSetInput == nil || nodeSetInput.ChainCapabilities == nil {
 		return []uint64{}, nil
 	}

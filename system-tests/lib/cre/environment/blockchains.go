@@ -305,7 +305,7 @@ func StartBlockchains(loggers BlockchainLoggers, input BlockchainsInput) (StartB
 
 	chainsConfigs := make([]devenv.ChainConfig, 0)
 	for _, bcOut := range blockchainsOutput {
-		cfg, cfgErr := cre.ChainConfigFromWrapped(bcOut)
+		cfg, cfgErr := devenv.ChainConfigFromWrapped(bcOut)
 		if cfgErr != nil {
 			return StartBlockchainsOutput{}, pkgerrors.Wrap(cfgErr, "failed to wrap blockchain output to chain config")
 		}

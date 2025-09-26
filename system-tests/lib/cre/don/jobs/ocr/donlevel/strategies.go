@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -26,7 +27,7 @@ var CapabilityEnabler = func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cr
 	return flags.HasFlag(nodeSetInput.ComputedCapabilities, flag)
 }
 
-var EnabledChainsProvider = func(donTopology *cre.DonTopology, _ *cre.CapabilitiesAwareNodeSet, _ cre.CapabilityFlag) ([]uint64, error) {
+var EnabledChainsProvider = func(donTopology *topology.DonTopology, _ *cre.CapabilitiesAwareNodeSet, _ cre.CapabilityFlag) ([]uint64, error) {
 
 	chain, ok := chainselectors.ChainBySelector(donTopology.HomeChainSelector)
 	if !ok {

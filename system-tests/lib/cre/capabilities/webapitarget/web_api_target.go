@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability/donlevel"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -41,7 +42,7 @@ func New() (*capabilities.Capability, error) {
 			flag,
 			configTemplate,
 			factory.NoOpExtractor, // No runtime values extraction needed
-			func(_ *cre.JobSpecInput, _ cre.CapabilityConfig) (string, error) {
+			func(_ *jobs.JobSpecInput, _ cre.CapabilityConfig) (string, error) {
 				return "__builtin_web-api-target", nil
 			},
 		)),

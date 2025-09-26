@@ -22,12 +22,13 @@ import (
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
 func GenerateJobSpecsForStandardCapabilityWithOCR(
-	donTopology *cre.DonTopology,
+	donTopology *topology.DonTopology,
 	ds datastore.DataStore,
 	nodeSetInput []*cre.CapabilitiesAwareNodeSet,
 	infraInput infra.Provider,
@@ -230,7 +231,7 @@ type JobConfigGenerator = func(logger zerolog.Logger, chainID uint64, nodeAddres
 type CapabilityEnabler func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
 
 // EnabledChainsProvider provides the list of enabled chains for a given capability
-type EnabledChainsProvider func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) ([]uint64, error)
+type EnabledChainsProvider func(donTopology *topology.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) ([]uint64, error)
 
 // ContractNamer is a function that returns the name of the OCR3 contract  used in the datastore
 type ContractNamer func(chainID uint64) string

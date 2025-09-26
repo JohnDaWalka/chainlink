@@ -1,4 +1,4 @@
-package environment
+package jobs
 
 import (
 	"time"
@@ -9,10 +9,12 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
@@ -20,11 +22,11 @@ type CreateJobsWithJdOpDeps struct {
 	Logger                    zerolog.Logger
 	SingleFileLogger          common.Logger
 	HomeChainBlockchainOutput *blockchain.Output
-	JobSpecFactoryFunctions   []cre.JobSpecFn
-	CreEnvironment            *cre.Environment
+	JobSpecFactoryFunctions   []JobSpecFn
+	CreEnvironment            *environment.Environment
 	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
 	CapabilitiesConfigs       cre.CapabilityConfigs
-	Capabilities              []cre.InstallableCapability
+	Capabilities              []types.InstallableCapability
 	InfraInput                infra.Provider
 }
 
@@ -45,7 +47,7 @@ var CreateJobsWithJdOp = operations.NewOperation(
 			if jobSpecGeneratingFn == nil {
 				continue
 			}
-			singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecInput{
+			singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&JobSpecInput{
 				CldEnvironment:            deps.CreEnvironment.CldfEnvironment,
 				BlockchainOutput:          deps.HomeChainBlockchainOutput,
 				DonTopology:               deps.CreEnvironment.DonTopology,
@@ -60,13 +62,13 @@ var CreateJobsWithJdOp = operations.NewOperation(
 			mergeJobSpecSlices(singleDonToJobSpecs, donToJobSpecs)
 		}
 
-		createJobsInput := cre.CreateJobsInput{
+		createJobsInput := CreateJobsInput{
 			CldEnv:        deps.CreEnvironment.CldfEnvironment,
 			DonTopology:   deps.CreEnvironment.DonTopology,
 			DonToJobSpecs: donToJobSpecs,
 		}
 
-		jobsErr := libdon.CreateJobs(b.GetContext(), deps.Logger, createJobsInput)
+		jobsErr := CreateJobs(b.GetContext(), deps.Logger, createJobsInput)
 		if jobsErr != nil {
 			return CreateJobsWithJdOpOutput{}, pkgerrors.Wrap(jobsErr, "failed to create jobs")
 		}
@@ -86,7 +88,7 @@ func CreateJobsWithJdOpFactory(id string, version string) *operations.Operation[
 			donToJobSpecs := make(cre.DonsToJobSpecs)
 
 			for _, jobSpecGeneratingFn := range deps.JobSpecFactoryFunctions {
-				singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&cre.JobSpecInput{
+				singleDonToJobSpecs, jobSpecsErr := jobSpecGeneratingFn(&JobSpecInput{
 					CldEnvironment:            deps.CreEnvironment.CldfEnvironment,
 					BlockchainOutput:          deps.HomeChainBlockchainOutput,
 					DonTopology:               deps.CreEnvironment.DonTopology,
@@ -100,13 +102,13 @@ func CreateJobsWithJdOpFactory(id string, version string) *operations.Operation[
 				mergeJobSpecSlices(singleDonToJobSpecs, donToJobSpecs)
 			}
 
-			createJobsInput := cre.CreateJobsInput{
+			createJobsInput := CreateJobsInput{
 				CldEnv:        deps.CreEnvironment.CldfEnvironment,
 				DonTopology:   deps.CreEnvironment.DonTopology,
 				DonToJobSpecs: donToJobSpecs,
 			}
 
-			jobsErr := libdon.CreateJobs(b.GetContext(), deps.Logger, createJobsInput)
+			jobsErr := CreateJobs(b.GetContext(), deps.Logger, createJobsInput)
 			if jobsErr != nil {
 				return CreateJobsWithJdOpOutput{}, pkgerrors.Wrap(jobsErr, "failed to create jobs")
 			}
@@ -116,4 +118,13 @@ func CreateJobsWithJdOpFactory(id string, version string) *operations.Operation[
 			return CreateJobsWithJdOpOutput{}, nil
 		},
 	)
+}
+
+func mergeJobSpecSlices(from, to cre.DonsToJobSpecs) {
+	for fromDonID, fromJobSpecs := range from {
+		if _, ok := to[fromDonID]; !ok {
+			to[fromDonID] = make([]*jobv1.ProposeJobRequest, 0)
+		}
+		to[fromDonID] = append(to[fromDonID], fromJobSpecs...)
+	}
 }

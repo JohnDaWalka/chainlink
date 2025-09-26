@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 )
 
 // Type aliases for cleaner function signatures
@@ -22,7 +23,7 @@ import (
 type RuntimeValuesExtractor func(chainID uint64, nodeMetadata *cre.NodeMetadata) map[string]any
 
 // CommandBuilder constructs the command string for executing a capability binary or built-in capability.
-type CommandBuilder func(input *cre.JobSpecInput, capabilityConfig cre.CapabilityConfig) (string, error)
+type CommandBuilder func(input *jobs.JobSpecInput, capabilityConfig cre.CapabilityConfig) (string, error)
 
 // JobNamer constructs the job name for a capability.
 type JobNamer func(chainID uint64, flag cre.CapabilityFlag) string
@@ -31,7 +32,7 @@ type JobNamer func(chainID uint64, flag cre.CapabilityFlag) string
 type CapabilityEnabler func(donMetadata *cre.DonMetadata, nodeSet *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool
 
 // EnabledChainsProvider provides the list of enabled chains for a given capability.
-type EnabledChainsProvider func(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64
+type EnabledChainsProvider func(donTopology *topology.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64
 
 // ConfigResolver resolves the capability config for a given chain.
 type ConfigResolver func(nodeSetInput *cre.CapabilitiesAwareNodeSet, capabilityConfig cre.CapabilityConfig, chainID uint64, flag cre.CapabilityFlag) (bool, map[string]any, error)
@@ -44,7 +45,7 @@ var NoOpExtractor RuntimeValuesExtractor = func(chainID uint64, nodeMetadata *cr
 
 // BinaryPathBuilder constructs the container path for capability binaries by combining
 // the default container directory with the base name of the capability's binary path
-var BinaryPathBuilder CommandBuilder = func(input *cre.JobSpecInput, capabilityConfig cre.CapabilityConfig) (string, error) {
+var BinaryPathBuilder CommandBuilder = func(input *jobs.JobSpecInput, capabilityConfig cre.CapabilityConfig) (string, error) {
 	containerPath, pathErr := crecapabilities.DefaultContainerDirectory(input.InfraInput.Type)
 	if pathErr != nil {
 		return "", errors.Wrapf(pathErr, "failed to get default container directory for infra type %s", input.InfraInput.Type)
@@ -98,8 +99,8 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 	configTemplate string,
 	runtimeValuesExtractor RuntimeValuesExtractor,
 	commandBuilder CommandBuilder,
-) func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
-	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+) func(input *jobs.JobSpecInput) (cre.DonsToJobSpecs, error) {
+	return func(input *jobs.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		if input.DonTopology == nil {
 			return nil, errors.New("topology is nil")
 		}

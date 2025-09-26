@@ -3,7 +3,6 @@ package sets
 import (
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	customcompute "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/compute"
 	consensusv1capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus/v1"
 	consensusv2capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/consensus/v2"
@@ -14,6 +13,7 @@ import (
 	logeventtriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/logeventtrigger"
 	mockcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/mock"
 	readcontractcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/readcontract"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/types"
 	vaultcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/vault"
 	webapitargetcapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitarget"
 	webapitriggercapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/webapitrigger"
@@ -21,8 +21,8 @@ import (
 	writesolanacapability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/writesolana"
 )
 
-func NewDefaultSet(homeChainID uint64) ([]cre.InstallableCapability, error) {
-	capabilities := []cre.InstallableCapability{}
+func NewDefaultSet(homeChainID uint64) ([]types.InstallableCapability, error) {
+	capabilities := []types.InstallableCapability{}
 
 	cron, cErr := croncapability.New()
 	if cErr != nil {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
@@ -17,7 +18,7 @@ func CapabilityEnabler(donMetadata *cre.DonMetadata, nodeSet *cre.CapabilitiesAw
 	return flags.HasFlag(donMetadata.Flags, flag)
 }
 
-func EnabledChainsProvider(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
+func EnabledChainsProvider(donTopology *topology.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
 	// Most DON-level capabilities do not operate on specific chains, so we return the home chain selector to satisfy the interface
 	return []uint64{donTopology.HomeChainSelector}
 }

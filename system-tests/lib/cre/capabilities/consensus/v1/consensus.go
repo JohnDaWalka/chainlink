@@ -55,8 +55,8 @@ func registerWithV1(donFlags []string, _ *cre.CapabilitiesAwareNodeSet) ([]keyst
 	return capabilities, nil
 }
 
-func jobSpec(chainID uint64) cre.JobSpecFn {
-	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+func jobSpec(chainID uint64) jobs.JobSpecFn {
+	return func(input *jobs.JobSpecInput) (jobs.DonsToJobSpecs, error) {
 		if input.DonTopology == nil {
 			return nil, errors.New("topology is nil")
 		}

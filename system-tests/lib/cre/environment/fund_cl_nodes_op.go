@@ -23,7 +23,8 @@ import (
 
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	libfunding "github.com/smartcontractkit/chainlink/system-tests/lib/funding"
 )
@@ -32,7 +33,7 @@ type PrepareFundCLNodesOpDeps struct {
 	TestLogger        zerolog.Logger
 	Env               *cldf.Environment
 	BlockchainOutputs []*cre.WrappedBlockchainOutput
-	DonTopology       *cre.DonTopology
+	DonTopology       *topology.DonTopology
 }
 
 type PrepareFundCLNodesOpInput struct {
@@ -170,7 +171,7 @@ type FundCLNodesOpDeps struct {
 	TestLogger        zerolog.Logger
 	Env               *cldf.Environment
 	BlockchainOutputs []*cre.WrappedBlockchainOutput
-	DonTopology       *cre.DonTopology
+	DonTopology       *topology.DonTopology
 }
 
 type FundCLNodesOpInput struct {
@@ -194,7 +195,7 @@ var FundCLNodesOp = operations.NewOperation(
 					bcOut.SolChain == nil { // for now, we can only write to solana, so we consider forwarder is always present
 					continue
 				}
-				for _, node := range deps.DonTopology.Dons.List()[donIndex].Nodes {
+				for _, node := range deps.DonTopology.Dons[donIndex].Nodes {
 					chainFamily := chainselectors.FamilyEVM
 					if bcOut.SolChain != nil {
 						chainFamily = chainselectors.FamilySolana
@@ -234,7 +235,7 @@ var FundCLNodesOp = operations.NewOperation(
 	},
 )
 
-func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, privateKeyPerChainFamily map[string]map[uint64][]byte) error {
+func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node *don.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, privateKeyPerChainFamily map[string]map[uint64][]byte) error {
 	nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
 	if nodeAddress == "" {
 		return nil // Skip nodes without addresses for this chain
@@ -266,7 +267,7 @@ func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.
 	return nil
 }
 
-func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, _ map[string]map[uint64][]byte) error {
+func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node *don.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, _ map[string]map[uint64][]byte) error {
 	funder := bcOut.SolChain.PrivateKey
 	recipient := solana.MustPublicKeyFromBase58(node.AccountAddr[bcOut.SolChain.ChainID])
 	testLogger.Info().Msgf("Attempting to fund Solana account %s", recipient.String())
@@ -284,7 +285,7 @@ func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node deve
 	return nil
 }
 
-func getTronNodeAddress(node devenv.Node, bcOut *cre.WrappedBlockchainOutput) common.Address {
+func getTronNodeAddress(node *don.Node, bcOut *cre.WrappedBlockchainOutput) common.Address {
 	nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
 	if nodeAddress == "" {
 		return common.Address{} // Skip nodes without addresses for this chain

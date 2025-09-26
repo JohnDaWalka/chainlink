@@ -1,4 +1,3 @@
-// system-tests/lib/cre/environment/env_artifact_test.go
 package environment
 
 import (

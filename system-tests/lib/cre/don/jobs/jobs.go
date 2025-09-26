@@ -7,13 +7,78 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"go.uber.org/ratelimit"
 	"golang.org/x/sync/errgroup"
 
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
+	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/types"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
+
+type (
+	DonJobs        = []*jobv1.ProposeJobRequest
+	DonsToJobSpecs = map[uint64]DonJobs
+	JobSpecFn      = func(input *JobSpecInput) (DonsToJobSpecs, error)
+)
+
+type JobSpecInput struct {
+	CldEnvironment            *cldf.Environment
+	BlockchainOutput          *blockchain.Output
+	DonTopology               *topology.DonTopology
+	InfraInput                infra.Provider
+	CapabilityConfigs         map[string]cre.CapabilityConfig
+	Capabilities              []types.InstallableCapability
+	CapabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet
+}
+
+type CreateJobsInput struct {
+	CldEnv        *cldf.Environment
+	DonTopology   *topology.DonTopology
+	DonToJobSpecs DonsToJobSpecs
+}
+
+func (c *CreateJobsInput) Validate() error {
+	if c.CldEnv == nil {
+		return errors.New("chainlink deployment env not set")
+	}
+	if c.DonTopology == nil {
+		return errors.New("don topology not set")
+	}
+	if len(c.DonTopology.Dons.List()) == 0 {
+		return errors.New("topology dons not set")
+	}
+	if len(c.DonToJobSpecs) == 0 {
+		return errors.New("don to job specs not set")
+	}
+
+	return nil
+}
+
+func CreateJobs(ctx context.Context, testLogger zerolog.Logger, input CreateJobsInput) error {
+	if err := input.Validate(); err != nil {
+		return errors.Wrap(err, "input validation failed")
+	}
+
+	for _, donMetadata := range input.DonTopology.ToDonMetadata() {
+		if jobSpecs, ok := input.DonToJobSpecs[donMetadata.ID]; ok {
+			createErr := Create(ctx, input.CldEnv.Offchain, jobSpecs)
+			if createErr != nil {
+				return errors.Wrapf(createErr, "failed to create jobs for DON %d", donMetadata.ID)
+			}
+		} else {
+			testLogger.Warn().Msgf("No job specs found for DON %d", donMetadata.ID)
+		}
+	}
+
+	return nil
+}
 
 func Create(ctx context.Context, offChainClient cldf_offchain.Client, jobSpecs cre.DonJobs) error {
 	if len(jobSpecs) == 0 {

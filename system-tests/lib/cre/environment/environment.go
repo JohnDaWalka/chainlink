@@ -13,8 +13,6 @@ import (
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
-	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -31,12 +29,15 @@ import (
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities/types"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/workflow"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
@@ -54,7 +55,7 @@ type SetupOutput struct {
 	WorkflowRegistryConfigurationOutput *cre.WorkflowRegistryOutput
 	CldEnvironment                      *cldf.Environment
 	BlockchainOutput                    []*cre.WrappedBlockchainOutput
-	DonTopology                         *cre.DonTopology
+	DonTopology                         *topology.DonTopology
 	NodeOutput                          []*cre.WrappedNodeOutput
 	InfraInput                          infra.Provider
 	S3ProviderOutput                    *s3provider.Output
@@ -73,12 +74,12 @@ type SetupInput struct {
 	S3ProviderInput           *s3provider.Input
 	CapabilityConfigs         cre.CapabilityConfigs
 	CopyCapabilityBinaries    bool // if true, copy capability binaries to the containers (if false, we assume that the plugins image already has them)
-	Capabilities              []cre.InstallableCapability
+	Capabilities              []types.InstallableCapability
 
 	// Deprecated: use Capabilities []cre.InstallableCapability instead
 	ConfigFactoryFunctions []cre.NodeConfigTransformerFn
 	// Deprecated: use Capabilities []cre.InstallableCapability instead
-	JobSpecFactoryFunctions []cre.JobSpecFn
+	JobSpecFactoryFunctions []jobs.JobSpecFn
 	// Deprecated: use Capabilities []cre.InstallableCapability instead
 	CapabilitiesContractFactoryFunctions []cre.CapabilityRegistryConfigFn
 
@@ -217,7 +218,7 @@ func SetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("DONs and Job Distributor started and linked in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Creating Jobs with Job Distributor")))
 
-	jobSpecFactoryFunctions := make([]cre.JobSpecFn, 0)
+	jobSpecFactoryFunctions := make([]jobs.JobSpecFn, 0)
 	for _, capability := range input.Capabilities {
 		jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, capability.JobSpecFn())
 	}
@@ -225,7 +226,7 @@ func SetupTestEnvironment(
 	jobSpecFactoryFunctions = append(jobSpecFactoryFunctions, input.JobSpecFactoryFunctions...) // Deprecated, use Capabilities instead
 
 	// CAUTION: It is crucial to configure OCR3 jobs on nodes before configuring the OCR3 contracts.
-	createJobsDeps := CreateJobsWithJdOpDeps{
+	createJobsDeps := jobs.CreateJobsWithJdOpDeps{
 		Logger:                    testLogger,
 		SingleFileLogger:          singleFileLogger,
 		HomeChainBlockchainOutput: startBlockchainsOutput.RegistryChain().BlockchainOutput,
@@ -236,7 +237,7 @@ func SetupTestEnvironment(
 		CapabilitiesConfigs:       input.CapabilityConfigs,
 		Capabilities:              input.Capabilities,
 	}
-	_, createJobsErr := operations.ExecuteOperation(deployKeystoneContractsOutput.Env.OperationsBundle, CreateJobsWithJdOp, createJobsDeps, CreateJobsWithJdOpInput{})
+	_, createJobsErr := operations.ExecuteOperation(deployKeystoneContractsOutput.Env.OperationsBundle, jobs.CreateJobsWithJdOp, createJobsDeps, jobs.CreateJobsWithJdOpInput{})
 	if createJobsErr != nil {
 		return nil, pkgerrors.Wrap(createJobsErr, "failed to create jobs with Job Distributor")
 	}
@@ -382,14 +383,14 @@ func evmOCR3AddressesFromDataStore(blockchains []*cre.WrappedBlockchainOutput, n
 	return evmOCR3CommonAddresses
 }
 
-func mergeJobSpecSlices(from, to cre.DonsToJobSpecs) {
-	for fromDonID, fromJobSpecs := range from {
-		if _, ok := to[fromDonID]; !ok {
-			to[fromDonID] = make([]*jobv1.ProposeJobRequest, 0)
-		}
-		to[fromDonID] = append(to[fromDonID], fromJobSpecs...)
-	}
-}
+// func mergeJobSpecSlices(from, to cre.DonsToJobSpecs) {
+// 	for fromDonID, fromJobSpecs := range from {
+// 		if _, ok := to[fromDonID]; !ok {
+// 			to[fromDonID] = make([]*jobv1.ProposeJobRequest, 0)
+// 		}
+// 		to[fromDonID] = append(to[fromDonID], fromJobSpecs...)
+// 	}
+// }
 
 func prepareKeystoneConfigurationInput(input SetupInput, homeChainSelector uint64, topology *cre.Topology, updatedNodeSets []*cre.CapabilitiesAwareNodeSet, cldEnvironment *cldf.Environment, deployKeystoneContractsOutput *crecontracts.DeployKeystoneContractsOutput, startBlockchainsOutput StartBlockchainsOutput) (*cre.ConfigureKeystoneInput, error) {
 	configureKeystoneInput := cre.ConfigureKeystoneInput{
@@ -500,15 +501,15 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 	input.JdInput.Out = jdOutput
 }
 
-func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*devenv.DON, topology *cre.Topology) (*cre.Environment, error) {
-	creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
-	if donsErr != nil {
-		return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")
-	}
+func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*don.DON, t *cre.Topology) (*Environment, error) {
+	// creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
+	// if donsErr != nil {
+	// 	return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")
+	// }
 
-	return &cre.Environment{
+	return &Environment{
 		CldfEnvironment: cldfEnv,
-		DonTopology:     cre.NewDonTopology(registryChainSelector, topology, creDons),
+		DonTopology:     topology.NewDonTopology(registryChainSelector, t, dons),
 	}, nil
 }
 
@@ -528,4 +529,9 @@ func newCldfEnvironment(ctx context.Context, singleFileLogger logger.Logger, cld
 	allChainsCLDEnvironment.OperationsBundle = operations.NewBundle(allChainsCLDEnvironment.GetContext, singleFileLogger, operations.NewMemoryReporter())
 
 	return allChainsCLDEnvironment
+}
+
+type Environment struct {
+	CldfEnvironment *cldf.Environment
+	DonTopology     *topology.DonTopology
 }

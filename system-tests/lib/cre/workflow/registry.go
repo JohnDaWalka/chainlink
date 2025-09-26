@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	libformat "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
@@ -41,7 +42,7 @@ func WaitForWorkflowRegistryFiltersRegistration(
 	singleFileLogger logger.Logger,
 	infraType infra.Type,
 	registryChainID uint64,
-	topology *cre.DonTopology,
+	topology *topology.DonTopology,
 	nodeSetInput []*cre.CapabilitiesAwareNodeSet,
 ) error {
 	// we currently have no way of checking if filters were registered, when code runs in CRIB
@@ -232,7 +233,7 @@ func ConfigureWorkflowRegistry(
 }
 
 // waitForAllNodesToHaveExpectedFiltersRegistered manually checks if all WorkflowRegistry filters used by the LogPoller are registered for all nodes. We want to see if this will help with the flakiness.
-func waitForAllNodesToHaveExpectedFiltersRegistered(singeFileLogger logger.Logger, testLogger zerolog.Logger, homeChainID uint64, donTopology *cre.DonTopology, nodeSetInput []*cre.CapabilitiesAwareNodeSet) error {
+func waitForAllNodesToHaveExpectedFiltersRegistered(singeFileLogger logger.Logger, testLogger zerolog.Logger, homeChainID uint64, donTopology *topology.DonTopology, nodeSetInput []*cre.CapabilitiesAwareNodeSet) error {
 	for donIdx, don := range donTopology.ToDonMetadata() {
 		if !flags.HasFlag(don.Flags, cre.WorkflowDON) {
 			continue

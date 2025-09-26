@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr/donlevel"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -60,7 +61,7 @@ func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[s
 	}
 }
 
-func jobSpec(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+func jobSpec(input *jobs.JobSpecInput) (cre.DonsToJobSpecs, error) {
 	var generateJobSpec = func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
 

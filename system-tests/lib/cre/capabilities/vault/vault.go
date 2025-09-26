@@ -74,15 +74,15 @@ func EncryptSecret(secret, masterPublicKeyStr string) (string, error) {
 	return hex.EncodeToString(cipherBytes), nil
 }
 
-func jobSpec(chainID uint64) cre.JobSpecFn {
-	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+func jobSpec(chainID uint64) jobs.JobSpecFn {
+	return func(input *jobs.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		if input.DonTopology == nil {
 			return nil, errors.New("topology is nil")
 		}
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
 		// return early if no DON has the vault capability
-		if !don.AnyDonHasCapability(input.DonTopology.Dons.DonMetadata, flag) {
+		if !don.AnyDonHasCapability(input.DonTopology.ToDonMetadata(), flag) {
 			return donToJobSpecs, nil
 		}
 
@@ -108,7 +108,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			return nil, errors.Wrap(err, "failed to get DKG address")
 		}
 
-		for _, donMetadata := range input.DonTopology.Dons.DonMetadata {
+		for _, donMetadata := range input.DonTopology.ToDonMetadata() {
 			if !flags.HasFlag(donMetadata.Flags, flag) {
 				continue
 			}

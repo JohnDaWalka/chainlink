@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 )
 
 func JobNamer(chainID uint64, flag cre.CapabilityFlag) string {
@@ -27,7 +28,7 @@ func CapabilityEnabler(_ *cre.DonMetadata, nodeSet *cre.CapabilitiesAwareNodeSet
 	return true
 }
 
-func EnabledChainsProvider(donTopology *cre.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
+func EnabledChainsProvider(donTopology *topology.DonTopology, nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) []uint64 {
 	// for chain-level capabilities, we need to return the list of chains the capability is enabled for
 	chainCapConfig, ok := nodeSetInput.ChainCapabilities[flag]
 	if !ok || chainCapConfig == nil {

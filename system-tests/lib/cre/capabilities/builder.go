@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 )
 
 type registryConfigFns struct {
@@ -13,7 +14,7 @@ type registryConfigFns struct {
 
 type Capability struct {
 	flag                      cre.CapabilityFlag
-	jobSpecFn                 cre.JobSpecFn
+	jobSpecFn                 jobs.JobSpecFn
 	nodeConfigFn              cre.NodeConfigTransformerFn
 	gatewayJobHandlerConfigFn cre.GatewayHandlerConfigFn
 	registryConfigFns         *registryConfigFns
@@ -24,7 +25,7 @@ func (c *Capability) Flag() cre.CapabilityFlag {
 	return c.flag
 }
 
-func (c *Capability) JobSpecFn() cre.JobSpecFn {
+func (c *Capability) JobSpecFn() jobs.JobSpecFn {
 	return c.jobSpecFn
 }
 
@@ -52,7 +53,7 @@ func (c *Capability) CapabilityRegistryV2ConfigFn() cre.CapabilityRegistryConfig
 
 type Option func(*Capability)
 
-func WithJobSpecFn(jobSpecFn cre.JobSpecFn) Option {
+func WithJobSpecFn(jobSpecFn jobs.JobSpecFn) Option {
 	return func(c *Capability) {
 		c.jobSpecFn = jobSpecFn
 	}

@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
-func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) cre.JobSpecFn {
-	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) jobs.JobSpecFn {
+	return func(input *jobs.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		if input.DonTopology == nil {
 			return nil, errors.New("topology is nil")
 		}

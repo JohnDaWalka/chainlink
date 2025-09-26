@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr/chainlevel"
 )
@@ -185,8 +186,8 @@ func buildRuntimeValues(chainID uint64, networkFamily, creForwarderAddress, node
 	}
 }
 
-func jobSpecWithRegistryChainSelector(registryChainSelector uint64) cre.JobSpecFn {
-	return func(input *cre.JobSpecInput) (cre.DonsToJobSpecs, error) {
+func jobSpecWithRegistryChainSelector(registryChainSelector uint64) jobs.JobSpecFn {
+	return func(input *jobs.JobSpecInput) (cre.DonsToJobSpecs, error) {
 		generateJobSpec := func(logger zerolog.Logger, chainID uint64, nodeAddress string, mergedConfig map[string]any) (string, error) {
 			cs, ok := chainselectors.EvmChainIdToChainSelector()[chainID]
 			if !ok {

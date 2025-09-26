@@ -21,6 +21,7 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 )
 
 const (
@@ -36,7 +37,7 @@ type EnvArtifact struct {
 	DONs          []DonArtifact                                        `json:"dons"`
 	Bootstrappers []BootstrapNodeArtifact                              `json:"bootstrappers"`
 	NOPs          []NOPArtifact                                        `json:"nops"`
-	Topology      cre.DonTopology                                      `json:"topology"`
+	Topology      topology.DonTopology                                 `json:"topology"`
 }
 
 type NodesArtifact struct {
@@ -197,7 +198,7 @@ func DumpArtifact(
 	datastore datastore.AddressRefStore,
 	addressBook cldf_deployment.AddressBook,
 	jdOutput jd.Output,
-	donTopology cre.DonTopology,
+	donTopology topology.DonTopology,
 	offchainClient cldf_offchain.Client,
 	capabilityRegistryFns []cre.CapabilityRegistryConfigFn,
 	nodeSets []*cre.CapabilitiesAwareNodeSet,
@@ -219,7 +220,7 @@ func GenerateArtifact(
 	ds datastore.AddressRefStore,
 	addressBook cldf_deployment.AddressBook,
 	jdOutput jd.Output,
-	donTopology cre.DonTopology,
+	donTopology topology.DonTopology,
 	offchainClient cldf_offchain.Client,
 	capabilityRegistryFns []cre.CapabilityRegistryConfigFn,
 	nodeSets []*cre.CapabilitiesAwareNodeSet,
@@ -292,8 +293,8 @@ func GenerateArtifact(
 		}
 
 		var nodeIDs []string
-		for _, node := range donTopology.Dons.List()[donIdx].Nodes {
-			nodeIDs = append(nodeIDs, node.NodeID)
+		for _, node := range donTopology.Dons[donIdx].Nodes {
+			nodeIDs = append(nodeIDs, node.JobDistributorDetails.NodeID)
 		}
 
 		artifact.Nodes[don.Name] = NodesArtifact{

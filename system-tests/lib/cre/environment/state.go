@@ -17,10 +17,12 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/topology"
 )
 
 // BuildFromSavedState rebuilds the CLDF environment and per‑chain clients from
@@ -94,15 +96,15 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 
 	allNodeInfo := make([]devenv.NodeInfo, 0)
 	allNodeIDs := make([]string, 0)
-	devenvDons := make([]*devenv.DON, 0, len(envArtifact.DONs))
+	devenvDons := make([]*don.DON, 0, len(envArtifact.DONs))
 
-	for idx, don := range envArtifact.DONs {
-		_, ok := envArtifact.Nodes[don.DonName]
+	for idx, d := range envArtifact.DONs {
+		_, ok := envArtifact.Nodes[d.DonName]
 		if !ok {
-			return nil, nil, errors.Errorf("no nodes found for don %s", don.DonName)
+			return nil, nil, errors.Errorf("no nodes found for don %s", d.DonName)
 		}
 
-		for id := range envArtifact.Nodes[don.DonName].Nodes {
+		for id := range envArtifact.Nodes[d.DonName].Nodes {
 			allNodeIDs = append(allNodeIDs, id)
 		}
 
@@ -112,9 +114,9 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			bootstrapNodesCount = 1
 		}
 
-		nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, don.DonID, bootstrapNodesCount)
+		nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, d.DonID, bootstrapNodesCount)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
+			return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", d.DonName)
 		}
 		offChain, offChainErr := devenv.NewJDClient(ctx, devenv.JDConfig{
 			WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
@@ -123,16 +125,16 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			NodeInfo: nodeInfo,
 		})
 		if offChainErr != nil {
-			return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", don.DonName)
+			return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", d.DonName)
 		}
 
 		jd, ok := offChain.(*devenv.JobDistributor)
 		if !ok {
-			return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", don.DonName)
+			return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", d.DonName)
 		}
-		registeredDon, donErr := devenv.NewRegisteredDON(ctx, nodeInfo, *jd)
+		registeredDon, donErr := don.NewDON(ctx, nodeInfo, jd)
 		if donErr != nil {
-			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
+			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", d.DonName)
 		}
 
 		devenvDons = append(devenvDons, registeredDon)
@@ -144,10 +146,13 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		return nil, nil, errors.Wrapf(metaErr, "failed to recreate dons metadata from artifact")
 	}
 
-	dons, donsErr := cre.NewDons(donsMetadata, devenvDons)
-	if donsErr != nil {
-		return nil, nil, errors.Wrapf(donsErr, "failed to create Dons from metadata")
-	}
+	// FIX ME
+	// dons, donsErr := cre.NewDons(donsMetadata, devenvDons)
+	// if donsErr != nil {
+	// 	return nil, nil, errors.Wrapf(donsErr, "failed to create Dons from metadata")
+	// }
+
+	_ = donsMetadata
 
 	offChain, offChainErr := devenv.NewJDClient(ctx, devenv.JDConfig{
 		WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
@@ -161,7 +166,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 
 	chainConfigs := make([]devenv.ChainConfig, 0, len(wrappedBlockchainOutputs))
 	for _, output := range wrappedBlockchainOutputs {
-		cfg, cfgErr := cre.ChainConfigFromWrapped(output)
+		cfg, cfgErr := devenv.ChainConfigFromWrapped(output)
 		if cfgErr != nil {
 			return nil, nil, errors.Wrapf(cfgErr, "failed to build chain config from write for blockchain %s", output.BlockchainOutput.Family)
 		}
@@ -187,14 +192,14 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		blockChains,
 	)
 
-	topology, tErr := cre.NewTopology(cachedInput.NodeSets, *cachedInput.Infra)
+	t, tErr := cre.NewTopology(cachedInput.NodeSets, *cachedInput.Infra)
 	if tErr != nil {
 		return nil, nil, errors.Wrap(tErr, "failed to recreate topology from artifact")
 	}
 
 	return &cre.Environment{
 		CldfEnvironment: cldEnv,
-		DonTopology:     cre.NewDonTopology(envArtifact.Topology.HomeChainSelector, topology, dons),
+		DonTopology:     topology.NewDonTopology(envArtifact.Topology.HomeChainSelector, t, dons),
 	}, wrappedBlockchainOutputs, nil
 }
 
