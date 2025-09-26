@@ -3,7 +3,6 @@ package secrets
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -69,30 +68,30 @@ func (n NodeKeys) CleansedPeerID() string {
 	if n.P2PKey == nil {
 		return ""
 	}
-	return strings.TrimPrefix(string(n.P2PKey.PeerID.String()), "p2p_")
+	return strings.TrimPrefix(n.P2PKey.PeerID.String(), "p2p_")
 }
 
 func (n *NodeKeys) ToNodeSecretsTOML() (string, error) {
-	nodeSecret := nodeSecret{}
+	ns := nodeSecret{}
 
 	if n.P2PKey != nil {
-		nodeSecret.P2PKey = nodeP2PKey{
+		ns.P2PKey = nodeP2PKey{
 			JSON:     string(n.P2PKey.EncryptedJSON),
 			Password: n.P2PKey.Password,
 		}
 	}
 
 	if n.DKGKey != nil {
-		nodeSecret.DKGRecipientKey = nodeDKGRecipientKey{
+		ns.DKGRecipientKey = nodeDKGRecipientKey{
 			JSON:     string(n.DKGKey.EncryptedJSON),
 			Password: n.DKGKey.Password,
 		}
 	}
 
 	if n.EVM != nil {
-		nodeSecret.EthKeys = nodeEthKeyWrapper{}
+		ns.EthKeys = nodeEthKeyWrapper{}
 		for chainID, evmKeys := range n.EVM {
-			nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, nodeEthKey{
+			ns.EthKeys.EthKeys = append(ns.EthKeys.EthKeys, nodeEthKey{
 				JSON:     string(evmKeys.EncryptedJSON),
 				Password: evmKeys.Password,
 				ChainID:  chainID,
@@ -101,9 +100,9 @@ func (n *NodeKeys) ToNodeSecretsTOML() (string, error) {
 	}
 
 	if n.Solana != nil {
-		nodeSecret.SolKeys = nodeSolKeyWrapper{}
+		ns.SolKeys = nodeSolKeyWrapper{}
 		for chainID, solKeys := range n.Solana {
-			nodeSecret.SolKeys.SolKeys = append(nodeSecret.SolKeys.SolKeys, nodeSolKey{
+			ns.SolKeys.SolKeys = append(ns.SolKeys.SolKeys, nodeSolKey{
 				JSON:     string(solKeys.EncryptedJSON),
 				Password: solKeys.Password,
 				ChainID:  chainID,
@@ -111,7 +110,7 @@ func (n *NodeKeys) ToNodeSecretsTOML() (string, error) {
 		}
 	}
 
-	nodeSecretString, err := toml.Marshal(nodeSecret)
+	nodeSecretString, err := toml.Marshal(ns)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal node secrets")
 	}
@@ -240,7 +239,7 @@ func ImportNodeKeys(secretsToml string) (*NodeKeys, error) {
 	}
 
 	if sSecrets.P2PKey.JSON == nil || sSecrets.P2PKey.Password == nil {
-		return nil, fmt.Errorf("P2P key or password is nil")
+		return nil, errors.New("P2P key or password is nil")
 	}
 
 	peerID, peerIDErr := publicP2PAddressFromEncryptedJSON(*sSecrets.P2PKey.JSON)
@@ -273,7 +272,7 @@ func ImportNodeKeys(secretsToml string) (*NodeKeys, error) {
 
 	for _, evmKey := range sSecrets.EVM.Keys {
 		if evmKey.JSON == nil || evmKey.Password == nil || evmKey.ID == nil {
-			return nil, fmt.Errorf("EVM key or password or ID is nil")
+			return nil, errors.New("EVM key or password or ID is nil")
 		}
 
 		publicEVMAddress, publicEVMAddressErr := publicEVMAddressFromEncryptedJSON(*evmKey.JSON)
@@ -294,7 +293,7 @@ func ImportNodeKeys(secretsToml string) (*NodeKeys, error) {
 
 	for _, solKey := range sSecrets.Solana.Keys {
 		if solKey.JSON == nil || solKey.Password == nil || solKey.ID == nil {
-			return nil, fmt.Errorf("solana key or password or id is nil")
+			return nil, errors.New("solana key or password or id is nil")
 		}
 
 		publicSolAddr, addrErr := publicSolKeyFromEncryptedJSON(*solKey.JSON)

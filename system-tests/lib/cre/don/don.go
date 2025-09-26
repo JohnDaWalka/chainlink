@@ -161,7 +161,10 @@ func findSupportedChainsForDON(donMetadata *cre.DonMetadata, blockchainOutputs [
 	chains := make([]devenv.ChainConfig, 0)
 
 	for chainSelector, bcOut := range blockchainOutputs {
-		if !slices.Contains(donMetadata.EVMChains(), bcOut.ChainID) && !(flags.HasFlagForAnyChain(donMetadata.Flags, cre.WriteSolanaCapability) && strings.EqualFold(bcOut.BlockchainOutput.Family, chainselectors.FamilySolana)) {
+		hasEVMChainEnabled := slices.Contains(donMetadata.EVMChains(), bcOut.ChainID)
+		hasSolanaWriteCapability := flags.HasFlagForAnyChain(donMetadata.Flags, cre.WriteSolanaCapability)
+		chainIsSolana := strings.EqualFold(bcOut.BlockchainOutput.Family, chainselectors.FamilySolana)
+		if !hasEVMChainEnabled && (!hasSolanaWriteCapability || !chainIsSolana) {
 			continue
 		}
 

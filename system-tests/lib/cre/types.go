@@ -854,12 +854,15 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 
 func newNodes(cfgs []NodeMetadataConfig) ([]*NodeMetadata, error) {
 	nodes := make([]*NodeMetadata, len(cfgs))
+
 	for i := range nodes {
 		node, err := NewNodeMetadata(cfgs[i])
 		if err != nil {
+			return nil, fmt.Errorf("failed to create node (index: %d): %w", i, err)
 		}
 		nodes[i] = node
 	}
+
 	return nodes, nil
 }
 
@@ -950,7 +953,7 @@ func (c *CapabilitiesAwareNodeSet) EVMChains() []uint64 {
 	}
 
 	// deduplicate
-	var out []uint64
+	out := []uint64{}
 	for chainID := range t {
 		out = append(out, chainID)
 	}
@@ -1172,7 +1175,6 @@ func NewNodeKeys(input NodeKeyInput) (*secrets.NodeKeys, error) {
 				return nil, fmt.Errorf("failed to generate EVM keys: %w", err)
 			}
 			out.EVM[chainID] = k
-
 		}
 	}
 

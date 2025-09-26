@@ -147,7 +147,7 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		}
 
 		if typedConfig.Solana[0].ChainID == nil {
-			return nil, fmt.Errorf("Solana chainID is nil for node at index %d", workerNode.Index)
+			return nil, fmt.Errorf("solana chainID is nil for node at index %d", workerNode.Index)
 		}
 
 		var solCfg solcfg.WorkflowConfig
