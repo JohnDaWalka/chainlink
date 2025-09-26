@@ -260,11 +260,10 @@ func addWorkerNodeConfig(
 	}
 
 	if flags.HasFlag(donFlags, cre.WorkflowDON) || don.NodeNeedsAnyGateway(donFlags) {
-		ethKey, ok := m.Keys.EVM[commonInputs.registryChainID]
+		evmKey, ok := m.Keys.EVM[commonInputs.registryChainID]
 		if !ok {
-			return existingConfig, errors.Errorf("no ETH address found for node for chain %d", commonInputs.registryChainID)
+			return existingConfig, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", commonInputs.registryChainID, m.Index)
 		}
-		nodeEthAddr := ethKey.PublicAddress.Hex()
 
 		gateways := []coretoml.ConnectorGateway{}
 		if gatewayConnector != nil && len(gatewayConnector.Configurations) > 0 {
@@ -281,7 +280,7 @@ func addWorkerNodeConfig(
 			existingConfig.Capabilities.GatewayConnector = coretoml.GatewayConnector{
 				DonID:             ptr.Ptr(donName),
 				ChainIDForNodeKey: ptr.Ptr(strconv.FormatUint(commonInputs.registryChainID, 10)),
-				NodeAddress:       ptr.Ptr(nodeEthAddr),
+				NodeAddress:       ptr.Ptr(evmKey.PublicAddress.Hex()),
 				Gateways:          gateways,
 			}
 		}

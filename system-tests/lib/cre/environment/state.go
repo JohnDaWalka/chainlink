@@ -136,7 +136,6 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
 		}
 
-		// envArtifact.Topology.Dons.Metadata()[idx].DON = registeredDon
 		devenvDons = append(devenvDons, registeredDon)
 		allNodeInfo = append(allNodeInfo, nodeInfo...)
 	}

@@ -52,11 +52,11 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 				return nil, errors.Wrap(err, "failed to get home chain id from selector")
 			}
 			for i, workerNode := range workerNode {
-				k, ok := workerNode.Keys.EVM[chainID]
+				evmKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", workerNode.Host, chainID)
+					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 				}
-				ethAddresses[i] = k.PublicAddress.Hex()
+				ethAddresses[i] = evmKey.PublicAddress.Hex()
 			}
 
 			handlers := map[string]string{}

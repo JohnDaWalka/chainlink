@@ -112,11 +112,11 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 			}
 			evmData.ForwarderAddress = forwarderAddress.Hex()
 
-			k, ok := workerNode.Keys.EVM[chainID]
+			evmKey, ok := workerNode.Keys.EVM[chainID]
 			if !ok {
-				return nil, fmt.Errorf("failed to get ETH address for chainID %d selector %d for node at index %d", chainID, chain.Selector, workerNode.Index)
+				return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 			}
-			evmData.FromAddress = k.PublicAddress
+			evmData.FromAddress = evmKey.PublicAddress
 
 			var mergeErr error
 			evmData, mergeErr = mergeDefaultAndRuntimeConfigValues(evmData, input.CapabilityConfigs, input.NodeSet.ChainCapabilities, chainID)

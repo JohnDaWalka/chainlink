@@ -116,9 +116,9 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				ethKey, ok := workerNode.Keys.EVM[chainID]
+				evmKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainID)
+					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 				}
 
 				ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
@@ -133,8 +133,8 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 				}
 
 				// we pass here bundles for all chains to enable multi-chain signing
-				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringCfg, chainID))
-				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringCfg, chainID))
+				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringCfg, chainID))
+				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringCfg, chainID))
 			}
 		}
 

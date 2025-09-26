@@ -247,7 +247,7 @@ func GenerateArtifact(
 		Topology:      donTopology,
 	}
 
-	for i, don := range donTopology.ToDonMetadata() {
+	for donIdx, don := range donTopology.ToDonMetadata() {
 		donArtifact := DonArtifact{
 			DonName:        don.Name,
 			DonID:          don.ID,
@@ -268,7 +268,7 @@ func GenerateArtifact(
 				continue
 			}
 
-			capabilitiesFn, capabilitiesFnErr := capabilityFn(don.Flags, nodeSets[i])
+			capabilitiesFn, capabilitiesFnErr := capabilityFn(don.Flags, nodeSets[donIdx])
 			if capabilitiesFnErr != nil {
 				return nil, pkgerrors.Wrap(capabilitiesFnErr, "failed to get capabilities from capability registry function")
 			}
@@ -286,13 +286,13 @@ func GenerateArtifact(
 		}
 
 		nop := NOPArtifact{
-			ID:    i + 1, // NOP IDs start from 1
+			ID:    donIdx + 1, // NOP IDs start from 1
 			Name:  fmt.Sprintf("NOP for %s DON", don.Name),
-			Admin: fmt.Sprintf("%s%06d", NOPAdminPrefix, i+1),
+			Admin: fmt.Sprintf("%s%06d", NOPAdminPrefix, donIdx+1),
 		}
 
 		var nodeIDs []string
-		for _, node := range donTopology.Dons.List()[i].Nodes {
+		for _, node := range donTopology.Dons.List()[donIdx].Nodes {
 			nodeIDs = append(nodeIDs, node.NodeID)
 		}
 

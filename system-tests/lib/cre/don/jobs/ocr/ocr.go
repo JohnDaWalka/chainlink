@@ -145,7 +145,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 
 				ethKey, ok := workerNode.Keys.EVM[chainIDUint64]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainIDUint64)
+					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainIDUint64, workerNode.Index)
 				}
 				transmitterAddress := ethKey.PublicAddress.Hex()
 
@@ -154,7 +154,7 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 					return nil, errors.Wrap(kbErr, "failed to get ocr families bundle id from worker node labels")
 				}
 
-				keyBundle, ok := bundlesPerFamily["evm"] // we can always expect evm bundle key id present since evm is registry chain
+				keyBundle, ok := bundlesPerFamily[chainsel.FamilyEVM] // we can always expect evm bundle key id present since evm is the registry chain
 				if !ok {
 					return nil, errors.New("failed to get key bundle id for evm family")
 				}

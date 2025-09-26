@@ -186,6 +186,7 @@ const (
 	CapabilityLabelKey = "capability"
 )
 
+// TODO stop using index to identify nodes, use some unique ID instead
 type (
 	NodeIndexToConfigOverride  = map[int]string
 	NodeIndexToSecretsOverride = map[int]string
@@ -520,7 +521,6 @@ func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provi
 		}
 
 		cfg := NodeMetadataConfig{
-			Labels: []*Label{},
 			Keys: NodeKeyInput{
 				EVMChainIDs:     c.EVMChains(),
 				SolanaChainIDs:  c.SupportedSolChains,
@@ -674,8 +674,8 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 	return slices.Contains(m.Flags, WorkflowDON)
 }
 
-// TODO remove later on or rething it. Probably when we move devenv.DON here
-// we could add to it all the metadata we need and avoid this struct altogether
+// TODO Refactor later on. Probably when we introduce our own DON struct
+// we could add to it all the metadata we need and avoid this wrapper struct altogether
 type Dons struct {
 	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
 	dons        []*devenv.DON
@@ -733,7 +733,7 @@ func (m DonsMetadata) validate() error {
 		return errors.New("at least one nodeSet must have a bootstrap node")
 	}
 
-	wfDon, err := m.GetWorkflowDON()
+	wfDon, err := m.WorkflowDON()
 	if err != nil {
 		return fmt.Errorf("failed to get workflow DON: %w", err)
 	}
@@ -778,42 +778,9 @@ func (m DonsMetadata) FindByID(id uint64) (*DonMetadata, error) {
 	return nil, fmt.Errorf("don with id %d not found", id)
 }
 
-func (m DonsMetadata) FindByName(name string) (*DonMetadata, error) {
-	for _, don := range m.dons {
-		if strings.EqualFold(don.Name, name) {
-			return don, nil
-		}
-	}
-	return nil, fmt.Errorf("don with name %s not found", name)
-}
-
-func (m DonsMetadata) FindByFlag(flag string) (*DonsMetadata, error) {
-	dons := make([]*DonMetadata, 0)
-	for _, don := range m.dons {
-		if slices.Contains(don.Flags, flag) {
-			dons = append(dons, don)
-		}
-	}
-	if len(dons) == 0 {
-		return nil, fmt.Errorf("no dons with flag %s found", flag)
-	}
-	return NewDonsMetadata(dons, m.infra)
-}
-
-func (m DonsMetadata) GetOneByFlag(flag string) (*DonMetadata, error) {
-	m2, err := m.FindByFlag(flag)
-	if err != nil {
-		return nil, err
-	}
-	if len(m2.dons) > 1 {
-		return nil, fmt.Errorf("multiple dons with flag %s found", flag)
-	}
-	return m2.dons[0], nil
-}
-
-// GetWorkflowDON returns the DON with the WorkflowDON flag. Returns an error if
+// WorkflowDON returns the DON with the WorkflowDON flag. Returns an error if
 // there is not exactly one such DON. Currently, the WorkflowDON flag is required on exactly one DON.
-func (m DonsMetadata) GetWorkflowDON() (*DonMetadata, error) {
+func (m DonsMetadata) WorkflowDON() (*DonMetadata, error) {
 	// don't use flag b/c may not be set
 	for _, don := range m.dons {
 		if don.IsWorkflowDON() {
@@ -868,11 +835,10 @@ func (n *NodeMetadata) HasRole(role string) bool {
 }
 
 type NodeMetadataConfig struct {
-	Labels []*Label
-	Keys   NodeKeyInput
-	Host   string
-	Roles  []string
-	Index  int
+	Keys  NodeKeyInput
+	Host  string
+	Roles []string
+	Index int
 }
 
 func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
@@ -881,13 +847,8 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 		return nil, err
 	}
 
-	labels := c.Labels
-	if labels == nil {
-		labels = make([]*Label, 0)
-	}
-
 	return &NodeMetadata{
-		Labels: labels,
+		Labels: make([]*Label, 0),
 		Keys:   keys,
 		Host:   c.Host,
 		Roles:  c.Roles,
@@ -916,7 +877,8 @@ func NewDonTopology(registryChainSelector uint64, topology *Topology, dons *Dons
 	}
 }
 
-// TODO make a constructor from Topology and find better names. It should expose some of the same methods as Topology does, e.g. GetWorkflowDON, GetBootstrapNode, etc.
+// TODO refactor it to only contain []DON, once we have our own DON struct
+// and maybe the GatewayConnectorOutput
 type DonTopology struct {
 	WorkflowDonID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
 	HomeChainSelector      uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`

@@ -52,7 +52,7 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provid
 		return nil, fmt.Errorf("failed to create DONs metadata: %w", err)
 	}
 
-	wfDon, err := donsMetadata.GetWorkflowDON()
+	wfDon, err := donsMetadata.WorkflowDON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get workflow DON: %w", err)
 	}
@@ -75,6 +75,21 @@ func NewTopology(nodeSetInput []*CapabilitiesAwareNodeSet, provider infra.Provid
 		}
 	}
 
+	bootstrapNodesFound := 0
+	for _, don := range topology.DonsMetadata.List() {
+		if don.ContainsBootstrapNode() {
+			bootstrapNodesFound++
+		}
+	}
+
+	if bootstrapNodesFound == 0 {
+		return nil, errors.New("no bootstrap nodes found in topology. At least one bootstrap node is required")
+	}
+
+	if bootstrapNodesFound > 1 {
+		return nil, errors.New("multiple bootstrap nodes found in topology. Only one bootstrap node is supported due to the limitations of the local environment")
+	}
+
 	return topology, nil
 }
 
@@ -93,8 +108,6 @@ func (t *Topology) BootstrapNode() (*NodeMetadata, error) {
 	return t.DonsMetadata.BootstrapNode()
 }
 
-// TODO i don't this think is actually used in so much as it seems to be overwritten in other places
-// The keys should be set by the secret generator and are independent of the topology abstraction
 func PeeringCfgs(bt *NodeMetadata) (CapabilitiesPeeringData, OCRPeeringData, error) {
 	p := bt.Keys.CleansedPeerID()
 	if p == "" {

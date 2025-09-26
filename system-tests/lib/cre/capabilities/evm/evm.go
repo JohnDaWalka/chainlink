@@ -276,7 +276,6 @@ func transformNodeConfig(input cre.GenerateConfigsInput, existingConfigs cre.Nod
 		return nil, errors.New("additional capabilities configs are nil, but are required to configure the evm capability")
 	}
 
-	// workerNodes, wErr := node.FindManyWithLabel(input.DonMetadata.NodesMetadata, &cre.Label{Key: node.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
 	workerNodes, wErr := input.DonMetadata.WorkerNodes()
 	if wErr != nil {
 		return nil, errors.Wrap(wErr, "failed to find worker nodes")
@@ -332,11 +331,11 @@ func findNodeAddressPerChain(input cre.GenerateConfigsInput, workerNode *cre.Nod
 	// get all the forwarders and add workflow config (FromAddress) for chains that have evm enabled
 	data := make(map[uint64]common.Address)
 	for _, chainID := range input.NodeSet.ChainCapabilities[flag].EnabledChains {
-		ethKey, ok := workerNode.Keys.EVM[chainID]
+		evmKey, ok := workerNode.Keys.EVM[chainID]
 		if !ok {
-			return nil, errors.Errorf("no EVM key found for chain ID %d for node", chainID)
+			return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 		}
-		data[chainID] = ethKey.PublicAddress
+		data[chainID] = evmKey.PublicAddress
 	}
 
 	return data, nil

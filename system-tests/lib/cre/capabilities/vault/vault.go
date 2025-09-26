@@ -108,14 +108,13 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			return nil, errors.Wrap(err, "failed to get DKG address")
 		}
 
-		for _, donWithMetadata := range input.DonTopology.Dons.DonMetadata {
-			if !flags.HasFlag(donWithMetadata.Flags, flag) {
+		for _, donMetadata := range input.DonTopology.Dons.DonMetadata {
+			if !flags.HasFlag(donMetadata.Flags, flag) {
 				continue
 			}
 
 			// create job specs for the worker nodes
-			// workflowNodeSet, err := node.FindManyWithLabel(donWithMetadata.NodesMetadata, &cre.Label{Key: cre.NodeTypeKey, Value: cre.WorkerNode}, node.EqualLabels)
-			workerNodes, wErr := donWithMetadata.WorkerNodes()
+			workerNodes, wErr := donMetadata.WorkerNodes()
 			if wErr != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(wErr, "failed to find worker nodes")
@@ -137,7 +136,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			}
 
 			// create job specs for the bootstrap node
-			donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "vault-capability", vaultCapabilityAddress.Address, chainID))
+			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "vault-capability", vaultCapabilityAddress.Address, chainID))
 
 			for _, workerNode := range workerNodes {
 				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
@@ -145,9 +144,9 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
 				}
 
-				ethKey, ok := workerNode.Keys.EVM[chainID]
+				evmKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have EVM key for chainID %d", nodeID, chainID)
+					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 				}
 
 				ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
@@ -160,7 +159,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 					return nil, errors.New("key bundle ID for evm family is not found")
 				}
 
-				donToJobSpecs[donWithMetadata.ID] = append(donToJobSpecs[donWithMetadata.ID], jobs.WorkerVaultOCR3(nodeID, vaultCapabilityAddress.Address, dkgAddress.Address, ethKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringData, chainID))
+				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.WorkerVaultOCR3(nodeID, vaultCapabilityAddress.Address, dkgAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringData, chainID))
 			}
 		}
 
