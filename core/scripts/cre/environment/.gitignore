@@ -32,3 +32,5 @@ bin/
 artifact_paths.json
 *.b64
 state/
+
+configs/devenv/**

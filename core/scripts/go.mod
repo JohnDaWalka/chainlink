@@ -30,7 +30,7 @@ require (
 	github.com/docker/docker v28.3.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/ethereum/go-ethereum v1.16.2
-	github.com/gkampitakis/go-snaps v0.5.13
+	github.com/gkampitakis/go-snaps v0.5.15
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0

@@ -238,7 +238,7 @@ require (
 	github.com/gin-gonic/gin v1.10.1 // indirect
 	github.com/gkampitakis/ciinfo v0.3.2 // indirect
 	github.com/gkampitakis/go-diff v1.3.2 // indirect
-	github.com/gkampitakis/go-snaps v0.5.13 // indirect
+	github.com/gkampitakis/go-snaps v0.5.15 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-chi/chi v1.5.5 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect

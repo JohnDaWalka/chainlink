@@ -1,0 +1,147 @@
+bootNodeCount: 1
+nodeCount: 2
+fullnameOverride: base
+networkPolicy:
+    enabled: false
+common:
+    affinity: {}
+    chainlink:
+        v2Config: {}
+    chainlinkNode:
+        enabled: false
+        metadata:
+            annotations:
+                chainlinknode.k8s.chain.link/disable-tls: "false"
+        spec:
+            credentials:
+                config:
+                    api:
+                        key: .api
+                        password: hWDmgcub2gUhyrG6cxriqt7T
+                        user: admin@chain.link
+                    keystore:
+                        key: .keystore
+                        password: cdz7KhvF4ATje2TjrwGMJh2Q
+                    vrf:
+                        key: .vrf
+                        password: cdz7KhvF4ATje2TjrwGMJh2Q
+            database:
+                config:
+                    database: chainlink
+                    host: null
+                    password: JGVgp7M2Emcg7Av8KKVUgMZb
+                    port: "5432"
+                    user: chainlink
+    image:
+        pullPolicy: Always
+        repository: image:latest
+        tag: develop
+    imagePullSecrets: []
+    ingress:
+        annotations: {}
+        enabled: false
+        hosts: []
+        ingressClassName: ""
+    nodeSelector: {}
+    podSecurityContext:
+        runAsGroup: 14933
+        runAsNonRoot: true
+        runAsUser: 14933
+    requiredLabels:
+        app.chain.link/blockchain: multichain
+        app.chain.link/network: multichain
+        app.chain.link/network-type: testnet
+        app.chain.link/product: base
+        app.chain.link/team: infra
+        app.kubernetes.io/component: chainlink
+    resources:
+        limits:
+            cpu: "1"
+            memory: 1Gi
+        requests:
+            cpu: "0.1"
+            memory: 256Mi
+    service:
+        private:
+            type: ClusterIP
+    servicemonitor:
+        enabled: false
+    tolerations: []
+overrides:
+    - chainlinkNode:
+        spec:
+            database:
+                config:
+                    database: ""
+                    host: base-db-bt-0
+                    password: ""
+                    port: ""
+                    user: ""
+    - chainlink:
+        v2Config:
+            99-config-override.toml: |-
+                [Capabilities]
+                [Capabilities.ExternalRegistry]
+                Address = '0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff'
+                ChainID = '1337'
+                NetworkID = 'evm'
+
+                [[EVM]]
+                ChainID = '1337'
+
+                [[EVM.Nodes]]
+                HTTPURL = 'https://crib-local-geth-1337-http.devenv.test'
+                Name = 'anvil'
+                WSURL = 'wss://crib-local-geth-1337-ws.devenv.test'
+      v2Secret:
+        99-secrets-override.toml: |-
+            [EVM]
+            [[EVM.Keys]]
+            JSON = '{"address":"bf04453133a8cb5384a2c1d4f26cd3edf7a88aec"}'
+            Password = ''
+            ID = 1337
+
+            [P2PKey]
+            JSON = '{"keyType":"P2P","publicKey":"8b160c162eb9a17edf539f87a9810a90a663451743875618061ef36b8c494b36"}'
+            Password = ''
+    - chainlinkNode:
+        spec:
+            database:
+                config:
+                    database: ""
+                    host: base-db-0
+                    password: ""
+                    port: ""
+                    user: ""
+    - chainlink:
+        v2Config:
+            99-config-override.toml: |-
+                [Capabilities]
+                [Capabilities.ExternalRegistry]
+                Address = '0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff'
+                ChainID = '1337'
+                NetworkID = 'evm'
+
+                [[EVM]]
+                ChainID = '1337'
+
+                [[EVM.Nodes]]
+                HTTPURL = 'https://crib-local-geth-1337-http.devenv.test'
+                Name = 'anvil'
+                WSURL = 'wss://crib-local-geth-1337-ws.devenv.test'
+      v2Secret:
+        99-secrets-override.toml: |-
+            [EVM]
+            [[EVM.Keys]]
+            JSON = '{"address":"bf04453133a8cb5384a2c1d4f26cd3edf7a88aec"}'
+            Password = ''
+            ID = 1337
+
+            [P2PKey]
+            JSON = '{"keyType":"P2P","publicKey":"8b160c162eb9a17edf539f87a9810a90a663451743875618061ef36b8c494b36"}'
+            Password = ''
+rollout:
+    enabled: false
+serviceAccount:
+    enabled: false
+    name: default
