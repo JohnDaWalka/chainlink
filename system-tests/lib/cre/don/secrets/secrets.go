@@ -17,52 +17,44 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 )
 
-type NodeEthKey struct {
-	JSON     string `toml:"JSON"`
-	Password string `toml:"Password"`
-	ChainID  uint64 `toml:"ID"`
-}
-
-type NodeSolKey struct {
-	JSON     string `toml:"JSON"`
-	Password string `toml:"Password"`
-	ChainID  string `toml:"ID"`
-}
-
-type NodeP2PKey struct {
-	JSON     string `toml:"JSON"`
-	Password string `toml:"Password"`
-}
-
-type NodeDKGRecipientKey struct {
-	JSON     string `toml:"JSON"`
-	Password string `toml:"Password"`
-}
-
-type NodeEthKeyWrapper struct {
-	EthKeys []NodeEthKey `toml:"Keys"`
-}
-
-type NodeSolKeyWrapper struct {
-	SolKeys []NodeSolKey `toml:"Keys"`
-}
-
-type NodeSecret struct {
-	EthKeys         NodeEthKeyWrapper   `toml:"EVM"`
-	SolKeys         NodeSolKeyWrapper   `toml:"Solana"`
-	P2PKey          NodeP2PKey          `toml:"P2PKey"`
-	DKGRecipientKey NodeDKGRecipientKey `toml:"DKGRecipientKey"`
+type nodeSecret struct {
+	EthKeys         nodeEthKeyWrapper   `toml:"EVM"`
+	SolKeys         nodeSolKeyWrapper   `toml:"Solana"`
+	P2PKey          nodeP2PKey          `toml:"P2PKey"`
+	DKGRecipientKey nodeDKGRecipientKey `toml:"DKGRecipientKey"`
 
 	// Add more fields as needed to reflect 'Secrets' struct from /core/config/toml/types.go
 	// We can't use the original struct, because it's using custom types that serialize secrets to 'xxxxx'
 }
 
-func (ns *NodeSecret) Toml() (string, error) {
-	nodeSecretString, err := toml.Marshal(ns)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal node secrets")
-	}
-	return string(nodeSecretString), nil
+type nodeEthKey struct {
+	JSON     string `toml:"JSON"`
+	Password string `toml:"Password"`
+	ChainID  uint64 `toml:"ID"`
+}
+
+type nodeSolKey struct {
+	JSON     string `toml:"JSON"`
+	Password string `toml:"Password"`
+	ChainID  string `toml:"ID"`
+}
+
+type nodeP2PKey struct {
+	JSON     string `toml:"JSON"`
+	Password string `toml:"Password"`
+}
+
+type nodeDKGRecipientKey struct {
+	JSON     string `toml:"JSON"`
+	Password string `toml:"Password"`
+}
+
+type nodeEthKeyWrapper struct {
+	EthKeys []nodeEthKey `toml:"Keys"`
+}
+
+type nodeSolKeyWrapper struct {
+	SolKeys []nodeSolKey `toml:"Keys"`
 }
 
 type NodeKeys struct {
@@ -72,7 +64,7 @@ type NodeKeys struct {
 	DKGKey *crypto.DKGRecipientKey
 }
 
-// returns the PeerID without the "p2p_" prefix, or an empty string if P2PKey is nil
+// CleansedPeerID returns the PeerID without the "p2p_" prefix, or an empty string if P2PKey is nil
 func (n NodeKeys) CleansedPeerID() string {
 	if n.P2PKey == nil {
 		return ""
@@ -80,28 +72,27 @@ func (n NodeKeys) CleansedPeerID() string {
 	return strings.TrimPrefix(string(n.P2PKey.PeerID.String()), "p2p_")
 }
 
-// TODO we should pass nm *cre.NodeMetadata here, but that creates a circular dependency
-func NewNodeSecret(keys *NodeKeys) *NodeSecret {
-	nodeSecret := NodeSecret{}
+func (n *NodeKeys) ToNodeSecretsTOML() (string, error) {
+	nodeSecret := nodeSecret{}
 
-	if keys.P2PKey != nil {
-		nodeSecret.P2PKey = NodeP2PKey{
-			JSON:     string(keys.P2PKey.EncryptedJSON),
-			Password: keys.P2PKey.Password,
+	if n.P2PKey != nil {
+		nodeSecret.P2PKey = nodeP2PKey{
+			JSON:     string(n.P2PKey.EncryptedJSON),
+			Password: n.P2PKey.Password,
 		}
 	}
 
-	if keys.DKGKey != nil {
-		nodeSecret.DKGRecipientKey = NodeDKGRecipientKey{
-			JSON:     string(keys.DKGKey.EncryptedJSON),
-			Password: keys.DKGKey.Password,
+	if n.DKGKey != nil {
+		nodeSecret.DKGRecipientKey = nodeDKGRecipientKey{
+			JSON:     string(n.DKGKey.EncryptedJSON),
+			Password: n.DKGKey.Password,
 		}
 	}
 
-	if keys.EVM != nil {
-		nodeSecret.EthKeys = NodeEthKeyWrapper{}
-		for chainID, evmKeys := range keys.EVM {
-			nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, NodeEthKey{
+	if n.EVM != nil {
+		nodeSecret.EthKeys = nodeEthKeyWrapper{}
+		for chainID, evmKeys := range n.EVM {
+			nodeSecret.EthKeys.EthKeys = append(nodeSecret.EthKeys.EthKeys, nodeEthKey{
 				JSON:     string(evmKeys.EncryptedJSON),
 				Password: evmKeys.Password,
 				ChainID:  chainID,
@@ -109,10 +100,10 @@ func NewNodeSecret(keys *NodeKeys) *NodeSecret {
 		}
 	}
 
-	if keys.Solana != nil {
-		nodeSecret.SolKeys = NodeSolKeyWrapper{}
-		for chainID, solKeys := range keys.Solana {
-			nodeSecret.SolKeys.SolKeys = append(nodeSecret.SolKeys.SolKeys, NodeSolKey{
+	if n.Solana != nil {
+		nodeSecret.SolKeys = nodeSolKeyWrapper{}
+		for chainID, solKeys := range n.Solana {
+			nodeSecret.SolKeys.SolKeys = append(nodeSecret.SolKeys.SolKeys, nodeSolKey{
 				JSON:     string(solKeys.EncryptedJSON),
 				Password: solKeys.Password,
 				ChainID:  chainID,
@@ -120,7 +111,11 @@ func NewNodeSecret(keys *NodeKeys) *NodeSecret {
 		}
 	}
 
-	return &nodeSecret
+	nodeSecretString, err := toml.Marshal(nodeSecret)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to marshal node secrets")
+	}
+	return string(nodeSecretString), nil
 }
 
 // secrets struct mirrors `Secrets` struct in "github.com/smartcontractkit/chainlink/v2/core/config/toml"

@@ -174,7 +174,7 @@ func SetupTestEnvironment(
 		deployKeystoneContractsOutput.Env.DataStore,
 		input.Capabilities,
 		input.CapabilityConfigs,
-		input.CopyCapabilityBinaries,
+		// input.CopyCapabilityBinaries,
 	)
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")
@@ -189,6 +189,8 @@ func SetupTestEnvironment(
 		startBlockchainsOutput.RegistryChain().BlockchainOutput,
 		topology,
 		input.InfraInput,
+		input.CapabilityConfigs,
+		input.CopyCapabilityBinaries,
 		updatedNodeSets,
 	)
 	if donJDErr != nil {
