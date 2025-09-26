@@ -498,11 +498,6 @@ func (g *GenerateConfigsInput) Validate() error {
 	return nil
 }
 
-type ToplogyInput struct {
-	NodeSetInput    []*CapabilitiesAwareNodeSet
-	DonToEthAddress map[uint32][]common.Address
-}
-
 type DonMetadata struct {
 	NodesMetadata []*NodeMetadata `toml:"nodes_metadata" json:"nodes_metadata"`
 	Flags         []string        `toml:"flags" json:"flags"`
@@ -1291,23 +1286,6 @@ func (d *DeployCribBlockchainInput) Validate() error {
 	return nil
 }
 
-type StartNixShellInput struct {
-	InfraInput     *infra.Provider
-	CribConfigsDir string
-	ExtraEnvVars   map[string]string
-	PurgeNamespace bool
-}
-
-func (s *StartNixShellInput) Validate() error {
-	if s.InfraInput == nil {
-		return errors.New("infra input not set")
-	}
-	if s.CribConfigsDir == "" {
-		return errors.New("crib configs dir not set")
-	}
-	return nil
-}
-
 type (
 	CapabilityRegistryConfigFn = func(donFlags []CapabilityFlag, nodeSetInput *CapabilitiesAwareNodeSet) ([]keystone_changeset.DONCapabilityWithConfig, error)
 	JobSpecFn                  = func(input *JobSpecInput) (DonsToJobSpecs, error)
@@ -1321,58 +1299,6 @@ type JobSpecInput struct {
 	CapabilityConfigs         map[string]CapabilityConfig
 	Capabilities              []InstallableCapability
 	CapabilitiesAwareNodeSets []*CapabilitiesAwareNodeSet
-}
-
-type ManageWorkflowWithCRECLIInput struct {
-	DoNotUseCRECLI           bool
-	ShouldCompileNewWorkflow bool
-	ChainSelector            uint64
-	WorkflowName             string
-	WorkflowDonID            uint32
-	WorkflowOwnerAddress     common.Address
-	CRECLIPrivateKey         string
-	CRECLIAbsPath            string
-	CRESettingsFile          *os.File
-	NewWorkflow              *NewWorkflow
-	ExistingWorkflow         *ExistingWorkflow
-	CRECLIProfile            string
-}
-
-type NewWorkflow struct {
-	WorkflowFileName string
-	FolderLocation   string
-	ConfigFilePath   *string
-	SecretsFilePath  *string
-	Secrets          map[string]string
-}
-
-type ExistingWorkflow struct {
-	BinaryURL  string
-	ConfigURL  *string
-	SecretsURL *string
-}
-
-func (w *ManageWorkflowWithCRECLIInput) Validate() error {
-	if w.ChainSelector == 0 {
-		return errors.New("ChainSelector is required")
-	}
-	if w.WorkflowName == "" {
-		return errors.New("WorkflowName is required")
-	}
-	if w.WorkflowDonID == 0 {
-		return errors.New("WorkflowDonID is required")
-	}
-	if w.CRECLIPrivateKey == "" {
-		return errors.New("CRECLIPrivateKey is required")
-	}
-	if w.CRESettingsFile == nil {
-		return errors.New("CRESettingsFile is required")
-	}
-	if w.NewWorkflow != nil && w.ExistingWorkflow != nil {
-		return errors.New("only one of NewWorkflow or ExistingWorkflow can be provided")
-	}
-
-	return nil
 }
 
 // InstallableCapability defines the interface for capabilities that can be dynamically

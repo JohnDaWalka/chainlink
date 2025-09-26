@@ -174,7 +174,6 @@ func SetupTestEnvironment(
 		deployKeystoneContractsOutput.Env.DataStore,
 		input.Capabilities,
 		input.CapabilityConfigs,
-		// input.CopyCapabilityBinaries,
 	)
 	if topoErr != nil {
 		return nil, pkgerrors.Wrap(topoErr, "failed to build topology")
