@@ -12,9 +12,6 @@ import (
 
 var v2RegistriesFlags = []string{"--with-contracts-version", "v2"}
 
-// a template for EVM negative tests names to avoid duplication
-const evmTestNameTemplate = "[v2] EVM.%s fails with %s" // e.g. "[v2] EVM.<Function> fails with <invalid input>"
-
 /*
 To execute tests locally start the local CRE first:
 Inside `core/scripts/cre/environment` directory
@@ -26,20 +23,21 @@ Inside `core/scripts/cre/environment` directory
  6. Execute the tests in `system-tests/tests/smoke/cre` with CTF_CONFIG set to the corresponding topology file:
     `export  CTF_CONFIGS=../../../../core/scripts/cre/environment/configs/<topology>.toml; go test -timeout 15m -run ^Test_CRE_Suite$`.
 */
-func Test_CRE_Suite_V2_Cron_Regression(t *testing.T) {
-	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
+func Test_CRE_V2_Cron_Regression(t *testing.T) {
+	for _, tCase := range cronInvalidSchedulesTests {
+		testName := "[v2] Cron (Beholder) fails when schedule is " + tCase.name
+		t.Run(testName, func(t *testing.T) {
+			testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 
-	t.Run("[v2] CRE Regression Suite", func(t *testing.T) {
-		for _, tCase := range cronInvalidSchedulesTests {
-			testName := "[v2] Cron (Beholder) fails when schedule is " + tCase.name
-			t.Run(testName, func(t *testing.T) {
-				CronBeholderFailsWithInvalidScheduleTest(t, testEnv, tCase.invalidSchedule)
-			})
-		}
-	})
+			CronBeholderFailsWithInvalidScheduleTest(t, testEnv, tCase.invalidSchedule)
+		})
+	}
 }
 
-func Test_CRE_Suite_V2_EVM_BalanceAt_Invalid_Address_Regression(t *testing.T) {
+// a template for EVM negative tests names to avoid duplication
+const evmTestNameTemplate = "[v2] EVM.%s fails with %s" // e.g. "[v2] EVM.<Function> fails with <invalid input>"
+
+func Test_CRE_V2_EVM_BalanceAt_Invalid_Address_Regression(t *testing.T) {
 	for _, tCase := range evmNegativeTestsBalanceAtInvalidAddress {
 		testName := fmt.Sprintf(evmTestNameTemplate, tCase.functionToTest, tCase.name)
 		t.Run(testName, func(t *testing.T) {
@@ -52,7 +50,7 @@ func Test_CRE_Suite_V2_EVM_BalanceAt_Invalid_Address_Regression(t *testing.T) {
 	}
 }
 
-func Test_CRE_Suite_V2_EVM_CallContract_Invalid_Addr_To_Read_Regression(t *testing.T) {
+func Test_CRE_V2_EVM_CallContract_Invalid_Addr_To_Read_Regression(t *testing.T) {
 	for _, tCase := range evmNegativeTestsCallContractInvalidAddressToRead {
 		testName := fmt.Sprintf(evmTestNameTemplate, tCase.functionToTest, tCase.name)
 		t.Run(testName, func(t *testing.T) {
@@ -65,7 +63,7 @@ func Test_CRE_Suite_V2_EVM_CallContract_Invalid_Addr_To_Read_Regression(t *testi
 	}
 }
 
-func Test_CRE_Suite_V2_EVM_CallContract_Invalid_Balance_Reader_Contract_Regression(t *testing.T) {
+func Test_CRE_V2_EVM_CallContract_Invalid_Balance_Reader_Contract_Regression(t *testing.T) {
 	for _, tCase := range evmNegativeTestsCallContractInvalidBalanceReaderContract {
 		testName := fmt.Sprintf(evmTestNameTemplate, tCase.functionToTest, tCase.name)
 		t.Run(testName, func(t *testing.T) {
@@ -78,7 +76,7 @@ func Test_CRE_Suite_V2_EVM_CallContract_Invalid_Balance_Reader_Contract_Regressi
 	}
 }
 
-func Test_CRE_Suite_V2_EVM_EstimateGas_Invalid_To_Address_Regression(t *testing.T) {
+func Test_CRE_V2_EVM_EstimateGas_Invalid_To_Address_Regression(t *testing.T) {
 	for _, tCase := range evmNegativeTestsEstimateGasInvalidToAddress {
 		testName := fmt.Sprintf(evmTestNameTemplate, tCase.functionToTest, tCase.name)
 		t.Run(testName, func(t *testing.T) {
