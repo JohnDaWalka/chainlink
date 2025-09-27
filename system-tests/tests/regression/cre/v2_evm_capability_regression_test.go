@@ -34,15 +34,7 @@ type evmNegativeTest struct {
 	expectedError  string
 }
 
-var evmNegativeTests = []evmNegativeTest{
-	// CallContract - invalid address to read
-	// Some invalid inputs are skipped (empty, symbols, "0x", "0x0") as they may map to the zero address and return a balance instead of empty.
-	{"a letter", "a", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
-	{"a number", "1", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
-	{"short address", "0x123456789012345678901234567890123456789", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
-	{"long address", "0x12345678901234567890123456789012345678901", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
-	{"invalid address", "0x1234567890abcdefg1234567890abcdef123456", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
-
+var evmNegativeTestsCallContractInvalidBalanceReaderContract = []evmNegativeTest{
 	// CallContract - invalid balance reader contract address
 	// TODO: Uncomment tests after https://smartcontract-it.atlassian.net/browse/CRE-943
 	// "empty" will default to the 0-address which is valid but has no contract deployed, so we expect an error.
@@ -55,6 +47,16 @@ var evmNegativeTests = []evmNegativeTest{
 	{"short address", "0x123456789012345678901234567890123456789", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
 	{"long address", "0x12345678901234567890123456789012345678901", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
 	{"invalid address", "0x1234567890abcdefg1234567890abcdef123456", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
+}
+
+var evmNegativeTests = []evmNegativeTest{
+	// CallContract - invalid address to read
+	// Some invalid inputs are skipped (empty, symbols, "0x", "0x0") as they may map to the zero address and return a balance instead of empty.
+	{"a letter", "a", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
+	{"a number", "1", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
+	{"short address", "0x123456789012345678901234567890123456789", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
+	{"long address", "0x12345678901234567890123456789012345678901", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
+	{"invalid address", "0x1234567890abcdefg1234567890abcdef123456", callContractInvalidAddressToReadFunction, expectedCallContractInvalidAddressToRead},
 
 	// EstimateGas - invalid 'to' address
 	// do not use 1, short, long addresses because common.Address will convert them to a valid address

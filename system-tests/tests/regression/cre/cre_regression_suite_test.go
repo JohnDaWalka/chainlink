@@ -48,3 +48,17 @@ func Test_CRE_Suite_V2_EVM_Regression(t *testing.T) {
 		})
 	}
 }
+
+func Test_CRE_Suite_V2_EVM_CallContract_Invalid_Balance_Reader_Contract_Regression(t *testing.T) {
+	flags := []string{"--with-contracts-version", "v2"}
+	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
+	// TODO remove this when OCR works properly with multiple chains in Local CRE
+	testEnv.WrappedBlockchainOutputs = []*cre.WrappedBlockchainOutput{testEnv.WrappedBlockchainOutputs[0]}
+
+	for _, tCase := range evmNegativeTestsCallContractInvalidBalanceReaderContract {
+		testName := fmt.Sprintf("[v2] EVM.%s fails with %s", tCase.functionToTest, tCase.name)
+		t.Run(testName, func(t *testing.T) {
+			EVMReadFailsTest(t, testEnv, tCase)
+		})
+	}
+}

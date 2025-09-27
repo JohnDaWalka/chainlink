@@ -12,7 +12,7 @@ import (
 //////////// SMOKE TESTS /////////////
 // target happy path and sanity checks
 // all other tests (e.g. edge cases, negative conditions)
-// should go to a `regression` package.
+// should go to a `regression` package
 /////////////////////////////////////
 
 /*
@@ -91,7 +91,7 @@ func Test_CRE_Suite_V2(t *testing.T) {
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
 
 	t.Run("[v2] CRE Proof of Reserve (PoR) Test", func(t *testing.T) {
-		priceProvider, wfConfig := beforePoRTest(t, testEnv, "por-workflow", PoRWFV1Location)
+		priceProvider, wfConfig := beforePoRTest(t, testEnv, "por-workflow-v2", PoRWFV2Location)
 		ExecutePoRTest(t, testEnv, priceProvider, wfConfig, false)
 	})
 
