@@ -1396,6 +1396,7 @@ func TestFluxMonitor_RoundTimeoutCausesPoll_timesOutNotZero(t *testing.T) {
 }
 
 func TestFluxMonitor_ConsumeLogBroadcast(t *testing.T) {
+	quarantine.Flaky(t, "DX-1844")
 	quarantine.Flaky(t, "DX-1843")
 	t.Parallel()
 
