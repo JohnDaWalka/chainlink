@@ -3,9 +3,11 @@ package ccip
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +16,7 @@ import (
 	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
+	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
@@ -133,9 +136,6 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 	evmChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyEVM))
 	suiChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySui))
 
-	// Deploy the dummy receiver contract
-	// testhelpers.DeployAptosCCIPReceiver(t, e.Env)
-
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
@@ -160,15 +160,47 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		)
 	)
 
-	// random reciever for now
-	hexStr := "0xd8b8029977e2dc973928917c1801f06f6da928def023cbe40cbda98d517b3fd4"
+	// Deploy SUI Reciever
+	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.DeployDummyReciever{}, sui_cs.DeployDummyRecieverConfig{
+			SuiChainSelector: destChain,
+			McmsOwner:        "0x1",
+		}),
+	})
+	require.NoError(t, err)
 
-	bytes, err := hex.DecodeString(hexStr)
-	if err != nil {
-		panic(err)
-	}
+	rawOutput := output[0].Reports[0]
 
-	receiverByte := bytes
+	outputMap, ok := rawOutput.Output.(sui_ops.OpTxResult[ccipops.DeployDummyReceiverObjects])
+	require.True(t, ok)
+
+	id := strings.TrimPrefix(outputMap.PackageId, "0x")
+	receiverByteDecoded, err := hex.DecodeString(id)
+	require.NoError(t, err)
+
+	// register the reciever
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.RegisterDummyReciever{}, sui_cs.RegisterDummyReceiverConfig{
+			SuiChainSelector:       destChain,
+			CCIPObjectRefObjectId:  state.SuiChains[destChain].CCIPObjectRef,
+			DummyReceiverPackageId: outputMap.PackageId,
+		}),
+	})
+	require.NoError(t, err)
+
+	receiverByte := receiverByteDecoded
+
+	var clockObj [32]byte
+	copy(clockObj[:], hexutil.MustDecode(
+		"0x0000000000000000000000000000000000000000000000000000000000000006",
+	))
+
+	var stateObj [32]byte
+	copy(stateObj[:], hexutil.MustDecode(
+		outputMap.Objects.CCIPReceiverStateObjectId,
+	))
+
+	recieverObjectIds := [][32]byte{clockObj, stateObj}
 
 	t.Run("Message to Sui", func(t *testing.T) {
 		// ccipChainState := state.SuiChains[destChain]
@@ -180,7 +212,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 				ValidationType:         messagingtest.ValidationTypeExec,
 				Receiver:               receiverByte,
 				MsgData:                message,
-				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true),
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 				// ExtraAssertions: []func(t *testing.T){
 				// 	func(t *testing.T) {

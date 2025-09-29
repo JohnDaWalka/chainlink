@@ -9,7 +9,6 @@ import (
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
 	suitx "github.com/block-vision/sui-go-sdk/transaction"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
@@ -684,19 +683,7 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 
 }
 
-func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool) []byte {
-	var clockObj [32]byte
-	copy(clockObj[:], hexutil.MustDecode(
-		"0x0000000000000000000000000000000000000000000000000000000000000006",
-	))
-
-	var stateObj [32]byte
-	copy(stateObj[:], hexutil.MustDecode(
-		"0xadec0d5017dc42e5334558c9f2899516562ff83edafaa1b01d5553940b7c66c7", // reciever CCIPReceiverStateObjectId
-	))
-
-	recieverObjectIds := [][32]byte{clockObj, stateObj}
-
+func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool, receiverObjectIds [][32]byte) []byte {
 	extraArgs, err := ccipevm.SerializeClientSUIExtraArgsV1(message_hasher.ClientSuiExtraArgsV1{
 		GasLimit:                 new(big.Int).SetUint64(gasLimit),
 		AllowOutOfOrderExecution: allowOOO,
@@ -705,7 +692,7 @@ func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool) []byte {
 		// 	74, 198, 97, 175, 68, 29, 25, 218,
 		// 	91, 210, 161, 191, 190, 29, 99, 41,
 		// 	194, 76, 193, 11, 75, 177, 25, 190}, // ObjectID i.e. CCIPReceiverStateObjectId
-		ReceiverObjectIds: recieverObjectIds,
+		ReceiverObjectIds: receiverObjectIds,
 	})
 	if err != nil {
 		panic(err)
