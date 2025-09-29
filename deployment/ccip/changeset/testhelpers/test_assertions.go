@@ -1408,6 +1408,7 @@ func SuiEventEmitter[T any](
 						continue // skip duplicates
 					}
 					lastSeenTxDigest = ev.Id.TxDigest
+					fmt.Println("NEW SUI EVENT:", ev)
 
 					var out T
 					if v, ok := sui_indexer.ConvertMapKeysToCamelCase(ev.ParsedJson).(T); ok {
@@ -1415,8 +1416,6 @@ func SuiEventEmitter[T any](
 					} else {
 						continue
 					}
-
-					fmt.Println("NEW SUI EVENT:", ev.Id.TxDigest)
 
 					ch <- struct {
 						Event   T
