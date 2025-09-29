@@ -19,6 +19,7 @@ import (
 
 	aptosBind "github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip"
+	aptos_fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_dummy_receiver"
 	module_onramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_onramp/onramp"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
@@ -36,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/bindings/test_token/test_token"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
@@ -43,6 +45,7 @@ import (
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -50,6 +53,7 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
 	commontypes "github.com/smartcontractkit/chainlink/deployment/common/types"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 )
 
 func DeployChainContractsToAptosCS(t *testing.T, e DeployedEnv, chainSelector uint64) commoncs.ConfiguredChangeSet {
@@ -98,6 +102,131 @@ func DeployChainContractsToAptosCS(t *testing.T, e DeployedEnv, chainSelector ui
 	}
 
 	return commoncs.Configure(aptoscs.DeployAptosChain{}, ccipConfig)
+}
+
+func AddLaneAptosChangesets(t *testing.T, srcChainSelector, destChainSelector uint64, gasPrices map[uint64]*big.Int, tokenPrices map[aptos.AccountAddress]*big.Int) []commoncs.ConfiguredChangeSet {
+	srcFamily, err := chainsel.GetSelectorFamily(srcChainSelector)
+	require.NoError(t, err)
+	destFamily, err := chainsel.GetSelectorFamily(destChainSelector)
+	require.NoError(t, err)
+
+	if srcFamily != chainsel.FamilyAptos &&
+		destFamily != chainsel.FamilyAptos {
+		t.Fatalf("At least one of the provided source/destination chains has to be Aptos. srcFamily: %v destFamily: %v", srcFamily, destFamily)
+	}
+
+	var src, dest config.ChainDefinition
+
+	switch srcFamily {
+	case chainsel.FamilyEVM:
+		src = config.EVMChainDefinition{
+			ChainDefinition: v1_6.ChainDefinition{
+				ConnectionConfig: v1_6.ConnectionConfig{
+					RMNVerificationDisabled: true,
+				},
+				Selector: srcChainSelector,
+			},
+		}
+	case chainsel.FamilyAptos:
+		src = config.AptosChainDefinition{
+			TokenPrices: tokenPrices,
+			ConnectionConfig: v1_6.ConnectionConfig{
+				RMNVerificationDisabled: true,
+			},
+			Selector:                      srcChainSelector,
+			AddTokenTransferFeeConfigs:    nil,
+			RemoveTokenTransferFeeConfigs: nil,
+		}
+	default:
+		t.Fatalf("Unsupported source chain family: %v", srcFamily)
+	}
+
+	switch destFamily {
+	case chainsel.FamilyEVM:
+		dest = config.EVMChainDefinition{
+			ChainDefinition: v1_6.ChainDefinition{
+				ConnectionConfig: v1_6.ConnectionConfig{
+					AllowListEnabled: false,
+				},
+				Selector: destChainSelector,
+				GasPrice: gasPrices[destChainSelector],
+				FeeQuoterDestChainConfig: fee_quoter.FeeQuoterDestChainConfig{
+					IsEnabled:                         true,
+					MaxNumberOfTokensPerMsg:           10,
+					MaxDataBytes:                      30_000,
+					MaxPerMsgGasLimit:                 3_000_000,
+					DestGasOverhead:                   ccipevm.DestGasOverhead,
+					DestGasPerPayloadByteBase:         ccipevm.CalldataGasPerByteBase,
+					DestGasPerPayloadByteHigh:         ccipevm.CalldataGasPerByteHigh,
+					DestGasPerPayloadByteThreshold:    ccipevm.CalldataGasPerByteThreshold,
+					DestDataAvailabilityOverheadGas:   0,
+					DestGasPerDataAvailabilityByte:    16,
+					DestDataAvailabilityMultiplierBps: 0,
+					ChainFamilySelector:               [4]byte{0x28, 0x12, 0xd5, 0x2c},
+					EnforceOutOfOrder:                 false,
+					DefaultTokenFeeUSDCents:           25,
+					DefaultTokenDestGasOverhead:       90_000,
+					DefaultTxGasLimit:                 200_000,
+					GasMultiplierWeiPerEth:            11e17,
+					GasPriceStalenessThreshold:        0,
+					NetworkFeeUSDCents:                10,
+				},
+			},
+			OnRampVersion: []byte{1, 6, 0},
+		}
+	case chainsel.FamilyAptos:
+		dest = config.AptosChainDefinition{
+			ConnectionConfig: v1_6.ConnectionConfig{
+				AllowListEnabled: false,
+			},
+			Selector: destChainSelector,
+			GasPrice: gasPrices[destChainSelector],
+			FeeQuoterDestChainConfig: aptos_fee_quoter.DestChainConfig{
+				IsEnabled:                         true,
+				MaxNumberOfTokensPerMsg:           1,
+				MaxDataBytes:                      30_000,
+				MaxPerMsgGasLimit:                 100_000,
+				DestGasOverhead:                   112,
+				DestGasPerPayloadByteBase:         0,
+				DestGasPerPayloadByteHigh:         0,
+				DestGasPerPayloadByteThreshold:    0,
+				DestDataAvailabilityOverheadGas:   0,
+				DestGasPerDataAvailabilityByte:    0,
+				DestDataAvailabilityMultiplierBps: 0,
+				ChainFamilySelector:               []byte{0xac, 0x77, 0xff, 0xec},
+				EnforceOutOfOrder:                 true,
+				DefaultTokenFeeUsdCents:           25,
+				DefaultTokenDestGasOverhead:       1_000,
+				DefaultTxGasLimit:                 200,
+				GasMultiplierWeiPerEth:            11e17,
+				GasPriceStalenessThreshold:        0,
+				NetworkFeeUsdCents:                10,
+			},
+		}
+	default:
+		t.Fatalf("Unsupported dstination chain family: %v", srcFamily)
+	}
+
+	return []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(
+			aptoscs.AddAptosLanes{},
+			config.UpdateAptosLanesConfig{
+				AptosMCMSConfig: &proposalutils.TimelockConfig{
+					MinDelay:     time.Second,
+					MCMSAction:   mcmstypes.TimelockActionSchedule,
+					OverrideRoot: false,
+				},
+				Lanes: []config.LaneConfig{
+					{
+						Source:     src,
+						Dest:       dest,
+						IsDisabled: false,
+					},
+				},
+				TestRouter: false,
+			},
+		),
+	}
 }
 
 // MakeBCSEVMExtraArgsV2 makes the BCS encoded extra args for a message sent from a Move based chain that is destined for an EVM chain.
