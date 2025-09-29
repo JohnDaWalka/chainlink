@@ -1361,14 +1361,15 @@ func SuiEventEmitter[T any](
 	done chan any,
 ) (<-chan struct {
 	Event   T
-	Version uint64
+	Version string
 }, <-chan error) {
 	ch := make(chan struct {
 		Event   T
-		Version uint64
+		Version string
 	}, 200)
 	errChan := make(chan error)
 	limit := uint64(50)
+	var lastSeenTxDigest string
 
 	fmt.Println("SUI EVENTS EMITTER")
 	go func() {
@@ -1397,28 +1398,32 @@ func SuiEventEmitter[T any](
 					return
 				}
 
-				fmt.Println("SUI EVENTS: ", events)
-
 				if len(events.Data) == 0 {
 					// No new events found
 					break
 				}
 
-				for _, event := range events.Data {
+				for _, ev := range events.Data {
+					if ev.Id.TxDigest == lastSeenTxDigest {
+						continue // skip duplicates
+					}
+					lastSeenTxDigest = ev.Id.TxDigest
+
 					var out T
-					if v, ok := sui_indexer.ConvertMapKeysToCamelCase(event.ParsedJson).(T); ok {
+					if v, ok := sui_indexer.ConvertMapKeysToCamelCase(ev.ParsedJson).(T); ok {
 						out = v
 					} else {
-						// handle type mismatch
 						continue
 					}
 
+					fmt.Println("NEW SUI EVENT:", ev.Id.TxDigest)
+
 					ch <- struct {
 						Event   T
-						Version uint64
+						Version string
 					}{
 						Event:   out,
-						Version: 1, // todo: change this
+						Version: ev.Id.EventSeq, // use the actual version
 					}
 				}
 
