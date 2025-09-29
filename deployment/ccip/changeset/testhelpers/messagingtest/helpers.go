@@ -309,6 +309,9 @@ func Run(t *testing.T, tc TestCase) (out TestCaseOutput) {
 		// Aptos does only support out-of-order execution
 		case chain_selectors.FamilyAptos:
 			unorderedExec = true
+		// Sui does only support out-of-order execution
+		case chain_selectors.FamilySui:
+			unorderedExec = true
 		// TON does only support out-of-order execution
 		case chain_selectors.FamilyTon:
 			unorderedExec = true
