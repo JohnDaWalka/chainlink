@@ -47,6 +47,7 @@ runs:
         QA_AWS_ROLE_TO_ASSUME: ${{ inputs.AWS_ROLE_TO_ASSUME }}
         GO_COVER_FLAG: true
         dep_evm_sha: ${{ inputs.dep_evm_sha }}
+        docker-additional-build-args: CL_EVM_CMD=chainlink-evm
     - name: Print Chainlink Image Built
       shell: sh
       run: |
