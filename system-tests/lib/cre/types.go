@@ -672,27 +672,18 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 // TODO Refactor later on. Probably when we introduce our own DON struct
 // we could add to it all the metadata we need and avoid this wrapper struct altogether
 type Dons struct {
-	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
-	dons        []*DON
+	// DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
+	dons []*DON
 }
 
 func (d *Dons) List() []*DON {
 	return d.dons
 }
 
-func NewDons(donsMetadata *DonsMetadata, dons []*DON) (*Dons, error) {
-	if donsMetadata == nil {
-		return nil, errors.New("donsMetadata is required")
-	}
-
-	if len(dons) != len(donsMetadata.List()) {
-		return nil, errors.New("dons and donsMetadata must have the same length")
-	}
-
+func NewDons(dons []*DON) *Dons {
 	return &Dons{
-		DonMetadata: donsMetadata.List(),
-		dons:        dons,
-	}, nil
+		dons: dons,
+	}
 }
 
 type DonsMetadata struct {
@@ -818,11 +809,11 @@ type Label struct {
 }
 
 type NodeMetadata struct {
-	Labels []*Label          `toml:"labels" json:"labels"`
-	Keys   *secrets.NodeKeys `toml:"keys" json:"keys"`
-	Host   string            `toml:"host" json:"host"`
-	Roles  []string          `toml:"roles" json:"roles"`
-	Index  int               `toml:"index" json:"index"` // hopefully we can remove it later, but for now we need it to construct urls in CRIB
+	// Labels []*Label          `toml:"labels" json:"labels"`
+	Keys  *secrets.NodeKeys `toml:"keys" json:"keys"`
+	Host  string            `toml:"host" json:"host"`
+	Roles []string          `toml:"roles" json:"roles"`
+	Index int               `toml:"index" json:"index"` // hopefully we can remove it later, but for now we need it to construct urls in CRIB
 }
 
 func (n *NodeMetadata) HasRole(role string) bool {
@@ -851,11 +842,11 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 	}
 
 	return &NodeMetadata{
-		Labels: make([]*Label, 0),
-		Keys:   keys,
-		Host:   c.Host,
-		Roles:  c.Roles,
-		Index:  c.Index,
+		// Labels: make([]*Label, 0),
+		Keys:  keys,
+		Host:  c.Host,
+		Roles: c.Roles,
+		Index: c.Index,
 	}, nil
 }
 
@@ -913,12 +904,12 @@ func (t *DonTopology) GatewayNode() (*Node, error) {
 	return nil, errors.New("no don contains a bootstrap node")
 }
 
-func (t *DonTopology) ToDonMetadata() []*DonMetadata {
-	metadata := []*DonMetadata{}
-	metadata = append(metadata, t.Dons.DonMetadata...)
+// func (t *DonTopology) ToDonMetadata() []*DonMetadata {
+// 	metadata := []*DonMetadata{}
+// 	metadata = append(metadata, t.Dons.DonMetadata...)
 
-	return metadata
-}
+// 	return metadata
+// }
 
 // CapabilitiesAwareNodeSet is the serialized form that declares nodesets in a topology.
 type CapabilitiesAwareNodeSet struct {

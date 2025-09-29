@@ -16,22 +16,22 @@ func CreateJobs(ctx context.Context, testLogger zerolog.Logger, input cre.Create
 		return errors.Wrap(err, "input validation failed")
 	}
 
-	for _, donMetadata := range input.DonTopology.ToDonMetadata() {
-		if jobSpecs, ok := input.DonToJobSpecs[donMetadata.ID]; ok {
+	for _, don := range input.DonTopology.Dons.List() {
+		if jobSpecs, ok := input.DonToJobSpecs[don.ID]; ok {
 			createErr := jobs.Create(ctx, input.CldEnv.Offchain, *input.DonTopology, jobSpecs)
 			if createErr != nil {
-				return errors.Wrapf(createErr, "failed to create jobs for DON %d", donMetadata.ID)
+				return errors.Wrapf(createErr, "failed to create jobs for DON %d", don.ID)
 			}
 		} else {
-			testLogger.Warn().Msgf("No job specs found for DON %d", donMetadata.ID)
+			testLogger.Warn().Msgf("No job specs found for DON %d", don.ID)
 		}
 	}
 
 	return nil
 }
 
-func AnyDonHasCapability(donMetadata []*cre.DonMetadata, capability cre.CapabilityFlag) bool {
-	for _, don := range donMetadata {
+func AnyDonHasCapability(dons []*cre.DON, capability cre.CapabilityFlag) bool {
+	for _, don := range dons {
 		if flags.HasFlagForAnyChain(don.Flags, capability) {
 			return true
 		}

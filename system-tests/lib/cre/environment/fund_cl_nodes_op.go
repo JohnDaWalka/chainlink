@@ -56,23 +56,23 @@ var PrepareCLNodesFundingOp = operations.NewOperation[PrepareFundCLNodesOpInput,
 			FundingPerChainFamilyForEachNode: input.FundingPerChainFamilyForEachNode,
 		}
 		requiredFundingPerChain := make(map[uint64]uint64)
-		for _, metaDon := range deps.DonTopology.ToDonMetadata() {
+		for _, don := range deps.DonTopology.Dons.List() {
 			for _, bcOut := range deps.BlockchainOutputs {
-				if !flags.RequiresForwarderContract(metaDon.Flags, bcOut.ChainID) && bcOut.SolChain == nil {
+				if !flags.RequiresForwarderContract(don.Flags, bcOut.ChainID) && bcOut.SolChain == nil {
 					continue
 				}
 
 				if bcOut.SolChain != nil {
-					requiredFundingPerChain[bcOut.SolChain.ChainSelector] += input.FundingPerChainFamilyForEachNode[chainselectors.FamilySolana] * uint64(len(metaDon.NodesMetadata))
+					requiredFundingPerChain[bcOut.SolChain.ChainSelector] += input.FundingPerChainFamilyForEachNode[chainselectors.FamilySolana] * uint64(len(don.Nodes))
 					continue
 				}
 
 				if bcOut.BlockchainOutput.Family == blockchain.FamilyTron {
-					requiredFundingPerChain[bcOut.ChainSelector] += input.FundingPerChainFamilyForEachNode[chainselectors.FamilyTron] * uint64(len(metaDon.NodesMetadata))
+					requiredFundingPerChain[bcOut.ChainSelector] += input.FundingPerChainFamilyForEachNode[chainselectors.FamilyTron] * uint64(len(don.Nodes))
 					continue
 				}
 
-				requiredFundingPerChain[bcOut.ChainSelector] += input.FundingPerChainFamilyForEachNode[chainselectors.FamilyEVM] * uint64(len(metaDon.NodesMetadata))
+				requiredFundingPerChain[bcOut.ChainSelector] += input.FundingPerChainFamilyForEachNode[chainselectors.FamilyEVM] * uint64(len(don.Nodes))
 			}
 		}
 
@@ -185,10 +185,10 @@ var FundCLNodesOp = operations.NewOperation(
 	"Fund Chainlink Nodes",
 	func(b operations.Bundle, deps FundCLNodesOpDeps, input FundCLNodesOpInput) (*FundCLNodesOpOutput, error) {
 		ctx := b.GetContext()
-		for donIndex, donMetadata := range deps.DonTopology.ToDonMetadata() {
-			deps.TestLogger.Info().Msgf("Funding nodes for DON %s", donMetadata.Name)
+		for donIndex, don := range deps.DonTopology.Dons.List() {
+			deps.TestLogger.Info().Msgf("Funding nodes for DON %s", don.Name)
 			for _, bcOut := range deps.BlockchainOutputs {
-				if !flags.RequiresForwarderContract(donMetadata.Flags, bcOut.ChainID) &&
+				if !flags.RequiresForwarderContract(don.Flags, bcOut.ChainID) &&
 					bcOut.SolChain == nil { // for now, we can only write to solana, so we consider forwarder is always present
 					continue
 				}
@@ -225,7 +225,7 @@ var FundCLNodesOp = operations.NewOperation(
 				}
 			}
 
-			deps.TestLogger.Info().Msgf("Funded nodes for DON %s", donMetadata.Name)
+			deps.TestLogger.Info().Msgf("Funded nodes for DON %s", don.Name)
 		}
 
 		return &FundCLNodesOpOutput{}, nil

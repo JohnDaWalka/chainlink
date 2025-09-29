@@ -500,14 +500,14 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 }
 
 func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*cre.DON, topology *cre.Topology) (*cre.Environment, error) {
-	creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
-	if donsErr != nil {
-		return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")
-	}
+	// creDons, donsErr :=
+	// if donsErr != nil {
+	// 	return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")
+	// }
 
 	return &cre.Environment{
 		CldfEnvironment: cldfEnv,
-		DonTopology:     cre.NewDonTopology(registryChainSelector, topology, creDons),
+		DonTopology:     cre.NewDonTopology(registryChainSelector, topology, cre.NewDons(dons)),
 	}, nil
 }
 

@@ -72,7 +72,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
 		// return early if no DON has the vault capability
-		if !don.AnyDonHasCapability(input.DonTopology.Dons.DonMetadata, flag) {
+		if !don.AnyDonHasCapability(input.DonTopology.Dons.List(), flag) {
 			return donToJobSpecs, nil
 		}
 

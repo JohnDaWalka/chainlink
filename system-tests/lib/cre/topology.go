@@ -16,16 +16,16 @@ const (
 )
 
 var (
-	NodeTypeKey            = "type"
-	IndexKey               = "node_index"
-	ExtraRolesKey          = "extra_roles"
-	NodeIDKey              = "node_id"
-	NodeOCRFamiliesKey     = "node_ocr_families"
-	NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
-	DONIDKey               = "don_id"
-	EnvironmentKey         = "environment"
-	ProductKey             = "product"
-	DONNameKey             = "don_name"
+	// NodeTypeKey            = "type"
+	// IndexKey               = "node_index"
+	// ExtraRolesKey          = "extra_roles"
+	// NodeIDKey              = "node_id"
+	// NodeOCRFamiliesKey     = "node_ocr_families"
+	// NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
+	DONIDKey       = "don_id"
+	EnvironmentKey = "environment"
+	ProductKey     = "product"
+	DONNameKey     = "don_name"
 )
 
 type Topology struct {

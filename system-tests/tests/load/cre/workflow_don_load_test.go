@@ -48,9 +48,8 @@ import (
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
+	credon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
@@ -223,25 +222,26 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	mockJobSpecsFactoryFn := func(input *cretypes.JobSpecInput) (cretypes.DonsToJobSpecs, error) {
 		donTojobSpecs := make(cretypes.DonsToJobSpecs, 0)
 
-		for _, donMetadata := range input.DonTopology.Dons.DonMetadata {
+		for _, don := range input.DonTopology.Dons.List() {
 			jobSpecs := make(cretypes.DonJobs, 0)
-			workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			// workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err2 := don.WorkerNodes()
 			if err2 != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				if nodeIDErr != nil {
-					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				}
+				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				// if nodeIDErr != nil {
+				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				// }
 
-				if flags.HasFlag(donMetadata.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
-					jobSpecs = append(jobSpecs, MockCapabilitiesJob(nodeID, "mock", in.MockCapabilities))
+				if flags.HasFlag(don.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
+					jobSpecs = append(jobSpecs, MockCapabilitiesJob(workerNode.JobDistributorDetails.NodeID, "mock", in.MockCapabilities))
 				}
 			}
 
-			donTojobSpecs[donMetadata.ID] = jobSpecs
+			donTojobSpecs[don.ID] = jobSpecs
 		}
 
 		return donTojobSpecs, nil
@@ -250,19 +250,20 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	loadTestJobSpecsFactoryFn := func(input *cretypes.JobSpecInput) (cretypes.DonsToJobSpecs, error) {
 		donTojobSpecs := make(cretypes.DonsToJobSpecs, 0)
 
-		for _, donMetadata := range input.DonTopology.Dons.DonMetadata {
+		for _, don := range input.DonTopology.Dons.List() {
 			jobSpecs := make(cretypes.DonJobs, 0)
-			workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			// workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err2 := don.WorkerNodes()
 			if err2 != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				if nodeIDErr != nil {
-					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				}
-				if flags.HasFlag(donMetadata.Flags, cretypes.WorkflowDON) {
+				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				// if nodeIDErr != nil {
+				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				// }
+				if flags.HasFlag(don.Flags, cretypes.WorkflowDON) {
 					for i := range feedsAddresses {
 						feedConfig := make([]FeedConfig, 0)
 
@@ -280,12 +281,12 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 							})
 						}
 
-						jobSpecs = append(jobSpecs, WorkflowsJob(nodeID, fmt.Sprintf("load_%d", i), feedConfig))
+						jobSpecs = append(jobSpecs, WorkflowsJob(workerNode.JobDistributorDetails.NodeID, fmt.Sprintf("load_%d", i), feedConfig))
 					}
 				}
 			}
 
-			donTojobSpecs[donMetadata.ID] = jobSpecs
+			donTojobSpecs[don.ID] = jobSpecs
 		}
 
 		return donTojobSpecs, nil
@@ -353,7 +354,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	for idx, don := range setupOutput.donTopology.Dons.DonMetadata {
 		if flags.HasFlag(don.Flags, cretypes.MockCapability) {
 			for _, n := range setupOutput.donTopology.Dons.List()[idx].Nodes {
-				key, err2 := n.ExportOCR2Keys(n.ChainsOcr2KeyBundlesID["evm"])
+				key, err2 := n.ExportOCR2Keys(n.Keys.OCR2BundleIDs[chainselectors.FamilyEVM])
 				if err2 == nil {
 					b, err3 := json.Marshal(key)
 					require.NoError(t, err3, "could not marshal OCR2 key")
@@ -1165,18 +1166,18 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 			return nil, errors.Wrap(err, "failed to get DON Time address")
 		}
 
-		for _, donMetadata := range input.DonTopology.Dons.DonMetadata {
-			if !flags.HasFlag(donMetadata.Flags, cretypes.ConsensusCapability) {
+		for _, don := range input.DonTopology.Dons.List() {
+			if !flags.HasFlag(don.Flags, cretypes.ConsensusCapability) {
 				continue
 			}
 
 			// create job specs for the worker nodes
-			workerNodes, wErr := donMetadata.WorkerNodes()
+			workerNodes, wErr := don.WorkerNodes()
 			if wErr != nil {
 				return nil, errors.Wrap(wErr, "failed to get worker nodes from DON metadata")
 			}
 
-			bootstrapNode, bootErr := donMetadata.BootstrapNode()
+			bootstrapNode, bootErr := don.BootstrapNode()
 			if bootErr != nil {
 				return nil, errors.Wrap(bootErr, "failed to get bootstrap node from DON metadata")
 			}
@@ -1184,37 +1185,37 @@ func consensusJobSpec(chainID uint64) cretypes.JobSpecFn {
 			bootstrapNodeID := bootstrapNode.Keys.CleansedPeerID()
 
 			// create job specs for the bootstrap node
-			donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.BootstrapOCR3(bootstrapNodeID, "ocr3-capability", ocr3CapabilityAddress.Address, chainID))
+			donToJobSpecs[don.ID] = append(donToJobSpecs[don.ID], jobs.BootstrapOCR3(bootstrapNodeID, "ocr3-capability", ocr3CapabilityAddress.Address, chainID))
 
 			ocrPeeringData := cretypes.OCRPeeringData{
 				OCRBootstraperPeerID: bootstrapNodeID,
 				OCRBootstraperHost:   bootstrapNode.Host,
-				Port:                 don.OCRPeeringPort,
+				Port:                 credon.OCRPeeringPort,
 			}
 
 			for _, workerNode := range workerNodes {
-				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				if nodeIDErr != nil {
-					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				}
+				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				// if nodeIDErr != nil {
+				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				// }
 				evmKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
 					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 				}
 
-				ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
-				if ocr2kbErr != nil {
-					return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
-				}
+				// ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
+				// if ocr2kbErr != nil {
+				// 	return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
+				// }
 
 				// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
-				evmOCR2KeyBundle, ok := ocr2KeyBundlesPerFamily[chainselectors.FamilyEVM]
+				evmOCR2KeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainselectors.FamilyEVM]
 				if !ok {
-					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for EVM", nodeID)
+					return nil, fmt.Errorf("node %s does not have OCR2 key bundle for EVM", workerNode.Name)
 				}
 
-				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.WorkerOCR3(nodeID, ocr3CapabilityAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocr2KeyBundlesPerFamily, ocrPeeringData, chainID))
-				donToJobSpecs[donMetadata.ID] = append(donToJobSpecs[donMetadata.ID], jobs.DonTimeJob(nodeID, donTimeAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringData, chainID))
+				donToJobSpecs[don.ID] = append(donToJobSpecs[don.ID], jobs.WorkerOCR3(workerNode.JobDistributorDetails.NodeID, ocr3CapabilityAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, workerNode.Keys.OCR2BundleIDs, ocrPeeringData, chainID))
+				donToJobSpecs[don.ID] = append(donToJobSpecs[don.ID], jobs.DonTimeJob(workerNode.JobDistributorDetails.NodeID, donTimeAddress.Address, evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringData, chainID))
 			}
 		}
 

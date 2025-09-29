@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	consensustypes "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/report"
@@ -47,7 +48,6 @@ import (
 	cldlogger "github.com/smartcontractkit/chainlink/deployment/logger"
 	cretypes "github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	libcontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	creenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	mock_capability "github.com/smartcontractkit/chainlink/system-tests/lib/cre/mock"
@@ -170,25 +170,26 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	loadTestJobSpecsFactoryFn := func(input *cretypes.JobSpecInput) (cretypes.DonsToJobSpecs, error) {
 		donTojobSpecs := make(cretypes.DonsToJobSpecs, 0)
 
-		for _, donMetadata := range input.DonTopology.Dons.DonMetadata {
+		for _, don := range input.DonTopology.Dons.List() {
 			jobSpecs := make(cretypes.DonJobs, 0)
-			workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			// workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
+			workflowNodeSet, err2 := don.WorkerNodes()
 			if err2 != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				if nodeIDErr != nil {
-					return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				}
+				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
+				// if nodeIDErr != nil {
+				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
+				// }
 
-				if flags.HasFlag(donMetadata.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
-					jobSpecs = append(jobSpecs, MockCapabilitiesJob(nodeID, "mock", in.MockCapabilities))
+				if flags.HasFlag(don.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
+					jobSpecs = append(jobSpecs, MockCapabilitiesJob(workerNode.JobDistributorDetails.NodeID, "mock", in.MockCapabilities))
 				}
 			}
 
-			donTojobSpecs[donMetadata.ID] = jobSpecs
+			donTojobSpecs[don.ID] = jobSpecs
 		}
 
 		return donTojobSpecs, nil
@@ -255,7 +256,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 				if i == 0 {
 					continue // Skip bootstrap nodes
 				}
-				key, err2 := n.ExportOCR2Keys(n.ChainsOcr2KeyBundlesID["evm"])
+				key, err2 := n.ExportOCR2Keys(n.Keys.OCR2BundleIDs[chainselectors.FamilyEVM])
 				if err2 == nil {
 					b, err3 := json.Marshal(key)
 					require.NoError(t, err3, "could not marshal OCR2 key")
@@ -271,12 +272,14 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 
 	f := 0
 	// Nr of signatures needs to be equal with f+1, compute f based on the nr of ocr3 worker nodes
-	for _, donMetadata := range setupOutput.donTopology.Dons.DonMetadata {
-		if flags.HasFlag(donMetadata.Flags, cretypes.ConsensusCapability) {
-			workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{
-				Key:   node.NodeTypeKey,
-				Value: cretypes.WorkerNode,
-			}, node.EqualLabels)
+	for _, don := range setupOutput.donTopology.Dons.List() {
+		if flags.HasFlag(don.Flags, cretypes.ConsensusCapability) {
+			// workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{
+			// 	Key:   node.NodeTypeKey,
+			// 	Value: cretypes.WorkerNode,
+			// }, node.EqualLabels)
+
+			workerNodes, workerNodesErr := don.WorkerNodes()
 			require.NoError(t, workerNodesErr, "could not find any worker nodes for ocr3")
 
 			f = (len(workerNodes) - 1) / 3

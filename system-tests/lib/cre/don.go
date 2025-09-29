@@ -24,14 +24,9 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	cldf_offchain "github.com/smartcontractkit/chainlink-deployments-framework/offchain"
-	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
-	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -67,6 +62,21 @@ type DON struct {
 	ChainCapabilities map[string]*ChainCapabilityConfig
 	// Roles []string // workflow, capability, gateway
 	// SupportedChains []uint64 // chain selector... optionally? to indicate, whether each node should connect to every chain in the environment or only some // not used anywhere currently
+}
+
+func (m *DON) ToMetadata() *DonMetadata {
+	dm := &DonMetadata{
+		Name:          m.Name,
+		ID:            m.ID,
+		Flags:         m.Flags,
+		NodesMetadata: make([]*NodeMetadata, len(m.Nodes)),
+	}
+
+	for i, node := range m.Nodes {
+		dm.NodesMetadata[i] = node.ToMetadata()
+	}
+
+	return dm
 }
 
 func (m *DON) ContainsBootstrapNode() bool {
@@ -141,7 +151,7 @@ func (don *DON) JDNodeIDs() []string {
 	return nodeIDs
 }
 
-func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Output, supportedChains []ChainConfig, jd *JobDistributor) (*DON, error) {
+func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Output, supportedChains []ChainConfig, jd *jd.JobDistributor) (*DON, error) {
 	don := &DON{
 		Nodes: make([]*Node, 0),
 		Name:  donMetadata.Name,
@@ -170,29 +180,29 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 			}
 
 			// TODO move this to SetUpAndLinkJobDistributor
-			labels := make([]*ptypes.Label, 0)
+			// labels := make([]*ptypes.Label, 0)
 
-			for _, role := range node.Roles {
-				switch role {
-				case WorkerNode:
-					labels = append(labels, &ptypes.Label{
-						Key:   LabelNodeTypeKey,
-						Value: ptr.Ptr(LabelNodeTypeValuePlugin),
-					})
-				case BootstrapNode:
-					labels = append(labels, &ptypes.Label{
-						Key:   LabelNodeTypeKey,
-						Value: ptr.Ptr(LabelNodeTypeValueBootstrap),
-					})
-				case GatewayNode:
-					// no specific data to set for gateway nodes yet
-				default:
-					return fmt.Errorf("unknown node role: %s", role)
-				}
-			}
+			// for _, role := range node.Roles {
+			// 	switch role {
+			// 	case WorkerNode:
+			// 		labels = append(labels, &ptypes.Label{
+			// 			Key:   LabelNodeTypeKey,
+			// 			Value: ptr.Ptr(LabelNodeTypeValuePlugin),
+			// 		})
+			// 	case BootstrapNode:
+			// 		labels = append(labels, &ptypes.Label{
+			// 			Key:   LabelNodeTypeKey,
+			// 			Value: ptr.Ptr(LabelNodeTypeValueBootstrap),
+			// 		})
+			// 	case GatewayNode:
+			// 		// no specific data to set for gateway nodes yet
+			// 	default:
+			// 		return fmt.Errorf("unknown node role: %s", role)
+			// 	}
+			// }
 
 			// Set up Job distributor in node and register node with the job distributor
-			setupErr := node.SetUpAndLinkJobDistributor(ctx, jd, labels)
+			setupErr := node.SetUpAndLinkJobDistributor(ctx, jd)
 			if setupErr != nil {
 				return fmt.Errorf("failed to set up job distributor in node %s: %w", node.Name, setupErr)
 			}
@@ -225,7 +235,7 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 	return don, nil
 }
 
-func (n *Node) CreateSupportedChains(ctx context.Context, chains []ChainConfig, jd *JobDistributor) error {
+func (n *Node) CreateSupportedChains(ctx context.Context, chains []ChainConfig, jd *jd.JobDistributor) error {
 	// g := new(errgroup.Group)
 	// for i := range don.Nodes {
 	// g.Go(func() error {
@@ -261,6 +271,15 @@ type Node struct {
 
 	Clients NodeClients
 	DON     DON // to easily get parent info
+}
+
+func (n *Node) ToMetadata() *NodeMetadata {
+	return &NodeMetadata{
+		Index: n.Index,
+		Keys:  n.Keys,
+		Roles: n.Roles,
+		Host:  n.Host,
+	}
 }
 
 func (n *Node) GetHost() string {
@@ -367,7 +386,7 @@ type JDChainConfigInput struct {
 	ChainType string
 }
 
-func (n *Node) CreateJDChainConfigs(ctx context.Context, chains []JDChainConfigInput, jd *JobDistributor) error {
+func (n *Node) CreateJDChainConfigs(ctx context.Context, chains []JDChainConfigInput, jd *jd.JobDistributor) error {
 	for _, chain := range chains {
 		var account string
 
@@ -553,7 +572,7 @@ func (n *Node) AcceptJob(ctx context.Context, spec string) error {
 
 // RegisterNodeToJobDistributor fetches the CSA public key of the node and registers the node with the job distributor
 // it sets the node id returned by JobDistributor as a result of registration in the node struct
-func (n *Node) RegisterNodeToJobDistributor(ctx context.Context, jd *JobDistributor, labels []*ptypes.Label) error {
+func (n *Node) RegisterNodeToJobDistributor(ctx context.Context, jd *jd.JobDistributor, labels []*ptypes.Label) error {
 	// Get the public key of the node
 	csaKeyRes, err := n.Clients.GQLClient.FetchCSAPublicKey(ctx)
 	if err != nil {
@@ -626,7 +645,7 @@ func (n *Node) RegisterNodeToJobDistributor(ctx context.Context, jd *JobDistribu
 
 // CreateJobDistributor fetches the keypairs from the job distributor and creates the job distributor in the node
 // and returns the job distributor id
-func (n *Node) CreateJobDistributor(ctx context.Context, jd *JobDistributor) (string, error) {
+func (n *Node) CreateJobDistributor(ctx context.Context, jd *jd.JobDistributor) (string, error) {
 	// Get the keypairs from the job distributor
 	csaKey, err := jd.GetCSAPublicKey(ctx)
 	if err != nil {
@@ -653,7 +672,28 @@ func (n *Node) CreateJobDistributor(ctx context.Context, jd *JobDistributor) (st
 
 // SetUpAndLinkJobDistributor sets up the job distributor in the node and registers the node with the job distributor
 // it sets the job distributor id for node
-func (n *Node) SetUpAndLinkJobDistributor(ctx context.Context, jd *JobDistributor, labels []*ptypes.Label) error {
+func (n *Node) SetUpAndLinkJobDistributor(ctx context.Context, jd *jd.JobDistributor) error {
+	labels := make([]*ptypes.Label, 0)
+
+	for _, role := range n.Roles {
+		switch role {
+		case WorkerNode:
+			labels = append(labels, &ptypes.Label{
+				Key:   LabelNodeTypeKey,
+				Value: ptr.Ptr(LabelNodeTypeValuePlugin),
+			})
+		case BootstrapNode:
+			labels = append(labels, &ptypes.Label{
+				Key:   LabelNodeTypeKey,
+				Value: ptr.Ptr(LabelNodeTypeValueBootstrap),
+			})
+		case GatewayNode:
+			// no specific data to set for gateway nodes yet
+		default:
+			return fmt.Errorf("unknown node role: %s", role)
+		}
+	}
+
 	// register the node in the job distributor
 	err := n.RegisterNodeToJobDistributor(ctx, jd, labels)
 	if err != nil {
@@ -742,6 +782,14 @@ func (n *Node) ApproveProposals(ctx context.Context, proposalIDs []string) error
 	return nil
 }
 
+func (n *Node) ExportOCR2Keys(id string) (*clclient.OCR2ExportKey, error) {
+	keys, _, err := n.Clients.RestClient.ExportOCR2Key(id)
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
 func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.Environment, []*DON, error) {
 	if input == nil {
 		return nil, nil, errors.New("input is nil")
@@ -761,9 +809,9 @@ func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.
 		return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
 	}
 
-	donJDClient := &JobDistributor{
-		JobDistributor: jdClient,
-	}
+	// donJDClient := &JobDistributor{
+	// 	JobDistributor: jdClient,
+	// }
 
 	dons := make([]*DON, len(input.NodeSetOutput))
 	// var allNodesInfo []NodeInfo
@@ -781,12 +829,12 @@ func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.
 		// }
 		// allNodesInfo = append(allNodesInfo, nodeInfo...)
 
-		supportedChains, schErr := findSupportedChainsForDON(input.Topology.DonsMetadata.List()[idx], input.BlockchainOutputs)
+		supportedChains, schErr := FindSupportedChainsForDON(input.Topology.DonsMetadata.List()[idx], input.BlockchainOutputs)
 		if schErr != nil {
 			return nil, nil, errors.Wrap(schErr, "failed to find supported chains for DON")
 		}
 
-		don, regErr := NewDON(ctx, input.Topology.DonsMetadata.List()[idx], nodeOutput.CLNodes, supportedChains, donJDClient)
+		don, regErr := NewDON(ctx, input.Topology.DonsMetadata.List()[idx], nodeOutput.CLNodes, supportedChains, jdClient)
 		if regErr != nil {
 			return nil, nil, fmt.Errorf("failed to create a new DON: %w", regErr)
 		}
@@ -821,7 +869,7 @@ func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.
 	// 	return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
 	// }
 
-	input.CldfEnvironment.Offchain = donJDClient
+	input.CldfEnvironment.Offchain = jdClient
 	input.CldfEnvironment.NodeIDs = nodeIDs
 
 	return input.CldfEnvironment, dons, nil
@@ -842,13 +890,15 @@ func HasFlagForAnyChain(values []string, capability string) bool {
 	return false
 }
 
-func findSupportedChainsForDON(donMetadata *DonMetadata, blockchainOutputs []*WrappedBlockchainOutput) ([]ChainConfig, error) {
+// TODO do we need to use metadata here? maybe actually some interface that both DON and metadata would implement?
+func FindSupportedChainsForDON(donMetadata *DonMetadata, blockchainOutputs []*WrappedBlockchainOutput) ([]ChainConfig, error) {
 	chains := make([]ChainConfig, 0)
 
 	for chainSelector, bcOut := range blockchainOutputs {
 		hasEVMChainEnabled := slices.Contains(donMetadata.EVMChains(), bcOut.ChainID)
 		hasSolanaWriteCapability := HasFlagForAnyChain(donMetadata.Flags, WriteSolanaCapability)
 		chainIsSolana := strings.EqualFold(bcOut.BlockchainOutput.Family, chainselectors.FamilySolana)
+
 		if !hasEVMChainEnabled && (!hasSolanaWriteCapability || !chainIsSolana) {
 			continue
 		}
@@ -864,63 +914,63 @@ func findSupportedChainsForDON(donMetadata *DonMetadata, blockchainOutputs []*Wr
 	return chains, nil
 }
 
-type JDConfig struct {
-	GRPC  string
-	WSRPC string
-	Creds credentials.TransportCredentials
-	Auth  oauth2.TokenSource
-	// NodeInfo []NodeInfo
-}
+// type JDConfig struct {
+// 	GRPC  string
+// 	WSRPC string
+// 	Creds credentials.TransportCredentials
+// 	Auth  oauth2.TokenSource
+// 	// NodeInfo []NodeInfo
+// }
 
-// JobDistributor implements the OffchainClient interface in CLDF and wraps the CLDF JD client and add DON functionality.
-// The CLDF JD client does not have the DON functionality, so we wrap it here.
-type JobDistributor struct {
-	*jd.JobDistributor
-	don *DON
-}
+// // JobDistributor implements the OffchainClient interface in CLDF and wraps the CLDF JD client and add DON functionality.
+// // The CLDF JD client does not have the DON functionality, so we wrap it here.
+// type JobDistributor struct {
+// 	*jd.JobDistributor
+// 	don *DON
+// }
 
 // NewJDClient creates a new Job Distributor client with the provided configuration.
-func NewJDClient(ctx context.Context, cfg JDConfig) (cldf_offchain.Client, error) {
-	jdConfig := jd.JDConfig{
-		GRPC:  cfg.GRPC,
-		WSRPC: cfg.WSRPC,
-		Creds: cfg.Creds,
-		Auth:  cfg.Auth,
-	}
-	jdClient, err := jd.NewJDClient(jdConfig)
-	if err != nil {
-		return nil, err
-	}
-	donJDClient := &JobDistributor{
-		JobDistributor: jdClient,
-	}
-	// if len(cfg.NodeInfo) > 0 {
-	// 	donJDClient.don, err = NewRegisteredDON(ctx, cfg.NodeInfo, *donJDClient)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to create registered DON: %w", err)
-	// 	}
-	// }
-	return donJDClient, err
-}
+// func NewJDClient(ctx context.Context, cfg JDConfig) (cldf_offchain.Client, error) {
+// 	jdConfig := jd.JDConfig{
+// 		GRPC:  cfg.GRPC,
+// 		WSRPC: cfg.WSRPC,
+// 		Creds: cfg.Creds,
+// 		Auth:  cfg.Auth,
+// 	}
+// 	jdClient, err := jd.NewJDClient(jdConfig)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	donJDClient := &JobDistributor{
+// 		JobDistributor: jdClient,
+// 	}
+// 	// if len(cfg.NodeInfo) > 0 {
+// 	// 	donJDClient.don, err = NewRegisteredDON(ctx, cfg.NodeInfo, *donJDClient)
+// 	// 	if err != nil {
+// 	// 		return nil, fmt.Errorf("failed to create registered DON: %w", err)
+// 	// 	}
+// 	// }
+// 	return donJDClient, err
+// }
 
 // ProposeJob proposes jobs through the jobService and accepts the proposed job on selected node based on ProposeJobRequest.NodeId
-func (jd JobDistributor) ProposeJob(ctx context.Context, in *jobv1.ProposeJobRequest, opts ...grpc.CallOption) (*jobv1.ProposeJobResponse, error) {
-	res, err := jd.JobDistributor.ProposeJob(ctx, in, opts...)
-	if err != nil {
-		return nil, err
-	}
+// func (jd JobDistributor) ProposeJob(ctx context.Context, in *jobv1.ProposeJobRequest, opts ...grpc.CallOption) (*jobv1.ProposeJobResponse, error) {
+// 	res, err := jd.JobDistributor.ProposeJob(ctx, in, opts...)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	if jd.don == nil || len(jd.don.Nodes) == 0 {
-		return res, nil
-	}
-	// for _, node := range jd.don.Nodes {
-	// 	if node.JobDistributorDetails.NodeID != in.NodeId {
-	// 		continue
-	// 	}
-	// 	// TODO : is there a way to accept the job with proposal id?
-	// 	if err := node.AcceptJob(ctx, res.Proposal.Spec); err != nil {
-	// 		return nil, fmt.Errorf("failed to accept job. err: %w", err)
-	// 	}
-	// }
-	return res, nil
-}
+// 	if jd.don == nil || len(jd.don.Nodes) == 0 {
+// 		return res, nil
+// 	}
+// 	// for _, node := range jd.don.Nodes {
+// 	// 	if node.JobDistributorDetails.NodeID != in.NodeId {
+// 	// 		continue
+// 	// 	}
+// 	// 	// TODO : is there a way to accept the job with proposal id?
+// 	// 	if err := node.AcceptJob(ctx, res.Proposal.Spec); err != nil {
+// 	// 		return nil, fmt.Errorf("failed to accept job. err: %w", err)
+// 	// 	}
+// 	// }
+// 	return res, nil
+// }

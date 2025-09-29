@@ -247,7 +247,7 @@ func GenerateArtifact(
 		Topology:      donTopology,
 	}
 
-	for donIdx, don := range donTopology.ToDonMetadata() {
+	for donIdx, don := range donTopology.Dons.List() {
 		donArtifact := DonArtifact{
 			DonName:        don.Name,
 			DonID:          don.ID,
