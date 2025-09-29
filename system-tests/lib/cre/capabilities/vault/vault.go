@@ -3,17 +3,14 @@ package vault
 import (
 	"encoding/hex"
 	"fmt"
-	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/tdh2/go/tdh2/lib/group/nist"
+
 	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
-	"golang.org/x/crypto/nacl/box"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 
