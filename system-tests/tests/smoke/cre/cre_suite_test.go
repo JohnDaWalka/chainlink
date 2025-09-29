@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 //////////// SMOKE TESTS /////////////
@@ -121,6 +122,7 @@ func Test_CRE_V2_HTTP_Trigger_Action(t *testing.T) {
 }
 
 func Test_CRE_V2_DON_Time(t *testing.T) {
+	quarantine.Flaky(t, "DX-1914")
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 
 	ExecuteDonTimeTest(t, testEnv)
