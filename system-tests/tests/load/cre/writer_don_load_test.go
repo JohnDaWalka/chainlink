@@ -250,9 +250,9 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	ctx := t.Context()
 	// Get OCR2 keys needed to sign the reports
 	kb := make([]ocr2key.KeyBundle, 0)
-	for idx, donMetadata := range setupOutput.donTopology.Dons.DonMetadata {
-		if flags.HasFlag(donMetadata.Flags, cretypes.MockCapability) {
-			for i, n := range setupOutput.donTopology.Dons.List()[idx].Nodes {
+	for _, don := range setupOutput.donTopology.Dons.List() {
+		if flags.HasFlag(don.Flags, cretypes.MockCapability) {
+			for i, n := range don.Nodes {
 				if i == 0 {
 					continue // Skip bootstrap nodes
 				}

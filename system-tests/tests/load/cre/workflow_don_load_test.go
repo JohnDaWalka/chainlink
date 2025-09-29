@@ -351,7 +351,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	ctx := t.Context()
 	// Get OCR2 keys needed to sign the reports
 	kb := make([]ocr2key.KeyBundle, 0)
-	for idx, don := range setupOutput.donTopology.Dons.DonMetadata {
+	for idx, don := range setupOutput.donTopology.Dons.List() {
 		if flags.HasFlag(don.Flags, cretypes.MockCapability) {
 			for _, n := range setupOutput.donTopology.Dons.List()[idx].Nodes {
 				key, err2 := n.ExportOCR2Keys(n.Keys.OCR2BundleIDs[chainselectors.FamilyEVM])
