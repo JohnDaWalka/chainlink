@@ -48,6 +48,8 @@ type DON struct {
 
 	Flags             []CapabilityFlag                  `toml:"flags" json:"flags"` // capabilities and roles
 	ChainCapabilities map[string]*ChainCapabilityConfig `toml:"chain_capabilities" json:"chain_capabilities"`
+
+	gh GatewayHelper
 }
 
 func (m *DON) ToMetadata() *DonMetadata {
@@ -150,6 +152,14 @@ func (m *DON) JDNodeIDs() []string {
 		nodeIDs = append(nodeIDs, n.JobDistributorDetails.NodeID)
 	}
 	return nodeIDs
+}
+
+func (m *DON) NeedsAnyGateway() bool {
+	return m.gh.NeedsAnyGateway(m.Flags)
+}
+
+func (m *DON) NeedsWebAPIGateway() bool {
+	return m.gh.NeedsWebAPIGateway(m.Flags)
 }
 
 func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Output, supportedChains []ChainConfig, jd *jd.JobDistributor) (*DON, error) {

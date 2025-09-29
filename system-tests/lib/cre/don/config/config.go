@@ -35,8 +35,6 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
 
@@ -183,7 +181,7 @@ func generateNodeTomlConfig(input cre.GenerateConfigsInput, nodeConfigTransforme
 				}
 			case cre.WorkerNode:
 				var cErr error
-				nodeConfig, cErr = addWorkerNodeConfig(nodeConfig, input.OCRPeeringData, commonInputs, input.GatewayConnectorOutput, input.DonMetadata.Name, input.DonMetadata.Flags, nodeMetadata)
+				nodeConfig, cErr = addWorkerNodeConfig(nodeConfig, input.OCRPeeringData, commonInputs, input.GatewayConnectorOutput, input.DonMetadata, nodeMetadata)
 				if cErr != nil {
 					return nil, errors.Wrapf(cErr, "failed to add worker node config for node at index %d in DON %s", nodeIdx, input.DonMetadata.Name)
 				}
@@ -309,8 +307,7 @@ func addWorkerNodeConfig(
 	ocrPeeringData cre.OCRPeeringData,
 	commonInputs *commonInputs,
 	gatewayConnector *cre.GatewayConnectorOutput,
-	donName string,
-	donFlags []string,
+	donMetadata *cre.DonMetadata,
 	m *cre.NodeMetadata,
 ) (corechainlink.Config, error) {
 	ocrBoostrapperLocator, ocrBErr := commontypes.NewBootstrapperLocator(ocrPeeringData.OCRBootstraperPeerID, []string{ocrPeeringData.OCRBootstraperHost + ":" + strconv.Itoa(ocrPeeringData.Port)})
@@ -364,7 +361,7 @@ func addWorkerNodeConfig(
 		ContractVersion: ptr.Ptr(commonInputs.capabilityRegistry.versionType.Version.String()),
 	}
 
-	if flags.HasFlag(donFlags, cre.WorkflowDON) {
+	if donMetadata.HasFlag(cre.WorkflowDON) {
 		existingConfig.Capabilities.WorkflowRegistry = coretoml.WorkflowRegistry{
 			Address:         ptr.Ptr(commonInputs.workflowRegistry.address.Hex()),
 			NetworkID:       ptr.Ptr("evm"),
@@ -374,7 +371,7 @@ func addWorkerNodeConfig(
 		}
 	}
 
-	if flags.HasFlag(donFlags, cre.WorkflowDON) || don.NodeNeedsAnyGateway(donFlags) {
+	if donMetadata.HasFlag(cre.WorkflowDON) || donMetadata.NeedsAnyGateway() {
 		evmKey, ok := m.Keys.EVM[commonInputs.registryChainID]
 		if !ok {
 			return existingConfig, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", commonInputs.registryChainID, m.Index)
@@ -393,7 +390,7 @@ func addWorkerNodeConfig(
 			}
 
 			existingConfig.Capabilities.GatewayConnector = coretoml.GatewayConnector{
-				DonID:             ptr.Ptr(donName),
+				DonID:             ptr.Ptr(donMetadata.Name),
 				ChainIDForNodeKey: ptr.Ptr(strconv.FormatUint(commonInputs.registryChainID, 10)),
 				NodeAddress:       ptr.Ptr(evmKey.PublicAddress.Hex()),
 				Gateways:          gateways,

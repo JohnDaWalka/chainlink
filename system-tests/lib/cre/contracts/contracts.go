@@ -787,7 +787,7 @@ func DKGReportingPluginConfig(topology *cre.Topology, nodeSets []*cre.Capabiliti
 
 	vaultIndex := -1
 	for i, don := range topology.DonsMetadata.List() {
-		if flags.HasFlag(don.Flags, cre.VaultCapability) {
+		if don.HasFlag(cre.VaultCapability) {
 			vaultIndex = i
 			break
 		}

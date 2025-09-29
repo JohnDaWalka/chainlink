@@ -504,6 +504,7 @@ type DonMetadata struct {
 	Name          string          `toml:"name" json:"name"`
 
 	ns CapabilitiesAwareNodeSet // computed field, not serialized
+	gh GatewayHelper
 }
 
 func NewDonMetadata(c *CapabilitiesAwareNodeSet, id uint64, provider infra.Provider) (*DonMetadata, error) {
@@ -565,6 +566,14 @@ func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration,
 	return nil, errors.New("don does not have the gateway flag or gateway node index not set")
 }
 
+func (m *DonMetadata) NeedsAnyGateway() bool {
+	return m.gh.NeedsAnyGateway(m.Flags)
+}
+
+func (m *DonMetadata) NeedsWebAPIGateway() bool {
+	return m.gh.NeedsWebAPIGateway(m.Flags)
+}
+
 func (m *DonMetadata) WorkerNodes() ([]*NodeMetadata, error) {
 	workers := make([]*NodeMetadata, 0)
 	for _, node := range m.NodesMetadata {
@@ -610,6 +619,10 @@ func (m *DonMetadata) GatewayNode() (*NodeMetadata, error) {
 
 	// fallback, should not happen
 	return m.NodesMetadata[m.ns.GatewayNodeIndex], nil
+}
+
+func (m *DonMetadata) HasFlag(flag CapabilityFlag) bool {
+	return HasFlagForAnyChain(m.Flags, flag)
 }
 
 func (m *DonMetadata) CapabilitiesAwareNodeSet() *CapabilitiesAwareNodeSet {
@@ -881,6 +894,16 @@ func (t *DonTopology) GatewayNode() (*Node, error) {
 	}
 
 	return nil, errors.New("no don contains a bootstrap node")
+}
+
+func (t *DonTopology) AnyDonHasCapability(capability CapabilityFlag) bool {
+	for _, don := range t.Dons.List() {
+		if don.HasFlag(capability) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // CapabilitiesAwareNodeSet is the serialized form that declares nodesets in a topology.

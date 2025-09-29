@@ -20,7 +20,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
@@ -72,7 +71,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 		donToJobSpecs := make(cre.DonsToJobSpecs)
 
 		// return early if no DON has the vault capability
-		if !don.AnyDonHasCapability(input.DonTopology.Dons.List(), flag) {
+		if !input.DonTopology.AnyDonHasCapability(flag) {
 			return donToJobSpecs, nil
 		}
 
@@ -143,7 +142,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 }
 
 func handlerConfig(don *cre.DON) (cre.HandlerTypeToConfig, error) {
-	if !flags.HasFlag(don.Flags, flag) {
+	if !don.HasFlag(flag) {
 		return nil, nil
 	}
 

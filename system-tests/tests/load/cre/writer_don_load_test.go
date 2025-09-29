@@ -179,7 +179,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				if flags.HasFlag(don.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
+				if don.HasFlag(cretypes.MockCapability) && in.MockCapabilities != nil {
 					jobSpecs = append(jobSpecs, MockCapabilitiesJob(workerNode.JobDistributorDetails.NodeID, "mock", in.MockCapabilities))
 				}
 			}
@@ -246,7 +246,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	// Get OCR2 keys needed to sign the reports
 	kb := make([]ocr2key.KeyBundle, 0)
 	for _, don := range setupOutput.donTopology.Dons.List() {
-		if flags.HasFlag(don.Flags, cretypes.MockCapability) {
+		if don.HasFlag(cretypes.MockCapability) {
 			for i, n := range don.Nodes {
 				if i == 0 {
 					continue // Skip bootstrap nodes
@@ -268,7 +268,7 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	f := 0
 	// Nr of signatures needs to be equal with f+1, compute f based on the nr of ocr3 worker nodes
 	for _, don := range setupOutput.donTopology.Dons.List() {
-		if flags.HasFlag(don.Flags, cretypes.ConsensusCapability) {
+		if don.HasFlag(cretypes.ConsensusCapability) {
 			workerNodes, workerNodesErr := don.WorkerNodes()
 			require.NoError(t, workerNodesErr, "could not find any worker nodes for ocr3")
 

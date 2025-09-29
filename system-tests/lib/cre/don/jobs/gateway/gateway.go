@@ -11,9 +11,7 @@ import (
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	credon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
 func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []string) cre.JobSpecFn {
@@ -36,7 +34,7 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 		// This map will be used to configure the gateway job on the node that runs it.
 		for _, don := range input.DonTopology.Dons.List() {
 			// if it's a workflow DON or it has custom compute capability or it has vault capability, it needs access to gateway connector
-			if !flags.HasFlag(don.Flags, cre.WorkflowDON) && !credon.NodeNeedsAnyGateway(don.Flags) {
+			if !don.HasFlag(cre.WorkflowDON) && !don.NeedsAnyGateway() {
 				continue
 			}
 
@@ -59,7 +57,7 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 			}
 
 			handlers := map[string]string{}
-			if flags.HasFlag(don.Flags, cre.WorkflowDON) || credon.NodeNeedsWebAPIGateway(don.Flags) {
+			if don.HasFlag(cre.WorkflowDON) || don.NeedsWebAPIGateway() {
 				handlerConfig := `
 				[gatewayConfig.Dons.Handlers.Config]
 				maxAllowedMessageAgeSec = 1_000

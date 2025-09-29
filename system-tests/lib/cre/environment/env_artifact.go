@@ -37,7 +37,6 @@ type EnvArtifact struct {
 	DONs                  []DonArtifact                                        `json:"dons"`
 	Bootstrappers         []BootstrapNodeArtifact                              `json:"bootstrappers"`
 	NOPs                  []NOPArtifact                                        `json:"nops"`
-	// DonTopology   cre.DonTopology                                      `json:"don_topology"`
 }
 
 type NodesArtifact struct {
@@ -246,7 +245,6 @@ func GenerateArtifact(
 		DONs:                  make([]DonArtifact, 0),
 		Bootstrappers:         make([]BootstrapNodeArtifact, 0),
 		NOPs:                  make([]NOPArtifact, 0),
-		// DonTopology:   donTopology,
 	}
 
 	for donIdx, don := range donTopology.Dons.List() {

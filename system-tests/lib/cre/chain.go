@@ -90,8 +90,10 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 	for _, chainCfg := range configs {
 		g.Go(func() error {
 			family := strings.ToLower(chainCfg.ChainType)
+			// tron's devnet chainID maps to many chain selectors, one for tron one for EVM
+			// we want to force mapping to EVM family here to avoid selector mismatches later
 			if strings.EqualFold(chainCfg.ChainType, chainselectors.FamilyTron) {
-				family = chainselectors.FamilyTron
+				family = chainselectors.FamilyEVM
 			}
 			chainDetails, err := chainselectors.GetChainDetailsByChainIDAndFamily(chainCfg.ChainID, family)
 			if err != nil {

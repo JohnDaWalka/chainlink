@@ -230,7 +230,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				if flags.HasFlag(don.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
+				if don.HasFlag(cretypes.MockCapability) && in.MockCapabilities != nil {
 					jobSpecs = append(jobSpecs, MockCapabilitiesJob(workerNode.JobDistributorDetails.NodeID, "mock", in.MockCapabilities))
 				}
 			}
@@ -252,7 +252,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				if flags.HasFlag(don.Flags, cretypes.WorkflowDON) {
+				if don.HasFlag(cretypes.WorkflowDON) {
 					for i := range feedsAddresses {
 						feedConfig := make([]FeedConfig, 0)
 
@@ -341,7 +341,7 @@ func TestLoad_Workflow_Streams_MockCapabilities(t *testing.T) {
 	// Get OCR2 keys needed to sign the reports
 	kb := make([]ocr2key.KeyBundle, 0)
 	for idx, don := range setupOutput.donTopology.Dons.List() {
-		if flags.HasFlag(don.Flags, cretypes.MockCapability) {
+		if don.HasFlag(cretypes.MockCapability) {
 			for _, n := range setupOutput.donTopology.Dons.List()[idx].Nodes {
 				key, err2 := n.ExportOCR2Keys(n.Keys.OCR2BundleIDs[chainselectors.FamilyEVM])
 				if err2 == nil {
