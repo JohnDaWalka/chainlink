@@ -669,20 +669,17 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 	return slices.Contains(m.Flags, WorkflowDON)
 }
 
-// TODO Refactor later on. Probably when we introduce our own DON struct
-// we could add to it all the metadata we need and avoid this wrapper struct altogether
 type Dons struct {
-	// DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
-	dons []*DON
+	Dons []*DON `toml:"dons" json:"dons"`
 }
 
 func (d *Dons) List() []*DON {
-	return d.dons
+	return d.Dons
 }
 
 func NewDons(dons []*DON) *Dons {
 	return &Dons{
-		dons: dons,
+		Dons: dons,
 	}
 }
 
@@ -755,15 +752,6 @@ func (m DonsMetadata) BootstrapNodeCount() int {
 	return count
 }
 
-func (m DonsMetadata) FindByID(id uint64) (*DonMetadata, error) {
-	for _, don := range m.dons {
-		if don.ID == id {
-			return don, nil
-		}
-	}
-	return nil, fmt.Errorf("don with id %d not found", id)
-}
-
 // WorkflowDON returns the DON with the WorkflowDON flag. Returns an error if
 // there is not exactly one such DON. Currently, the WorkflowDON flag is required on exactly one DON.
 func (m DonsMetadata) WorkflowDON() (*DonMetadata, error) {
@@ -803,13 +791,7 @@ func (m DonsMetadata) GatewayRequired() bool {
 	return false
 }
 
-type Label struct {
-	Key   string `toml:"key" json:"key"`
-	Value string `toml:"value" json:"value"`
-}
-
 type NodeMetadata struct {
-	// Labels []*Label          `toml:"labels" json:"labels"`
 	Keys  *secrets.NodeKeys `toml:"keys" json:"keys"`
 	Host  string            `toml:"host" json:"host"`
 	Roles []string          `toml:"roles" json:"roles"`
@@ -842,7 +824,6 @@ func NewNodeMetadata(c NodeMetadataConfig) (*NodeMetadata, error) {
 	}
 
 	return &NodeMetadata{
-		// Labels: make([]*Label, 0),
 		Keys:  keys,
 		Host:  c.Host,
 		Roles: c.Roles,
@@ -873,8 +854,6 @@ func NewDonTopology(registryChainSelector uint64, topology *Topology, dons *Dons
 	}
 }
 
-// TODO refactor it to only contain []DON, once we have our own DON struct
-// and maybe the GatewayConnectorOutput
 type DonTopology struct {
 	WorkflowDonID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
 	HomeChainSelector      uint64                  `toml:"home_chain_selector" json:"home_chain_selector"`
@@ -903,13 +882,6 @@ func (t *DonTopology) GatewayNode() (*Node, error) {
 
 	return nil, errors.New("no don contains a bootstrap node")
 }
-
-// func (t *DonTopology) ToDonMetadata() []*DonMetadata {
-// 	metadata := []*DonMetadata{}
-// 	metadata = append(metadata, t.Dons.DonMetadata...)
-
-// 	return metadata
-// }
 
 // CapabilitiesAwareNodeSet is the serialized form that declares nodesets in a topology.
 type CapabilitiesAwareNodeSet struct {

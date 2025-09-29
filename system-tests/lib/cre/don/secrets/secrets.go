@@ -57,7 +57,7 @@ type nodeSolKeyWrapper struct {
 }
 
 type NodeKeys struct {
-	CSAKey        crypto.CSAKey
+	CSAKey        *crypto.CSAKey
 	EVM           map[uint64]*crypto.EVMKey
 	Solana        map[string]*crypto.SolKey
 	P2PKey        *crypto.P2PKey

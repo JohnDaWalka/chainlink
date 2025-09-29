@@ -99,7 +99,7 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 		}
 
 		for _, don := range input.DonTopology.Dons.List() {
-			if !flags.HasFlag(don.Flags, flag) {
+			if !don.HasFlag(flag) {
 				continue
 			}
 
@@ -115,11 +115,6 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 				return nil, errors.Wrap(bootErr, "failed to find bootstrap node")
 			}
 
-			// bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
-			// if nodeIDErr != nil {
-			// 	return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
-			// }
-
 			_, ocrPeeringData, peeringErr := cre.PeeringCfgs(bootstrapNode)
 			if peeringErr != nil {
 				return nil, errors.Wrap(peeringErr, "failed to find peering data")
@@ -129,20 +124,10 @@ func jobSpec(chainID uint64) cre.JobSpecFn {
 			donToJobSpecs[don.ID] = append(donToJobSpecs[don.ID], jobs.BootstrapOCR3(bootstrapNode.JobDistributorDetails.NodeID, "vault-capability", vaultCapabilityAddress.Address, chainID))
 
 			for _, workerNode := range workerNodes {
-				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				// if nodeIDErr != nil {
-				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				// }
-
 				evmKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
 					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 				}
-
-				// ocr2KeyBundlesPerFamily, ocr2kbErr := node.ExtractBundleKeysPerFamily(workerNode)
-				// if ocr2kbErr != nil {
-				// 	return nil, errors.Wrap(ocr2kbErr, "failed to get ocr2 key bundle id from labels")
-				// }
 
 				evmOCR2KeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainselectors.FamilyEVM]
 				if !ok {

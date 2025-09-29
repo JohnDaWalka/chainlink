@@ -63,7 +63,6 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 	logger := framework.L
 
 	for donIdx, don := range donTopology.Dons.List() {
-		// TODO: change signature to expect []string, so we can pass don.Capabilities directly
 		if !capabilityEnabler(don, flag) {
 			continue
 		}
@@ -89,11 +88,6 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get bootstrap node from DON metadata")
 		}
-
-		// bootstrapNodeID, nodeIDErr := node.FindLabelValue(bootstrapNode, node.NodeIDKey)
-		// if nodeIDErr != nil {
-		// 	return nil, errors.Wrap(nodeIDErr, "failed to get bootstrap node id from labels")
-		// }
 
 		chainIDs, err := enabledChainsProvider(donTopology, nodeSetInput[donIdx], flag)
 		if err != nil {
@@ -138,21 +132,11 @@ func GenerateJobSpecsForStandardCapabilityWithOCR(
 			logger.Debug().Msgf("Found deployed '%s' OCR3 contract on chain %d at %s", contractName, chainID, ocr3ConfigContractAddress.Address)
 
 			for _, workerNode := range workerNodes {
-				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				// if nodeIDErr != nil {
-				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				// }
-
 				evmKey, ok := workerNode.Keys.EVM[chainID]
 				if !ok {
 					return nil, fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 				}
 				transmitterAddress := evmKey.PublicAddress.Hex()
-
-				// bundlesPerFamily, kbErr := node.ExtractBundleKeysPerFamily(workerNode)
-				// if kbErr != nil {
-				// 	return nil, errors.Wrap(kbErr, "failed to get ocr families bundle id from worker node labels")
-				// }
 
 				evmKeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainsel.FamilyEVM] // we can always expect evm bundle key id present since evm is the registry chain
 				if !ok {

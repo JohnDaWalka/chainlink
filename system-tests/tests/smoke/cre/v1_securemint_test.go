@@ -30,9 +30,11 @@ import (
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 	writetarget "github.com/smartcontractkit/chainlink-solana/pkg/solana/write_target"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/deployment"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	df_sol "github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/solana"
@@ -138,7 +140,7 @@ func waitForFeedUpdate(t *testing.T, solclient *rpc.Client, s *setup) {
 			r.answer = amount
 
 			if r.answer.Uint64() == 0 {
-				framework.L.Info().Msgf("Feed is not update yet")
+				framework.L.Info().Msgf("Feed not updated yet.. Retrying...")
 				continue
 			}
 			framework.L.Info().Msg("Feed is updated. Asserting results...")
@@ -405,13 +407,19 @@ func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.Wrapp
 }
 
 func proposeSecureMintJob(t *testing.T, offchain offchain.Client, donTopology cre.DonTopology, jobSpec string) {
-	nodes, err := offchain.ListNodes(t.Context(), &node.ListNodesRequest{})
+	workerNodes, err := offchain.ListNodes(t.Context(), &node.ListNodesRequest{
+		Filter: &node.ListNodesRequest_Filter{
+			Selectors: []*ptypes.Selector{{
+				Key:   cre.LabelNodeTypeKey,
+				Value: ptr.Ptr(cre.LabelNodeTypeValuePlugin),
+				Op:    ptypes.SelectorOp_EQ,
+			},
+			},
+		},
+	})
 	require.NoError(t, err, "failed to get list nodes")
 	var specs cre.DonJobs
-	for _, n := range nodes.GetNodes() {
-		if strings.Contains(n.Name, "bootstrap") {
-			continue
-		}
+	for _, n := range workerNodes.GetNodes() {
 
 		specs = append(specs, &job.ProposeJobRequest{
 			Spec:   jobSpec,

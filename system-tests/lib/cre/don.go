@@ -36,32 +36,16 @@ const (
 	LabelNodeTypeValuePlugin    = "plugin"
 
 	LabelNodeP2PIDKey = "p2p_id"
-
-	LabelJobTypeKey         = "jobType"
-	LabelJobTypeValueLLO    = "llo"
-	LabelJobTypeValueStream = "stream"
-
-	LabelEnvironmentKey = "environment"
-	LabelStreamIDKey    = "streamID"
-
-	LabelProductKey = "product"
 )
 
-// type NodeCapabilitiesProvider interface {
-// 	CapabilityFlags() []CapabilityFlag
-// 	ChainCapabilities() map[string]*ChainCapabilityConfig
-// }
-
 type DON struct {
-	Name string
-	ID   uint64
+	Name string `toml:"name" json:"name"`
+	ID   uint64 `toml:"id" json:"id"`
 
-	Nodes []*Node
+	Nodes []*Node `toml:"nodes" json:"nodes"`
 
-	Flags             []CapabilityFlag // capabilities and roles
-	ChainCapabilities map[string]*ChainCapabilityConfig
-	// Roles []string // workflow, capability, gateway
-	// SupportedChains []uint64 // chain selector... optionally? to indicate, whether each node should connect to every chain in the environment or only some // not used anywhere currently
+	Flags             []CapabilityFlag                  `toml:"flags" json:"flags"` // capabilities and roles
+	ChainCapabilities map[string]*ChainCapabilityConfig `toml:"chain_capabilities" json:"chain_capabilities"`
 }
 
 func (m *DON) ToMetadata() *DonMetadata {
@@ -70,6 +54,7 @@ func (m *DON) ToMetadata() *DonMetadata {
 		ID:            m.ID,
 		Flags:         m.Flags,
 		NodesMetadata: make([]*NodeMetadata, len(m.Nodes)),
+		// caution: missing NodeSet field, since we don't have it here
 	}
 
 	for i, node := range m.Nodes {
@@ -77,6 +62,20 @@ func (m *DON) ToMetadata() *DonMetadata {
 	}
 
 	return dm
+}
+
+func (m *DON) HasFlag(flag CapabilityFlag) bool {
+	if slices.Contains(m.Flags, flag) {
+		return true
+	}
+
+	for _, value := range m.Flags {
+		if strings.HasPrefix(value, flag+"-") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (m *DON) ContainsBootstrapNode() bool {
@@ -160,17 +159,6 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 	}
 	mu := &sync.Mutex{}
 
-	// TODO maybe that should be a higher level provider, like capabilities flags?
-	// knownDONRoles := []string{WorkflowDON, CapabilitiesDON, GatewayDON}
-
-	// Flags contain both roles and capabilities, we need to separate them, but in TOML these are separated, so maybe it doesn't make sense to have them separated here?
-	// TODO: maybe we should just have Flags on DON instead of Roles and Capabilities separately?
-	// for _, flag := range donMetadata.Flags {
-	// 	if slices.Contains(knownDONRoles, flag) {
-	// 		don.Roles = append(don.Roles, flag)
-	// 	}
-	// }
-
 	errgroup := errgroup.Group{}
 	for idx, nodeMetadata := range donMetadata.NodesMetadata {
 		errgroup.Go(func() error {
@@ -178,28 +166,6 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 			if err != nil {
 				return fmt.Errorf("failed to create node %d: %w", idx, err)
 			}
-
-			// TODO move this to SetUpAndLinkJobDistributor
-			// labels := make([]*ptypes.Label, 0)
-
-			// for _, role := range node.Roles {
-			// 	switch role {
-			// 	case WorkerNode:
-			// 		labels = append(labels, &ptypes.Label{
-			// 			Key:   LabelNodeTypeKey,
-			// 			Value: ptr.Ptr(LabelNodeTypeValuePlugin),
-			// 		})
-			// 	case BootstrapNode:
-			// 		labels = append(labels, &ptypes.Label{
-			// 			Key:   LabelNodeTypeKey,
-			// 			Value: ptr.Ptr(LabelNodeTypeValueBootstrap),
-			// 		})
-			// 	case GatewayNode:
-			// 		// no specific data to set for gateway nodes yet
-			// 	default:
-			// 		return fmt.Errorf("unknown node role: %s", role)
-			// 	}
-			// }
 
 			// Set up Job distributor in node and register node with the job distributor
 			setupErr := node.SetUpAndLinkJobDistributor(ctx, jd)
@@ -236,10 +202,6 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 }
 
 func (n *Node) CreateSupportedChains(ctx context.Context, chains []ChainConfig, jd *jd.JobDistributor) error {
-	// g := new(errgroup.Group)
-	// for i := range don.Nodes {
-	// g.Go(func() error {
-	// n := don.Nodes[i]
 	var jdChains []JDChainConfigInput
 	for _, chain := range chains {
 		jdChains = append(jdChains, JDChainConfigInput{
@@ -247,39 +209,41 @@ func (n *Node) CreateSupportedChains(ctx context.Context, chains []ChainConfig, 
 			ChainType: chain.ChainType,
 		})
 	}
-	if err1 := n.CreateJDChainConfigs(ctx, jdChains, jd); err1 != nil {
-		return err1
+
+	if err := n.CreateJDChainConfigs(ctx, jdChains, jd); err != nil {
+		return fmt.Errorf("failed to create JD chain configs for node %s: %w", n.Name, err)
 	}
-	// don.Nodes[i] = n
-	// return nil
-	// })
-	// }
 
 	return nil
-	// return g.Wait()
 }
 
 type Node struct {
-	Name                  string
-	Host                  string
-	Index                 int
-	IDs                   NodeIDs
-	Keys                  *secrets.NodeKeys
-	Addresses             Addresses
-	JobDistributorDetails *JobDistributorDetails
-	Roles                 []string
+	Name                  string                 `toml:"name" json:"name"`
+	Host                  string                 `toml:"host" json:"host"`
+	Index                 int                    `toml:"index" json:"index"`
+	IDs                   NodeIDs                `toml:"ids" json:"ids"`
+	Keys                  *secrets.NodeKeys      `toml:"-" json:"-"`
+	Addresses             Addresses              `toml:"addresses" json:"addresses"`
+	JobDistributorDetails *JobDistributorDetails `toml:"job_distributor_details" json:"job_distributor_details"`
+	Roles                 []string               `toml:"roles" json:"roles"`
 
-	Clients NodeClients
-	DON     DON // to easily get parent info
+	Clients NodeClients `toml:"-" json:"-"`
+	DON     DON         `toml:"-" json:"-"`
 }
 
 func (n *Node) ToMetadata() *NodeMetadata {
-	return &NodeMetadata{
+	node := &NodeMetadata{
 		Index: n.Index,
 		Keys:  n.Keys,
 		Roles: n.Roles,
 		Host:  n.Host,
 	}
+
+	if node.Keys == nil {
+		node.Keys = &secrets.NodeKeys{}
+	}
+
+	return node
 }
 
 func (n *Node) GetHost() string {
@@ -362,18 +326,18 @@ func NewNode(ctx context.Context, name string, nodeMetadata *NodeMetadata, ctfNo
 }
 
 type JobDistributorDetails struct {
-	NodeID string // node id returned by JD after node is registered with it
-	JDID   string // JD id returned by node after Job distributor is created in the node
+	NodeID string `toml:"node_id" json:"node_id"` // node id returned by JD after node is registered with it
+	JDID   string `toml:"jd_id" json:"jd_id"`     // JD id returned by node after Job distributor is created in the node
 }
 
 // Do we need to store public address per chain or is it enough to store keys, so that we can derive public address when needed?
 type Addresses struct {
-	AdminAddress string
-	MultiAddress string
+	AdminAddress string `toml:"admin_address" json:"admin_address"` // address used to pay for transactions, applicable only for worker nodes
+	MultiAddress string `toml:"multi_address" json:"multi_address"` // multi address used by OCR2, applicable only for bootstrap nodes
 }
 
 type NodeIDs struct {
-	PeerID string
+	PeerID string `toml:"peer_id" json:"peer_id"`
 }
 
 type NodeClients struct {
@@ -415,15 +379,6 @@ func (n *Node) CreateJDChainConfigs(ctx context.Context, chains []JDChainConfigI
 			} else {
 				account = evmKey.PublicAddress.Hex()
 			}
-			// accountAddr, err := n.gqlClient.FetchAccountAddress(ctx, chain.ChainID)
-			// if err != nil {
-			// 	return fmt.Errorf("failed to fetch account address for node %s: %w", n.Name, err)
-			// }
-			// if accountAddr == nil {
-			// 	return fmt.Errorf("no account address found for node %s", n.Name)
-			// }
-			// n.AccountAddr[chain.ChainID] = *accountAddr
-			// account = *accountAddr
 		case chainselectors.FamilySolana:
 			solKey, ok := n.Keys.Solana[chain.ChainID]
 			if !ok {
@@ -446,20 +401,10 @@ func (n *Node) CreateJDChainConfigs(ctx context.Context, chains []JDChainConfigI
 			if len(accounts) == 0 {
 				return fmt.Errorf("failed to fetch account address for node %s and chain %s", n.Name, chain.ChainType)
 			}
-			// TODO store that or not?
-			// n.AccountAddr[chain.ChainID] = accounts[0]
 			account = accounts[0]
 		default:
 			return fmt.Errorf("unsupported chainType %v", chain.ChainType)
 		}
-
-		// peerID, err := n.gqlClient.FetchP2PPeerID(ctx)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to fetch peer id for node %s: %w", n.Name, err)
-		// }
-		// if peerID == nil {
-		// 	return fmt.Errorf("no peer id found for node %s", n.Name)
-		// }
 
 		chainType := chain.ChainType
 		if strings.EqualFold(chain.ChainType, blockchain.FamilyTron) {
@@ -478,16 +423,6 @@ func (n *Node) CreateJDChainConfigs(ctx context.Context, chains []JDChainConfigI
 		}
 
 		n.Keys.OCR2BundleIDs[strings.ToLower(chainType)] = ocr2BundleID
-
-		// fetch node labels to know if the node is bootstrap or plugin
-		// if multi address is set, then it's a bootstrap node
-		// isBootstrap := n.HasRole(BootstrapNode)
-		// for _, label := range n.labels {
-		// 	if label.Key == LabelNodeTypeKey && value(label.Value) == LabelNodeTypeValueBootstrap {
-		// 		isBootstrap = true
-		// 		break
-		// 	}
-		// }
 
 		// retry twice with 5 seconds interval to create JobDistributorChainConfig
 		retryErr := retry.Do(ctx, retry.WithMaxDuration(10*time.Second, retry.NewConstant(3*time.Second)), func(ctx context.Context) error {
@@ -574,26 +509,20 @@ func (n *Node) AcceptJob(ctx context.Context, spec string) error {
 // it sets the node id returned by JobDistributor as a result of registration in the node struct
 func (n *Node) RegisterNodeToJobDistributor(ctx context.Context, jd *jd.JobDistributor, labels []*ptypes.Label) error {
 	// Get the public key of the node
-	csaKeyRes, err := n.Clients.GQLClient.FetchCSAPublicKey(ctx)
-	if err != nil {
-		return err
-	}
-	if csaKeyRes == nil {
-		return fmt.Errorf("no csa key found for node %s", n.Name)
+	if n.Keys.CSAKey == nil {
+		csaKeyRes, err := n.Clients.GQLClient.FetchCSAPublicKey(ctx)
+		if err != nil {
+			return err
+		}
+		if csaKeyRes == nil {
+			return fmt.Errorf("no csa key found for node %s", n.Name)
+		}
+
+		n.Keys.CSAKey = &crypto.CSAKey{
+			Key: *csaKeyRes,
+		}
 	}
 
-	n.Keys.CSAKey = crypto.CSAKey{
-		Key: *csaKeyRes,
-	}
-
-	// // tag nodes with p2p_id for easy lookup
-	// peerID, err := n.gqlClient.FetchP2PPeerID(ctx)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to fetch peer id for node %s: %w", n.Name, err)
-	// }
-	// if peerID == nil {
-	// 	return fmt.Errorf("no peer id found for node %s", n.Name)
-	// }
 	labels = append(labels, &ptypes.Label{
 		Key:   LabelNodeP2PIDKey,
 		Value: ptr.Ptr(n.Keys.P2PKey.PeerID.String()),
@@ -728,18 +657,6 @@ func (n *Node) SetUpAndLinkJobDistributor(ctx context.Context, jd *jd.JobDistrib
 	return nil
 }
 
-// func ptr[T any](v T) *T {
-// 	return &v
-// }
-
-// func value[T any](v *T) T {
-// 	zero := new(T)
-// 	if v == nil {
-// 		return *zero
-// 	}
-// 	return *v
-// }
-
 func (n *Node) CancelProposalsByExternalJobID(ctx context.Context, externalJobIDs []string) ([]string, error) {
 	jd, err := n.Clients.GQLClient.GetJobDistributor(ctx, n.JobDistributorDetails.JDID)
 	if err != nil {
@@ -809,26 +726,9 @@ func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.
 		return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
 	}
 
-	// donJDClient := &JobDistributor{
-	// 	JobDistributor: jdClient,
-	// }
-
 	dons := make([]*DON, len(input.NodeSetOutput))
-	// var allNodesInfo []NodeInfo
 
 	for idx, nodeOutput := range input.NodeSetOutput {
-		// a maximum of 1 bootstrap is supported due to environment constraints
-		// bootstrapNodeCount := 0
-		// if input.Topology.DonsMetadata.List()[idx].ContainsBootstrapNode() {
-		// 	bootstrapNodeCount = 1
-		// }
-
-		// nodeInfo, err := node.GetNodeInfo(nodeOutput.Output, nodeOutput.NodeSetName, input.Topology.DonsMetadata.List()[idx].ID, bootstrapNodeCount)
-		// if err != nil {
-		// 	return nil, nil, errors.Wrap(err, "failed to get node info")
-		// }
-		// allNodesInfo = append(allNodesInfo, nodeInfo...)
-
 		supportedChains, schErr := FindSupportedChainsForDON(input.Topology.DonsMetadata.List()[idx], input.BlockchainOutputs)
 		if schErr != nil {
 			return nil, nil, errors.Wrap(schErr, "failed to find supported chains for DON")
@@ -840,34 +740,12 @@ func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.
 		}
 
 		dons[idx] = don
-
-		// var regErr error
-		// dons[idx], regErr = configureJDForDON(ctx, nodeInfo, supportedChains, input.JdOutput)
-		// if regErr != nil {
-		// 	return nil, nil, fmt.Errorf("failed to configure JD for DON: %w", regErr)
-		// }
 	}
 
 	var nodeIDs []string
 	for _, don := range dons {
 		nodeIDs = append(nodeIDs, don.JDNodeIDs()...)
 	}
-
-	// dons = addOCRKeyLabelsToNodeMetadata(dons, input.Topology)
-
-	// ctxWithTimeout, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	// defer cancel()
-
-	// jd, jdErr := NewJDClient(ctxWithTimeout, JDConfig{
-	// 	GRPC:     input.JdOutput.ExternalGRPCUrl,
-	// 	WSRPC:    input.JdOutput.InternalWSRPCUrl,
-	// 	Creds:    insecure.NewCredentials(),
-	// 	NodeInfo: allNodesInfo,
-	// })
-
-	// if jdErr != nil {
-	// 	return nil, nil, errors.Wrap(jdErr, "failed to create JD client")
-	// }
 
 	input.CldfEnvironment.Offchain = jdClient
 	input.CldfEnvironment.NodeIDs = nodeIDs
@@ -913,64 +791,3 @@ func FindSupportedChainsForDON(donMetadata *DonMetadata, blockchainOutputs []*Wr
 
 	return chains, nil
 }
-
-// type JDConfig struct {
-// 	GRPC  string
-// 	WSRPC string
-// 	Creds credentials.TransportCredentials
-// 	Auth  oauth2.TokenSource
-// 	// NodeInfo []NodeInfo
-// }
-
-// // JobDistributor implements the OffchainClient interface in CLDF and wraps the CLDF JD client and add DON functionality.
-// // The CLDF JD client does not have the DON functionality, so we wrap it here.
-// type JobDistributor struct {
-// 	*jd.JobDistributor
-// 	don *DON
-// }
-
-// NewJDClient creates a new Job Distributor client with the provided configuration.
-// func NewJDClient(ctx context.Context, cfg JDConfig) (cldf_offchain.Client, error) {
-// 	jdConfig := jd.JDConfig{
-// 		GRPC:  cfg.GRPC,
-// 		WSRPC: cfg.WSRPC,
-// 		Creds: cfg.Creds,
-// 		Auth:  cfg.Auth,
-// 	}
-// 	jdClient, err := jd.NewJDClient(jdConfig)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	donJDClient := &JobDistributor{
-// 		JobDistributor: jdClient,
-// 	}
-// 	// if len(cfg.NodeInfo) > 0 {
-// 	// 	donJDClient.don, err = NewRegisteredDON(ctx, cfg.NodeInfo, *donJDClient)
-// 	// 	if err != nil {
-// 	// 		return nil, fmt.Errorf("failed to create registered DON: %w", err)
-// 	// 	}
-// 	// }
-// 	return donJDClient, err
-// }
-
-// ProposeJob proposes jobs through the jobService and accepts the proposed job on selected node based on ProposeJobRequest.NodeId
-// func (jd JobDistributor) ProposeJob(ctx context.Context, in *jobv1.ProposeJobRequest, opts ...grpc.CallOption) (*jobv1.ProposeJobResponse, error) {
-// 	res, err := jd.JobDistributor.ProposeJob(ctx, in, opts...)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if jd.don == nil || len(jd.don.Nodes) == 0 {
-// 		return res, nil
-// 	}
-// 	// for _, node := range jd.don.Nodes {
-// 	// 	if node.JobDistributorDetails.NodeID != in.NodeId {
-// 	// 		continue
-// 	// 	}
-// 	// 	// TODO : is there a way to accept the job with proposal id?
-// 	// 	if err := node.AcceptJob(ctx, res.Proposal.Spec); err != nil {
-// 	// 		return nil, fmt.Errorf("failed to accept job. err: %w", err)
-// 	// 	}
-// 	// }
-// 	return res, nil
-// }

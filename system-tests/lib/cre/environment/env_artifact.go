@@ -29,14 +29,15 @@ const (
 )
 
 type EnvArtifact struct {
-	AddressRefs   []datastore.AddressRef                               `json:"address_refs"`
-	AddressBook   map[uint64]map[string]cldf_deployment.TypeAndVersion `json:"address_book"`
-	JdConfig      jd.Output                                            `json:"jd_config"`
-	Nodes         map[string]NodesArtifact                             `json:"nodes"`
-	DONs          []DonArtifact                                        `json:"dons"`
-	Bootstrappers []BootstrapNodeArtifact                              `json:"bootstrappers"`
-	NOPs          []NOPArtifact                                        `json:"nops"`
-	Topology      cre.DonTopology                                      `json:"topology"`
+	RegistryChainSelector uint64                                               `json:"home_chain_selector"`
+	AddressRefs           []datastore.AddressRef                               `json:"address_refs"`
+	AddressBook           map[uint64]map[string]cldf_deployment.TypeAndVersion `json:"address_book"`
+	JdConfig              jd.Output                                            `json:"jd_config"`
+	Nodes                 map[string]NodesArtifact                             `json:"nodes"`
+	DONs                  []DonArtifact                                        `json:"dons"`
+	Bootstrappers         []BootstrapNodeArtifact                              `json:"bootstrappers"`
+	NOPs                  []NOPArtifact                                        `json:"nops"`
+	// DonTopology   cre.DonTopology                                      `json:"don_topology"`
 }
 
 type NodesArtifact struct {
@@ -237,14 +238,15 @@ func GenerateArtifact(
 	}
 
 	artifact := EnvArtifact{
-		JdConfig:      jdOutput,
-		AddressBook:   addresses,
-		AddressRefs:   addressRecords,
-		Nodes:         make(map[string]NodesArtifact),
-		DONs:          make([]DonArtifact, 0),
-		Bootstrappers: make([]BootstrapNodeArtifact, 0),
-		NOPs:          make([]NOPArtifact, 0),
-		Topology:      donTopology,
+		RegistryChainSelector: donTopology.HomeChainSelector,
+		JdConfig:              jdOutput,
+		AddressBook:           addresses,
+		AddressRefs:           addressRecords,
+		Nodes:                 make(map[string]NodesArtifact),
+		DONs:                  make([]DonArtifact, 0),
+		Bootstrappers:         make([]BootstrapNodeArtifact, 0),
+		NOPs:                  make([]NOPArtifact, 0),
+		// DonTopology:   donTopology,
 	}
 
 	for donIdx, don := range donTopology.Dons.List() {

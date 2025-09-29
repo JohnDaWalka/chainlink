@@ -3,6 +3,7 @@ package cre
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -12,11 +13,15 @@ import (
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gagliardetto/solana-go"
 	solRpc "github.com/gagliardetto/solana-go/rpc"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/zksync-sdk/zksync2-go/accounts"
 	"github.com/zksync-sdk/zksync2-go/clients"
 
@@ -31,14 +36,10 @@ import (
 	tronprovider "github.com/smartcontractkit/chainlink-deployments-framework/chain/tron/provider"
 	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
 	"github.com/smartcontractkit/chainlink/deployment"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 )
 
-const (
-	EVMChainType   = "EVM"
-	SolChainType   = "SOLANA"
-	AptosChainType = "APTOS"
-	TronChainType  = "TRON"
-)
+// most of the functions were copied from deployment/environment/devenv/chain.go to avoid dependency on deployment module
 
 type CribRPCs struct {
 	Internal string
@@ -87,11 +88,11 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 	g := new(errgroup.Group)
 	for _, chainCfg := range configs {
 		g.Go(func() error {
-			family := chainCfg.ChainType
-			if chainCfg.ChainType == TronChainType {
-				family = EVMChainType
+			family := strings.ToLower(chainCfg.ChainType)
+			if strings.EqualFold(chainCfg.ChainType, chainselectors.FamilyTron) {
+				family = chainselectors.FamilyTron
 			}
-			chainDetails, err := chainselectors.GetChainDetailsByChainIDAndFamily(chainCfg.ChainID, strings.ToLower(family))
+			chainDetails, err := chainselectors.GetChainDetailsByChainIDAndFamily(chainCfg.ChainID, family)
 			if err != nil {
 				return fmt.Errorf("failed to get selector from chain id %s: %w", chainCfg.ChainID, err)
 			}
@@ -101,8 +102,8 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 				RPCs:          chainCfg.ToRPCs(),
 			}
 
-			switch chainCfg.ChainType {
-			case EVMChainType:
+			switch strings.ToLower(chainCfg.ChainType) {
+			case chainselectors.FamilyEVM:
 				ec, evmErr := cldf_evm_client.NewMultiClient(logger, rpcConf, chainCfg.MultiClientOpts...)
 				if evmErr != nil {
 					return fmt.Errorf("failed to create multi client: %w", evmErr)
@@ -154,7 +155,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 				evmSyncMap.Store(chainDetails.ChainSelector, chain)
 				return nil
 
-			case SolChainType:
+			case chainselectors.FamilySolana:
 				solArtifactPath := chainCfg.SolArtifactDir
 				if solArtifactPath == "" {
 					logger.Info("Creating tmp directory for generated solana programs and keypairs")
@@ -183,7 +184,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 				})
 				return nil
 
-			case AptosChainType:
+			case chainselectors.FamilyAptos:
 				cID, err := strconv.ParseUint(chainCfg.ChainID, 10, 8)
 				if err != nil {
 					return err
@@ -218,7 +219,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 					},
 				})
 				return nil
-			case TronChainType:
+			case chainselectors.FamilyTron:
 				signerGen, err := tronprovider.SignerGenCTFDefault()
 				if err != nil {
 					return fmt.Errorf("failed to create signer generator: %w", err)
@@ -279,4 +280,58 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (cldf_chain.BlockCha
 	})
 
 	return cldf_chain.NewBlockChainsFromSlice(blockChains), nil
+}
+
+// ChainConfigFromWrapped converts a single wrapped chain into a ChainConfig.
+func ChainConfigFromWrapped(w *WrappedBlockchainOutput) (ChainConfig, error) {
+	if w == nil || w.BlockchainOutput == nil || len(w.BlockchainOutput.Nodes) == 0 {
+		return ChainConfig{}, errors.New("invalid wrapped blockchain output")
+	}
+	n := w.BlockchainOutput.Nodes[0]
+
+	cfg := ChainConfig{
+		WSRPCs: []CribRPCs{{
+			External: n.ExternalWSUrl, Internal: n.InternalWSUrl,
+		}},
+		HTTPRPCs: []CribRPCs{{
+			External: n.ExternalHTTPUrl, Internal: n.InternalHTTPUrl,
+		}},
+	}
+
+	cfg.ChainType = strings.ToUpper(w.BlockchainOutput.Family)
+
+	// Solana
+	if w.SolChain != nil {
+		cfg.ChainID = w.SolChain.ChainID
+		cfg.SolDeployerKey = w.SolChain.PrivateKey
+		cfg.SolArtifactDir = w.SolChain.ArtifactsDir
+		return cfg, nil
+	}
+
+	if strings.EqualFold(cfg.ChainType, blockchain.FamilyTron) {
+		cfg.ChainID = strconv.FormatUint(w.ChainID, 10)
+		privateKey, err := crypto.HexToECDSA(w.DeployerPrivateKey)
+		if err != nil {
+			return ChainConfig{}, errors.Wrap(err, "failed to parse private key for Tron")
+		}
+
+		deployerKey, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(conversions.MustSafeInt64(w.ChainID)))
+		if err != nil {
+			return ChainConfig{}, errors.Wrap(err, "failed to create transactor for Tron")
+		}
+		cfg.DeployerKey = deployerKey
+		return cfg, nil
+	}
+
+	// EVM
+	if w.SethClient == nil {
+		return ChainConfig{}, fmt.Errorf("blockchain output evm family without SethClient for chainID %d", w.ChainID)
+	}
+
+	cfg.ChainID = strconv.FormatUint(w.ChainID, 10)
+	cfg.ChainName = w.SethClient.Cfg.Network.Name
+	// ensure nonce fetched from chain at use time
+	cfg.DeployerKey = w.SethClient.NewTXOpts(seth.WithNonce(nil))
+
+	return cfg, nil
 }

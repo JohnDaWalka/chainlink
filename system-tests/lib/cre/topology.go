@@ -15,19 +15,6 @@ const (
 	CapabilitiesPeeringPort = 6690
 )
 
-var (
-	// NodeTypeKey            = "type"
-	// IndexKey               = "node_index"
-	// ExtraRolesKey          = "extra_roles"
-	// NodeIDKey              = "node_id"
-	// NodeOCRFamiliesKey     = "node_ocr_families"
-	// NodeOCR2KeyBundleIDKey = "ocr2_key_bundle_id"
-	DONIDKey       = "don_id"
-	EnvironmentKey = "environment"
-	ProductKey     = "product"
-	DONNameKey     = "don_name"
-)
-
 type Topology struct {
 	WorkflowDONID          uint64                  `toml:"workflow_don_id" json:"workflow_don_id"`
 	DonsMetadata           *DonsMetadata           `toml:"dons_metadata" json:"dons_metadata"`

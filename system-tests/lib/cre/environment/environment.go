@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
+	donconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -165,7 +166,7 @@ func SetupTestEnvironment(
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("Keystone contracts deployed in %.2f seconds", input.StageGen.Elapsed().Seconds())))
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.Wrap("Preparing DONs configuration")))
 
-	topology, updatedNodeSets, topoErr := PrepareNodeTOMLConfigurations(
+	topology, updatedNodeSets, topoErr := donconfig.PrepareNodeTOMLs(
 		startBlockchainsOutput.RegistryChain().ChainSelector,
 		input.CapabilitiesAwareNodeSets,
 		input.Provider,
@@ -208,9 +209,9 @@ func SetupTestEnvironment(
 	if cldErr != nil {
 		return nil, pkgerrors.Wrap(cldErr, "failed to link DONs to Job Distributor")
 	}
-	creEnvironment, creErr := newCreEnvironment(startBlockchainsOutput.RegistryChain().ChainSelector, cldfEnvironment, dons, topology)
-	if creErr != nil {
-		return nil, pkgerrors.Wrap(creErr, "failed to create CRE environment")
+	creEnvironment := &cre.Environment{
+		CldfEnvironment: cldfEnvironment,
+		DonTopology:     cre.NewDonTopology(startBlockchainsOutput.RegistryChain().ChainSelector, topology, cre.NewDons(dons)),
 	}
 
 	fmt.Print(libformat.PurpleText("%s", input.StageGen.WrapAndNext("DONs and Job Distributor started and linked in %.2f seconds", input.StageGen.Elapsed().Seconds())))
@@ -497,18 +498,6 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 
 	// append the jd output, so that later it can be stored in the cached output, so that we can use the environment again without running setup
 	input.JdInput.Out = jdOutput
-}
-
-func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*cre.DON, topology *cre.Topology) (*cre.Environment, error) {
-	// creDons, donsErr :=
-	// if donsErr != nil {
-	// 	return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")
-	// }
-
-	return &cre.Environment{
-		CldfEnvironment: cldfEnv,
-		DonTopology:     cre.NewDonTopology(registryChainSelector, topology, cre.NewDons(dons)),
-	}, nil
 }
 
 func newCldfEnvironment(ctx context.Context, singleFileLogger logger.Logger, cldfBlockchains map[uint64]cldf_chain.BlockChain) *cldf.Environment {

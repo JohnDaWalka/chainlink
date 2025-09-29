@@ -96,7 +96,7 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 
 		for _, don := range input.DonTopology.Dons.List() {
 			// create job specs only for the gateway node
-			if !flags.HasFlag(don.Flags, cre.GatewayDON) {
+			if !don.HasFlag(cre.GatewayDON) {
 				continue
 			}
 
@@ -104,11 +104,6 @@ func JobSpec(extraAllowedPorts []int, extraAllowedIPs, extraAllowedIPsCIDR []str
 			if nodeErr != nil {
 				return nil, errors.Wrap(nodeErr, "failed to find gateway node")
 			}
-
-			// gatewayNodeID, gatewayErr := node.FindLabelValue(gatewayNode, node.NodeIDKey)
-			// if gatewayErr != nil {
-			// 	return nil, errors.Wrap(gatewayErr, "failed to get gateway node id from labels")
-			// }
 
 			homeChainID, homeChainErr := chainselectors.ChainIdFromSelector(input.DonTopology.HomeChainSelector)
 			if homeChainErr != nil {

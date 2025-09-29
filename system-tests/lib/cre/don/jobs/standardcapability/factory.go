@@ -147,11 +147,6 @@ func (f *CapabilityJobSpecFactory) BuildJobSpec(
 
 				// Create job specs for each worker node
 				for _, workerNode := range workerNodes {
-					// nodeID, nodeIDErr := crenode.FindLabelValue(workerNode, crenode.NodeIDKey)
-					// if nodeIDErr != nil {
-					// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-					// }
-
 					// Apply runtime values to merged config using the runtime value builder
 					templateData, aErr := credon.ApplyRuntimeValues(mergedConfig, runtimeValuesExtractor(chainID, workerNode))
 					if aErr != nil {

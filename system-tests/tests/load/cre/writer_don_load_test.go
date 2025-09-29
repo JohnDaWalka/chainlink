@@ -172,18 +172,12 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 
 		for _, don := range input.DonTopology.Dons.List() {
 			jobSpecs := make(cretypes.DonJobs, 0)
-			// workflowNodeSet, err2 := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{Key: node.NodeTypeKey, Value: cretypes.WorkerNode}, node.EqualLabels)
 			workflowNodeSet, err2 := don.WorkerNodes()
 			if err2 != nil {
 				// there should be no DON without worker nodes, even gateway DON is composed of a single worker node
 				return nil, errors.Wrap(err2, "failed to find worker nodes")
 			}
 			for _, workerNode := range workflowNodeSet {
-				// nodeID, nodeIDErr := node.FindLabelValue(workerNode, node.NodeIDKey)
-				// if nodeIDErr != nil {
-				// 	return nil, errors.Wrap(nodeIDErr, "failed to get node id from labels")
-				// }
-
 				if flags.HasFlag(don.Flags, cretypes.MockCapability) && in.MockCapabilities != nil {
 					jobSpecs = append(jobSpecs, MockCapabilitiesJob(workerNode.JobDistributorDetails.NodeID, "mock", in.MockCapabilities))
 				}
@@ -274,11 +268,6 @@ func TestLoad_Writer_MockCapabilities(t *testing.T) {
 	// Nr of signatures needs to be equal with f+1, compute f based on the nr of ocr3 worker nodes
 	for _, don := range setupOutput.donTopology.Dons.List() {
 		if flags.HasFlag(don.Flags, cretypes.ConsensusCapability) {
-			// workerNodes, workerNodesErr := node.FindManyWithLabel(donMetadata.NodesMetadata, &cretypes.Label{
-			// 	Key:   node.NodeTypeKey,
-			// 	Value: cretypes.WorkerNode,
-			// }, node.EqualLabels)
-
 			workerNodes, workerNodesErr := don.WorkerNodes()
 			require.NoError(t, workerNodesErr, "could not find any worker nodes for ocr3")
 

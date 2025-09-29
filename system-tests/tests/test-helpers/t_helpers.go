@@ -629,9 +629,6 @@ func CompileAndDeployWorkflow[T WorkflowConfig](t *testing.T,
 	testLogger.Info().Msgf("compiling and registering workflow '%s'", workflowName)
 	homeChainSelector := testEnv.WrappedBlockchainOutputs[0].ChainSelector
 
-	// workflowDON, donErr := flags.OneDonMetadataWithFlag(testEnv.CreEnvironment.DonTopology.ToDonMetadata(), cre.WorkflowDON)
-	// require.NoError(t, donErr, "failed to get find workflow DON in the topology")
-
 	workflowDOName := ""
 	for _, don := range testEnv.CreEnvironment.DonTopology.Dons.List() {
 		if don.ID == testEnv.CreEnvironment.DonTopology.WorkflowDonID {
