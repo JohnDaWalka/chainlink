@@ -175,28 +175,26 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		message := []byte("Hello Sui, from EVM!")
 		messagingtest.Run(t,
 			messagingtest.TestCase{
-				TestSetup:      setup,
-				Nonce:          &nonce,
-				ValidationType: messagingtest.ValidationTypeExec,
-				Receiver:       receiverByte,
-				MsgData:        message,
-				ExtraArgs:      testhelpers.MakeSuiExtraArgs(1000000, true),
-				// true for out of order execution, which is necessary and enforced for Aptos
-				// ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, true),
+				TestSetup:              setup,
+				Nonce:                  &nonce,
+				ValidationType:         messagingtest.ValidationTypeExec,
+				Receiver:               receiverByte,
+				MsgData:                message,
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-				ExtraAssertions: []func(t *testing.T){
-					func(t *testing.T) {
-						// TODO: check dummy receiver events
-						// dummyReceiver := state.AptosChains[destChain].ReceiverAddress
-						// events, err := e.Env.AptosChains[destChain].Client.EventsByHandle(dummyReceiver, fmt.Sprintf("%s::dummy_receiver::CCIPReceiverState", dummyReceiver), "received_message_events", nil, nil)
-						// require.NoError(t, err)
-						// require.Len(t, events, 1)
-						// var receivedMessage module_dummy_receiver.ReceivedMessage
-						// err = codec.DecodeAptosJsonValue(events[0].Data, &receivedMessage)
-						// require.NoError(t, err)
-						// require.Equal(t, message, receivedMessage.Data)
-					},
-				},
+				// ExtraAssertions: []func(t *testing.T){
+				// 	func(t *testing.T) {
+				// 		// TODO: check dummy receiver events
+				// 		// dummyReceiver := state.AptosChains[destChain].ReceiverAddress
+				// 		// events, err := e.Env.AptosChains[destChain].Client.EventsByHandle(dummyReceiver, fmt.Sprintf("%s::dummy_receiver::CCIPReceiverState", dummyReceiver), "received_message_events", nil, nil)
+				// 		// require.NoError(t, err)
+				// 		// require.Len(t, events, 1)
+				// 		// var receivedMessage module_dummy_receiver.ReceivedMessage
+				// 		// err = codec.DecodeAptosJsonValue(events[0].Data, &receivedMessage)
+				// 		// require.NoError(t, err)
+				// 		// require.Equal(t, message, receivedMessage.Data)
+				// 	},
+				// },
 			},
 		)
 	})

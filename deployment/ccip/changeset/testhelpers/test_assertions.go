@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	sui_module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
 	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui/bindings/packages/offramp"
+	sui_indexer "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/indexer"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -868,6 +869,18 @@ func ConfirmExecWithSeqNrsForAll(
 				if err != nil {
 					return err
 				}
+			case chainsel.FamilySui:
+				innerExecutionStates, err = ConfirmExecWithExpectedSeqNrsSui(
+					t,
+					srcChain,
+					e.BlockChains.SuiChains()[dstChain],
+					state.SuiChains[dstChain].CCIPAddress,
+					startBlock,
+					seqRange,
+				)
+				if err != nil {
+					return err
+				}
 			default:
 				return fmt.Errorf("unsupported chain family; %v", family)
 			}
@@ -1098,6 +1111,82 @@ func ConfirmExecWithExpectedSeqNrsAptos(
 	}
 }
 
+func ConfirmExecWithExpectedSeqNrsSui(
+	t *testing.T,
+	srcSelector uint64,
+	dest cldf_sui.Chain,
+	offRampAddress string,
+	startVersion *uint64,
+	expectedSeqNrs []uint64,
+) (executionStates map[uint64]int, err error) {
+	if startVersion != nil {
+		t.Logf("[DEBUG] startVersion = %d", *startVersion)
+	} else {
+		t.Log("[DEBUG] startVersion = nil (streaming from latest)")
+	}
+
+	if len(expectedSeqNrs) == 0 {
+		t.Log("[DEBUG] expectedSeqNrs is empty")
+		return nil, errors.New("no expected sequence numbers provided")
+	}
+
+	done := make(chan any)
+	defer close(done)
+
+	t.Log("[DEBUG] Subscribing to Aptos events...")
+	sink, errChan := SuiEventEmitter[module_offramp.ExecutionStateChanged](t, dest.Client, offRampAddress, "offramp", "ExecutionStateChanged", done)
+
+	t.Log("[DEBUG] Event subscription established")
+
+	executionStates = make(map[uint64]int)
+	seqNrsToWatch := make(map[uint64]bool)
+	for _, seqNr := range expectedSeqNrs {
+		seqNrsToWatch[seqNr] = true
+	}
+	t.Logf("[DEBUG] Watching for sequence numbers: %+v", seqNrsToWatch)
+
+	timeout := time.NewTimer(tests.WaitTimeout(t))
+	defer timeout.Stop()
+
+	for {
+		select {
+		case event := <-sink:
+			t.Logf("[DEBUG] Received event: %+v", event)
+
+			if !seqNrsToWatch[event.Event.SequenceNumber] {
+				t.Logf("[DEBUG] Ignoring event with unexpected sequence number: %d", event.Event.SequenceNumber)
+				continue
+			}
+
+			if event.Event.SourceChainSelector != srcSelector {
+				t.Logf("[DEBUG] Ignoring event with unexpected source chain selector: got %d, expected %d",
+					event.Event.SourceChainSelector, srcSelector)
+				continue
+			}
+
+			if seqNrsToWatch[event.Event.SequenceNumber] && event.Event.SourceChainSelector == srcSelector {
+				t.Logf("(Sui) received ExecutionStateChanged (state %s) on chain %d (offramp %s) with expected sequence number %d (tx %d)",
+					executionStateToString(event.Event.State), dest.Selector, offRampAddress, event.Event.SequenceNumber, event.Version,
+				)
+				if event.Event.State == EXECUTION_STATE_INPROGRESS {
+					continue
+				}
+				executionStates[event.Event.SequenceNumber] = int(event.Event.State)
+				delete(seqNrsToWatch, event.Event.SequenceNumber)
+				if len(seqNrsToWatch) == 0 {
+					return executionStates, nil
+				}
+			}
+
+		case err := <-errChan:
+			require.NoError(t, err)
+		case <-timeout.C:
+			return nil, fmt.Errorf("(Sui) timed out waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence numbers %+v",
+				dest.Selector, offRampAddress, srcSelector, expectedSeqNrs)
+		}
+	}
+}
+
 func ConfirmNoExecConsistentlyWithSeqNr(
 	t *testing.T,
 	sourceSelector uint64,
@@ -1316,17 +1405,14 @@ func SuiEventEmitter[T any](
 				}
 
 				for _, event := range events.Data {
-
-					fmt.Println("EVENTT SUII: ", event)
-					// seqNum = event.SequenceNumber + 1
-					// if startVersion != nil && event.Version < *startVersion {
-					// 	continue
-					// }
 					var out T
-					if err := codec.DecodeAptosJsonValue(event, &out); err != nil {
-						errChan <- err
+					if v, ok := sui_indexer.ConvertMapKeysToCamelCase(event.ParsedJson).(T); ok {
+						out = v
+					} else {
+						// handle type mismatch
 						continue
 					}
+
 					ch <- struct {
 						Event   T
 						Version uint64

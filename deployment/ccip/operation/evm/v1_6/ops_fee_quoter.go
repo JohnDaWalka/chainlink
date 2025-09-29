@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	fqSui "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
@@ -46,19 +45,29 @@ var (
 	DeployFeeQuoterOp = opsutil.NewEVMDeployOperation(
 		"DeployFeeQuoter",
 		semver.MustParse("1.0.0"),
-		"Deploys FeeQuoter 1.6.3 contract on the specified evm chain",
-		cldf.NewTypeAndVersion(shared.FeeQuoter, deployment.Version1_6_0),
-		opsutil.VMDeployers[DeployFeeQInput]{
-			DeployEVM: func(opts *bind.TransactOpts, backend bind.ContractBackend, input DeployFeeQInput) (common.Address, *types.Transaction, error) {
-				// TODO update once latest fee quoter is supported https://smartcontract-it.atlassian.net/browse/CCIP-7181?atlOrigin=eyJpIjoiODlmNDc2MDhmNTAyNGY1YmFhNGU3YTk3NGQ5ODk5ZjciLCJwIjoiaiJ9
-				// TEMP: Use latest fee quoter to support TON
-				// fee_quoter.FeeQuoterBin = latest_fee_quoter.FeeQuoterBin
-
-				addr, tx, _, err := fee_quoter.DeployFeeQuoter(opts, backend,
-					fee_quoter.FeeQuoterStaticConfig{
-						MaxFeeJuelsPerMsg:            input.Params.MaxFeeJuelsPerMsg,
-						LinkToken:                    input.LinkAddr,
-						TokenPriceStalenessThreshold: input.Params.TokenPriceStalenessThreshold,
+		"Deploys FeeQuoter 1.6.x contract on the specified evm chain",
+		shared.FeeQuoter,
+		fee_quoter.FeeQuoterMetaData,
+		&opsutil.ContractOpts{
+			Version:          &deployment.Version1_6_0,
+			EVMBytecode:      common.FromHex(fee_quoter.FeeQuoterBin),
+			ZkSyncVMBytecode: fee_quoter.ZkBytecode,
+		},
+		func(input DeployFeeQInput) []interface{} {
+			return []interface{}{
+				fee_quoter.FeeQuoterStaticConfig{
+					MaxFeeJuelsPerMsg:            input.Params.MaxFeeJuelsPerMsg,
+					LinkToken:                    input.LinkAddr,
+					TokenPriceStalenessThreshold: input.Params.TokenPriceStalenessThreshold,
+				},
+				input.PriceUpdaters,
+				[]common.Address{input.WethAddr, input.LinkAddr}, // fee tokens
+				input.Params.TokenPriceFeedUpdates,
+				input.Params.TokenTransferFeeConfigArgs,
+				append([]fee_quoter.FeeQuoterPremiumMultiplierWeiPerEthArgs{
+					{
+						PremiumMultiplierWeiPerEth: input.Params.LinkPremiumMultiplierWeiPerEth,
+						Token:                      input.LinkAddr,
 					},
 					{
 						PremiumMultiplierWeiPerEth: input.Params.WethPremiumMultiplierWeiPerEth,
