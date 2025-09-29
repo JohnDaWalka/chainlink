@@ -16,13 +16,13 @@ import (
 const griddleConfigsDir = "./configs/griddle-devenv/"
 
 // Bootstrap bootstraps the development environment based on the provided infra input.
-func Bootstrap(infraInput infra.Input) error {
+func Bootstrap(infraInput infra.Provider) error {
 	// connect to telepresence
 
 	return nil
 }
 
-func DeployBlockchain(infraIn infra.Input, input *cre.DeployGriddleDevenvBlockchainInput) (*blockchain.Output, error) {
+func DeployBlockchain(infraIn infra.Provider, input *cre.DeployGriddleDevenvBlockchainInput) (*blockchain.Output, error) {
 	griddleBaseConfigDir := "base"
 
 	// generate griddle yaml config for the blockchain

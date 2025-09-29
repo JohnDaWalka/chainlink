@@ -37,7 +37,7 @@ import (
 
 type BlockchainsInput struct {
 	blockchainsInput []blockchain.Input
-	infra            infra.Input
+	infra            infra.Provider
 }
 
 type BlockchainOutput struct {
@@ -150,7 +150,7 @@ func hasSolanaArtifacts(dir string) bool {
 	return false
 }
 
-func deployBlockchain(testLogger zerolog.Logger, infraIn infra.Input, bi blockchain.Input) (*blockchain.Output, error) {
+func deployBlockchain(testLogger zerolog.Logger, infraIn infra.Provider, bi blockchain.Input) (*blockchain.Output, error) {
 	if infraIn.Type == infra.Docker {
 		bcOut, err := blockchain.NewBlockchainNetwork(&bi)
 		if err != nil {

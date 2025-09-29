@@ -2,7 +2,7 @@ package griddle
 
 import "github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 
-func ConfigFromInfraInput(infraInput infra.Input) GriddleConfig {
+func ConfigFromInfraInput(infraInput infra.Provider) GriddleConfig {
 	metadata := infraInput.GriddleDevenvInput.GriddleMetadata
 
 	// Create a config struct
@@ -21,7 +21,7 @@ func ConfigFromInfraInput(infraInput infra.Input) GriddleConfig {
 }
 
 // ConfigFromInfraInputWithTemplate creates a GriddleConfig from the given infra input and adds a custom deploy template.
-func ConfigFromInfraInputWithTemplate(infraInput infra.Input, templateName string, template DeployTemplate) GriddleConfig {
+func ConfigFromInfraInputWithTemplate(infraInput infra.Provider, templateName string, template DeployTemplate) GriddleConfig {
 	config := ConfigFromInfraInput(infraInput)
 
 	config.DeployTemplates = map[string]DeployTemplate{
