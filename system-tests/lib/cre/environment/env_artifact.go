@@ -293,7 +293,7 @@ func GenerateArtifact(
 
 		var nodeIDs []string
 		for _, node := range donTopology.Dons.List()[donIdx].Nodes {
-			nodeIDs = append(nodeIDs, node.NodeID)
+			nodeIDs = append(nodeIDs, node.JobDistributorDetails.NodeID)
 		}
 
 		artifact.Nodes[don.Name] = NodesArtifact{

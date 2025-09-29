@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -234,12 +232,13 @@ var FundCLNodesOp = operations.NewOperation(
 	},
 )
 
-func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, privateKeyPerChainFamily map[string]map[uint64][]byte) error {
-	nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
-	if nodeAddress == "" {
-		return nil // Skip nodes without addresses for this chain
+func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node *cre.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, privateKeyPerChainFamily map[string]map[uint64][]byte) error {
+	evmKey, ok := node.Keys.EVM[bcOut.ChainID]
+	if !ok {
+		return nil // Skip nodes without EVM keys for this chain
 	}
 
+	nodeAddress := evmKey.PublicAddress.String()
 	testLogger.Info().Msgf("Attempting to fund EVM account %s", nodeAddress)
 
 	fundingPrivateKey, ok := privateKeyPerChainFamily["evm"][bcOut.ChainSelector]
@@ -266,9 +265,13 @@ func fundEthAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.
 	return nil
 }
 
-func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node devenv.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, _ map[string]map[uint64][]byte) error {
+func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node *cre.Node, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, _ map[string]map[uint64][]byte) error {
 	funder := bcOut.SolChain.PrivateKey
-	recipient := solana.MustPublicKeyFromBase58(node.AccountAddr[bcOut.SolChain.ChainID])
+	solKey, ok := node.Keys.Solana[bcOut.SolChain.ChainID]
+	if !ok {
+		return fmt.Errorf("missing solana key for node %s on chain %d", node.Name, bcOut.SolChain.ChainID)
+	}
+	recipient := solana.MustPublicKeyFromBase58(solKey.PublicAddress.String())
 	testLogger.Info().Msgf("Attempting to fund Solana account %s", recipient.String())
 
 	err := libfunding.SendFundsSol(ctx, zerolog.Logger{}, bcOut.SolClient, libfunding.FundsToSendSol{
@@ -284,18 +287,19 @@ func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node deve
 	return nil
 }
 
-func getTronNodeAddress(node devenv.Node, bcOut *cre.WrappedBlockchainOutput) common.Address {
-	nodeAddress := node.AccountAddr[strconv.FormatUint(bcOut.ChainID, 10)]
-	if nodeAddress == "" {
-		return common.Address{} // Skip nodes without addresses for this chain
+func getTronNodeAddress(node *cre.Node, bcOut *cre.WrappedBlockchainOutput) common.Address {
+	evmKey, ok := node.Keys.EVM[bcOut.ChainID]
+	if !ok {
+		return common.Address{} // Skip nodes without EVM keys for this chain
 	}
+
+	nodeAddress := evmKey.PublicAddress.String()
 
 	return common.HexToAddress(nodeAddress)
 }
 
 func FundTronAddress(ctx context.Context, testLogger zerolog.Logger, nodeAddress common.Address, fundingAmount uint64, bcOut *cre.WrappedBlockchainOutput, env *cldf.Environment) error {
 	receiverAddress := address.EVMAddressToAddress(nodeAddress)
-
 	testLogger.Info().Msgf("Attempting to fund TRON account %s", nodeAddress)
 
 	tronChains := env.BlockChains.TronChains()

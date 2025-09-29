@@ -4,23 +4,25 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/cockroachdb/errors"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/gagliardetto/solana-go"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	focr "github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
-	deployment_devenv "github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
-	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 )
 
 // BuildFromSavedState rebuilds the CLDF environment and per‑chain clients from
@@ -92,9 +94,24 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		}
 	}
 
-	allNodeInfo := make([]deployment_devenv.NodeInfo, 0)
+	// allNodeInfo := make([]deployment_devenv.NodeInfo, 0)
 	allNodeIDs := make([]string, 0)
-	devenvDons := make([]*deployment_devenv.DON, 0, len(envArtifact.DONs))
+	devenvDons := make([]*cre.DON, 0, len(envArtifact.DONs))
+
+	offChain, offChainErr := cre.NewJDClient(ctx, cre.JDConfig{
+		WSRPC: envArtifact.JdConfig.ExternalGRPCUrl,
+		GRPC:  envArtifact.JdConfig.ExternalGRPCUrl,
+		Creds: insecure.NewCredentials(),
+		// NodeInfo: nodeInfo,
+	})
+	if offChainErr != nil {
+		return nil, nil, errors.Wrap(offChainErr, "failed to create offchain client")
+	}
+
+	jd, ok := offChain.(*cre.JobDistributor)
+	if !ok {
+		return nil, nil, errors.New("offchain client is not a JobDistributor")
+	}
 
 	for idx, don := range envArtifact.DONs {
 		_, ok := envArtifact.Nodes[don.DonName]
@@ -107,36 +124,42 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		}
 
 		// a maximum of 1 bootstrap is supported due to environment constraints
-		bootstrapNodesCount := 0
-		if envArtifact.Topology.ToDonMetadata()[idx].ContainsBootstrapNode() {
-			bootstrapNodesCount = 1
+		// bootstrapNodesCount := 0
+		// if envArtifact.Topology.ToDonMetadata()[idx].ContainsBootstrapNode() {
+		// 	bootstrapNodesCount = 1
+		// }
+
+		// nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, don.DonID, bootstrapNodesCount)
+		// if err != nil {
+		// 	return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
+		// }
+		// offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
+		// 	WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
+		// 	GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
+		// 	Creds:    insecure.NewCredentials(),
+		// 	NodeInfo: nodeInfo,
+		// })
+		// if offChainErr != nil {
+		// 	return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", don.DonName)
+		// }
+
+		// jd, ok := offChain.(*deployment_devenv.JobDistributor)
+		// if !ok {
+		// 	return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", don.DonName)
+		// }
+
+		supportedChains, sErr := findSupportedChainsForDON(envArtifact.Topology.Dons.DonMetadata[idx], wrappedBlockchainOutputs)
+		if sErr != nil {
+			return nil, nil, errors.Wrapf(sErr, "failed to find supported chains for don %s", don.DonName)
 		}
 
-		nodeInfo, err := crenode.GetNodeInfo(cachedInput.NodeSets[idx].Out, cachedInput.NodeSets[idx].Name, don.DonID, bootstrapNodesCount)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to get node info for don %s", don.DonName)
-		}
-		offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
-			WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
-			GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
-			Creds:    insecure.NewCredentials(),
-			NodeInfo: nodeInfo,
-		})
-		if offChainErr != nil {
-			return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client for don %s", don.DonName)
-		}
-
-		jd, ok := offChain.(*deployment_devenv.JobDistributor)
-		if !ok {
-			return nil, nil, errors.Errorf("offchain client is not a JobDistributor for don %s", don.DonName)
-		}
-		registeredDon, donErr := deployment_devenv.NewRegisteredDON(ctx, nodeInfo, *jd)
+		registeredDon, donErr := cre.NewDON(ctx, envArtifact.Topology.Dons.DonMetadata[idx], cachedInput.NodeSets[idx].Out.CLNodes, supportedChains, jd)
 		if donErr != nil {
 			return nil, nil, errors.Wrapf(donErr, "failed to create DON for don %s", don.DonName)
 		}
 
 		devenvDons = append(devenvDons, registeredDon)
-		allNodeInfo = append(allNodeInfo, nodeInfo...)
+		// allNodeInfo = append(allNodeInfo, nodeInfo...)
 	}
 
 	donsMetadata, metaErr := cre.NewDonsMetadata(envArtifact.Topology.ToDonMetadata(), *cachedInput.Infra)
@@ -149,17 +172,17 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		return nil, nil, errors.Wrapf(donsErr, "failed to create Dons from metadata")
 	}
 
-	offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
-		WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
-		GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
-		Creds:    insecure.NewCredentials(),
-		NodeInfo: allNodeInfo,
-	})
-	if offChainErr != nil {
-		return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client")
-	}
+	// offChain, offChainErr := deployment_devenv.NewJDClient(ctx, deployment_devenv.JDConfig{
+	// 	WSRPC:    envArtifact.JdConfig.ExternalGRPCUrl,
+	// 	GRPC:     envArtifact.JdConfig.ExternalGRPCUrl,
+	// 	Creds:    insecure.NewCredentials(),
+	// 	NodeInfo: allNodeInfo,
+	// })
+	// if offChainErr != nil {
+	// 	return nil, nil, errors.Wrapf(offChainErr, "failed to create offchain client")
+	// }
 
-	chainConfigs := make([]deployment_devenv.ChainConfig, 0, len(wrappedBlockchainOutputs))
+	chainConfigs := make([]cre.ChainConfig, 0, len(wrappedBlockchainOutputs))
 	for _, output := range wrappedBlockchainOutputs {
 		cfg, cfgErr := cre.ChainConfigFromWrapped(output)
 		if cfgErr != nil {
@@ -168,7 +191,7 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		chainConfigs = append(chainConfigs, cfg)
 	}
 
-	blockChains, chainErr := deployment_devenv.NewChains(cldLogger, chainConfigs)
+	blockChains, chainErr := cre.NewChains(cldLogger, chainConfigs)
 	if chainErr != nil {
 		return nil, nil, errors.Wrapf(chainErr, "failed to create block chains")
 	}
@@ -196,6 +219,29 @@ func BuildFromSavedState(ctx context.Context, cldLogger logger.Logger, cachedInp
 		CldfEnvironment: cldEnv,
 		DonTopology:     cre.NewDonTopology(envArtifact.Topology.HomeChainSelector, topology, dons),
 	}, wrappedBlockchainOutputs, nil
+}
+
+// copied from cre, remove!
+func findSupportedChainsForDON(donMetadata *cre.DonMetadata, blockchainOutputs []*cre.WrappedBlockchainOutput) ([]cre.ChainConfig, error) {
+	chains := make([]cre.ChainConfig, 0)
+
+	for chainSelector, bcOut := range blockchainOutputs {
+		hasEVMChainEnabled := slices.Contains(donMetadata.EVMChains(), bcOut.ChainID)
+		hasSolanaWriteCapability := flags.HasFlagForAnyChain(donMetadata.Flags, cre.WriteSolanaCapability)
+		chainIsSolana := strings.EqualFold(bcOut.BlockchainOutput.Family, chainselectors.FamilySolana)
+		if !hasEVMChainEnabled && (!hasSolanaWriteCapability || !chainIsSolana) {
+			continue
+		}
+
+		cfg, cfgErr := cre.ChainConfigFromWrapped(bcOut)
+		if cfgErr != nil {
+			return nil, errors.Wrapf(cfgErr, "failed to build chain config for chain selector %d", chainSelector)
+		}
+
+		chains = append(chains, cfg)
+	}
+
+	return chains, nil
 }
 
 func SetDefaultPrivateKeyIfEmpty(defaultPrivateKey string) error {

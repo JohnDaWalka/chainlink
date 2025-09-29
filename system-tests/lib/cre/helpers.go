@@ -12,22 +12,21 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 )
 
-// ChainConfigFromWrapped converts a single wrapped chain into a devenv.ChainConfig.
-func ChainConfigFromWrapped(w *WrappedBlockchainOutput) (devenv.ChainConfig, error) {
+// ChainConfigFromWrapped converts a single wrapped chain into a ChainConfig.
+func ChainConfigFromWrapped(w *WrappedBlockchainOutput) (ChainConfig, error) {
 	if w == nil || w.BlockchainOutput == nil || len(w.BlockchainOutput.Nodes) == 0 {
-		return devenv.ChainConfig{}, errors.New("invalid wrapped blockchain output")
+		return ChainConfig{}, errors.New("invalid wrapped blockchain output")
 	}
 	n := w.BlockchainOutput.Nodes[0]
 
-	cfg := devenv.ChainConfig{
-		WSRPCs: []devenv.CribRPCs{{
+	cfg := ChainConfig{
+		WSRPCs: []CribRPCs{{
 			External: n.ExternalWSUrl, Internal: n.InternalWSUrl,
 		}},
-		HTTPRPCs: []devenv.CribRPCs{{
+		HTTPRPCs: []CribRPCs{{
 			External: n.ExternalHTTPUrl, Internal: n.InternalHTTPUrl,
 		}},
 	}
@@ -46,12 +45,12 @@ func ChainConfigFromWrapped(w *WrappedBlockchainOutput) (devenv.ChainConfig, err
 		cfg.ChainID = strconv.FormatUint(w.ChainID, 10)
 		privateKey, err := crypto.HexToECDSA(w.DeployerPrivateKey)
 		if err != nil {
-			return devenv.ChainConfig{}, errors.Wrap(err, "failed to parse private key for Tron")
+			return ChainConfig{}, errors.Wrap(err, "failed to parse private key for Tron")
 		}
 
 		deployerKey, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(conversions.MustSafeInt64(w.ChainID)))
 		if err != nil {
-			return devenv.ChainConfig{}, errors.Wrap(err, "failed to create transactor for Tron")
+			return ChainConfig{}, errors.Wrap(err, "failed to create transactor for Tron")
 		}
 		cfg.DeployerKey = deployerKey
 		return cfg, nil
@@ -59,7 +58,7 @@ func ChainConfigFromWrapped(w *WrappedBlockchainOutput) (devenv.ChainConfig, err
 
 	// EVM
 	if w.SethClient == nil {
-		return devenv.ChainConfig{}, fmt.Errorf("blockchain output evm family without SethClient for chainID %d", w.ChainID)
+		return ChainConfig{}, fmt.Errorf("blockchain output evm family without SethClient for chainID %d", w.ChainID)
 	}
 
 	cfg.ChainID = strconv.FormatUint(w.ChainID, 10)

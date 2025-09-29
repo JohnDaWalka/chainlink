@@ -28,13 +28,11 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/s3provider"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
-	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
@@ -205,7 +203,7 @@ func SetupTestEnvironment(
 		Topology:          topology,
 	}
 
-	cldfEnvironment, dons, cldErr := libdon.LinkToJobDistributor(ctx, linkDonsToJDInput)
+	cldfEnvironment, dons, cldErr := cre.LinkToJobDistributor(ctx, linkDonsToJDInput)
 	if cldErr != nil {
 		return nil, pkgerrors.Wrap(cldErr, "failed to link DONs to Job Distributor")
 	}
@@ -500,7 +498,7 @@ func appendOutputsToInput(input *SetupInput, nodeSetOutput []*cre.WrappedNodeOut
 	input.JdInput.Out = jdOutput
 }
 
-func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*devenv.DON, topology *cre.Topology) (*cre.Environment, error) {
+func newCreEnvironment(registryChainSelector uint64, cldfEnv *cldf.Environment, dons []*cre.DON, topology *cre.Topology) (*cre.Environment, error) {
 	creDons, donsErr := cre.NewDons(topology.DonsMetadata, dons)
 	if donsErr != nil {
 		return nil, pkgerrors.Wrap(donsErr, "failed to create CRE Dons")

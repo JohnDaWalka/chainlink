@@ -20,7 +20,6 @@ import (
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
 
-	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
@@ -674,14 +673,14 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 // we could add to it all the metadata we need and avoid this wrapper struct altogether
 type Dons struct {
 	DonMetadata []*DonMetadata `toml:"dons_metadata" json:"dons_metadata"`
-	dons        []*devenv.DON
+	dons        []*DON
 }
 
-func (d *Dons) List() []*devenv.DON {
+func (d *Dons) List() []*DON {
 	return d.dons
 }
 
-func NewDons(donsMetadata *DonsMetadata, dons []*devenv.DON) (*Dons, error) {
+func NewDons(donsMetadata *DonsMetadata, dons []*DON) (*Dons, error) {
 	if donsMetadata == nil {
 		return nil, errors.New("donsMetadata is required")
 	}

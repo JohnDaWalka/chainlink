@@ -138,7 +138,7 @@ func swapCapability(ctx context.Context, capabilityFlag, binaryPath string, forc
 						Op:    *ptypes.SelectorOp_EQ.Enum(),
 						Value: &capabilityFlag,
 					}},
-					NodeIds: []string{node.NodeID},
+					NodeIds: []string{node.JobDistributorDetails.NodeID},
 				},
 			})
 
@@ -158,7 +158,7 @@ func swapCapability(ctx context.Context, capabilityFlag, binaryPath string, forc
 				return errors.Wrapf(cancelErr, "failed to cancel job proposals for node %s", node.Name)
 			}
 			framework.L.Info().Msgf("Cancelled %d job proposals for node %s", len(proposalIDs), node.Name)
-			donIdxToNodeIDToProposalIDs[idx][node.NodeID] = proposalIDs
+			donIdxToNodeIDToProposalIDs[idx][node.JobDistributorDetails.NodeID] = proposalIDs
 		}
 	}
 
@@ -247,7 +247,7 @@ func swapCapability(ctx context.Context, capabilityFlag, binaryPath string, forc
 	// approve the job proposals again, so that the jobs are restarted with the new binary
 	for donIdx, nodeIDToProposalIDs := range donIdxToNodeIDToProposalIDs {
 		for _, node := range creEnvironment.DonTopology.Dons.List()[donIdx].Nodes {
-			proposalIDs, ok := nodeIDToProposalIDs[node.NodeID]
+			proposalIDs, ok := nodeIDToProposalIDs[node.JobDistributorDetails.NodeID]
 			if ok {
 				framework.L.Info().Msgf("Approving %d job proposals for node %s", len(proposalIDs), node.Name)
 				approveErr := node.ApproveProposals(ctx, proposalIDs)

@@ -57,10 +57,12 @@ type nodeSolKeyWrapper struct {
 }
 
 type NodeKeys struct {
-	EVM    map[uint64]*crypto.EVMKey
-	Solana map[string]*crypto.SolKey
-	P2PKey *crypto.P2PKey
-	DKGKey *crypto.DKGRecipientKey
+	CSAKey        crypto.CSAKey
+	EVM           map[uint64]*crypto.EVMKey
+	Solana        map[string]*crypto.SolKey
+	P2PKey        *crypto.P2PKey
+	DKGKey        *crypto.DKGRecipientKey
+	OCR2BundleIDs map[string]string
 }
 
 // CleansedPeerID returns the PeerID without the "p2p_" prefix, or an empty string if P2PKey is nil
