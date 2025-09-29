@@ -985,6 +985,11 @@ func (d *DeployCribJdInput) Validate() error {
 	return nil
 }
 
+type DeployGriddleDevenvBlockchainInput struct {
+	BlockchainInput   *blockchain.Input
+	GriddleConfigFile string
+	Namespace         string
+}
 type DeployCribBlockchainInput struct {
 	BlockchainInput *blockchain.Input
 	CribConfigsDir  string

@@ -34,3 +34,4 @@ artifact_paths.json
 state/
 
 configs/devenv/**
+configs/griddle-devenv/**

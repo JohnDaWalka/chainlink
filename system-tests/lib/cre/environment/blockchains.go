@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
+	griddledevenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 
 	cldf_solana_provider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
@@ -150,31 +151,45 @@ func hasSolanaArtifacts(dir string) bool {
 }
 
 func deployBlockchain(testLogger zerolog.Logger, infraIn infra.Input, bi blockchain.Input) (*blockchain.Output, error) {
-	if infraIn.Type != infra.CRIB {
+	if infraIn.Type == infra.Docker {
 		bcOut, err := blockchain.NewBlockchainNetwork(&bi)
 		if err != nil {
 			return nil, pkgerrors.Wrapf(err, "failed to deploy blockchain %s chainID: %s", bi.Type, bi.ChainID)
 		}
 
 		return bcOut, nil
+	} else if infraIn.Type == infra.GriddleDevenv {
+		deployInput := &cre.DeployGriddleDevenvBlockchainInput{
+			BlockchainInput:   &bi,
+			GriddleConfigFile: filepath.Join(griddleDevenvConfigsDir, "generated", "griddle-blockchain-config.yaml"),
+			Namespace:         infraIn.GriddleDevenvInput.Namespace,
+		}
+		output, err := griddledevenv.DeployBlockchain(infraIn, deployInput)
+		if err != nil {
+			return nil, pkgerrors.Wrapf(err, "failed to deploy blockchain %s chainID: %s", bi.Type, bi.ChainID)
+		}
+		return output, nil
+
+	} else if infraIn.Type == infra.CRIB {
+		deployCribBlockchainInput := &cre.DeployCribBlockchainInput{
+			BlockchainInput: &bi,
+			CribConfigsDir:  cribConfigsDir,
+			Namespace:       infraIn.CRIB.Namespace,
+		}
+		bcOut, err := crib.DeployBlockchain(deployCribBlockchainInput)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "failed to deploy blockchain")
+		}
+
+		err = infra.WaitForRPCEndpoint(testLogger, bcOut.Nodes[0].ExternalHTTPUrl, 10*time.Minute)
+		if err != nil {
+			return nil, pkgerrors.Wrap(err, "RPC endpoint is not available")
+		}
+
+		return bcOut, nil
 	}
 
-	deployCribBlockchainInput := &cre.DeployCribBlockchainInput{
-		BlockchainInput: &bi,
-		CribConfigsDir:  cribConfigsDir,
-		Namespace:       infraIn.CRIB.Namespace,
-	}
-	bcOut, err := crib.DeployBlockchain(deployCribBlockchainInput)
-	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to deploy blockchain")
-	}
-
-	err = infra.WaitForRPCEndpoint(testLogger, bcOut.Nodes[0].ExternalHTTPUrl, 10*time.Minute)
-	if err != nil {
-		return nil, pkgerrors.Wrap(err, "RPC endpoint is not available")
-	}
-
-	return bcOut, nil
+	return nil, pkgerrors.Errorf("unsupported infra type: %s", infraIn.Type)
 }
 
 func wrapTron(bi *blockchain.Input, bcOut *blockchain.Output) (*cre.WrappedBlockchainOutput, error) {

@@ -46,6 +46,7 @@ const (
 	E2eJobDistributorImageEnvVarName   = "E2E_JD_IMAGE"
 	E2eJobDistributorVersionEnvVarName = "E2E_JD_VERSION"
 	cribConfigsDir                     = "crib-configs"
+	griddleDevenvConfigsDir            = "griddle-devenv"
 )
 
 type SetupOutput struct {
