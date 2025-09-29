@@ -164,10 +164,11 @@ func (m *DON) NeedsWebAPIGateway() bool {
 
 func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Output, supportedChains []ChainConfig, jd *jd.JobDistributor) (*DON, error) {
 	don := &DON{
-		Nodes: make([]*Node, 0),
-		Name:  donMetadata.Name,
-		ID:    donMetadata.ID,
-		Flags: donMetadata.Flags,
+		Nodes:             make([]*Node, 0),
+		Name:              donMetadata.Name,
+		ID:                donMetadata.ID,
+		Flags:             donMetadata.Flags,
+		ChainCapabilities: donMetadata.ns.ChainCapabilities,
 	}
 	mu := &sync.Mutex{}
 
