@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	sui_module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
 	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui/bindings/packages/offramp"
-	sui_indexer "github.com/smartcontractkit/chainlink-sui/relayer/chainreader/indexer"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -1409,10 +1408,12 @@ func SuiEventEmitter[T any](
 					}
 					lastSeenTxDigest = ev.Id.TxDigest
 
+					// ev.ParsedJson returns
+					// {{J2KNH5PYPy4EfdsceZP7Y4JSY5iyfE9UaG5yc3cQ9Y1e 0} 0x403321f7a76ab6bed713cd267654da11826ffcc8d13a34c7ce94a13624bcaaa6 offramp 0x5ecb6107dfc7159d2a66a04d3fe801295bc64d60670e040ab65648165316696e 0x403321f7a76ab6bed713cd267654da11826ffcc8d13a34c7ce94a13624bcaaa6::offramp::CommitReportAccepted map[blessed_merkle_roots:[] price_updates:map[gas_price_updates:[] token_price_updates:[]] unblessed_merkle_roots:[map[max_seq_nr:1 merkle_root:[155 105 105 10 57 189 195 19 32 114 63 222 200 253 156 212 243 84 170 47 91 53 76 60 4 37 39 179 47 110 188 65] min_seq_nr:1 on_ramp_address:[173 201 63 246 63 57 42 74 73 76 90 184 238 123 199 73 36 135 105 183] source_chain_selector:909606746561742123]]] AAErhRxGhJKfDBStyT/2PzkqSklMWrjue8dJJIdptwEAAAAAAAAAAQAAAAAAAAAgm2lpCjm9wxMgcj/eyP2c1PNUqi9bNUw8BCUnsy9uvEEAAA== 1759171182431}
+
 					var out T
-					if v, ok := sui_indexer.ConvertMapKeysToCamelCase(ev.ParsedJson).(T); ok {
-						out = v
-					} else {
+					if err := codec.DecodeAptosJsonValue(ev.ParsedJson, &out); err != nil {
+						errChan <- err
 						continue
 					}
 
