@@ -108,18 +108,23 @@ func (t *Topology) BootstrapNode() (*NodeMetadata, error) {
 	return t.DonsMetadata.BootstrapNode()
 }
 
-func PeeringCfgs(bt *NodeMetadata) (CapabilitiesPeeringData, OCRPeeringData, error) {
-	p := bt.Keys.CleansedPeerID()
+type PeerableNode interface {
+	GetHost() string
+	CleansedPeerID() string
+}
+
+func PeeringCfgs(bt PeerableNode) (CapabilitiesPeeringData, OCRPeeringData, error) {
+	p := bt.CleansedPeerID()
 	if p == "" {
 		return CapabilitiesPeeringData{}, OCRPeeringData{}, errors.New("cannot create peering configs, node has no P2P key")
 	}
 	return CapabilitiesPeeringData{
 			GlobalBootstraperPeerID: p,
-			GlobalBootstraperHost:   bt.Host,
+			GlobalBootstraperHost:   bt.GetHost(),
 			Port:                    CapabilitiesPeeringPort,
 		}, OCRPeeringData{
 			OCRBootstraperPeerID: p,
-			OCRBootstraperHost:   bt.Host,
+			OCRBootstraperHost:   bt.GetHost(),
 			Port:                 OCRPeeringPort,
 		}, nil
 }

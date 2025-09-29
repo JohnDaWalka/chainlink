@@ -86,7 +86,7 @@ func ExecuteSecureMintTest(t *testing.T, tenv *ttypes.TestEnvironment) {
 	// deploy workflow
 	framework.L.Info().Msg("Generate and propose secure mint job...")
 	jobSpec := createSecureMintWorkflowJobSpec(t, &s, solChain)
-	proposeSecureMintJob(t, creEnvironment.CldfEnvironment.Offchain, jobSpec)
+	proposeSecureMintJob(t, creEnvironment.CldfEnvironment.Offchain, *creEnvironment.DonTopology, jobSpec)
 	framework.L.Info().Msgf("Secure mint job is successfully posted. Job spec:\n %v", jobSpec)
 
 	// trigger workflow
@@ -404,7 +404,7 @@ func createSecureMintWorkflowJobSpec(t *testing.T, s *setup, solChain *cre.Wrapp
 	`, workflowJobSpec.Toml())
 }
 
-func proposeSecureMintJob(t *testing.T, offchain offchain.Client, jobSpec string) {
+func proposeSecureMintJob(t *testing.T, offchain offchain.Client, donTopology cre.DonTopology, jobSpec string) {
 	nodes, err := offchain.ListNodes(t.Context(), &node.ListNodesRequest{})
 	require.NoError(t, err, "failed to get list nodes")
 	var specs cre.DonJobs
@@ -418,7 +418,7 @@ func proposeSecureMintJob(t *testing.T, offchain offchain.Client, jobSpec string
 			NodeId: n.Id,
 		})
 	}
-	err = jobs.Create(t.Context(), offchain, specs)
+	err = jobs.Create(t.Context(), offchain, donTopology, specs)
 	if err != nil && strings.Contains(err.Error(), "is already approved") {
 		return
 	}

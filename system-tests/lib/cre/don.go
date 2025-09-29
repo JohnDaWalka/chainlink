@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -51,15 +52,21 @@ const (
 	LabelProductKey = "product"
 )
 
+// type NodeCapabilitiesProvider interface {
+// 	CapabilityFlags() []CapabilityFlag
+// 	ChainCapabilities() map[string]*ChainCapabilityConfig
+// }
+
 type DON struct {
 	Name string
 	ID   uint64
 
 	Nodes []*Node
 
-	Capabilities    []CapabilityFlag
-	Roles           []string // workflow, capability, gateway
-	SupportedChains []uint64 // chain selector... optionally? to indicate, whether each node should connect to every chain in the environment or only some
+	Flags             []CapabilityFlag // capabilities and roles
+	ChainCapabilities map[string]*ChainCapabilityConfig
+	// Roles []string // workflow, capability, gateway
+	// SupportedChains []uint64 // chain selector... optionally? to indicate, whether each node should connect to every chain in the environment or only some // not used anywhere currently
 }
 
 func (m *DON) ContainsBootstrapNode() bool {
@@ -70,6 +77,30 @@ func (m *DON) ContainsBootstrapNode() bool {
 	}
 
 	return false
+}
+
+func (m *DON) ContainsGatewayNode() bool {
+	for _, node := range m.Nodes {
+		if slices.Contains(node.Roles, GatewayNode) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *DON) GatewayNode() (*Node, error) {
+	if !m.ContainsGatewayNode() {
+		return nil, errors.New("don does not contain a gateway node")
+	}
+
+	for _, node := range m.Nodes {
+		if slices.Contains(node.Roles, GatewayNode) {
+			return node, nil
+		}
+	}
+
+	return nil, errors.New("no gateway node found in don")
 }
 
 // Currently only one bootstrap node is supported.
@@ -113,83 +144,115 @@ func (don *DON) JDNodeIDs() []string {
 func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Output, supportedChains []ChainConfig, jd *JobDistributor) (*DON, error) {
 	don := &DON{
 		Nodes: make([]*Node, 0),
+		Name:  donMetadata.Name,
+		ID:    donMetadata.ID,
+		Flags: donMetadata.Flags,
 	}
+	mu := &sync.Mutex{}
+
+	// TODO maybe that should be a higher level provider, like capabilities flags?
+	// knownDONRoles := []string{WorkflowDON, CapabilitiesDON, GatewayDON}
+
+	// Flags contain both roles and capabilities, we need to separate them, but in TOML these are separated, so maybe it doesn't make sense to have them separated here?
+	// TODO: maybe we should just have Flags on DON instead of Roles and Capabilities separately?
+	// for _, flag := range donMetadata.Flags {
+	// 	if slices.Contains(knownDONRoles, flag) {
+	// 		don.Roles = append(don.Roles, flag)
+	// 	}
+	// }
+
+	errgroup := errgroup.Group{}
 	for idx, nodeMetadata := range donMetadata.NodesMetadata {
-		node, err := NewNode(ctx, fmt.Sprintf("%s-node%d", donMetadata.Name, idx), nodeMetadata, ctfNodes[idx])
-		if err != nil {
-			return nil, fmt.Errorf("failed to create node %d: %w", idx, err)
-		}
-
-		labels := make([]*ptypes.Label, 0)
-
-		for _, role := range node.Roles {
-			switch role {
-			case WorkerNode:
-				labels = append(labels, &ptypes.Label{
-					Key:   LabelNodeTypeKey,
-					Value: ptr.Ptr(LabelNodeTypeValuePlugin),
-				})
-			case BootstrapNode:
-				labels = append(labels, &ptypes.Label{
-					Key:   LabelNodeTypeKey,
-					Value: ptr.Ptr(LabelNodeTypeValueBootstrap),
-				})
-			case GatewayNode:
-				// no specific data to set for gateway nodes yet
-			default:
-				return nil, fmt.Errorf("unknown node role: %s", role)
+		errgroup.Go(func() error {
+			node, err := NewNode(ctx, fmt.Sprintf("%s-node%d", donMetadata.Name, idx), nodeMetadata, ctfNodes[idx])
+			if err != nil {
+				return fmt.Errorf("failed to create node %d: %w", idx, err)
 			}
-		}
 
-		// Set up Job distributor in node and register node with the job distributor
-		setupErr := node.SetUpAndLinkJobDistributor(ctx, jd, labels)
-		if setupErr != nil {
-			return nil, fmt.Errorf("failed to set up job distributor in node %s: %w", node.Name, setupErr)
-		}
+			// TODO move this to SetUpAndLinkJobDistributor
+			labels := make([]*ptypes.Label, 0)
 
-		for _, role := range node.Roles {
-			switch role {
-			case WorkerNode, BootstrapNode:
-				if err := don.CreateSupportedChains(ctx, supportedChains, jd); err != nil {
-					return nil, fmt.Errorf("failed to create supported chains: %w", err)
+			for _, role := range node.Roles {
+				switch role {
+				case WorkerNode:
+					labels = append(labels, &ptypes.Label{
+						Key:   LabelNodeTypeKey,
+						Value: ptr.Ptr(LabelNodeTypeValuePlugin),
+					})
+				case BootstrapNode:
+					labels = append(labels, &ptypes.Label{
+						Key:   LabelNodeTypeKey,
+						Value: ptr.Ptr(LabelNodeTypeValueBootstrap),
+					})
+				case GatewayNode:
+					// no specific data to set for gateway nodes yet
+				default:
+					return fmt.Errorf("unknown node role: %s", role)
 				}
-			case GatewayNode:
-				// no chains configuration needed for gateway nodes
-			default:
-				return nil, fmt.Errorf("unknown node role: %s", role)
 			}
-		}
 
-		don.Nodes = append(don.Nodes, node)
-	}
-	return don, nil
-}
+			// Set up Job distributor in node and register node with the job distributor
+			setupErr := node.SetUpAndLinkJobDistributor(ctx, jd, labels)
+			if setupErr != nil {
+				return fmt.Errorf("failed to set up job distributor in node %s: %w", node.Name, setupErr)
+			}
 
-func (don *DON) CreateSupportedChains(ctx context.Context, chains []ChainConfig, jd *JobDistributor) error {
-	g := new(errgroup.Group)
-	for i := range don.Nodes {
-		g.Go(func() error {
-			n := don.Nodes[i]
-			var jdChains []JDChainConfigInput
-			for _, chain := range chains {
-				jdChains = append(jdChains, JDChainConfigInput{
-					ChainID:   chain.ChainID,
-					ChainType: chain.ChainType,
-				})
+			for _, role := range node.Roles {
+				switch role {
+				case WorkerNode, BootstrapNode:
+					if err := node.CreateSupportedChains(ctx, supportedChains, jd); err != nil {
+						return fmt.Errorf("failed to create supported chains: %w", err)
+					}
+				case GatewayNode:
+					// no chains configuration needed for gateway nodes
+				default:
+					return fmt.Errorf("unknown node role: %s", role)
+				}
 			}
-			if err1 := n.CreateJDChainConfigs(ctx, jdChains, jd); err1 != nil {
-				return err1
-			}
-			don.Nodes[i] = n
+
+			mu.Lock()
+			don.Nodes = append(don.Nodes, node)
+			mu.Unlock()
+
 			return nil
 		})
 	}
-	return g.Wait()
+
+	if err := errgroup.Wait(); err != nil {
+		return nil, fmt.Errorf("failed to create new nodes in DON: %w", err)
+	}
+
+	return don, nil
+}
+
+func (n *Node) CreateSupportedChains(ctx context.Context, chains []ChainConfig, jd *JobDistributor) error {
+	// g := new(errgroup.Group)
+	// for i := range don.Nodes {
+	// g.Go(func() error {
+	// n := don.Nodes[i]
+	var jdChains []JDChainConfigInput
+	for _, chain := range chains {
+		jdChains = append(jdChains, JDChainConfigInput{
+			ChainID:   chain.ChainID,
+			ChainType: chain.ChainType,
+		})
+	}
+	if err1 := n.CreateJDChainConfigs(ctx, jdChains, jd); err1 != nil {
+		return err1
+	}
+	// don.Nodes[i] = n
+	// return nil
+	// })
+	// }
+
+	return nil
+	// return g.Wait()
 }
 
 type Node struct {
 	Name                  string
 	Host                  string
+	Index                 int
 	IDs                   NodeIDs
 	Keys                  *secrets.NodeKeys
 	Addresses             Addresses
@@ -198,6 +261,14 @@ type Node struct {
 
 	Clients NodeClients
 	DON     DON // to easily get parent info
+}
+
+func (n *Node) GetHost() string {
+	return n.Host
+}
+
+func (n *Node) CleansedPeerID() string {
+	return n.Keys.CleansedPeerID()
 }
 
 func (n *Node) HasRole(role string) bool {
@@ -236,6 +307,7 @@ func NewNode(ctx context.Context, name string, nodeMetadata *NodeMetadata, ctfNo
 			RestClient: chainlinkClient,
 		},
 		Name:  name,
+		Index: nodeMetadata.Index,
 		Keys:  nodeMetadata.Keys,
 		Roles: nodeMetadata.Roles,
 		Host:  nodeMetadata.Host,
@@ -301,16 +373,16 @@ func (n *Node) CreateJDChainConfigs(ctx context.Context, chains []JDChainConfigI
 
 		switch strings.ToLower(chain.ChainType) {
 		case chainselectors.FamilyEVM, chainselectors.FamilyTron:
-			chainIDUint64, parseErr := strconv.ParseUint(chain.ChainID, 10, 64)
+			chainID, parseErr := strconv.ParseUint(chain.ChainID, 10, 64)
 			if parseErr != nil {
 				return fmt.Errorf("failed to parse chain id %s: %w", chain.ChainID, parseErr)
 			}
 
-			if chainIDUint64 == 0 {
+			if chainID == 0 {
 				return fmt.Errorf("invalid chain id: %s", chain.ChainID)
 			}
 
-			evmKey, ok := n.Keys.EVM[chainIDUint64]
+			evmKey, ok := n.Keys.EVM[chainID]
 			if !ok {
 				var fetchErr error
 				accountAddr, fetchErr := n.Clients.GQLClient.FetchAccountAddress(ctx, chain.ChainID)
@@ -716,7 +788,7 @@ func LinkToJobDistributor(ctx context.Context, input *LinkDonsToJDInput) (*cldf.
 
 		don, regErr := NewDON(ctx, input.Topology.DonsMetadata.List()[idx], nodeOutput.CLNodes, supportedChains, donJDClient)
 		if regErr != nil {
-			return nil, nil, fmt.Errorf("failed to create registered DON: %w", regErr)
+			return nil, nil, fmt.Errorf("failed to create a new DON: %w", regErr)
 		}
 
 		dons[idx] = don
@@ -841,14 +913,14 @@ func (jd JobDistributor) ProposeJob(ctx context.Context, in *jobv1.ProposeJobReq
 	if jd.don == nil || len(jd.don.Nodes) == 0 {
 		return res, nil
 	}
-	for _, node := range jd.don.Nodes {
-		if node.JobDistributorDetails.NodeID != in.NodeId {
-			continue
-		}
-		// TODO : is there a way to accept the job with proposal id?
-		if err := node.AcceptJob(ctx, res.Proposal.Spec); err != nil {
-			return nil, fmt.Errorf("failed to accept job. err: %w", err)
-		}
-	}
+	// for _, node := range jd.don.Nodes {
+	// 	if node.JobDistributorDetails.NodeID != in.NodeId {
+	// 		continue
+	// 	}
+	// 	// TODO : is there a way to accept the job with proposal id?
+	// 	if err := node.AcceptJob(ctx, res.Proposal.Spec); err != nil {
+	// 		return nil, fmt.Errorf("failed to accept job. err: %w", err)
+	// 	}
+	// }
 	return res, nil
 }

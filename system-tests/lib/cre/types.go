@@ -445,7 +445,7 @@ type NodeConfigTransformerFn = func(input GenerateConfigsInput, existingConfigs 
 
 type (
 	HandlerTypeToConfig    = map[string]string
-	GatewayHandlerConfigFn = func(donMetadata *DonMetadata) (HandlerTypeToConfig, error)
+	GatewayHandlerConfigFn = func(don *DON) (HandlerTypeToConfig, error)
 )
 
 type GenerateConfigsInput struct {
@@ -829,6 +829,14 @@ func (n *NodeMetadata) HasRole(role string) bool {
 	return slices.Contains(n.Roles, role)
 }
 
+func (n *NodeMetadata) GetHost() string {
+	return n.Host
+}
+
+func (n *NodeMetadata) CleansedPeerID() string {
+	return n.Keys.CleansedPeerID()
+}
+
 type NodeMetadataConfig struct {
 	Keys  NodeKeyInput
 	Host  string
@@ -883,14 +891,25 @@ type DonTopology struct {
 	GatewayConnectorOutput *GatewayConnectorOutput `toml:"gateway_connector_output" json:"gateway_connector_output"`
 }
 
-// BootstrapNode returns the metadata for the node that should be used as the bootstrap node for P2P peering
+// BootstrapNode returns the the bootstrap node that should be used as the bootstrap node for P2P peering
 // Currently only one bootstrap is supported.
-func (t *DonTopology) BootstrapNode() (*NodeMetadata, error) {
-	for _, don := range t.Dons.DonMetadata {
+func (t *DonTopology) BootstrapNode() (*Node, error) {
+	for _, don := range t.Dons.List() {
 		if don.ContainsBootstrapNode() {
 			return don.BootstrapNode()
 		}
 	}
+
+	return nil, errors.New("no don contains a bootstrap node")
+}
+
+func (t *DonTopology) GatewayNode() (*Node, error) {
+	for _, don := range t.Dons.List() {
+		if don.ContainsBootstrapNode() {
+			return don.BootstrapNode()
+		}
+	}
+
 	return nil, errors.New("no don contains a bootstrap node")
 }
 

@@ -19,11 +19,11 @@ var ConfigMerger = func(flag cre.CapabilityFlag, nodeSetInput *cre.CapabilitiesA
 	return config.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSetInput.CapabilityOverrides), true, nil
 }
 
-var CapabilityEnabler = func(nodeSetInput *cre.CapabilitiesAwareNodeSet, flag cre.CapabilityFlag) bool {
-	if nodeSetInput == nil {
+var CapabilityEnabler = func(don *cre.DON, flag cre.CapabilityFlag) bool {
+	if don == nil {
 		return false
 	}
-	return flags.HasFlag(nodeSetInput.ComputedCapabilities, flag)
+	return flags.HasFlag(don.Flags, flag)
 }
 
 var EnabledChainsProvider = func(donTopology *cre.DonTopology, _ *cre.CapabilitiesAwareNodeSet, _ cre.CapabilityFlag) ([]uint64, error) {
