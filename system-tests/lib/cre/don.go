@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-retry"
+
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
@@ -24,10 +25,11 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/environment/web/sdk/client"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/crypto"
 )
 
 const (
@@ -142,9 +144,9 @@ func (m *DON) WorkerNodes() ([]*Node, error) {
 	return workers, nil
 }
 
-func (don *DON) JDNodeIDs() []string {
+func (m *DON) JDNodeIDs() []string {
 	nodeIDs := []string{}
-	for _, n := range don.Nodes {
+	for _, n := range m.Nodes {
 		nodeIDs = append(nodeIDs, n.JobDistributorDetails.NodeID)
 	}
 	return nodeIDs
@@ -202,7 +204,7 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 }
 
 func (n *Node) CreateSupportedChains(ctx context.Context, chains []ChainConfig, jd *jd.JobDistributor) error {
-	var jdChains []JDChainConfigInput
+	jdChains := []JDChainConfigInput{}
 	for _, chain := range chains {
 		jdChains = append(jdChains, JDChainConfigInput{
 			ChainID:   chain.ChainID,

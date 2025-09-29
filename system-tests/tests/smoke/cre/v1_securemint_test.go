@@ -420,7 +420,6 @@ func proposeSecureMintJob(t *testing.T, offchain offchain.Client, donTopology cr
 	require.NoError(t, err, "failed to get list nodes")
 	var specs cre.DonJobs
 	for _, n := range workerNodes.GetNodes() {
-
 		specs = append(specs, &job.ProposeJobRequest{
 			Spec:   jobSpec,
 			NodeId: n.Id,

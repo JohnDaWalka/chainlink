@@ -269,7 +269,7 @@ func fundSolanaAddress(ctx context.Context, testLogger zerolog.Logger, node *cre
 	funder := bcOut.SolChain.PrivateKey
 	solKey, ok := node.Keys.Solana[bcOut.SolChain.ChainID]
 	if !ok {
-		return fmt.Errorf("missing solana key for node %s on chain %d", node.Name, bcOut.SolChain.ChainID)
+		return fmt.Errorf("missing solana key for node %s on chain %s", node.Name, bcOut.SolChain.ChainID)
 	}
 	recipient := solana.MustPublicKeyFromBase58(solKey.PublicAddress.String())
 	testLogger.Info().Msgf("Attempting to fund Solana account %s", recipient.String())
