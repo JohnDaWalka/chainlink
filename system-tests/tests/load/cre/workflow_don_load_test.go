@@ -68,6 +68,10 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 )
 
+const (
+	relativePathToRepoRoot = "../../../../"
+)
+
 type Chaos struct {
 	Mode                        string   `toml:"mode"`
 	Latency                     string   `toml:"latency"`
@@ -136,7 +140,7 @@ func setupLoadTestEnvironment(
 	}
 
 	singleFileLogger := cldlogger.NewSingleFileLogger(t)
-	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, singleFileLogger, &universalSetupInput)
+	universalSetupOutput, setupErr := creenv.SetupTestEnvironment(t.Context(), testLogger, singleFileLogger, &universalSetupInput, relativePathToRepoRoot)
 	require.NoError(t, setupErr, "failed to setup test environment")
 
 	// Set inputs in the test config, so that they can be saved
