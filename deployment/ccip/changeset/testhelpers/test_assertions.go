@@ -873,7 +873,7 @@ func ConfirmExecWithSeqNrsForAll(
 					t,
 					srcChain,
 					e.BlockChains.SuiChains()[dstChain],
-					state.SuiChains[dstChain].CCIPAddress,
+					state.SuiChains[dstChain].OffRampAddress,
 					startBlock,
 					seqRange,
 				)
@@ -1132,7 +1132,7 @@ func ConfirmExecWithExpectedSeqNrsSui(
 	done := make(chan any)
 	defer close(done)
 
-	t.Log("[DEBUG] Subscribing to Sui events...")
+	t.Log("[DEBUG] Subscribing to Sui events...", offRampAddress)
 	sink, errChan := SuiEventEmitter[module_offramp.ExecutionStateChanged](t, dest.Client, offRampAddress, "offramp", "ExecutionStateChanged", done)
 
 	t.Log("[DEBUG] Event subscription established")
