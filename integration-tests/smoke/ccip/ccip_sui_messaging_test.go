@@ -161,7 +161,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 	)
 
 	// random reciever for now
-	hexStr := "3f6d6a9e3f7707485bf51c02a6bc6cb6e17dffe7f3e160b3c5520d55d1de8398"
+	hexStr := "0xd8b8029977e2dc973928917c1801f06f6da928def023cbe40cbda98d517b3fd4"
 
 	bytes, err := hex.DecodeString(hexStr)
 	if err != nil {

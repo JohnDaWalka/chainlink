@@ -682,7 +682,6 @@ func SendSuiRequestViaChainWriter(e cldf.Environment, cfg *ccipclient.CCIPSendRe
 	// 	RawEvent:       rawevent,
 	// }, nil
 
-	return &ccipclient.AnyMsgSentEvent{}, nil
 }
 
 func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool) []byte {
@@ -693,7 +692,7 @@ func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool) []byte {
 
 	var stateObj [32]byte
 	copy(stateObj[:], hexutil.MustDecode(
-		"0xffa55df38c762e3c4ac661af441d19da5bd2a1bfbe1d6329c24cc10b4bb119be", // reciever CCIPReceiverStateObjectId
+		"0xadec0d5017dc42e5334558c9f2899516562ff83edafaa1b01d5553940b7c66c7", // reciever CCIPReceiverStateObjectId
 	))
 
 	recieverObjectIds := [][32]byte{clockObj, stateObj}
