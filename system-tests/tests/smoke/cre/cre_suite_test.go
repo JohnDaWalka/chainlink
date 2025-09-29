@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
+	"github.com/smartcontractkit/quarantine"
 )
 
 //////////// SMOKE TESTS /////////////
@@ -103,6 +104,7 @@ func Test_CRE_V2_Proof_Of_Reserve(t *testing.T) {
 }
 
 func Test_CRE_V2_Vault_DON(t *testing.T) {
+	quarantine.Flaky(t, "DX-1923")
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 
 	ExecuteVaultTest(t, testEnv)
