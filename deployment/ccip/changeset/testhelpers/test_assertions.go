@@ -1408,7 +1408,6 @@ func SuiEventEmitter[T any](
 						continue // skip duplicates
 					}
 					lastSeenTxDigest = ev.Id.TxDigest
-					fmt.Println("NEW SUI EVENT:", ev)
 
 					var out T
 					if v, ok := sui_indexer.ConvertMapKeysToCamelCase(ev.ParsedJson).(T); ok {
@@ -1462,6 +1461,7 @@ func ConfirmCommitWithExpectedSeqNumRangeSui(
 	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
 
 	verifyCommitReport := func(report sui_module_offramp.CommitReportAccepted) bool {
+		fmt.Println("SUI REPORTS: ", report)
 		processRoots := func(roots []sui_module_offramp.MerkleRoot) bool {
 			for _, mr := range roots {
 				t.Logf("(Sui) Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
