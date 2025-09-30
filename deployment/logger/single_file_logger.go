@@ -31,7 +31,7 @@ var _ corelogger.Logger = (*SingleFileLogger)(nil)
 func NewSingleFileLogger(tb testing.TB) *SingleFileLogger {
 	// Our logs will go here so GH can upload them:
 	baseDir := "logs"
-	timeLayout := "2006-01-02T15-04-05"
+	timeLayout := "2006-01-02T15:04:05.000"
 
 	var filename string
 	if tb == nil {
