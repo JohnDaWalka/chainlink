@@ -48,7 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
 
-	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
+	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2_dev"
 	cap_reg_v2_seq "github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/sequences"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
 	syncer_v2 "github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer/v2"

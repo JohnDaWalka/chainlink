@@ -2,7 +2,7 @@ package contracts
 
 import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
+	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2_dev"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 )
