@@ -3,6 +3,7 @@ package contracts
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -158,7 +159,8 @@ func dedupCapabilities(
 		return nil, errors.New("capabilities list is empty")
 	}
 
-	caps, err := capReg.GetCapabilities(nil)
+	// TODO pagination if needed
+	caps, err := capReg.GetCapabilities(nil, big.NewInt(0), big.NewInt(256))
 	if err != nil {
 		err = cldf.DecodeErr(capabilities_registry_v2.CapabilitiesRegistryABI, err)
 		return nil, fmt.Errorf("failed to call GetCapabilities: %w", err)

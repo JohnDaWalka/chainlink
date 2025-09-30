@@ -101,7 +101,7 @@ func TestConfigureCapabilitiesRegistry(t *testing.T) {
 		nopsInput := contracts.RegisterNopsInput{
 			Address:       mcmsFixture.capabilitiesRegistryAddress,
 			ChainSelector: mcmsFixture.chainSelector,
-			Nops: []capabilities_registry_v2.CapabilitiesRegistryNodeOperator{
+			Nops: []capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams{
 				{
 					Admin: common.HexToAddress("0x0000000000000000000000000000000000000001"),
 					Name:  "test nop1",
@@ -721,15 +721,15 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 	t.Logf("CapabilitiesRegistry instance created at address: %s", fixture.capabilitiesRegistryAddress)
 
 	// Verify node operators
-	registeredNops, err := capabilitiesRegistry.GetNodeOperators(nil)
+	registeredNops, err := capabilitiesRegistry.GetNodeOperators(nil, big.NewInt(0), big.NewInt(100))
 	require.NoError(t, err, "failed to get registered node operators")
 	require.Len(t, registeredNops, len(fixture.nops), "should have registered the correct number of node operators")
 	for _, nop := range fixture.nops {
-		assert.Contains(t, registeredNops, nop.ToWrapper(), "node operator should be registered")
+		assert.Contains(t, registeredNops, nop.Info(), "node operator should be registered")
 	}
 
 	// Verify capabilities
-	registeredCapabilities, err := capabilitiesRegistry.GetCapabilities(nil)
+	registeredCapabilities, err := capabilitiesRegistry.GetCapabilities(nil, big.NewInt(0), big.NewInt(256))
 	require.NoError(t, err, "failed to get registered capabilities")
 	require.Len(t, registeredCapabilities, len(fixture.capabilities), "should have registered the correct number of capabilities")
 	for _, capability := range fixture.capabilities {
@@ -745,7 +745,7 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 	}
 
 	// Verify nodes
-	registeredNodes, err := capabilitiesRegistry.GetNodes(nil)
+	registeredNodes, err := capabilitiesRegistry.GetNodes(nil, big.NewInt(0), big.NewInt(256))
 	require.NoError(t, err, "failed to get registered nodes")
 	require.Len(t, registeredNodes, len(fixture.nodes), "should have registered the correct number of nodes")
 
@@ -773,7 +773,7 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 	}
 
 	// Verify DONs
-	registeredDONs, err := capabilitiesRegistry.GetDONs(nil)
+	registeredDONs, err := capabilitiesRegistry.GetDONs(nil, big.NewInt(0), big.NewInt(256))
 	require.NoError(t, err, "failed to get registered DONs")
 	require.Len(t, registeredDONs, len(fixture.DONs), "should have registered the correct number of DONs")
 
@@ -801,7 +801,7 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 		assert.Equal(t, don.AcceptsWorkflows, foundDON.AcceptsWorkflows, "DON accepts workflows flag should match")
 	}
 
-	donsFamilyTwo, err := capabilitiesRegistry.GetDONsInFamily(nil, "don-family-2")
+	donsFamilyTwo, err := capabilitiesRegistry.GetDONsInFamily(nil, "don-family-2", big.NewInt(0), big.NewInt(10))
 	require.NoError(t, err, "failed to get DONs in family 'don-family-2'")
 	require.Len(t, donsFamilyTwo, 1, "should have one DON in family 'don-family-2'")
 	assert.Equal(t, big.NewInt(2), donsFamilyTwo[0], "DON ID should match")

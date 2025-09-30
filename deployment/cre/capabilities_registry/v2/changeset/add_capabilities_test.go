@@ -2,6 +2,7 @@ package changeset_test
 
 import (
 	"encoding/json"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -90,7 +91,7 @@ func TestAddCapabilities_Apply(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	caps, err := capReg.GetCapabilities(nil)
+	caps, err := capReg.GetCapabilities(nil, big.NewInt(0), big.NewInt(256)) // TODO pagination if needed
 	require.NoError(t, err)
 	var found bool
 	for _, c := range caps {
@@ -106,7 +107,7 @@ func TestAddCapabilities_Apply(t *testing.T) {
 	require.True(t, found, "new capability should be registered")
 
 	// Nodes should now include new capability id
-	nodes, err := capReg.GetNodes(nil)
+	nodes, err := capReg.GetNodes(nil, big.NewInt(0), big.NewInt(256)) // TODO pagination if needed
 	require.NoError(t, err)
 	for _, n := range nodes {
 		assert.Contains(t, n.CapabilityIds, newCapID, "node should have new capability id appended")

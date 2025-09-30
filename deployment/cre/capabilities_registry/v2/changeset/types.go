@@ -18,8 +18,17 @@ type CapabilitiesRegistryNodeOperator struct {
 	Name  string         `json:"name" yaml:"name"`
 }
 
-func (nop CapabilitiesRegistryNodeOperator) ToWrapper() capabilities_registry_v2.CapabilitiesRegistryNodeOperator {
-	return capabilities_registry_v2.CapabilitiesRegistryNodeOperator{
+// Params converts to the wrapper struct used for input params
+func (nop CapabilitiesRegistryNodeOperator) Params() capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams {
+	return capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams{
+		Admin: nop.Admin,
+		Name:  nop.Name,
+	}
+}
+
+// Info converts to the wrapper struct used for output info
+func (nop CapabilitiesRegistryNodeOperator) Info() capabilities_registry_v2.CapabilitiesRegistryNodeOperatorInfo {
+	return capabilities_registry_v2.CapabilitiesRegistryNodeOperatorInfo{
 		Admin: nop.Admin,
 		Name:  nop.Name,
 	}

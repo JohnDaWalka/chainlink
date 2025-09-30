@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -95,8 +96,8 @@ var RegisterDons = operations.NewOperation[RegisterDonsInput, RegisterDonsOutput
 				if err != nil {
 					return nil, fmt.Errorf("failed to create CapabilitiesRegistryCaller: %w", err)
 				}
-
-				donInfo, err := capabilityRegistryCaller.GetDONs(nil)
+				// TODO pagination if needed
+				donInfo, err := capabilityRegistryCaller.GetDONs(nil, big.NewInt(0), big.NewInt(256))
 				if err != nil {
 					return nil, fmt.Errorf("failed to get DONs: %w", err)
 				}
