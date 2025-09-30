@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv/dctl"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv/griddle"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 	"gopkg.in/yaml.v3"
@@ -18,6 +19,11 @@ const griddleConfigsDir = "./configs/griddle-devenv/"
 // Bootstrap bootstraps the development environment based on the provided infra input.
 func Bootstrap(infraInput infra.Provider) error {
 	// connect to telepresence
+	dctlClient := dctl.NewDctlClient()
+	err := dctlClient.NetworkConnect()
+	if err != nil {
+		return errors.Wrapf(err, "failed to connect to telepresence")
+	}
 
 	return nil
 }
@@ -57,8 +63,8 @@ func DeployBlockchain(infraIn infra.Provider, input *cre.DeployGriddleDevenvBloc
 	}
 
 	// deploy the blockchain using dctl wrapper
-	dctlClient := NewDctlClient()
-	err = dctlClient.Apply(configFilePath, "blockchain", infraIn.GriddleDevenvInput.Namespace)
+	dctlClient := dctl.NewDctlClient()
+	err = dctlClient.DeployApply(configFilePath, "blockchain", infraIn.GriddleDevenvInput.Namespace, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to deploy blockchain using dctl")
 	}

@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
+	griddledevenv "github.com/smartcontractkit/chainlink/system-tests/lib/cre/devenv"
 	libdon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/stagegen"
@@ -123,6 +124,11 @@ func SetupTestEnvironment(
 		cribErr := crib.Bootstrap(input.InfraInput)
 		if cribErr != nil {
 			return nil, pkgerrors.Wrap(cribErr, "failed to bootstrap CRIB")
+		}
+	} else if input.InfraInput.Type == infra.GriddleDevenv {
+		griddledevenvErr := griddledevenv.Bootstrap(input.InfraInput)
+		if griddledevenvErr != nil {
+			return nil, pkgerrors.Wrap(griddledevenvErr, "failed to bootstrap Griddle Devenv")
 		}
 	}
 
