@@ -613,6 +613,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 		if errExpose != nil {
 			return fmt.Errorf("failed to expose v2 capability remotely %s: %w", cid, errExpose)
 		}
+		return nil
 	}
 
 	switch capability.CapabilityType {

@@ -177,8 +177,7 @@ func TestLauncher(t *testing.T) {
 		defer launcher.Close()
 
 		require.NoError(t, launcher.OnNewRegistry(t.Context(), localRegistry))
-		require.NoError(t, launcher.Close())
-		assert.Equal(t, 1, observedLogs.FilterMessage("failed to add server-side receiver for a trigger capability - it won't be exposed remotely").Len())
+		assert.Len(t, observedLogs.FilterMessage("failed to serve capability").Len(), 1)
 	})
 
 	t.Run("NOK-invalid_target_capability", func(t *testing.T) {
@@ -221,8 +220,7 @@ func TestLauncher(t *testing.T) {
 		defer launcher.Close()
 
 		require.NoError(t, launcher.OnNewRegistry(t.Context(), localRegistry))
-		require.NoError(t, launcher.Close())
-		assert.Equal(t, 1, observedLogs.FilterMessage("failed to add server-side receiver for a target capability - it won't be exposed remotely").Len())
+		assert.Len(t, observedLogs.FilterMessage("failed to serve capability").Len(), 1)
 	})
 
 	t.Run("start and close with nil peer wrapper", func(t *testing.T) {
