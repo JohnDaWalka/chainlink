@@ -617,8 +617,8 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 
 	switch capability.CapabilityType {
 	case capabilities.CapabilityTypeTrigger:
-		newTriggerPublisher := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			triggerCapability, ok := (cap).(capabilities.TriggerCapability)
+		newTriggerPublisher := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+			triggerCapability, ok := (bc).(capabilities.TriggerCapability)
 			if !ok {
 				return nil, errors.New("capability does not implement TriggerCapability")
 			}
@@ -640,8 +640,8 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			return fmt.Errorf("failed to add server-side receiver for a trigger capability '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	case capabilities.CapabilityTypeAction:
-		newActionServer := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			actionCapability, ok := (cap).(capabilities.ActionCapability)
+		newActionServer := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+			actionCapability, ok := (bc).(capabilities.ActionCapability)
 			if !ok {
 				return nil, errors.New("capability does not implement ActionCapability")
 			}
@@ -673,8 +673,8 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 	case capabilities.CapabilityTypeConsensus:
 		w.lggr.Debug("no remote client configured for capability type consensus, skipping configuration")
 	case capabilities.CapabilityTypeTarget: // TODO: unify Target and Action into Executable
-		newTargetServer := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			targetCapability, ok := (cap).(capabilities.TargetCapability)
+		newTargetServer := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+			targetCapability, ok := (bc).(capabilities.TargetCapability)
 			if !ok {
 				return nil, errors.New("capability does not implement TargetCapability")
 			}
