@@ -24,7 +24,6 @@ inputs:
   github-token:
     description: The GitHub token used to commit any changes made by the linter. Necessary if fix-issues is set to "true".
     required: false
-    default: ${{ secrets.GITHUB_TOKEN }}
 
 outputs:
   golang-report-artifact-url:
