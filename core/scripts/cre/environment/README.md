@@ -15,8 +15,7 @@ Slack: #topic-local-dev-environments
    - [Stop Environment](#stop-environment)
    - [Restart Environment](#restarting-the-environment)
    - [DX Tracing](#dx-tracing)
-2. [Job Distributor Image](#job-distributor-image)
-3. [Example Workflows](#example-workflows)
+2. [Example Workflows](#example-workflows)
 3. [Adding a New Standard Capability](#adding-a-new-standard-capability)
     - [Capability Types](#capability-types)
     - [Step 1: Define the Capability Flag](#step-1-define-the-capability-flag)
@@ -28,7 +27,7 @@ Slack: #topic-local-dev-environments
     - [Step 7: Add to Environment Configurations](#step-7-add-to-environment-configurations)
     - [Configuration Templates](#configuration-templates)
     - [Important Notes](#important-notes)
-5. [Multiple DONs](#multiple-dons)
+4. [Multiple DONs](#multiple-dons)
     - [Supported Capabilities](#supported-capabilities)
     - [DON-level Capabilities](#don-level-capabilities)
     - [Chain-level Capabilities](#chain-level-capabilities)
@@ -38,7 +37,7 @@ Slack: #topic-local-dev-environments
     - [Configuration Modes](#configuration-modes)
     - [Port Management](#port-management)
     - [Important Notes](#important-notes)
-6. [Enabling Already Implemented Capabilities](#enabling-already-implemented-capabilities)
+5. [Enabling Already Implemented Capabilities](#enabling-already-implemented-capabilities)
     - [Available Configuration Files](#available-configuration-files)
     - [Capability Types and Configuration](#capability-types-and-configuration)
     - [DON-level Capabilities](#don-level-capabilities-1)
@@ -49,10 +48,10 @@ Slack: #topic-local-dev-environments
     - [Custom Capability Configuration](#custom-capability-configuration)
     - [Important Notes](#important-notes-1)
     - [Troubleshooting Capability Issues](#troubleshooting-capability-issues)
-7. [Binary Location and Naming](#binary-location-and-naming)
-8. [Hot swapping](#hot-swapping)
-9. [Telemetry Configuration](#telemetry-configuration)
-10. [Troubleshooting](#troubleshooting)
+6. [Binary Location and Naming](#binary-location-and-naming)
+7. [Hot swapping](#hot-swapping)
+8. [Telemetry Configuration](#telemetry-configuration)
+9. [Troubleshooting](#troubleshooting)
 
 # Using the CLI
 
@@ -64,9 +63,18 @@ The CLI manages CRE test environments. It is located in `core/scripts/cre/enviro
     - with Apple Virtualization framework **enabled**
     - with VirtioFS **enabled**
     - with use of containerd for pulling and storing images **disabled**
-2. **AWS SSO access to SDLC**
+2. **AWS SSO access to SDLC** or **Access to Git repositories**
+  AWS:
   - REQUIRED: `sdlc` profile (with `PowerUserAccess` role)
 >  [See more for configuring AWS in CLL](https://smartcontract-it.atlassian.net/wiki/spaces/INFRA/pages/1045495923/Configure+the+AWS+CLI)
+  Git repositories:
+  - REQUIRED: read access to [Atlas](https://github.com/smartcontractkit/atlas) and [Capabilities](https://github.com/smartcontractkit/capabilities) and [Job Distributor](https://github.com/smartcontractkit/job-distributor) repositories
+
+  Either AWS or Git access is required in order to pull/build Docker images for:
+  - Chip Ingress (Beholder)
+  - Job Distributor
+
+  Git access to `Capabilities` repository is required in order to build capability binaries. Unless you plan on only using Docker images with all capabilities baked in.
 
 
 ## Prerequisites For CRIB ###
@@ -86,11 +94,21 @@ Refer to [this document](https://docs.google.com/document/d/1HtVLv2ipx2jvU15WYOi
 
 ## Setup
 
-Environment can be setup by running `go run . env setup` inside `fdf` folder. Its configuration is defined in [configs/setup.toml](configs/setup.toml) file. It will make sure that:
+Environment can be setup by running `go run . env setup` inside `core/scripts/cre/environment` folder. Its configuration is defined in [configs/setup.toml](configs/setup.toml) file. It will make sure that:
 - you have AWS CLI installed and configured
 - you have GH CLI installed and authenticated
 - you have required Job Distributor and Chip Ingress (Beholder) images
-- build and copy all capability binaries to expected location
+- install and copy all capability binaries to expected location
+
+Capability installation is based on `Makefile` commands and by default installing binaries defined in following files:
+- [plugins.public.yaml](../../../../plugins/plugins.public.yaml)
+- [plugins.private.yaml](../../../../plugins/plugins.private.yaml)
+
+Plus `local` plugins:
+- `chainlink-evm`
+- `chainlink-medianpoc`
+- `chainlink-ocr3-capability`
+- `log-event-trigger`
 
 ## Start Environment
 ```bash
@@ -183,7 +201,7 @@ ctf bs r
 ```
 ---
 
-## Debugging core nodes 
+## Debugging core nodes
 Before start the environment set the `CTF_CLNODE_DLV` environment variable to `true`
 ```bash
 export CTF_CLNODE_DLV="true"
@@ -437,20 +455,6 @@ Other environment variables:
 * `DX_FORCE_OFFLINE_MODE` -- doesn't send any events, instead saves them on the disk
 
 ---
-
-# Job Distributor Image
-
-Tests require a local Job Distributor image. By default, configs expect version `job-distributor:0.12.7`.
-
-To build locally:
-```bash
-git clone https://github.com/smartcontractkit/job-distributor
-cd job-distributor
-git checkout v0.12.7
-docker build -t job-distributor:0.12.7 -f e2e/Dockerfile.e2e .
-```
-
-If you pull the image from the PRO ECR remember to either update the image name in [TOML config](./configs/) for your chosed topology or to tag that image as `job-distributor:0.12.7`.
 
 ## Example Workflows
 
@@ -1444,7 +1448,7 @@ TRON blockchain support is integrated into the CRE environment by configuring TR
 [[nodesets]]
 ...
   [nodesets.chain_capabilities]
-    # Tron is configured as an EVM chain so we can use all the EVM capabilities. 
+    # Tron is configured as an EVM chain so we can use all the EVM capabilities.
     read-contract = ["1337", "3360022319"]
     write-evm = ["1337", "3360022319"]
 ```

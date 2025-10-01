@@ -99,15 +99,8 @@ type billingServiceConfig struct {
 }
 
 type capabilitiesConfig struct {
-	TargetPath   string                 `toml:"target_path"`
-	Repositories []capabilityRepository `toml:"repositories"`
-}
-
-type capabilityRepository struct {
-	RepoURL       string   `toml:"repository"`
-	Branch        string   `toml:"branch"`
-	BuildCommand  string   `toml:"build_command"`
-	ArtifactsDirs []string `toml:"artifacts_dirs"`
+	TargetPath   string   `toml:"target_path"`
+	MakeCommands []string `toml:"make_commands"`
 }
 
 var (
@@ -115,6 +108,7 @@ var (
 )
 
 const DefaultSetupConfigPath = "configs/setup.toml"
+const DefaultCapabilityBinariesPath = ".binaries"
 
 // SetupConfig represents the configuration for the setup command
 type SetupConfig struct {
@@ -478,10 +472,13 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt, purge, withBill
 		return
 	}
 
-	buildErr := buildCapabilityBinaries(ctx, cfg.Capabilities)
-	if buildErr != nil {
-		setupErr = errors.Wrap(buildErr, "failed to build capabilities")
-		return
+	if err := runGHSetupGit(); err != nil {
+		return errors.Wrap(err, "failed to run 'gh auth setup-git'")
+	}
+
+	installedCapabilities, capErr := makeCapabilities(cfg.Capabilities, relativePathToRepoRoot)
+	if capErr != nil {
+		return errors.Wrap(capErr, "failed to install capabilities")
 	}
 
 	// Print summary
@@ -503,10 +500,11 @@ func RunSetup(ctx context.Context, config SetupConfig, noPrompt, purge, withBill
 	} else {
 		logger.Warn().Msg("   ✗ CTF CLI is not installed")
 	}
-	if len(cfg.Capabilities.Repositories) > 0 {
-		logger.Info().Msg("   ✓ Capabilities binaries built")
+	if len(cfg.Capabilities.MakeCommands) > 0 {
+		logger.Info().Msg("   ✓ Capabilities binaries installed")
+		logger.Info().Msgf("     - capabilities: %s", strings.Join(installedCapabilities, ", "))
 	} else {
-		logger.Warn().Msg("   ✗ Capabilities binaries not built")
+		logger.Warn().Msg("   ✗ Capabilities binaries not installed")
 	}
 
 	fmt.Println()
@@ -532,19 +530,123 @@ func BuildCapabilities(ctx context.Context, config SetupConfig, noPrompt bool) e
 		return errors.Wrap(ghCliErr, "failed to ensure GitHub CLI")
 	}
 
-	buildErr := buildCapabilityBinaries(ctx, cfg.Capabilities)
-	if buildErr != nil {
-		return errors.Wrap(buildErr, "failed to build capabilities")
+	if err := runGHSetupGit(); err != nil {
+		return errors.Wrap(err, "failed to run 'gh auth setup-git'")
+	}
+
+	installedCapabilities, capErr := makeCapabilities(cfg.Capabilities, relativePathToRepoRoot)
+	if capErr != nil {
+		return errors.Wrap(capErr, "failed to install capabilities")
 	}
 
 	fmt.Println()
 	logger := framework.L
 	logger.Info().Msg("✅ Build Capabilities Summary:")
-	for _, repo := range cfg.Capabilities.Repositories {
-		logger.Info().Msgf("   ✓ %s", repo.RepoURL)
+	for _, capability := range installedCapabilities {
+		logger.Info().Msgf("   ✓ %s", capability)
+	}
+	logger.Info().Msgf("   ✓ %d capabilities installed", len(installedCapabilities))
+
+	return nil
+}
+
+func runGHSetupGit() error {
+	logger := framework.L
+	logger.Info().Msg("🔍 Checking if GitHub CLI authentication is set up for Git...")
+	cmd := exec.Command("bash", "-c", `printf "protocol=https\nhost=github.com\n\n" | git credential fill | sed -n 's/^password=//p' | head -n1`)
+	var out bytes.Buffer
+
+	cmd.Stdout = &out
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, "failed to run git credential fill")
+	}
+
+	if out.String() == "" {
+		logger.Info().Msg("  GitHub CLI authentication is not set up for Git. Running 'gh auth setup-git'...")
+		setupCmd := exec.Command("gh", "auth", "setup-git")
+		setupCmd.Stdout = os.Stdout
+		setupCmd.Stderr = os.Stderr
+		if err := setupCmd.Run(); err != nil {
+			return errors.Wrap(err, "failed to run 'gh auth setup-git'")
+		}
+		logger.Info().Msg("  ✓ GitHub CLI authentication is now set up for Git.")
+	} else {
+		logger.Info().Msg("  ✓ GitHub CLI authentication is already set up for Git.")
 	}
 
 	return nil
+}
+
+func makeCapabilities(capabilitiesConfig capabilitiesConfig, repoRootRelativePath string) ([]string, error) {
+	if len(capabilitiesConfig.MakeCommands) == 0 {
+		framework.L.Info().Msg("No make commands specified for capabilities. Skipping capabilities build.")
+		return nil, nil
+	}
+
+	logger := framework.L
+	logger.Info().Msg("🔍 Installing capabilities binaries...")
+
+	tempDir, tempErr := os.MkdirTemp(".", ".tmp-capability-binaries")
+	if tempErr != nil {
+		return nil, fmt.Errorf("failed to create temporary directory: %w", tempErr)
+	}
+
+	tempDirAbsPath, tAbsErr := filepath.Abs(tempDir)
+	if tAbsErr != nil {
+		return nil, fmt.Errorf("failed to get absolute path of temporary directory: %w", tAbsErr)
+	}
+
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
+
+	for _, makeCommand := range capabilitiesConfig.MakeCommands {
+		cmd := exec.Command("make", makeCommand) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
+		cmd.Dir = repoRootRelativePath
+		// Set GOBIN to the absolute path of the target path, so that binaries are placed there
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, "GOBIN="+tempDirAbsPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("failed to run make command '%s': %w", makeCommand, err)
+		}
+	}
+
+	if capabilitiesConfig.TargetPath == "" {
+		capabilitiesConfig.TargetPath = DefaultCapabilityBinariesPath
+	}
+
+	absPath, absErr := filepath.Abs(capabilitiesConfig.TargetPath)
+	if absErr != nil {
+		return nil, fmt.Errorf("failed to get absolute path of target path: %w", absErr)
+	}
+
+	if err := os.MkdirAll(absPath, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create target path: %w", err)
+	}
+
+	cmd := exec.Command("cp", "-R", tempDir+string(os.PathSeparator)+".", absPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	files, err := os.ReadDir(tempDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read temporary directory: %w", err)
+	}
+
+	installedCapabilities := []string{}
+	for _, f := range files {
+		if f.Type().IsRegular() {
+			installedCapabilities = append(installedCapabilities, f.Name())
+		}
+	}
+
+	logger.Info().Msgf("  ✓ %d capabilities binaries installed in %s", len(installedCapabilities), absPath)
+
+	return installedCapabilities, nil
 }
 
 func readConfig(configPath string) (*config, error) {
@@ -560,82 +662,6 @@ func readConfig(configPath string) (*config, error) {
 	}
 
 	return cfg, nil
-}
-
-func buildCapabilityBinaries(ctx context.Context, capabilitiesConfig capabilitiesConfig) error {
-	logger := framework.L
-	logger.Info().Msg("🔍 Building capabilities binaries...")
-
-	// Save current directory and change to working directory
-	currentDir, cErr := os.Getwd()
-	if cErr != nil {
-		return fmt.Errorf("failed to get current directory: %w", cErr)
-	}
-
-	dirsToDelete := []string{}
-
-	for _, repo := range capabilitiesConfig.Repositories {
-		logger.Info().Msgf("🔍 Building %s...", repo.RepoURL)
-
-		workingDir, isLocalRepo, err := setupRepo(ctx, logger, repo.RepoURL, repo.Branch, "")
-		if err != nil {
-			return fmt.Errorf("failed to setup up repository: %w", err)
-		}
-
-		if !isLocalRepo {
-			dirsToDelete = append(dirsToDelete, workingDir)
-		}
-
-		if err := os.Chdir(workingDir); err != nil {
-			return fmt.Errorf("failed to change to working directory: %w", err)
-		}
-
-		// Only checkout specific version if using a git repo and version is specified
-		if !isLocalRepo && repo.Branch != "" {
-			logger.Info().Msgf("Checking out version %s", repo.Branch)
-			cmd := exec.CommandContext(ctx, "git", "checkout", repo.Branch) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to checkout version %s: %w", repo.Branch, err)
-			}
-		}
-
-		// Run build command
-		logger.Info().Msgf("Running build command: %s", repo.BuildCommand)
-		cmd := exec.CommandContext(ctx, "bash", "-c", repo.BuildCommand) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to run build command: %w", err)
-		}
-
-		// Copy artifacts to target path
-		targetPath := filepath.Join(currentDir, capabilitiesConfig.TargetPath)
-		if err := os.MkdirAll(targetPath, 0755); err != nil {
-			return fmt.Errorf("failed to create target directory: %w", err)
-		}
-
-		for _, artifactDir := range repo.ArtifactsDirs {
-			logger.Info().Msgf("Copying build artifacts from %s to %s", artifactDir, targetPath)
-			artifactsDir := filepath.Join(workingDir, artifactDir)
-			copyCmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("cp -r %s/* %s/", artifactsDir, targetPath)) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
-			if err := copyCmd.Run(); err != nil {
-				return fmt.Errorf("failed to copy directory: %w", err)
-			}
-		}
-
-		logger.Info().Msgf("✓ Build artifacts copied to %s", targetPath)
-	}
-
-	defer func() {
-		_ = os.Chdir(currentDir)
-		for _, dir := range dirsToDelete {
-			_ = os.RemoveAll(dir)
-		}
-	}()
-
-	return nil
 }
 
 // isCommandAvailable checks if a command is available in the PATH
@@ -998,6 +1024,13 @@ func checkCTF(ctx context.Context, requiredVersion string, noPrompt bool, purge 
 	if purge {
 		_ = os.Remove(filepath.Join(binDir, "ctf"))
 	}
+
+	ctfCmd := exec.Command("ctf")
+	if runErr := ctfCmd.Run(); runErr == nil {
+		logger.Info().Msg("✓ CTF CLI is already installed")
+		return true, nil
+	}
+
 	// Check for CTF CLI is in binDir
 	if _, statErr := os.Stat(filepath.Join(binDir, "ctf")); statErr == nil {
 		logger.Info().Msg("✓ CTF CLI is already installed")
