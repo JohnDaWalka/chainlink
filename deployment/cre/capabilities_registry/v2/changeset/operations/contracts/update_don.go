@@ -118,13 +118,6 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 		if f == 0 {
 			f = don.F
 		}
-		// this is implement as such to maintain backwards compatibility; the default (omitted) value of a bool is false
-		var isPublic bool
-		if !input.IsPublic {
-			isPublic = false
-		} else {
-			isPublic = don.IsPublic
-		}
 
 		strategy, err := strategies.CreateStrategy(
 			chain,
@@ -138,15 +131,21 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 			return UpdateDONOutput{}, fmt.Errorf("failed to create strategy: %w", err)
 		}
 
+		p2pIDs := pkg.PeerIDsToBytes(input.P2PIDs)
+		// DON composition is not changing, use existing P2P IDs
+		if len(p2pIDs) == 0 {
+			p2pIDs = don.NodeP2PIds
+		}
+
 		var resultDon capabilities_registry_v2.CapabilitiesRegistryDONInfo
 
 		// Execute the transaction using the strategy
 		proposals, err := strategy.Apply(func(opts *bind.TransactOpts) (*types.Transaction, error) {
 			tx, err := registry.UpdateDONByName(opts, input.DonName, capabilities_registry_v2.CapabilitiesRegistryUpdateDONParams{
 				Name:                     input.DonName,
-				Nodes:                    pkg.PeerIDsToBytes(input.P2PIDs),
+				Nodes:                    p2pIDs,
 				CapabilityConfigurations: cfgs,
-				IsPublic:                 isPublic,
+				IsPublic:                 input.IsPublic,
 				F:                        f,
 				Config:                   don.Config,
 			})
