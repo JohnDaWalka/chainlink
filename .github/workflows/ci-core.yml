@@ -117,6 +117,8 @@ jobs:
     # We don't directly merge dependabot PRs to not waste the resources.
     if: ${{ (github.event_name == 'pull_request' ||  github.event_name == 'schedule') && github.actor != 'dependabot[bot]' }}
     permissions:
+      # To assume aws role.
+      id-token: write
       # To annotate code in the PR.
       checks: write
       # To commit changes made by golangci-lint-action.
