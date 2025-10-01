@@ -636,8 +636,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			return publisher, nil
 		}
 
-		err := w.addReceiver(ctx, capability, don, newTriggerPublisher)
-		if err != nil {
+		if err = w.addReceiver(ctx, capability, don, newTriggerPublisher); err != nil {
 			return fmt.Errorf("failed to add server-side receiver for a trigger capability '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	case capabilities.CapabilityTypeAction:
@@ -668,8 +667,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			), nil
 		}
 
-		err = w.addReceiver(ctx, capability, don, newActionServer)
-		if err != nil {
+		if err = w.addReceiver(ctx, capability, don, newActionServer); err != nil {
 			return fmt.Errorf("failed to add action server-side receiver '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	case capabilities.CapabilityTypeConsensus:
@@ -702,8 +700,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			), nil
 		}
 
-		err := w.addReceiver(ctx, capability, don, newTargetServer)
-		if err != nil {
+		if err = w.addReceiver(ctx, capability, don, newTargetServer); err != nil {
 			return fmt.Errorf("failed to add server-side receiver for a target capability '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	default:
