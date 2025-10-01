@@ -146,7 +146,6 @@ jobs:
           go-directory: ${{ matrix.modules }}
           fix-issues: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        secrets: inherit
 
       - name: Notify Slack
         if: ${{ failure() && needs.run-frequency.outputs.one-per-day-frequency == 'true' }}
