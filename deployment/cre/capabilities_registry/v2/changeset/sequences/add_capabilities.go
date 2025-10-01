@@ -163,7 +163,7 @@ var AddCapabilities = operations.NewSequence[AddCapabilitiesInput, AddCapabiliti
 				CapabilityConfigs: input.CapabilityConfigs,
 				DonName:           input.DonName,
 				F:                 don.F,
-				IsPrivate:         !don.IsPublic,
+				IsPublic:          don.IsPublic,
 				Force:             input.Force,
 			},
 		)

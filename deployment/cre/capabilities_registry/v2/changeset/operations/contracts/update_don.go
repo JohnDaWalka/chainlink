@@ -42,9 +42,9 @@ type UpdateDONInput struct {
 	// if omitted, the existing value fetched from the registry is used
 	F uint8
 
-	// IsPrivate indicates whether the DON is public or private
+	// IsPublic indicates whether the DON is public or private
 	// If omitted, the existing value fetched from the registry is used
-	IsPrivate bool
+	IsPublic bool
 
 	// Force indicates whether to force the update even if we cannot validate that all forwarder contracts are ready to accept the new configure version.
 	// This is very dangerous, and could break the whole platform if the forwarders are not ready. Be very careful with this option.
@@ -109,7 +109,7 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 			return UpdateDONOutput{}, fmt.Errorf("refusing to update workflow don %d at config version %d because we cannot validate that all forwarder contracts are ready to accept the new configure version", don.Id, don.ConfigCount)
 		}
 
-		cfgs, err := computeConfigs(input.CapabilityConfigs, don.CapabilityConfigurations)
+		cfgs, err := computeConfigs(input.CapabilityConfigs)
 		if err != nil {
 			return UpdateDONOutput{}, fmt.Errorf("failed to compute configs: %w", err)
 		}
@@ -120,7 +120,7 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 		}
 		// this is implement as such to maintain backwards compatibility; the default (omitted) value of a bool is false
 		var isPublic bool
-		if input.IsPrivate {
+		if !input.IsPublic {
 			isPublic = false
 		} else {
 			isPublic = don.IsPublic
@@ -192,7 +192,7 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 	},
 )
 
-func computeConfigs(capCfgs []CapabilityConfig, existingCapConfigs []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration) ([]capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration, error) {
+func computeConfigs(capCfgs []CapabilityConfig) ([]capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration, error) {
 	var out []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration
 	for _, capCfg := range capCfgs {
 		cfg := capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{}

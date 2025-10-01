@@ -29,11 +29,6 @@ type ConfigureCapabilitiesRegistryInput struct {
 	Qualifier                   string                             `json:"qualifier,omitempty" yaml:"qualifier,omitempty"`
 }
 
-type ConfigureCapabilitiesRegistryDeps struct {
-	Env           *cldf.Environment
-	MCMSContracts *commonchangeset.MCMSWithTimelockState // Required if MCMSConfig input is not nil
-}
-
 type ConfigureCapabilitiesRegistry struct{}
 
 func (l ConfigureCapabilitiesRegistry) VerifyPreconditions(e cldf.Environment, config ConfigureCapabilitiesRegistryInput) error {
