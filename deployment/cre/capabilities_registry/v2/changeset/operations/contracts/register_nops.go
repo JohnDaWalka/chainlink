@@ -41,6 +41,13 @@ var RegisterNops = operations.NewOperation[RegisterNopsInput, RegisterNopsOutput
 	semver.MustParse("1.0.0"),
 	"Register Node Operators in Capabilities Registry",
 	func(b operations.Bundle, deps RegisterNopsDeps, input RegisterNopsInput) (RegisterNopsOutput, error) {
+		if len(input.Nops) == 0 {
+			b.Logger.Info("No node operators to register, skipping")
+			return RegisterNopsOutput{
+				Nops: []*capabilities_registry_v2.CapabilitiesRegistryNodeOperatorAdded{},
+			}, nil
+		}
+
 		// Get the target chain
 		chain, ok := deps.Env.BlockChains.EVMChains()[input.ChainSelector]
 		if !ok {

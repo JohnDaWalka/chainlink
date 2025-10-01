@@ -38,6 +38,8 @@ type UpdateDONInput struct {
 	// DonName to update, this is required
 	DonName string
 
+	NewDonName string
+
 	// F is the fault tolerance level
 	// if omitted, the existing value fetched from the registry is used
 	F uint8
@@ -119,6 +121,11 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 			f = don.F
 		}
 
+		donName := input.NewDonName
+		if donName == "" {
+			donName = input.DonName
+		}
+
 		strategy, err := strategies.CreateStrategy(
 			chain,
 			*deps.Env,
@@ -137,12 +144,19 @@ var UpdateDON = operations.NewOperation[UpdateDONInput, UpdateDONOutput, UpdateD
 			p2pIDs = don.NodeP2PIds
 		}
 
+		b.Logger.Debugf("don name: %s, total p2pIDs: %d, isPublic: %t, F: %d", input.DonName, len(p2pIDs), input.IsPublic, f)
+
+		b.Logger.Debugf(
+			"ON CHAIN: ID: %d, don name: %s, total p2pIDs: %d, isPublic: %t, F: %d, cap configs: %d, config count: %d, acceptsWorkflows: %t",
+			don.Id, don.Name, len(don.NodeP2PIds), don.IsPublic, don.F, len(don.CapabilityConfigurations), don.ConfigCount, don.AcceptsWorkflows,
+		)
+
 		var resultDon capabilities_registry_v2.CapabilitiesRegistryDONInfo
 
 		// Execute the transaction using the strategy
 		proposals, err := strategy.Apply(func(opts *bind.TransactOpts) (*types.Transaction, error) {
 			tx, err := registry.UpdateDONByName(opts, input.DonName, capabilities_registry_v2.CapabilitiesRegistryUpdateDONParams{
-				Name:                     input.DonName,
+				Name:                     donName,
 				Nodes:                    p2pIDs,
 				CapabilityConfigurations: cfgs,
 				IsPublic:                 input.IsPublic,

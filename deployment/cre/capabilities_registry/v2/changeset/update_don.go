@@ -29,6 +29,8 @@ type UpdateDONInput struct {
 	// DonName to update, this is required
 	DonName string `json:"don_name" yaml:"don_name"`
 
+	NewDonName string `json:"new_don_name" yaml:"new_don_name"`
+
 	// F is the fault tolerance level
 	// if omitted, the existing value fetched from the registry is used
 	F uint8 `json:"f" yaml:"f"`
@@ -86,6 +88,7 @@ func (u UpdateDON) Apply(e cldf.Environment, input UpdateDONInput) (cldf.Changes
 			P2PIDs:            input.P2PIDs,
 			CapabilityConfigs: input.CapabilityConfigs,
 			DonName:           input.DonName,
+			NewDonName:        input.NewDonName,
 			F:                 input.F,
 			IsPublic:          input.IsPublic,
 			Force:             input.Force,
