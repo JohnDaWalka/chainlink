@@ -8,4 +8,5 @@ const (
 	UpdateDONDescription            = "update DON"
 	UpdateNodeDescription           = "update node"
 	UpdateNodesDescription          = "update nodes"
+	RemoveDONsDescription           = "remove DONs"
 )
