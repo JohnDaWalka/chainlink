@@ -379,6 +379,7 @@ func (r *Relayer) NewOCR3CapabilityProvider(ctx context.Context, rargs commontyp
 	}, nil
 }
 
+// TODO: Add plumbing for registrySyncer
 func (r *Relayer) NewPluginProvider(ctx context.Context, rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.PluginProvider, error) {
 	lggr := logger.Sugared(r.lggr).Named("PluginProvider").Named(rargs.ExternalJobID.String())
 	relayOpts := types.NewRelayOpts(rargs)
@@ -387,6 +388,7 @@ func (r *Relayer) NewPluginProvider(ctx context.Context, rargs commontypes.Relay
 		return nil, fmt.Errorf("failed to get relay config: %w", err)
 	}
 
+	// TODO: Add plumbing for registrySyncer
 	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
 	if err != nil {
 		return nil, err

@@ -202,6 +202,7 @@ type RelayConfig struct {
 	ChainID                *big.Big           `json:"chainID"`
 	FromBlock              uint64             `json:"fromBlock"`
 	EffectiveTransmitterID null.String        `json:"effectiveTransmitterID"`
+	CapRegConfig           bool               `json:"capRegConfig"` // TODO: True if the config lives in the Cap Reg
 	ConfigContractAddress  *common.Address    `json:"configContractAddress"`
 	ChainReader            *ChainReaderConfig `json:"chainReader"`
 	Codec                  *CodecConfig       `json:"codec"`
