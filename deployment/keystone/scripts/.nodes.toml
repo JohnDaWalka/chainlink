@@ -1,0 +1,74 @@
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-0"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "FMLgw8sA^24fyBdJPg&DqlA$0hH8Y"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-0.main.stage.cldev.sh"  # Node URL with port
+
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-1"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "gF1&492FwODRCBKb8e5B50ryA5w^^u3f"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-1.main.stage.cldev.sh"  # Node URL with port
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-2"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "6jG&&HIM6vbh8bhM5w5NM$WN"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-2.main.stage.cldev.sh"  # Node URL with port
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-3"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "B522Oa>>PqO*xMWhXn2oP6EqDN57p0b"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-3.main.stage.cldev.sh"  # Node URL with port
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-4"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "N7riNJJ><bfX>otkUNHY51234eZ"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-4.main.stage.cldev.sh"  # Node URL with port
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-5"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "Inh7xQMoOq9kC7idgVP&0&0$2"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-5.main.stage.cldev.sh"  # Node URL with port
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-6"
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "LSodNoL>cINj<W70Sh6X6&sT7fp7"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-6.main.stage.cldev.sh"  # Node URL with port
+
+[[nodes]]
+name = "cl-keystone-one-zone-b-bt-0"
+bootstrap = true  # This node is the bootstrap
+[nodes.credentials]
+email = "admin@chain.link"  # Your Chainlink node login email
+password = "v8q14&P9TqZ*78<5wxvoTo8PSJD6C7"    # Your Chainlink node login password
+
+[nodes.connection]
+base_url = "https://cl-keystone-one-zone-b-bt-0.main.stage.cldev.sh"  # Node URL with port

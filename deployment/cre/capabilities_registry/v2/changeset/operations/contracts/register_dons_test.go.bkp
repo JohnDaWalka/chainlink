@@ -1,0 +1,262 @@
+package contracts_test
+
+import (
+	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink/deployment/cre/capabilities_registry/v2/changeset/operations/contracts"
+	"github.com/smartcontractkit/chainlink/deployment/cre/test"
+
+	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2_dev"
+)
+
+func TestRegisterDons(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successfully registers 5 DONs with no capabilities", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup memory environment
+		// lggr := logger.Test(t)
+		tenv := test.SetupEnvV2(t, false)
+
+		var testP2PIDs [][32]byte
+		for i := 0; i < 4; i++ {
+			p2pID := [32]byte{0: byte(i)}
+			testP2PIDs = append(testP2PIDs, p2pID)
+		}
+
+		// Create 5 DONs with no capabilities
+		dons := []capabilities_registry_v2.CapabilitiesRegistryNewDONParams{
+			{
+				Name:                     "DON_1",
+				Nodes:                    nil, // testP2PIDs,
+				CapabilityConfigurations: []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{},
+				IsPublic:                 false,
+				AcceptsWorkflows:         false,
+				F:                        1,
+			},
+			/*
+				{
+					Name:                     "DON_2",
+					Nodes:                    testP2PIDs,
+					CapabilityConfigurations: []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{},
+					IsPublic:                 false,
+					AcceptsWorkflows:         true,
+					F:                        1,
+				},
+				{
+					Name:                     "DON_3",
+					Nodes:                    testP2PIDs,
+					CapabilityConfigurations: []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{},
+					IsPublic:                 true,
+					AcceptsWorkflows:         false,
+					F:                        1,
+				},
+				{
+					Name:                     "DON_4",
+					Nodes:                    testP2PIDs,
+					CapabilityConfigurations: []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{},
+					IsPublic:                 true,
+					AcceptsWorkflows:         true,
+					F:                        1,
+				},
+				{
+					Name:                     "DON_5",
+					Nodes:                    testP2PIDs,
+					CapabilityConfigurations: []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{},
+					IsPublic:                 false,
+					AcceptsWorkflows:         false,
+					F:                        1,
+				},
+			*/
+		}
+
+		// Apply the changeset to deploy the V2 capabilities registry
+		t.Log("Starting changeset application...")
+		e := tenv.Env
+		registrySelector := tenv.RegistrySelector
+		capRegAddr := tenv.RegistryAddress.String()
+
+		input := contracts.RegisterDonsInput{
+			Address:       capRegAddr,
+			ChainSelector: registrySelector,
+			DONs:          dons,
+		}
+
+		deps2 := contracts.RegisterDonsDeps{
+			Env: e,
+		}
+
+		result, err := operations.ExecuteOperation(
+			e.OperationsBundle,
+			contracts.RegisterDons, deps2, input,
+		)
+		require.NoError(t, err)
+
+		// Verify the result
+		require.NotNil(t, result)
+		require.Len(t, result.Output.DONs, 5, "Should have registered 5 DONs")
+
+		// Verify each DON was registered correctly
+		for i, don := range result.Output.DONs {
+			// DON IDs should start from 1 and increment
+			assert.Equal(t, uint32(i+1), don.Id, "DON ID should match expected value")
+
+			// Verify the P2P IDs match what we sent
+			require.Len(t, don.NodeP2PIds, 1, "Each DON should have exactly 1 node")
+			assert.Equal(t, testP2PIDs[i], don.NodeP2PIds[0], "P2P ID should match for DON %d", i+1)
+
+			// Verify no capability configurations
+			assert.Empty(t, don.CapabilityConfigurations, "DON %d should have no capabilities", i+1)
+
+			// Verify flags match input
+			assert.Equal(t, dons[i].IsPublic, don.IsPublic, "IsPublic flag should match for DON %d", i+1)
+			assert.Equal(t, dons[i].AcceptsWorkflows, don.AcceptsWorkflows, "AcceptsWorkflows flag should match for DON %d", i+1)
+			assert.Equal(t, dons[i].F, don.F, "F value should match for DON %d", i+1)
+		}
+
+		// Verify the DONs are actually on chain by calling the registry directly
+		capabilitiesRegistry, err := capabilities_registry_v2.NewCapabilitiesRegistryCaller(
+			common.HexToAddress(capRegAddr),
+			e.BlockChains.EVMChains()[registrySelector].Client,
+		)
+		require.NoError(t, err)
+
+		onChainDONs, err := capabilitiesRegistry.GetDONs(nil)
+		require.NoError(t, err)
+		require.Len(t, onChainDONs, 5, "Should have 5 DONs on chain")
+
+		gotDons := result.Output.DONs
+		// Compare on-chain DONs with result
+		for i, onChainDON := range onChainDONs {
+			assert.Equal(t, gotDons[i].Id, onChainDON.Id, "On-chain DON ID should match result for DON %d", i+1)
+			assert.Equal(t, gotDons[i].NodeP2PIds, onChainDON.NodeP2PIds, "On-chain P2P IDs should match result for DON %d", i+1)
+			assert.Equal(t, gotDons[i].CapabilityConfigurations, onChainDON.CapabilityConfigurations, "On-chain capabilities should match result for DON %d", i+1)
+			assert.Equal(t, gotDons[i].IsPublic, onChainDON.IsPublic, "On-chain IsPublic should match result for DON %d", i+1)
+			assert.Equal(t, gotDons[i].AcceptsWorkflows, onChainDON.AcceptsWorkflows, "On-chain AcceptsWorkflows should match result for DON %d", i+1)
+			assert.Equal(t, gotDons[i].F, onChainDON.F, "On-chain F should match result for DON %d", i+1)
+		}
+	})
+	/*
+		t.Run("fails when chain selector is invalid", func(t *testing.T) {
+			t.Parallel()
+
+			// Setup memory environment
+			lggr := logger.Test(t)
+			cfg := memory.MemoryEnvironmentConfig{
+				Chains: 1,
+			}
+			env := memory.NewMemoryEnvironment(t, lggr, zapcore.DebugLevel, cfg)
+
+			// Use invalid chain selector
+			invalidChainSelector := uint64(999999)
+
+			input := RegisterDonsInput{
+				Address:       "0x1234567890123456789012345678901234567890",
+				ChainSelector: invalidChainSelector,
+				DONs:          []capabilities_registry_v2.CapabilitiesRegistryNewDONParams{},
+			}
+
+			deps := RegisterDonsDeps{
+				Env: env,
+			}
+
+			_, err := RegisterDons.Execute(cldf.Bundle{}, deps, input)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "chain not found for selector")
+		})
+
+		t.Run("fails when registry address is invalid", func(t *testing.T) {
+			t.Parallel()
+
+			// Setup memory environment
+			lggr := logger.Test(t)
+			cfg := memory.MemoryEnvironmentConfig{
+				Chains: 1,
+			}
+			env := memory.NewMemoryEnvironment(t, lggr, zapcore.DebugLevel, cfg)
+
+			// Get the first chain
+			chains := env.BlockChains.EVMChains()
+			require.Len(t, chains, 1)
+			var registrySelector uint64
+			for sel := range chains {
+				registrySelector = sel
+				break
+			}
+
+			// Use invalid registry address (not deployed)
+			input := RegisterDonsInput{
+				Address:       "0x1234567890123456789012345678901234567890",
+				ChainSelector: registrySelector,
+				DONs: []capabilities_registry_v2.CapabilitiesRegistryNewDONParams{
+					{
+						NodeP2PIds:               [][]byte{testutils.Random32Byte()[:]},
+						CapabilityConfigurations: []capabilities_registry_v2.CapabilitiesRegistryCapabilityConfiguration{},
+						IsPublic:                 false,
+						AcceptsWorkflows:         true,
+						F:                        0,
+					},
+				},
+			}
+
+			deps := RegisterDonsDeps{
+				Env: env,
+			}
+
+			_, err := RegisterDons.Execute(cldf.Bundle{}, deps, input)
+			require.Error(t, err)
+			// Error should be related to calling the non-existent contract
+			assert.Contains(t, err.Error(), "failed to call AddDONs")
+		})
+
+		t.Run("successfully registers empty DONs list", func(t *testing.T) {
+			t.Parallel()
+
+			// Setup memory environment
+			lggr := logger.Test(t)
+			cfg := memory.MemoryEnvironmentConfig{
+				Chains: 1,
+			}
+			env := memory.NewMemoryEnvironment(t, lggr, zapcore.DebugLevel, cfg)
+
+			// Get the first chain
+			chains := env.BlockChains.EVMChains()
+			require.Len(t, chains, 1)
+			var registrySelector uint64
+			for sel := range chains {
+				registrySelector = sel
+				break
+			}
+
+			// Deploy capabilities registry first
+			deployResp, err := DeployCapabilitiesRegistry.Execute(cldf.Bundle{}, DeployCapabilitiesRegistryDeps{
+				Env: env,
+			}, DeployCapabilitiesRegistryInput{
+				ChainSelector: registrySelector,
+			})
+			require.NoError(t, err)
+
+			// Register empty DONs list (should succeed but do nothing)
+			input := RegisterDonsInput{
+				Address:       deployResp.Address,
+				ChainSelector: registrySelector,
+				DONs:          []capabilities_registry_v2.CapabilitiesRegistryNewDONParams{},
+			}
+
+			deps := RegisterDonsDeps{
+				Env: env,
+			}
+
+			result, err := RegisterDons.Execute(cldf.Bundle{}, deps, input)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Len(t, result.DONs, 0, "Should have no DONs registered")
+		})
+	*/
+}

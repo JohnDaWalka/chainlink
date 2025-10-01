@@ -1,0 +1,10 @@
+[
+  {
+    "name": "cl-keystone-one-zone-b-bt-0",
+    "url": "https://cl-keystone-one-zone-b-bt-0.main.stage.cldev.sh",
+    "csa_public_key": "csa_cddc41b1f5f93705b83e6e914b8b25299230e73871e8af8da4cbd78b9a1fd20e",
+    "p2p_peer_id": "p2p_12D3KooWDsN9Jxw6hvRMVX4V1kBt764Wruopb4xU7XVGoSFTWiYE",
+    "ocr_url": "12D3KooWDsN9Jxw6hvRMVX4V1kBt764Wruopb4xU7XVGoSFTWiYE@cl-keystone-one-zone-b-bt-0:5001",
+    "don2_don_url": "12D3KooWDsN9Jxw6hvRMVX4V1kBt764Wruopb4xU7XVGoSFTWiYE@cl-keystone-one-zone-b-bt-0:6690"
+  }
+]

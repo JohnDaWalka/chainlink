@@ -1,0 +1,156 @@
+[
+  {
+    "name": "cl-keystone-one-zone-b-0",
+    "url": "https://cl-keystone-one-zone-b-0.main.stage.cldev.sh",
+    "csa_public_key": "csa_4e01d2bcf24bb9cbd0f39cf3d483f4c23f501f713aa7aff6f8a8813d22dd7b92",
+    "p2p_peer_id": "p2p_12D3KooWCwV9eGqc1xk6FwhjmCb5Kyp31RsbpCKqkmcZZjL4sgVW",
+    "ocr2_key_bundles": [
+      {
+        "id": "f44902c5ce9bea02a9485638556d4592ef2bf23576c22232a8cc99d7519ada91",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_fc60ce4f64758017d72da2805f538e5dffc001c9d86088906ac64fad2145b52c",
+        "onChainPublicKey": "ocr2on_evm_c5566e290e754f587a4e9de9b076ec64fd623f9c",
+        "offChainPublicKey": "ocr2off_evm_0c1cb7b1adb2d14b4efcc3f06bcfb28c1334da15d98dc4d5fb366a83b95388c9"
+      },
+      {
+        "id": "432f1803a311969e007a150a9d1831e82e2ad86d9298fc431932c0ecf3e1f81e",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_81eb4abc64fffbac4478df64f05481af5c431c35bb10469f9ded2b64af20f52d",
+        "onChainPublicKey": "ocr2on_aptos_7d73d84fc9cef7412fb4c5f1bb2b5fc3ee16240035a8910813d44a4c167602c5",
+        "offChainPublicKey": "ocr2off_aptos_77ea9e5ff372d369d636916d612697f58a9adfab8d538cd95265e13458a7417e"
+      }
+    ]
+  },
+  {
+    "name": "cl-keystone-one-zone-b-1",
+    "url": "https://cl-keystone-one-zone-b-1.main.stage.cldev.sh",
+    "csa_public_key": "csa_636d5be94fa1e362cdcf7543f5da16e5b52a43f8c3b84cce31f3899ac17bd3f9",
+    "p2p_peer_id": "p2p_12D3KooWS6TVG5Zuc4ATabUD4seisdVQyt1ib4frJWTRCBpYBQPu",
+    "ocr2_key_bundles": [
+      {
+        "id": "2d04a0699aa62e12bfa326d745fb50e735606bb349b6906887de40f47d6fb080",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_2b9b3e0dd33d5dd8c2a5d1bce18741102edf059ae20cacebd3130ef57ff3c85e",
+        "onChainPublicKey": "ocr2on_evm_a5f13b3dea6dbdb233fb1841149dc6240ddcfaec",
+        "offChainPublicKey": "ocr2off_evm_78f0f54e2a95555ccaf8429dec67aae20078234f87d5c9d9075c6e5448c4ee88"
+      },
+      {
+        "id": "da0a6ea8ae0e3dde9dd6fd046374b7dc158cbd1f951844d26a7dbe47bc09570a",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_f6eada34c1f5eb4773069fc31b8fbf1c784d61018c07bbe64bd791eea4ba9c09",
+        "onChainPublicKey": "ocr2on_aptos_9e51acccb2d9ff8b7cc88cfbb86a1990dce4c6bcc1112da97b1abeabb477a827",
+        "offChainPublicKey": "ocr2off_aptos_69bde7afcb4af431bf52b9bf30dbe8a6ad041ec7371cae0b00a3d0e9ad9a9e2b"
+      }
+    ]
+  },
+  {
+    "name": "cl-keystone-one-zone-b-2",
+    "url": "https://cl-keystone-one-zone-b-2.main.stage.cldev.sh",
+    "csa_public_key": "csa_cd870d482d3b41dc161dc4373ecbdc30e000449a38ccd95861433b570d5c38a3",
+    "p2p_peer_id": "p2p_12D3KooWBHtm6PNiLW9QjwDYXz9wqNybz2nbGTV5DJBmCtU6rBRY",
+    "ocr2_key_bundles": [
+      {
+        "id": "104d7ccf30ed70b99c46dab7a6cefd5af7835449af575dfd97e58b57b5018241",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_60fb6cabccf1434eef244587e68147b938675ba34ac3b9d2b77dcac99dd51d59",
+        "onChainPublicKey": "ocr2on_evm_0097de275ff1136d054f2d0dd6fc2be8d8aa2cce",
+        "offChainPublicKey": "ocr2off_evm_d5beb82ab5d0aba9eb88f4cd9565c2500a29999c2d138df350c8bfbd8601a8f3"
+      },
+      {
+        "id": "dcb517243bcefeec44c6ea98eedea3216b040a0cfbdcc04ccf99e69f3bde7e3e",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_da215858b87c2ad08312376c9e23ecf0b50b525dc50e99c57d9dec060669a159",
+        "onChainPublicKey": "ocr2on_aptos_8d96f50b8dd69ae517ddbc99edd16f4e2423d86f881afdabdc3aff4134917a0e",
+        "offChainPublicKey": "ocr2off_aptos_386e77812f3b30fc494ffbead9fde45c3c9b3d73b8e4a09816b6afc4952a4820"
+      }
+    ]
+  },
+  {
+    "name": "cl-keystone-one-zone-b-3",
+    "url": "https://cl-keystone-one-zone-b-3.main.stage.cldev.sh",
+    "csa_public_key": "csa_fcaf37517ad5b4f2c96ef819d0bace0a6c5057965dd1416f39e2b2d25c4bb85c",
+    "p2p_peer_id": "p2p_12D3KooWLm4KtxVcPhmAiJocye1ttJY3yyyTEUUEvrHDUFU3gRHU",
+    "ocr2_key_bundles": [
+      {
+        "id": "8d488e929ad9153eeca191a4c06454ae17cd84450687b7d5bae6c633181a3648",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_19c18f06d27aca24b51e217c5753391d3655f71b250075024949a8c58c10426f",
+        "onChainPublicKey": "ocr2on_evm_60a41f319dbf8a5ed100600ac2e7bf6322be10f4",
+        "offChainPublicKey": "ocr2off_evm_c1aa602f9a4f31abbe9a7fa2af3260347686e6261bf8360d5a7a30962f859583"
+      },
+      {
+        "id": "ed5e615b2d28afcff90b11dc87ab9fc31cdd2a6aa8a7cb3445b22a782c57c513",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_9bde8624c5cd55542422ff2960775dd0ed194f6f8ce1e918405f54e2d3b5cc3d",
+        "onChainPublicKey": "ocr2on_aptos_e83dcbc8ff6b53504902640a5b415706aa90941684555ed9f310182d04db6f02",
+        "offChainPublicKey": "ocr2off_aptos_38e4f41856c8e559436a93c03e50aeb6322a57bc08286efb06cf3d61e06273ab"
+      }
+    ]
+  },
+  {
+    "name": "cl-keystone-one-zone-b-4",
+    "url": "https://cl-keystone-one-zone-b-4.main.stage.cldev.sh",
+    "csa_public_key": "csa_fa9eb590f94b4f4066d59fcd1ac9dc6dac83284364a51438790755df5db2bc7d",
+    "p2p_peer_id": "p2p_12D3KooWFATweAJEzaTXN8bjHTQTUjsSJXqi7tKJKAqxiqXUjHku",
+    "ocr2_key_bundles": [
+      {
+        "id": "e937d753f988bcb67b60736ac8e1400863bbd1bcdc5e8d9b5043270fa5e82e3b",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_a45d15959d432af3de2947d163703c8ebe335f2c066aa19be91421b471053a48",
+        "onChainPublicKey": "ocr2on_evm_0019f408a1b957d17bdb64978e40a540b9936134",
+        "offChainPublicKey": "ocr2off_evm_843c2a162956fb77ac25391ddc9b4ee2c5918b77a1f7092debea1629fc77fa6b"
+      },
+      {
+        "id": "16b72a072a044db5e027cd0ee057928b5d662885db70455f7956e2a6e35e82c0",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_fbc4de797b7a626d6bbc2b7a9f81628f8e8958146e170bd9d3a8f59784c39534",
+        "onChainPublicKey": "ocr2on_aptos_f82e4446faee2ee3427a2b814e47a23258c3eff92bcff48a178f427317edc43e",
+        "offChainPublicKey": "ocr2off_aptos_c14d37fc411779f20424e1271da76b7262afd3ffd22f36e79bb8c781c15304d0"
+      }
+    ]
+  },
+  {
+    "name": "cl-keystone-one-zone-b-5",
+    "url": "https://cl-keystone-one-zone-b-5.main.stage.cldev.sh",
+    "csa_public_key": "csa_3884bd2cd41b50c6a8d2483d0e9140b9b17c79e7e73d0baa0fb492c96eb565de",
+    "p2p_peer_id": "p2p_12D3KooWJt15UR4czGhG5dj5KqmkLXWzMZ2bkE2BsQHheGzMsSWs",
+    "ocr2_key_bundles": [
+      {
+        "id": "42ace0d758db132d98330e66be5feadbf623a1c5986fc4c67ca42f1f328aecbb",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_3e42faad46aa1963c3b982427bdc569be2b3b3f1218e9531cea013df44d61a0f",
+        "onChainPublicKey": "ocr2on_evm_81676c39069a0a30d28afd621510bf1b08f8f313",
+        "offChainPublicKey": "ocr2off_evm_0ad0a0b9253ef141aafc5abe984a7ff4f1e2a936e444f5f0dd89cb6255aa9a00"
+      },
+      {
+        "id": "e2cb2426be9c8a49d1b53141565eca9615d83189f8697d88f7f72a320ca75d8f",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_5d8de38a6579a248d48ce0bb85ba2cafece7f24cd67ab18a0af5e171cb487f26",
+        "onChainPublicKey": "ocr2on_aptos_d773b07df30d8db42898e063a0141726788b5f5e7ac76f9567b2b1a104c2a980",
+        "offChainPublicKey": "ocr2off_aptos_5e47f9a2a65e1b9fa64ce694fea3b7c90c4b66d7c423c10f519631236b6b575e"
+      }
+    ]
+  },
+  {
+    "name": "cl-keystone-one-zone-b-6",
+    "url": "https://cl-keystone-one-zone-b-6.main.stage.cldev.sh",
+    "csa_public_key": "csa_f7b6347d655e405d222fd66c886b2f3bd6bc9ddeb3836c43ca84dc447664c2c5",
+    "p2p_peer_id": "p2p_12D3KooWNoMv3S5NQ4Wz3nHaLfVXP7drvFGvArMmNSRJYDKdaxtX",
+    "ocr2_key_bundles": [
+      {
+        "id": "b582fa1b3ef5b757af64534e3ae83c54eda84cd06ab98faf94a20e8a12e8690d",
+        "chainType": "EVM",
+        "configPublicKey": "ocr2cfg_evm_6fedc0dd29d4799084240659a4715fe577824e45ab74eabb8ca8adfdbcade673",
+        "onChainPublicKey": "ocr2on_evm_a0486972ac37cbbad6d8923ff19f8275852d7f7f",
+        "offChainPublicKey": "ocr2off_evm_3836b7ae3adef55e71acc9552e046fc002db11e57320566afee2631e40e3cee3"
+      },
+      {
+        "id": "ededcba1a456fdb35293b9e8907a28cd18f5d8e38fdac96e4e62e1311be26075",
+        "chainType": "APTOS",
+        "configPublicKey": "ocr2cfg_aptos_598a11d643fefbe847fc81959cf80df6b247e78e11673b5597a99a650884bd32",
+        "onChainPublicKey": "ocr2on_aptos_ee9b39d8b6b26aa03d064a3c6c95024a739d91ea2b4e30c26fe365b839ec475b",
+        "offChainPublicKey": "ocr2off_aptos_fa39f77f403123ad91ee160c1c3f8005ae751ad97bfddf36b93268a732f5e56a"
+      }
+    ]
+  }
+]

@@ -1,0 +1,5 @@
+name = "Job Distributor"
+uri = "wsrpc-job-distributor.main.stage.cldev.sh"
+public_key = "41dcc9f2d7bf9d7510d95995c1ecac09a2116f0c902a1d532cf010bfb91badf1"
+
+
