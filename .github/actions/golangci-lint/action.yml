@@ -129,7 +129,7 @@ runs:
 
     - name: Comment on PR
       shell: bash
-      if: ${{ failure() && inputs.fix-issues == 'true' }}
+      if: ${{ failure() && inputs.fix-issues != 'true' }}
       env:
         GITHUB_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
         GH_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
