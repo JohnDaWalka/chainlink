@@ -144,6 +144,8 @@ jobs:
         timeout-minutes: 20
         with:
           go-directory: ${{ matrix.modules }}
+          fix-issues: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Notify Slack
         if: ${{ failure() && needs.run-frequency.outputs.one-per-day-frequency == 'true' }}

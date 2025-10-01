@@ -17,6 +17,14 @@ inputs:
   go-module-file:
     description: Set where the go module file is located at
     default: "go.sum"
+  fix-issues:
+    description: If set to "true", will attempt to fix found issues and commit any resulting changes
+    required: false
+    default: "false"
+  github-token:
+    description: The GitHub token used to commit any changes made by the linter. Necessary if fix-issues is set to "true".
+    required: false
+    default: ${{ secrets.GITHUB_TOKEN }}
 
 outputs:
   golang-report-artifact-url:
@@ -76,13 +84,14 @@ runs:
         working-directory: ${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}
 
     - name: Commit golangci-lint fixes
+      if: ${{ inputs.fix-issues }}
       uses: planetscale/ghcommit-action@322be9669498a4be9ce66efc1169f8f43f6bd883 # v0.2.17
       with:
         commit_message: "🤖 golangci-lint fixes"
         repo: ${{ github.repository }}
         branch: ${{ github.head_ref || github.ref_name }}
       env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        GITHUB_TOKEN: ${{inputs.github-token}}
 
     - name: Print Golangci-lint report results
       if: failure()
