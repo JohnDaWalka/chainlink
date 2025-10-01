@@ -291,7 +291,7 @@ jobs:
           CL_DATABASE_URL: ${{ env.DB_URL }}
           OUTPUT_FILE: ./output.txt
           PRODUCE_JUNIT_XML: ${{ matrix.type.trunk-auto-quarantine }}
-          RUN_QUARANTINED_TESTS: 'true' # always run quarantined tests in CI
+          RUN_QUARANTINED_TESTS: "true" # always run quarantined tests in CI
           JUNIT_FILE: ${{ github.workspace }}/junit.xml
         run: |
           GODEBUG=goindex=0 ./tools/bin/${{ matrix.type.cmd }} ./...
@@ -301,7 +301,7 @@ jobs:
         if: ${{ matrix.type.should-run == 'true' && matrix.type.trunk-auto-quarantine == 'true' && !cancelled() }}
         uses: smartcontractkit/.github/actions/branch-out-upload@branch-out-upload/0.1.0
         with:
-          junit-file-path: './junit.xml'
+          junit-file-path: "./junit.xml"
           trunk-org-slug: chainlink
           trunk-token: ${{ secrets.TRUNK_API_KEY }}
           trunk-previous-step-outcome: ${{ steps.run-tests.outcome }}
@@ -518,15 +518,14 @@ jobs:
         run: |
           make rm-mocked
           make generate
-      - name: Ensure clean after generate
-        run: |
-          git add --all
-          git diff --stat --cached --exit-code
-      - run: make gomodtidy
-      - name: Ensure clean after tidy
-        run: |
-          git add --all
-          git diff --minimal --cached --exit-code
+      - name: Commit changes
+        uses: planetscale/ghcommit-action@322be9669498a4be9ce66efc1169f8f43f6bd883 # v0.2.17
+        with:
+          commit_message: "🤖 tidy and generate"
+          repo: ${{ github.repository }}
+          branch: ${{ github.head_ref || github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
   run-frequency:
     name: Run frequency
