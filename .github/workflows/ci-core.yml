@@ -149,7 +149,7 @@ jobs:
           go-directory: ${{ matrix.modules }}
           # Enables us to commit fixes to the PR
           fix-issues: true
-          gati-role-arn: ${{ secrets.AWS_OIDC_GLOBAL_READ_ONLY_TOKEN_ISSUER_ROLE_ARN }}
+          gati-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_CI_AUTO_PR_TOKEN_ISSUER_ROLE_ARN }}
           gati-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
           gati-region: ${{ secrets.AWS_REGION }}
 
