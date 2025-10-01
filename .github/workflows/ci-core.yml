@@ -119,7 +119,8 @@ jobs:
     permissions:
       # To annotate code in the PR.
       checks: write
-      contents: read
+      # To commit changes made by golangci-lint-action.
+      contents: write
       # For golangci-lint-action's `only-new-issues` option.
       pull-requests: read
     runs-on: ${{ needs.runner-config.outputs.lint-runner }}
