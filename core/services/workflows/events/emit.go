@@ -42,6 +42,7 @@ func EmitWorkflowStatusChangedEventV2(
 	binaryURL string,
 	configURL string,
 	eventErr error,
+	lggr logger.Logger,
 ) error {
 	// Emit v1 event
 	var multiErr error
@@ -53,6 +54,18 @@ func EmitWorkflowStatusChangedEventV2(
 	creInfo := buildCREMetadataV2(labels)
 	workflow := buildWorkflowV2(labels, binaryURL, configURL)
 	txInfo := buildTxInfo(head)
+
+	// Debug log organization ID for v2 workflow status events
+	if orgID, exists := labels[platform.KeyOrganizationID]; exists {
+		lggr.Debugw("V2 WorkflowStatusChanged event - Organization ID",
+			"status", status,
+			"orgID", orgID,
+			"workflowID", labels[platform.KeyWorkflowID])
+	} else {
+		lggr.Debugw("V2 WorkflowStatusChanged event - Organization ID missing",
+			"status", status,
+			"workflowID", labels[platform.KeyWorkflowID])
+	}
 
 	var v2Event proto.Message
 	var errorMessage string
@@ -102,6 +115,7 @@ func EmitExecutionStartedEvent(
 	labels map[string]string,
 	triggerEventID string,
 	executionID string,
+	lggr logger.Logger,
 ) error {
 	metadata := buildWorkflowMetadata(labels, executionID)
 
@@ -114,6 +128,18 @@ func EmitExecutionStartedEvent(
 	// Also emit v2 event
 	creInfo := buildCREMetadataV2(labels)
 	workflowKey := buildWorkflowKeyV2(labels)
+
+	// Debug log organization ID for v2 workflow execution started event
+	if orgID, exists := labels[platform.KeyOrganizationID]; exists {
+		lggr.Debugw("V2 WorkflowExecutionStarted event - Organization ID",
+			"orgID", orgID,
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID)
+	} else {
+		lggr.Debugw("V2 WorkflowExecutionStarted event - Organization ID missing",
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID)
+	}
 
 	v2Event := &eventsv2.WorkflowExecutionStarted{
 		CreInfo:             creInfo,
@@ -147,6 +173,20 @@ func EmitExecutionFinishedEvent(ctx context.Context, labels map[string]string, s
 	creInfo := buildCREMetadataV2(labels)
 	workflowKey := buildWorkflowKeyV2(labels)
 
+	// Debug log organization ID for v2 workflow execution finished event
+	if orgID, exists := labels[platform.KeyOrganizationID]; exists {
+		lggr.Debugw("V2 WorkflowExecutionFinished event - Organization ID",
+			"orgID", orgID,
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID,
+			"status", status)
+	} else {
+		lggr.Debugw("V2 WorkflowExecutionFinished event - Organization ID missing",
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID,
+			"status", status)
+	}
+
 	// Convert status string to v2 ExecutionStatus enum
 	var executionStatus eventsv2.ExecutionStatus
 	switch status {
@@ -177,7 +217,7 @@ func EmitExecutionFinishedEvent(ctx context.Context, labels map[string]string, s
 	return multiErr
 }
 
-func EmitCapabilityStartedEvent(ctx context.Context, labels map[string]string, executionID, capabilityID, stepRef string) error {
+func EmitCapabilityStartedEvent(ctx context.Context, labels map[string]string, executionID, capabilityID, stepRef string, lggr logger.Logger) error {
 	metadata := buildWorkflowMetadata(labels, executionID)
 
 	event := &events.CapabilityExecutionStarted{
@@ -190,6 +230,20 @@ func EmitCapabilityStartedEvent(ctx context.Context, labels map[string]string, e
 	// Also emit v2 event
 	creInfo := buildCREMetadataV2(labels)
 	workflowKey := buildWorkflowKeyV2(labels)
+
+	// Debug log organization ID for v2 capability execution started event
+	if orgID, exists := labels[platform.KeyOrganizationID]; exists {
+		lggr.Debugw("V2 CapabilityExecutionStarted event - Organization ID",
+			"orgID", orgID,
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID,
+			"capabilityID", capabilityID)
+	} else {
+		lggr.Debugw("V2 CapabilityExecutionStarted event - Organization ID missing",
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID,
+			"capabilityID", capabilityID)
+	}
 
 	// Convert stepRef string to int32
 	// V1 engine has arbitrary string stepRefs, v2 engine has monotonically increasing integers
@@ -235,7 +289,7 @@ func EmitTriggerExecutionStarted(ctx context.Context, labels map[string]string, 
 	return emitProtoMessage(ctx, v2Event)
 }
 
-func EmitCapabilityFinishedEvent(ctx context.Context, labels map[string]string, executionID, capabilityID, stepRef, status string, capErr error) error {
+func EmitCapabilityFinishedEvent(ctx context.Context, labels map[string]string, executionID, capabilityID, stepRef, status string, capErr error, lggr logger.Logger) error {
 	metadata := buildWorkflowMetadata(labels, executionID)
 
 	event := &events.CapabilityExecutionFinished{
@@ -249,6 +303,22 @@ func EmitCapabilityFinishedEvent(ctx context.Context, labels map[string]string, 
 	// Also emit v2 event
 	creInfo := buildCREMetadataV2(labels)
 	workflowKey := buildWorkflowKeyV2(labels)
+
+	// Debug log organization ID for v2 capability execution finished event
+	if orgID, exists := labels[platform.KeyOrganizationID]; exists {
+		lggr.Debugw("V2 CapabilityExecutionFinished event - Organization ID",
+			"orgID", orgID,
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID,
+			"capabilityID", capabilityID,
+			"status", status)
+	} else {
+		lggr.Debugw("V2 CapabilityExecutionFinished event - Organization ID missing",
+			"workflowID", labels[platform.KeyWorkflowID],
+			"executionID", executionID,
+			"capabilityID", capabilityID,
+			"status", status)
+	}
 
 	// Convert stepRef string to int32
 	// V1 engine has arbitrary string stepRefs, v2 engine has monotonically increasing integers

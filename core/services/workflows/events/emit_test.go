@@ -13,6 +13,7 @@ import (
 	pb "github.com/smartcontractkit/chainlink-protos/workflows/go/events"
 	eventsv2 "github.com/smartcontractkit/chainlink-protos/workflows/go/v2"
 
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/events"
 )
@@ -24,6 +25,7 @@ func TestEmit(t *testing.T) {
 	capabilityID := "capability_" + uuid.NewString()
 	stepRef := "step"
 	beholderObserver := beholdertest.NewObserver(t)
+	lggr := logger.TestLogger(t)
 	labels := map[string]string{
 		platform.KeyWorkflowOwner: "owner",
 	}
@@ -32,7 +34,7 @@ func TestEmit(t *testing.T) {
 	timeMatcher := regexp.MustCompile(`[0-9\-]{10}T[0-9:]{8}\.[0-9Z\-:\+]+`)
 
 	t.Run(events.WorkflowExecutionStarted, func(t *testing.T) {
-		require.NoError(t, events.EmitExecutionStartedEvent(t.Context(), labels, triggerID, executionID))
+		require.NoError(t, events.EmitExecutionStartedEvent(t.Context(), labels, triggerID, executionID, lggr))
 		require.Len(t, labels, 1)
 
 		msgs := beholderObserver.Messages(t, "beholder_entity", "workflows.v1."+events.WorkflowExecutionStarted)
@@ -58,7 +60,7 @@ func TestEmit(t *testing.T) {
 	})
 
 	t.Run(events.CapabilityExecutionStarted, func(t *testing.T) {
-		require.NoError(t, events.EmitCapabilityStartedEvent(t.Context(), labels, executionID, capabilityID, stepRef))
+		require.NoError(t, events.EmitCapabilityStartedEvent(t.Context(), labels, executionID, capabilityID, stepRef, lggr))
 		require.Len(t, labels, 1)
 
 		msgs := beholderObserver.Messages(t, "beholder_entity", "workflows.v1."+events.CapabilityExecutionStarted)
@@ -71,7 +73,7 @@ func TestEmit(t *testing.T) {
 	})
 
 	t.Run(events.CapabilityExecutionFinished, func(t *testing.T) {
-		require.NoError(t, events.EmitCapabilityFinishedEvent(t.Context(), labels, executionID, capabilityID, stepRef, "status", nil))
+		require.NoError(t, events.EmitCapabilityFinishedEvent(t.Context(), labels, executionID, capabilityID, stepRef, "status", nil, lggr))
 		require.Len(t, labels, 1)
 
 		msgs := beholderObserver.Messages(t, "beholder_entity", "workflows.v1."+events.CapabilityExecutionFinished)
