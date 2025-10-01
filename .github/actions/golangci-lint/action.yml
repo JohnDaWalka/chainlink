@@ -77,25 +77,20 @@ runs:
           echo "golangci-lint-working-directory=${{ inputs.go-directory }}/" >> $GITHUB_OUTPUT
         fi
 
-    - name: Golangci-lint
-      uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
-      env:
-        # golangci-lint runs with absolute path mode: --path-mode=abs
-        REPORT_PATH: ${{ github.workspace }}/${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}golangci-lint-report.xml
-      with:
-        version: v2.2.1
-        only-new-issues: true
-        args: --output.checkstyle.path=${{ env.REPORT_PATH }} --fix
-        working-directory: ${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}
-
-    - name: Set up Git user for fixes
+    # If asked to fix issues, set up Git user and GitHub token to make the commit.
+    - name: Set up Git user to commit fixes
       if: ${{ inputs.fix-issues }}
       shell: bash
       run: |
+        if [ -z "${{ inputs.gati-role-arn }}" ] || [ -z "${{ inputs.gati-lambda-url }}" ] || [ -z "${{ inputs.gati-region }}" ]; then
+          echo "ERROR: fix-issues=${{ inputs.fix-issues }}: Unable to commit linting fixes to the PR: GATI inputs are not set."
+          exit 1
+        fi
+
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Setup GitHub Token for fixes
+    - name: Setup GitHub Token to commit fixes
       if: ${{ inputs.fix-issues }}
       id: setup-github-token
       uses: smartcontractkit/.github/actions/setup-github-token@ef78fa97bf3c77de6563db1175422703e9e6674f # setup-github-token@0.1.2
@@ -104,6 +99,17 @@ runs:
         aws-lambda-url: ${{ inputs.gati-lambda-url }}
         aws-region: ${{ inputs.gati-region }}
         aws-role-duration-seconds: "1800"
+
+    - name: Golangci-lint
+      uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
+      env:
+        # golangci-lint runs with absolute path mode: --path-mode=abs
+        REPORT_PATH: ${{ github.workspace }}/${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}golangci-lint-report.xml
+      with:
+        version: v2.2.1
+        only-new-issues: true
+        args: --output.checkstyle.path=${{ env.REPORT_PATH }} ${{ inputs.fix-issues == 'true' && '--fix' || '' }}
+        working-directory: ${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}
 
     - name: Commit golangci-lint fixes
       if: ${{ inputs.fix-issues }}
@@ -118,7 +124,9 @@ runs:
     - name: Print Golangci-lint report results
       if: failure()
       shell: bash
-      run: cat ./${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}golangci-lint-report.xml
+      run: |
+        cat ./${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}golangci-lint-report.xml
+        gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your linting issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
 
       # Get a valid name for the upload-artifact step.
       # Avoid error: `The artifact name is not valid: <path>/<to>/<artifact>/` caused by `/`.
