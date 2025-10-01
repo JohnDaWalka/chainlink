@@ -126,7 +126,14 @@ runs:
       shell: bash
       run: |
         cat ./${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}golangci-lint-report.xml
-        gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your linting issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
+
+    - name: Comment on PR
+      shell: bash
+      if: ${{ failure() && inputs.fix-issues == 'true' }}
+      env:
+        GITHUB_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
+        GH_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
+      run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your linting issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
 
       # Get a valid name for the upload-artifact step.
       # Avoid error: `The artifact name is not valid: <path>/<to>/<artifact>/` caused by `/`.
