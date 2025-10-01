@@ -2,8 +2,6 @@ module github.com/smartcontractkit/chainlink/core/scripts/cre/environment/exampl
 
 go 1.24.5
 
-toolchain go1.24.7
-
 require (
 	github.com/smartcontractkit/chainlink-common v0.9.5-0.20250905131850-7713941a6848
 	github.com/smartcontractkit/chainlink/v2 v2.22.1-por-beta.5.0.20250409140717-74e9650abd95
