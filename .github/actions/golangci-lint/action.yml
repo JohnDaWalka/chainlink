@@ -21,9 +21,15 @@ inputs:
     description: If set to "true", will attempt to fix found issues and commit any resulting changes
     required: false
     default: "false"
-  github-token:
-    description: The GitHub token used to commit any changes made by the linter. Necessary if fix-issues is set to "true".
-    required: false
+  gati-role-arn:
+    description: ARN of the GATI role to assume for GitHub token
+    required: true
+  gati-lambda-url:
+    description: URL of the GATI Lambda function to get the GitHub token
+    required: true
+  gati-region:
+    description: AWS region for the GATI Lambda function
+    default: "us-west-2"
 
 outputs:
   golang-report-artifact-url:
@@ -82,6 +88,23 @@ runs:
         args: --output.checkstyle.path=${{ env.REPORT_PATH }} --fix
         working-directory: ${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}
 
+    - name: Set up Git user for fixes
+      if: ${{ inputs.fix-issues }}
+      shell: bash
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Setup GitHub Token for fixes
+      if: ${{ inputs.fix-issues }}
+      id: setup-github-token
+      uses: smartcontractkit/.github/actions/setup-github-token@ef78fa97bf3c77de6563db1175422703e9e6674f # setup-github-token@0.1.2
+      with:
+        aws-role-arn: ${{ inputs.gati-role-arn }}
+        aws-lambda-url: ${{ inputs.gati-lambda-url }}
+        aws-region: ${{ inputs.gati-region }}
+        aws-role-duration-seconds: "1800"
+
     - name: Commit golangci-lint fixes
       if: ${{ inputs.fix-issues }}
       uses: planetscale/ghcommit-action@322be9669498a4be9ce66efc1169f8f43f6bd883 # v0.2.17
@@ -90,7 +113,7 @@ runs:
         repo: ${{ github.repository }}
         branch: ${{ github.head_ref || github.ref_name }}
       env:
-        GITHUB_TOKEN: ${{inputs.github-token}}
+        GITHUB_TOKEN: ${{steps.setup-github-token.outputs.access-token}}
 
     - name: Print Golangci-lint report results
       if: failure()
