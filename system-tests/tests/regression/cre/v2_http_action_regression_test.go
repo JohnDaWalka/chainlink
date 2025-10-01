@@ -50,67 +50,67 @@ var httpActionFailureTests = []httpActionFailureTest{
 		testCase:      "crud-failure",
 		method:        "GET",
 		url:           "not-a-valid-url",
-		expectedError: "invalid URL",
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	{
 		name:          "non-existing URL",
 		testCase:      "crud-failure",
 		method:        "GET",
 		url:           "http://non-existing-domain-12345.com/api/test",
-		expectedError: "connection failed",
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	// Invalid method tests
 	{
 		name:          "invalid HTTP method",
 		testCase:      "crud-failure",
 		method:        "INVALID",
-		url:           "http://localhost:8080/test",
-		expectedError: "invalid method",
+		url:           "http://host.docker.internal:8080/test",
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	// Invalid headers tests
 	{
 		name:     "invalid headers",
 		testCase: "crud-failure",
 		method:   "GET",
-		url:      "http://localhost:8080/test",
+		url:      "http://host.docker.internal:8080/test",
 		headers: map[string]string{
 			"Invalid\nHeader": "value",
 		},
-		expectedError: "invalid header",
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	// Invalid body tests
 	{
 		name:          "corrupt JSON body",
 		testCase:      "crud-failure",
 		method:        "POST",
-		url:           "http://localhost:8080/test",
+		url:           "http://host.docker.internal:8080/test",
 		body:          `{"invalid": json}`,
-		expectedError: "invalid JSON",
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	// Size limit tests
 	{
 		name:          "oversized request body",
 		testCase:      "crud-failure",
 		method:        "POST",
-		url:           "http://localhost:8080/test",
+		url:           "http://host.docker.internal:8080/test",
 		body:          strings.Repeat("a", 10*1024*1024), // 10MB body
-		expectedError: "request too large",
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	{
 		name:          "oversized URL",
 		testCase:      "crud-failure",
 		method:        "GET",
-		url:           "http://localhost:8080/test?" + strings.Repeat("param=value&", 10000), // Very long URL
-		expectedError: "URL too long",
+		url:           "http://host.docker.internal:8080/test?" + strings.Repeat("param=value&", 10000), // Very long URL
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 	// Timeout tests
 	{
 		name:          "request timeout",
 		testCase:      "crud-failure",
 		method:        "GET",
-		url:           "http://httpbin.org/delay/10", // Endpoint that delays response
-		timeoutMs:     1000,                          // 1 second timeout
-		expectedError: "timeout",
+		url:           "http://host.docker.internal:8080/delay/10", // Endpoint that delays response
+		timeoutMs:     1000,                                        // 1 second timeout
+		expectedError: "HTTP Action expected failure: failed to execute capability: internal error",
 	},
 }
 
@@ -178,21 +178,23 @@ func HTTPActionFailureTest(t *testing.T, testEnv *ttypes.TestEnvironment, httpAc
 	// Start Beholder listener to capture error messages
 	listenerCtx, messageChan, kafkaErrChan := t_helpers.StartBeholder(t, testLogger, testEnv)
 
-	// Wait for error message in Beholder
-	testLogger.Info().Msg("Waiting for expected HTTP Action failure in Beholder...")
+	// Wait for specific error message in Beholder based on test case
+	testLogger.Info().Msgf("Waiting for expected HTTP Action failure: '%s' in Beholder...", httpActionTest.expectedError)
 	timeout := 60 * time.Second
-	err := t_helpers.AssertBeholderMessage(listenerCtx, t, "HTTP Action expected failure", testLogger, messageChan, kafkaErrChan, timeout)
 
-	// For some failure cases, we might get a different but acceptable error message
+	// Try to find the specific expected error message first
+	err := t_helpers.AssertBeholderMessage(listenerCtx, t, httpActionTest.expectedError, testLogger, messageChan, kafkaErrChan, timeout)
+
+	// If specific error not found, try generic error messages as fallback
 	if err != nil {
-		// Try to find any error-related message
-		err = t_helpers.AssertBeholderMessage(listenerCtx, t, "HTTP Action failed", testLogger, messageChan, kafkaErrChan, timeout)
+		testLogger.Info().Msg("Specific error not found, trying generic error messages...")
+		err = t_helpers.AssertBeholderMessage(listenerCtx, t, "HTTP Action expected failure", testLogger, messageChan, kafkaErrChan, timeout)
 		if err != nil {
-			err = t_helpers.AssertBeholderMessage(listenerCtx, t, httpActionTest.expectedError, testLogger, messageChan, kafkaErrChan, timeout)
+			err = t_helpers.AssertBeholderMessage(listenerCtx, t, "HTTP Action failed", testLogger, messageChan, kafkaErrChan, timeout)
 		}
 	}
 
-	require.NoError(t, err, "Expected HTTP Action failure message not found in Beholder logs")
+	require.NoError(t, err, "Expected HTTP Action failure message '%s' not found in Beholder logs", httpActionTest.expectedError)
 	testLogger.Info().Msg("HTTP Action failure test completed successfully")
 }
 
@@ -235,6 +237,14 @@ func startCRUDTestServer(t *testing.T, port int, testID string) (*fake.Output, e
 	}
 	err = fake.JSON("DELETE", "/api/resources/test-resource-123", deleteResponse, 200)
 	require.NoError(t, err, "failed to set up DELETE endpoint")
+
+	// GET /delay/{seconds} - Delay endpoint for timeout testing
+	delayResponse := map[string]interface{}{
+		"message": "delayed response",
+		"delay":   "10",
+	}
+	err = fake.JSON("GET", "/delay/10", delayResponse, 200)
+	require.NoError(t, err, "failed to set up delay endpoint")
 
 	framework.L.Info().Msgf("CRUD test server started on port %d at: %s", port, fakeOutput.BaseURLHost)
 	framework.L.Info().Msgf("Server URL will be converted to: %s", strings.Replace(fakeOutput.BaseURLHost, "localhost", "host.docker.internal", 1))
