@@ -15,7 +15,7 @@ import (
 	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
+
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	remoteMocks "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/p2p/types/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
@@ -244,7 +243,7 @@ func TestLauncher(t *testing.T) {
 }
 
 func newTriggerEventMsg(t *testing.T,
-	senderPeerID types.PeerID,
+	senderPeerID p2ptypes.PeerID,
 	workflowID string,
 	triggerEvent map[string]any,
 	triggerEventID string,
@@ -258,7 +257,7 @@ func newTriggerEventMsg(t *testing.T,
 		},
 		Err: nil,
 	}
-	marshaled, err := pb.MarshalTriggerResponse(capResponse)
+	marshaled, err := capabilitiespb.MarshalTriggerResponse(capResponse)
 	require.NoError(t, err)
 	return &remotetypes.MessageBody{
 		Sender: senderPeerID[:],

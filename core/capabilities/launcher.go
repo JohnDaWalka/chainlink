@@ -129,7 +129,7 @@ func filterDon2Don(
 ) bool {
 	// Below logic is based on identification who is who using a workflow acceptance flag
 	// and does it support any capabilities
-	candidatePeerBelongsToWorkflowDON := candidatePeerDON.DON.AcceptsWorkflows
+	candidatePeerBelongsToWorkflowDON := candidatePeerDON.AcceptsWorkflows
 	candidatePeerBelongsToCapabilityDON := len(candidatePeerDON.CapabilityConfigurations) > 0
 
 	// We identify few cases from the perspective of the node:
@@ -170,14 +170,14 @@ func (w *launcher) peers(
 	allPeers := make(map[ragetypes.PeerID]p2ptypes.StreamConfig)
 	for _, id := range w.allDONs(localRegistry) {
 		candidatePeerDON := localRegistry.IDsToDONs[id]
-		if !candidatePeerDON.DON.IsPublic {
+		if !candidatePeerDON.IsPublic {
 			w.lggr.Debugw("skipping non-public DON for peer connections", "DON.ID", candidatePeerDON.ID)
 			continue
 		}
 		if !isBootstrap && filterDon2Don(w.lggr, belongsToACapabilityDON, belongsToAWorkflowDON, candidatePeerDON) {
 			continue
 		}
-		for _, nid := range candidatePeerDON.DON.Members {
+		for _, nid := range candidatePeerDON.Members {
 			allPeers[nid] = defaultStreamConfig
 		}
 	}
@@ -191,7 +191,7 @@ func (w *launcher) publicDONs(
 	publicDONs := make([]registrysyncer.DON, 0)
 	for _, id := range allDONIDs {
 		candidatePeerDON := localRegistry.IDsToDONs[id]
-		if !candidatePeerDON.DON.IsPublic {
+		if !candidatePeerDON.IsPublic {
 			continue
 		}
 		publicDONs = append(publicDONs, candidatePeerDON)
@@ -642,7 +642,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 		}
 	case capabilities.CapabilityTypeAction:
 		newActionServer := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			actionCapability, ok := (bc).(capabilities.ActionCapability)
+			actionCapability, ok := (bc).(capabilities.ActionCapability) //nolint:staticcheck //SA1019
 			if !ok {
 				return nil, errors.New("capability does not implement ActionCapability")
 			}
@@ -675,7 +675,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 		w.lggr.Debug("no remote client configured for capability type consensus, skipping configuration")
 	case capabilities.CapabilityTypeTarget: // TODO: unify Target and Action into Executable
 		newTargetServer := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			targetCapability, ok := (bc).(capabilities.TargetCapability)
+			targetCapability, ok := (bc).(capabilities.TargetCapability) //nolint:staticcheck //SA1019
 			if !ok {
 				return nil, errors.New("capability does not implement TargetCapability")
 			}
