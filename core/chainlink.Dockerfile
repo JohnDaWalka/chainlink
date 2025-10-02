@@ -29,6 +29,7 @@ ARG COMMIT_SHA
 ARG VERSION_TAG
 # Build chainlink bin with cover flag https://go.dev/doc/build-cover#FAQ
 ARG GO_COVER_FLAG=false
+ARG CL_IS_PROD_BUILD=true
 
 ENV CL_LOOPINSTALL_OUTPUT_DIR=/tmp/loopinstall-output
 RUN --mount=type=secret,id=GIT_AUTH_TOKEN \
@@ -56,6 +57,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     if [ "$GO_COVER_FLAG" = "true" ]; then \
           GOBIN=/gobins make install-chainlink-cover; \
+      elif [ "$CL_IS_PROD_BUILD" = "false" ]; then \
+          GOBIN=/gobins make install-chainlink-dev; \
       else \
           GOBIN=/gobins make install-chainlink; \
       fi

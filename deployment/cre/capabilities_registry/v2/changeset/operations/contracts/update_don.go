@@ -202,9 +202,6 @@ func computeConfigs(capCfgs []CapabilityConfig, existingCapConfigs []capabilitie
 			return nil, fmt.Errorf("failed to marshal capability configuration config: %w", err)
 		}
 		cfg.Config = configBytes
-		if cfg.Config == nil {
-			return nil, fmt.Errorf("config is required for capability %s", capCfg.Capability.CapabilityID)
-		}
 		out = append(out, cfg)
 	}
 	return out, nil
