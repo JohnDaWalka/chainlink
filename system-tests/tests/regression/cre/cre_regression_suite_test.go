@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
 )
@@ -84,6 +86,7 @@ func Test_CRE_V2_EVM_FilterLogs_Invalid_Addresses_Regression(t *testing.T) {
 }
 
 func Test_CRE_V2_EVM_FilterLogs_Invalid_FromBlock_Regression(t *testing.T) {
+	quarantine.Flaky(t, "DX-1928")
 	runEVMNegativeTestSuite(t, evmNegativeTestsFilterLogsWithInvalidFromBlock)
 }
 
