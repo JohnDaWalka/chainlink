@@ -666,28 +666,31 @@ func ConfigureKeystone(input cre.ConfigureKeystoneInput) error {
 
 	for chainSelector, evmOCR3Address := range input.EVMOCR3Addresses {
 		// not sure how to map EVM chains to DONs, so for now we assume that there's only one DON that supports EVM chains
-		evmDON, err := dons.shouldBeOneDon(cre.EVMCapability)
+		//  evmDON, err := dons.shouldBeOneDon(cre.EVMCapability)
+		evmDons, err := dons.ListByFlag(cre.EVMCapability)
 		if err != nil {
 			return fmt.Errorf("failed to get EVM DON: %w", err)
 		}
 
 		if evmOCR3Address.Cmp(common.Address{}) != 0 {
-			_, err = operations.ExecuteOperation(
-				input.CldEnv.OperationsBundle,
-				ks_contracts_op.ConfigureOCR3Op,
-				ks_contracts_op.ConfigureOCR3OpDeps{
-					Env: input.CldEnv,
-				},
-				ks_contracts_op.ConfigureOCR3OpInput{
-					ContractAddress: &evmOCR3Address,
-					ChainSelector:   chainSelector,
-					DON:             evmDON.keystoneDonConfig(),
-					Config:          evmDON.resolveOcr3Config(input.EVMOCR3Config),
-					DryRun:          false,
-				},
-			)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("failed to configure EVM OCR3 contract for chain selector: %d, address:%s", chainSelector, evmOCR3Address.Hex()))
+			for _, evmDON := range evmDons {
+				_, err = operations.ExecuteOperation(
+					input.CldEnv.OperationsBundle,
+					ks_contracts_op.ConfigureOCR3Op,
+					ks_contracts_op.ConfigureOCR3OpDeps{
+						Env: input.CldEnv,
+					},
+					ks_contracts_op.ConfigureOCR3OpInput{
+						ContractAddress: &evmOCR3Address,
+						ChainSelector:   chainSelector,
+						DON:             evmDON.keystoneDonConfig(),
+						Config:          evmDON.resolveOcr3Config(input.EVMOCR3Config),
+						DryRun:          false,
+					},
+				)
+				if err != nil {
+					return errors.Wrap(err, fmt.Sprintf("failed to configure EVM OCR3 contract for chain selector: %d, address:%s", chainSelector, evmOCR3Address.Hex()))
+				}
 			}
 		}
 	}
