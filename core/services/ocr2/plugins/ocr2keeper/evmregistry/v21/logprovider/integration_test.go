@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-automation/pkg/v3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	ocr2keepers "github.com/smartcontractkit/chainlink-common/pkg/types/automation"
@@ -249,6 +251,7 @@ func TestIntegration_LogEventProvider_Backfill(t *testing.T) {
 }
 
 func TestIntegration_LogRecoverer_Backfill(t *testing.T) {
+	quarantine.Flaky(t, "DX-1889")
 	ctx := testutils.Context(t)
 
 	backend, stopMining, accounts := setupBackend(t)
