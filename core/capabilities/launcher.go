@@ -74,6 +74,11 @@ type donNotifier interface {
 	NotifyDonSet(don capabilities.DON)
 }
 
+// TODO: add metric handler and instrument all the internal log.Error calls
+
+// NewLauncher creates a new capabilities launcher.
+// If peerWrapper is nil, no p2p connections will be managed by the launcher.
+// If don2donSharedPeer is nil, no DON-to-DON connections will be managed by the launcher.
 func NewLauncher(
 	lggr logger.Logger,
 	peerWrapper p2ptypes.PeerWrapper,
@@ -129,7 +134,7 @@ func filterDon2Don(
 ) bool {
 	// Below logic is based on identification who is who using a workflow acceptance flag
 	// and does it support any capabilities
-	candidatePeerBelongsToWorkflowDON := candidatePeerDON.DON.AcceptsWorkflows
+	candidatePeerBelongsToWorkflowDON := candidatePeerDON.AcceptsWorkflows
 	candidatePeerBelongsToCapabilityDON := len(candidatePeerDON.CapabilityConfigurations) > 0
 
 	// We identify few cases from the perspective of the node:
@@ -170,14 +175,14 @@ func (w *launcher) peers(
 	allPeers := make(map[ragetypes.PeerID]p2ptypes.StreamConfig)
 	for _, id := range w.allDONs(localRegistry) {
 		candidatePeerDON := localRegistry.IDsToDONs[id]
-		if !candidatePeerDON.DON.IsPublic {
+		if !candidatePeerDON.IsPublic {
 			w.lggr.Debugw("skipping non-public DON for peer connections", "DON.ID", candidatePeerDON.ID)
 			continue
 		}
 		if !isBootstrap && filterDon2Don(w.lggr, belongsToACapabilityDON, belongsToAWorkflowDON, candidatePeerDON) {
 			continue
 		}
-		for _, nid := range candidatePeerDON.DON.Members {
+		for _, nid := range candidatePeerDON.Members {
 			allPeers[nid] = defaultStreamConfig
 		}
 	}
@@ -191,7 +196,7 @@ func (w *launcher) publicDONs(
 	publicDONs := make([]registrysyncer.DON, 0)
 	for _, id := range allDONIDs {
 		candidatePeerDON := localRegistry.IDsToDONs[id]
-		if !candidatePeerDON.DON.IsPublic {
+		if !candidatePeerDON.IsPublic {
 			continue
 		}
 		publicDONs = append(publicDONs, candidatePeerDON)
@@ -379,6 +384,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 	for cid, c := range remoteDON.CapabilityConfigurations {
 		err := w.addRemoteCapability(ctx, cid, c, myDON, remoteDON, localRegistry)
 		if err != nil {
+			// TODO CRE-1021 metrics for failures
 			w.lggr.Errorw("failed to add remote capability ", "myDON", myDON, "remoteDON", remoteDON, "capabilityID", cid, "err", err)
 		}
 	}
@@ -390,10 +396,10 @@ func (w *launcher) addRemoteCapability(ctx context.Context, cid string, c regist
 		return fmt.Errorf("could not find capability matching id %s", cid)
 	}
 
-		capabilityConfig, err := c.Unmarshal()
-		if err != nil {
-			return fmt.Errorf("could not unmarshal capability config for id %s with bytes: %x: %w", cid, c.Config, err)
-		}
+	capabilityConfig, err := c.Unmarshal()
+	if err != nil {
+		return fmt.Errorf("could not unmarshal capability config for id %s: %w", cid, err)
+	}
 
 	methodConfig := capabilityConfig.CapabilityMethodConfig
 	if methodConfig != nil { // v2 capability - handle via CombinedClient
@@ -588,6 +594,7 @@ func (w *launcher) serveCapabilities(ctx context.Context, myPeerID p2ptypes.Peer
 	for cid, c := range don.CapabilityConfigurations {
 		err := w.serveCapability(ctx, cid, c, myPeerID, don, localRegistry, idsToDONs)
 		if err != nil {
+			// TODO CRE-1021 metrics for failures
 			w.lggr.Errorw("failed to serve capability", "myPeerID", myPeerID, "don", don, "capabilityID", cid, "err", err)
 		}
 	}
@@ -602,10 +609,10 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 		return fmt.Errorf("could not find capability matching id %s", cid)
 	}
 
-		capabilityConfig, err := c.Unmarshal()
-		if err != nil {
-			return fmt.Errorf("could not unmarshal capability config for id %s with bytes: %x: %w", cid, c.Config, err)
-		}
+	capabilityConfig, err := c.Unmarshal()
+	if err != nil {
+		return fmt.Errorf("could not unmarshal capability config for id %s: %w", cid, err)
+	}
 
 	methodConfig := capabilityConfig.CapabilityMethodConfig
 	if methodConfig != nil { // v2 capability
@@ -613,12 +620,13 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 		if errExpose != nil {
 			return fmt.Errorf("failed to expose v2 capability remotely %s: %w", cid, errExpose)
 		}
+		return nil
 	}
 
 	switch capability.CapabilityType {
 	case capabilities.CapabilityTypeTrigger:
-		newTriggerPublisher := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			triggerCapability, ok := (cap).(capabilities.TriggerCapability)
+		newTriggerPublisher := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+			triggerCapability, ok := (bc).(capabilities.TriggerCapability)
 			if !ok {
 				return nil, errors.New("capability does not implement TriggerCapability")
 			}
@@ -636,13 +644,12 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			return publisher, nil
 		}
 
-		err := w.addReceiver(ctx, capability, don, newTriggerPublisher)
-		if err != nil {
+		if err = w.addReceiver(ctx, capability, don, newTriggerPublisher); err != nil {
 			return fmt.Errorf("failed to add server-side receiver for a trigger capability '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	case capabilities.CapabilityTypeAction:
-		newActionServer := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			actionCapability, ok := (cap).(capabilities.ActionCapability)
+		newActionServer := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+			actionCapability, ok := (bc).(capabilities.ActionCapability) //nolint:staticcheck //SA1019
 			if !ok {
 				return nil, errors.New("capability does not implement ActionCapability")
 			}
@@ -668,15 +675,14 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			), nil
 		}
 
-		err = w.addReceiver(ctx, capability, don, newActionServer)
-		if err != nil {
+		if err = w.addReceiver(ctx, capability, don, newActionServer); err != nil {
 			return fmt.Errorf("failed to add action server-side receiver '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	case capabilities.CapabilityTypeConsensus:
 		w.lggr.Debug("no remote client configured for capability type consensus, skipping configuration")
 	case capabilities.CapabilityTypeTarget: // TODO: unify Target and Action into Executable
-		newTargetServer := func(cap capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
-			targetCapability, ok := (cap).(capabilities.TargetCapability)
+		newTargetServer := func(bc capabilities.BaseCapability, info capabilities.CapabilityInfo) (remotetypes.ReceiverService, error) {
+			targetCapability, ok := (bc).(capabilities.TargetCapability) //nolint:staticcheck //SA1019
 			if !ok {
 				return nil, errors.New("capability does not implement TargetCapability")
 			}
@@ -702,8 +708,7 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 			), nil
 		}
 
-		err := w.addReceiver(ctx, capability, don, newTargetServer)
-		if err != nil {
+		if err = w.addReceiver(ctx, capability, don, newTargetServer); err != nil {
 			return fmt.Errorf("failed to add server-side receiver for a target capability '%s' - it won't be exposed remotely: %w", cid, err)
 		}
 	default:
@@ -785,6 +790,7 @@ func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, meth
 	for method, config := range methodConfig {
 		w.lggr.Infow("addRemoteCapabilityV2", "capID", capID, "method", method)
 		if config.RemoteTriggerConfig == nil && config.RemoteExecutableConfig == nil {
+			// TODO CRE-1021 metrics
 			w.lggr.Errorw("no remote config found", "method", method, "capID", capID)
 			continue
 		}
@@ -804,6 +810,7 @@ func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, meth
 
 			if !alreadyExists {
 				if err2 := w.startNewShim(ctx, sub.(remotetypes.ReceiverService), capID, remoteDON.ID, method); err2 != nil {
+					// TODO CRE-1021 metrics
 					w.lggr.Errorw("failed to start receiver", "capID", capID, "method", method, "error", err2)
 					continue
 				}
@@ -832,6 +839,7 @@ func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, meth
 
 			if !alreadyExists {
 				if err2 := w.startNewShim(ctx, client.(remotetypes.ReceiverService), capID, remoteDON.ID, method); err2 != nil {
+					// TODO CRE-1021 metrics
 					w.lggr.Errorw("failed to start receiver", "capID", capID, "method", method, "error", err2)
 					continue
 				}
