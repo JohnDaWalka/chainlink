@@ -602,7 +602,7 @@ func makeCapabilities(capabilitiesConfig capabilitiesConfig, repoRootRelativePat
 	}()
 
 	for _, makeCommand := range capabilitiesConfig.MakeCommands {
-		cmd := exec.Command("make", makeCommand) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
+		cmd := exec.Command("make", makeCommand)
 		cmd.Dir = repoRootRelativePath
 		// Set GOBIN to the absolute path of the target path, so that binaries are placed there
 		cmd.Env = os.Environ()
@@ -628,7 +628,7 @@ func makeCapabilities(capabilitiesConfig capabilitiesConfig, repoRootRelativePat
 		return nil, fmt.Errorf("failed to create target path: %w", err)
 	}
 
-	cmd := exec.Command("cp", "-R", tempDir+string(os.PathSeparator)+".", absPath)
+	cmd := exec.Command("cp", "-R", tempDir+string(os.PathSeparator)+".", absPath) //nolint:gosec //G204: Subprocess launched with a potential tainted input or cmd arguments
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
