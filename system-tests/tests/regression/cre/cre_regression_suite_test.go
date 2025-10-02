@@ -34,13 +34,11 @@ func Test_CRE_V2_Cron_Regression(t *testing.T) {
 	}
 }
 
-func Test_CRE_Suite_V2_HTTP_Regression(t *testing.T) {
-	flags := []string{"--with-contracts-version", "v2"}
-	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
-
+func Test_CRE_V2_HTTP_Regression(t *testing.T) {
 	for _, tCase := range httpNegativeTests {
 		testName := "[v2] HTTP Trigger fails with " + tCase.name
 		t.Run(testName, func(t *testing.T) {
+			testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 			HTTPTriggerFailsTest(t, testEnv, tCase)
 		})
 	}
@@ -80,7 +78,6 @@ func Test_CRE_V2_EVM_EstimateGas_Invalid_To_Address_Regression(t *testing.T) {
 }
 
 func Test_CRE_V2_EVM_FilterLogs_Invalid_Addresses_Regression(t *testing.T) {
-	t.Skip("Skipping because evm.FilterLogs does not return an error or nil for invalid/not existing addresses")
 	runEVMNegativeTestSuite(t, evmNegativeTestsFilterLogsWithInvalidAddress)
 }
 
@@ -104,25 +101,12 @@ func Test_CRE_V2_EVM_HeaderByNumber_Invalid_Block_Regression(t *testing.T) {
 	runEVMNegativeTestSuite(t, evmNegativeTestsHeaderByNumberInvalidBlock)
 }
 
-func Test_CRE_V2_HTTP_Action_CRUD_Success_Regression(t *testing.T) {
-	flags := []string{"--with-contracts-version", "v2"}
-	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
-
-	for _, tCase := range httpActionSuccessTests {
-		testName := "[v2] HTTP Action " + tCase.name
-		t.Run(testName, func(t *testing.T) {
-			HTTPActionSuccessTest(t, testEnv, tCase)
-		})
-	}
-}
-
-func Test_CRE_V2_HTTP_Action_CRUD_Failure_Regression(t *testing.T) {
-	flags := []string{"--with-contracts-version", "v2"}
-	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), flags...)
-
+func Test_CRE_V2_HTTP_Action_CRUD_Regression(t *testing.T) {
 	for _, tCase := range httpActionFailureTests {
 		testName := "[v2] HTTP Action fails with " + tCase.name
 		t.Run(testName, func(t *testing.T) {
+			testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
+
 			HTTPActionFailureTest(t, testEnv, tCase)
 		})
 	}
