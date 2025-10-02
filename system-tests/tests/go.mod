@@ -59,9 +59,6 @@ require (
 	github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/evm/evmread-negative v0.0.0-20250923184312-03c1c70ed66b
 	github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/http v0.0.0-20250929083906-1fde9e41af0e
 	github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evm/evmread v0.0.0-20250923184312-03c1c70ed66b
-	github.com/smartcontractkit/cre-sdk-go v0.8.0
-	github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.7.0
-	github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron v0.8.0
 	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
