@@ -15,18 +15,17 @@ import (
 
 type configTracker struct {
 	cfg            cctypes.OCR3ConfigWithMeta
-	addressCodec   ccipcommon.AddressCodec
+	addressCodec   *ccipcommon.AddressCodecRegistry
 	contractConfig types.ContractConfig
 }
 
-func NewConfigTracker(cfg cctypes.OCR3ConfigWithMeta, addressCodec ccipcommon.AddressCodec) (*configTracker, error) {
-	contractConfig, err := contractConfigFromOCRConfig(cfg, addressCodec)
+func NewConfigTracker(cfg cctypes.OCR3ConfigWithMeta) (*configTracker, error) {
+	contractConfig, err := contractConfigFromOCRConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create contract config from ocr config: %w", err)
 	}
 	return &configTracker{
 		cfg:            cfg,
-		addressCodec:   addressCodec,
 		contractConfig: contractConfig,
 	}, nil
 }
@@ -51,7 +50,9 @@ func (c *configTracker) Notify() <-chan struct{} {
 	return nil
 }
 
-func contractConfigFromOCRConfig(cfg cctypes.OCR3ConfigWithMeta, addressCodec ccipcommon.AddressCodec) (types.ContractConfig, error) {
+func contractConfigFromOCRConfig(cfg cctypes.OCR3ConfigWithMeta) (types.ContractConfig, error) {
+	// Get singleton address codec registry instance only when it's needed
+	addressCodec := ccipcommon.GetAddressCodecRegistry()
 	var signers [][]byte
 	var transmitters [][]byte
 	var err error
@@ -105,7 +106,7 @@ func toOnchainPublicKeys(signers [][]byte) []types.OnchainPublicKey {
 	return keys
 }
 
-func toOCRAccounts(transmitters [][]byte, addressCodec ccipcommon.AddressCodec, chainSelector ccipocr3.ChainSelector) ([]types.Account, error) {
+func toOCRAccounts(transmitters [][]byte, addressCodec *ccipcommon.AddressCodecRegistry, chainSelector ccipocr3.ChainSelector) ([]types.Account, error) {
 	accounts := make([]types.Account, len(transmitters))
 	for i, transmitter := range transmitters {
 		address, err := addressCodec.TransmitterBytesToString(transmitter, chainSelector)

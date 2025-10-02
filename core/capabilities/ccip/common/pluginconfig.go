@@ -32,7 +32,7 @@ type PluginConfig struct {
 // PluginServices aggregates services for multiple chain families (singleton registry).
 type PluginServices struct {
 	PluginConfigs              map[string]PluginConfig // chainFamily -> PluginConfig
-	AddrCodec                  AddressCodec
+	AddrCodec                  *AddressCodecRegistry   // Pointer to singleton registry
 	ChainRW                    MultiChainRW
 	LOOPPCCIPProviderSupported map[string]bool
 	mu                         sync.RWMutex
@@ -76,6 +76,7 @@ func (ps *PluginServices) initializeFromFactories(lggr logger.Logger) {
 	defer ps.mu.Unlock()
 
 	extraDataCodecRegistry := GetExtraDataCodecRegistry()
+	addressCodecRegistry := GetAddressCodecRegistry()
 	addressCodecMap := make(map[string]ChainSpecificAddressCodec)
 	chainRWProviderMap := make(map[string]ChainRWProvider)
 	looppSupported := make(map[string]bool)
@@ -98,7 +99,10 @@ func (ps *PluginServices) initializeFromFactories(lggr logger.Logger) {
 		}
 	}
 
-	ps.AddrCodec = NewAddressCodec(addressCodecMap)
+	// Update all at once to avoid multiple locks
+	addressCodecRegistry.RegisterAddressCodecs(addressCodecMap)
+	ps.AddrCodec = addressCodecRegistry
+
 	ps.ChainRW = NewCRCW(chainRWProviderMap)
 	ps.LOOPPCCIPProviderSupported = looppSupported
 }
@@ -113,9 +117,10 @@ func (ps *PluginServices) UpdateCodecsFromCCIPProviders(
 	// Track which address codecs get updated
 	updatedAddressCodecs := make(map[string]ChainSpecificAddressCodec)
 
-	// Start with existing address codecs
-	if ps.AddrCodec.RegisteredAddressCodecMap != nil {
-		for family, codec := range ps.AddrCodec.RegisteredAddressCodecMap {
+	// Start with existing address codecs from the singleton registry
+	if ps.AddrCodec != nil {
+		existingCodecs := ps.AddrCodec.GetRegisteredAddressCodecMap()
+		for family, codec := range existingCodecs {
 			updatedAddressCodecs[family] = codec
 		}
 	}
@@ -164,9 +169,9 @@ func (ps *PluginServices) UpdateCodecsFromCCIPProviders(
 		}
 	}
 
-	// Rebuild the AddrCodec with updated address codecs
-	// This ensures delegate.go gets the updated address codecs
-	ps.AddrCodec = NewAddressCodec(updatedAddressCodecs)
+	// Update the singleton address codec registry directly
+	// This ensures all components that reference the singleton see the updates immediately
+	ps.AddrCodec.RegisterAddressCodecs(updatedAddressCodecs)
 
 	return nil
 }

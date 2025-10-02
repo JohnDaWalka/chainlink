@@ -74,7 +74,6 @@ type pluginOracleCreator struct {
 	homeChainReader       ccipreaderpkg.HomeChain
 	homeChainSelector     cciptypes.ChainSelector
 	relayers              map[types.RelayID]loop.Relayer
-	addressCodec          ccipcommon.AddressCodec
 	p2pID                 p2pkey.KeyV2
 }
 
@@ -93,7 +92,6 @@ func NewPluginOracleCreator(
 	bootstrapperLocators []commontypes.BootstrapperLocator,
 	homeChainReader ccipreaderpkg.HomeChain,
 	homeChainSelector cciptypes.ChainSelector,
-	addressCodec ccipcommon.AddressCodec,
 	p2pID p2pkey.KeyV2,
 ) cctypes.OracleCreator {
 	return &pluginOracleCreator{
@@ -111,7 +109,6 @@ func NewPluginOracleCreator(
 		bootstrapperLocators:  bootstrapperLocators,
 		homeChainReader:       homeChainReader,
 		homeChainSelector:     homeChainSelector,
-		addressCodec:          addressCodec,
 		p2pID:                 p2pID,
 	}
 }
@@ -161,7 +158,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	}
 	destRelayID := types.NewRelayID(destChainFamily, destChainID)
 
-	configTracker, err := ocrimpls.NewConfigTracker(config, i.addressCodec)
+	configTracker, err := ocrimpls.NewConfigTracker(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config tracker: %w, %d", err, chainSelector)
 	}
@@ -190,7 +187,8 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		"maxDurationShouldTransmitAcceptedReport", publicConfig.MaxDurationShouldTransmitAcceptedReport,
 	)
 
-	offrampAddrStr, err := i.addressCodec.AddressBytesToString(config.Config.OfframpAddress, cciptypes.ChainSelector(chainSelector))
+	addressCodec := ccipcommon.GetAddressCodecRegistry()
+	offrampAddrStr, err := addressCodec.AddressBytesToString(config.Config.OfframpAddress, cciptypes.ChainSelector(chainSelector))
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert offramp address to string using address codec: %w", err)
 	}
@@ -332,6 +330,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 ) (ocr3types.ReportingPluginFactory[[]byte], ocr3types.ContractTransmitter[[]byte], error) {
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
+	addressCodec := ccipcommon.GetAddressCodecRegistry()
 	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
 		if !i.peerWrapper.IsStarted() {
 			return nil, nil, errors.New("peer wrapper is not started")
@@ -359,7 +358,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				OcrConfig:                  ccipreaderpkg.OCR3ConfigWithMeta(config),
 				CommitCodec:                pluginConfig.CommitPluginCodec,
 				MsgHasher:                  pluginConfig.MessageHasher,
-				AddrCodec:                  i.addressCodec,
+				AddrCodec:                  addressCodec,
 				HomeChainReader:            i.homeChainReader,
 				HomeChainSelector:          i.homeChainSelector,
 				ChainAccessors:             chainAccessors,
@@ -435,7 +434,7 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 				OcrConfig:                  ccipreaderpkg.OCR3ConfigWithMeta(config),
 				ExecCodec:                  pluginConfig.ExecutePluginCodec,
 				MsgHasher:                  pluginConfig.MessageHasher,
-				AddrCodec:                  i.addressCodec,
+				AddrCodec:                  addressCodec,
 				HomeChainReader:            i.homeChainReader,
 				TokenDataEncoder:           pluginConfig.TokenDataEncoder,
 				EstimateProvider:           pluginConfig.GasEstimateProvider,

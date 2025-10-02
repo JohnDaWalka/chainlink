@@ -21,8 +21,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/bytes"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_home"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
@@ -393,10 +394,10 @@ func BuildOCR3ConfigForCCIPHome(
 	execOffchainCfg *pluginconfig.ExecuteOffchainConfig,
 	skipChainConfigValidation bool,
 ) (map[types.PluginType]ccip_home.CCIPHomeOCR3Config, error) {
-	addressCodec := ccipcommon.NewAddressCodec(map[string]ccipcommon.ChainSpecificAddressCodec{
+	addressCodec := map[string]ccipcommon.ChainSpecificAddressCodec{
 		chain_selectors.FamilyEVM:    ccipevm.AddressCodec{},
 		chain_selectors.FamilySolana: ccipsolana.AddressCodec{},
-	})
+	}
 
 	// check if we have info from this node for another chain in the same destFamily
 	destFamily, err := chain_selectors.GetSelectorFamily(destSelector)
@@ -634,18 +635,27 @@ func BuildOCR3ConfigForCCIPHome(
 
 // replaceEmptyTransmitters replaces empty transmitters with a canonical address, using the oracle ID as the address in order to pass OCR config validation.
 // TODO: this is super hacky, should not have to do this.
-func replaceEmptyTransmitters(transmitters []ocrtypes.Account, addressCodec ccipcommon.AddressCodec, destSelector uint64) ([]ocrtypes.Account, error) {
+func replaceEmptyTransmitters(transmitters []ocrtypes.Account, addressCodec map[string]ccipcommon.ChainSpecificAddressCodec, destSelector uint64) ([]ocrtypes.Account, error) {
+	family, err := chainsel.GetSelectorFamily(destSelector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain family for selector %d: %w", destSelector, err)
+	}
+	addrCodec, ok := addressCodec[family]
+	if !ok {
+		return nil, fmt.Errorf("no address codec for chain family %s", family)
+	}
+
 	var ret []ocrtypes.Account
 	for oracleID, transmitter := range transmitters {
 		acct := transmitter
 		if len(acct) == 0 {
 			// #nosec G115 - Overflow is not a concern in this test scenario
-			canonicalAddress, err := addressCodec.OracleIDAsAddressBytes(uint8(oracleID), ccipocr3.ChainSelector(destSelector))
+			canonicalAddress, err := addrCodec.OracleIDAsAddressBytes(uint8(oracleID))
 			if err != nil {
 				return nil, err
 			}
 
-			acctString, err := addressCodec.AddressBytesToString(canonicalAddress, ccipocr3.ChainSelector(destSelector))
+			acctString, err := addrCodec.AddressBytesToString(canonicalAddress)
 			if err != nil {
 				return nil, err
 			}

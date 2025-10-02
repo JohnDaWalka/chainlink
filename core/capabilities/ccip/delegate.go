@@ -214,9 +214,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		return nil, fmt.Errorf("failed to get chain selector from chain ID %d", homeChainChainID)
 	}
 
-	// Get the singleton registry instead of chain-specific services
-	pluginRegistry := common.GetPluginServicesRegistry(d.lggr)
-
 	// if bootstrappers are provided we assume that the node is a plugin oracle.
 	// the reason for this is that bootstrap oracles do not need to be aware
 	// of other bootstrap oracles. however, plugin oracles, at least initially,
@@ -238,7 +235,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 			bootstrapperLocators,
 			hcr,
 			cciptypes.ChainSelector(homeChainChainSelector),
-			pluginRegistry.AddrCodec,
 			p2pID,
 		)
 	} else {
@@ -249,7 +245,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 			d.monitoringEndpointGen,
 			d.lggr,
 			homeChainContractReader,
-			pluginRegistry.AddrCodec,
 		)
 	}
 

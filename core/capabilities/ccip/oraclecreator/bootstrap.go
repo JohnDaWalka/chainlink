@@ -32,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -120,7 +119,6 @@ type bootstrapOracleCreator struct {
 	monitoringEndpointGen   telemetry.MonitoringEndpointGenerator
 	lggr                    logger.Logger
 	homeChainContractReader types.ContractReader
-	addressCodec            ccipcommon.AddressCodec
 }
 
 func NewBootstrapOracleCreator(
@@ -130,7 +128,6 @@ func NewBootstrapOracleCreator(
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
 	lggr logger.Logger,
 	homeChainContractReader types.ContractReader,
-	addressCodec ccipcommon.AddressCodec,
 ) cctypes.OracleCreator {
 	return &bootstrapOracleCreator{
 		peerWrapper:             peerWrapper,
@@ -139,7 +136,6 @@ func NewBootstrapOracleCreator(
 		monitoringEndpointGen:   monitoringEndpointGen,
 		lggr:                    lggr,
 		homeChainContractReader: homeChainContractReader,
-		addressCodec:            addressCodec,
 	}
 }
 
@@ -181,7 +177,7 @@ func (i *bootstrapOracleCreator) Create(ctx context.Context, _ uint32, config cc
 		config.ConfigDigest,
 	)
 
-	configTracker, err := ocrimpls.NewConfigTracker(config, i.addressCodec)
+	configTracker, err := ocrimpls.NewConfigTracker(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config tracker: %w", err)
 	}
