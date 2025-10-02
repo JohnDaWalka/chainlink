@@ -74,6 +74,11 @@ type donNotifier interface {
 	NotifyDonSet(don capabilities.DON)
 }
 
+// TODO: add metric handler and instrument all the internal log.Error calls
+
+// NewLauncher creates a new capabilities launcher.
+// If peerWrapper is nil, no p2p connections will be managed by the launcher.
+// If don2donSharedPeer is nil, no DON-to-DON connections will be managed by the launcher.
 func NewLauncher(
 	lggr logger.Logger,
 	peerWrapper p2ptypes.PeerWrapper,
@@ -379,6 +384,7 @@ func (w *launcher) addRemoteCapabilities(ctx context.Context, myDON registrysync
 	for cid, c := range remoteDON.CapabilityConfigurations {
 		err := w.addRemoteCapability(ctx, cid, c, myDON, remoteDON, localRegistry)
 		if err != nil {
+			// TODO CRE-1021 metrics for failures
 			w.lggr.Errorw("failed to add remote capability ", "myDON", myDON, "remoteDON", remoteDON, "capabilityID", cid, "err", err)
 		}
 	}
@@ -588,6 +594,7 @@ func (w *launcher) serveCapabilities(ctx context.Context, myPeerID p2ptypes.Peer
 	for cid, c := range don.CapabilityConfigurations {
 		err := w.serveCapability(ctx, cid, c, myPeerID, don, localRegistry, idsToDONs)
 		if err != nil {
+			// TODO CRE-1021 metrics for failures
 			w.lggr.Errorw("failed to serve capability", "myPeerID", myPeerID, "don", don, "capabilityID", cid, "err", err)
 		}
 	}
@@ -783,6 +790,7 @@ func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, meth
 	for method, config := range methodConfig {
 		w.lggr.Infow("addRemoteCapabilityV2", "capID", capID, "method", method)
 		if config.RemoteTriggerConfig == nil && config.RemoteExecutableConfig == nil {
+			// TODO CRE-1021 metrics
 			w.lggr.Errorw("no remote config found", "method", method, "capID", capID)
 			continue
 		}
@@ -802,6 +810,7 @@ func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, meth
 
 			if !alreadyExists {
 				if err2 := w.startNewShim(ctx, sub.(remotetypes.ReceiverService), capID, remoteDON.ID, method); err2 != nil {
+					// TODO CRE-1021 metrics
 					w.lggr.Errorw("failed to start receiver", "capID", capID, "method", method, "error", err2)
 					continue
 				}
@@ -830,6 +839,7 @@ func (w *launcher) addRemoteCapabilityV2(ctx context.Context, capID string, meth
 
 			if !alreadyExists {
 				if err2 := w.startNewShim(ctx, client.(remotetypes.ReceiverService), capID, remoteDON.ID, method); err2 != nil {
+					// TODO CRE-1021 metrics
 					w.lggr.Errorw("failed to start receiver", "capID", capID, "method", method, "error", err2)
 					continue
 				}
