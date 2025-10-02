@@ -34,12 +34,12 @@ import (
 
 	aptos_fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/helpers"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry"
 
@@ -2011,10 +2011,6 @@ func Transfer(
 			FeeToken:     feeToken,
 			TokenAmounts: tokens.([]SuiTokenAmount),
 		}
-		suiState, _ := stateview.LoadOnchainState(env)
-
-		fmt.Println("SUISTATE IN TESTSENDREQUEST: ", suiState.SuiChains[sourceChain].CCIPBurnMintTokenPool)
-
 	default:
 		t.Errorf("unsupported source chain: %v", family)
 	}

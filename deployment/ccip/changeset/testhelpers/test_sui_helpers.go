@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
 	suitx "github.com/block-vision/sui-go-sdk/transaction"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
@@ -862,16 +865,12 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 
 }
 
-func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool, receiverObjectIds [][32]byte) []byte {
+func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool, receiverObjectIds [][32]byte, tokenReceiver [32]byte) []byte {
 	extraArgs, err := ccipevm.SerializeClientSUIExtraArgsV1(message_hasher.ClientSuiExtraArgsV1{
 		GasLimit:                 new(big.Int).SetUint64(gasLimit),
 		AllowOutOfOrderExecution: allowOOO,
-		TokenReceiver:            [32]byte{},
-		// TokenReceiver: [32]byte{255, 165, 93, 243, 140, 118, 46, 60,
-		// 	74, 198, 97, 175, 68, 29, 25, 218,
-		// 	91, 210, 161, 191, 190, 29, 99, 41,
-		// 	194, 76, 193, 11, 75, 177, 25, 190}, // ObjectID i.e. CCIPReceiverStateObjectId
-		ReceiverObjectIds: receiverObjectIds,
+		TokenReceiver:            tokenReceiver,
+		ReceiverObjectIds:        receiverObjectIds,
 	})
 	if err != nil {
 		panic(err)
@@ -879,39 +878,39 @@ func MakeSuiExtraArgs(gasLimit uint64, allowOOO bool, receiverObjectIds [][32]by
 	return extraArgs
 }
 
-func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, sourceChain, destChain uint64) (cldf.Environment, []byte, []byte, error) {
+func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChainSel uint64) (cldf.Environment, *burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, error) {
 	suiChains := e.BlockChains.SuiChains()
-	suiChain := suiChains[sourceChain]
+	suiChain := suiChains[suiChainSel]
 
-	evmChain := e.BlockChains.EVMChains()[destChain]
+	evmChain := e.BlockChains.EVMChains()[evmChainSel]
 
 	// Deploy Transferrable TOKEN on ETH
 	// EVM
 	evmDeployerKey := evmChain.DeployerKey
 	state, err := stateview.LoadOnchainState(e)
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, fmt.Errorf("failed load onstate chains %w", err)
+		return cldf.Environment{}, nil, nil, fmt.Errorf("failed load onstate chains %w", err)
 	}
 
-	linkTokenPkgId := state.SuiChains[sourceChain].LinkTokenAddress
-	linkTokenObjectMetadataId := state.SuiChains[sourceChain].LinkTokenCoinMetadataId
-	linkTokenTreasuryCapId := state.SuiChains[sourceChain].LinkTokenTreasuryCapId
+	linkTokenPkgId := state.SuiChains[suiChainSel].LinkTokenAddress
+	linkTokenObjectMetadataId := state.SuiChains[suiChainSel].LinkTokenCoinMetadataId
+	linkTokenTreasuryCapId := state.SuiChains[suiChainSel].LinkTokenTreasuryCapId
 
 	// Deploy transferrable token on EVM
 	evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, fmt.Errorf("failed to deploy transfer token for evm chain %d: %w", destChain, err)
+		return cldf.Environment{}, nil, nil, fmt.Errorf("failed to deploy transfer token for evm chain %d: %w", evmChainSel, err)
 	}
 
 	err = attachTokenToTheRegistry(evmChain, state.MustGetEVMChainState(evmChain.Selector), evmDeployerKey, evmToken.Address(), evmPool.Address())
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, fmt.Errorf("failed to attach token to registry for evm %d: %w", destChain, err)
+		return cldf.Environment{}, nil, nil, fmt.Errorf("failed to attach token to registry for evm %d: %w", evmChainSel, err)
 	}
 
 	// // // Deploy & Configure BurnMint TP on SUI
 	e, _, err = commoncs.ApplyChangesets(&testing.T{}, e, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.DeployTPAndConfigure{}, sui_cs.DeployTPAndConfigureConfig{
-			SuiChainSelector: sourceChain,
+			SuiChainSelector: suiChainSel,
 			TokenPoolTypes:   []string{"bnm"},
 			BurnMintTpInput: burnminttokenpoolops.DeployAndInitBurnMintTokenPoolInput{
 				CoinObjectTypeArg:    linkTokenPkgId + "::link::LINK",
@@ -920,14 +919,14 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, sourceChain, destCha
 
 				// apply dest chain updates
 				RemoteChainSelectorsToRemove: []uint64{},
-				RemoteChainSelectorsToAdd:    []uint64{destChain},
+				RemoteChainSelectorsToAdd:    []uint64{evmChainSel},
 				RemotePoolAddressesToAdd:     [][]string{{evmPool.Address().String()}}, // this gets convert to 32byte bytes internally
 				RemoteTokenAddressesToAdd: []string{
 					evmToken.Address().String(), // this gets convert to 32byte bytes internally
 				},
 
 				// set chain rate limiter configs
-				RemoteChainSelectors: []uint64{destChain},
+				RemoteChainSelectors: []uint64{evmChainSel},
 				OutboundIsEnableds:   []bool{false},
 				OutboundCapacities:   []uint64{100000},
 				OutboundRates:        []uint64{100},
@@ -938,27 +937,33 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, sourceChain, destCha
 		}),
 	})
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, err
+		return cldf.Environment{}, nil, nil, err
 	}
 
 	// reload onChainState to get deployed TP contracts
 	state, err = stateview.LoadOnchainState(e)
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, fmt.Errorf("failed load onstate chains %w", err)
+		return cldf.Environment{}, nil, nil, fmt.Errorf("failed load onstate chains %w", err)
 	}
 
-	suiTokenBytes, _ := hex.DecodeString(linkTokenObjectMetadataId)
-	suiPoolBytes, _ := hex.DecodeString(state.SuiChains[sourceChain].CCIPBurnMintTokenPool)
+	suiTokenBytes, err := hex.DecodeString(strings.TrimPrefix(linkTokenObjectMetadataId, "0x"))
+	if err != nil {
+		return cldf.Environment{}, nil, nil, fmt.Errorf("Error while decoding suiToken")
+	}
+	suiPoolBytes, err := hex.DecodeString(strings.TrimPrefix(state.SuiChains[suiChainSel].CCIPBurnMintTokenPool, "0x"))
+	if err != nil {
+		return cldf.Environment{}, nil, nil, fmt.Errorf("Error while decoding suiPool")
+	}
 
 	err = setTokenPoolCounterPart(e.BlockChains.EVMChains()[evmChain.Selector], evmPool, evmDeployerKey, suiChain.Selector, suiTokenBytes[:], suiPoolBytes[:])
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, fmt.Errorf("failed to add token to the counterparty %d: %w", destChain, err)
+		return cldf.Environment{}, nil, nil, fmt.Errorf("failed to add token to the counterparty %d: %w", evmChainSel, err)
 	}
 
 	err = grantMintBurnPermissions(e.Logger, e.BlockChains.EVMChains()[evmChain.Selector], evmToken, evmDeployerKey, evmPool.Address())
 	if err != nil {
-		return cldf.Environment{}, []byte{}, []byte{}, fmt.Errorf("failed to grant burnMint %d: %w", destChain, err)
+		return cldf.Environment{}, nil, nil, fmt.Errorf("failed to grant burnMint %d: %w", evmChainSel, err)
 	}
 
-	return e, evmToken.Address().Bytes(), evmPool.Address().Bytes(), nil
+	return e, evmToken, evmPool, nil
 }
