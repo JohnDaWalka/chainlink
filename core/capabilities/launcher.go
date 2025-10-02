@@ -390,10 +390,10 @@ func (w *launcher) addRemoteCapability(ctx context.Context, cid string, c regist
 		return fmt.Errorf("could not find capability matching id %s", cid)
 	}
 
-	capabilityConfig, err := c.Unmarshal()
-	if err != nil {
-		return fmt.Errorf("could not unmarshal capability config for id %s: %w", cid, err)
-	}
+		capabilityConfig, err := c.Unmarshal()
+		if err != nil {
+			return fmt.Errorf("could not unmarshal capability config for id %s with bytes: %x: %w", cid, c.Config, err)
+		}
 
 	methodConfig := capabilityConfig.CapabilityMethodConfig
 	if methodConfig != nil { // v2 capability - handle via CombinedClient
@@ -539,7 +539,7 @@ func (w *launcher) addToRegistryAndSetDispatcher(ctx context.Context, capability
 	w.lggr.Debugw("Adding remote capability to registry", "id", info.ID, "don", info.DON)
 	cp, err := newCapFn(info)
 	if err != nil {
-		return fmt.Errorf("failed to instantiate capability: %w", err)
+		return fmt.Errorf("failed to instantiate capability %q: %w", capabilityID, err)
 	}
 
 	err = w.registry.Add(ctx, cp)
@@ -602,10 +602,10 @@ func (w *launcher) serveCapability(ctx context.Context, cid string, c registrysy
 		return fmt.Errorf("could not find capability matching id %s", cid)
 	}
 
-	capabilityConfig, err := c.Unmarshal()
-	if err != nil {
-		return fmt.Errorf("could not unmarshal capability config for id %s: %w", cid, err)
-	}
+		capabilityConfig, err := c.Unmarshal()
+		if err != nil {
+			return fmt.Errorf("could not unmarshal capability config for id %s with bytes: %x: %w", cid, c.Config, err)
+		}
 
 	methodConfig := capabilityConfig.CapabilityMethodConfig
 	if methodConfig != nil { // v2 capability
