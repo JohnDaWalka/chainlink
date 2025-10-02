@@ -177,7 +177,7 @@ func TestLauncher(t *testing.T) {
 		defer launcher.Close()
 
 		require.NoError(t, launcher.OnNewRegistry(t.Context(), localRegistry))
-		assert.Equal(t, observedLogs.FilterMessage("failed to serve capability").Len(), 1)
+		assert.Equal(t, 1, observedLogs.FilterMessage("failed to serve capability").Len())
 	})
 
 	t.Run("NOK-invalid_target_capability", func(t *testing.T) {
@@ -220,7 +220,7 @@ func TestLauncher(t *testing.T) {
 		defer launcher.Close()
 
 		require.NoError(t, launcher.OnNewRegistry(t.Context(), localRegistry))
-		assert.Equal(t, observedLogs.FilterMessage("failed to serve capability").Len(), 1)
+		assert.Equal(t, 1, observedLogs.FilterMessage("failed to serve capability").Len())
 	})
 
 	t.Run("start and close with nil peer wrapper", func(t *testing.T) {
