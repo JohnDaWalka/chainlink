@@ -38,7 +38,7 @@ require (
 	github.com/prometheus/common v0.65.0
 	github.com/rs/zerolog v1.33.0
 	github.com/shopspring/decimal v1.4.0
-	github.com/smartcontractkit/chainlink-common v0.9.6-0.20250929154511-1f5fbda7ae76
+	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251001150007-98903c79c124
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.52.0
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20250917110014-65bff6568f77
@@ -535,7 +535,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.72 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250916164650-970686360fbf // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251002041728-7c66dc2bbd91 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251002042239-4167d6938ea4 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.4 // indirect
