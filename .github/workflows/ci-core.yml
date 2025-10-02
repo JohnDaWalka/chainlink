@@ -555,7 +555,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{steps.setup-github-token.outputs.access-token}}
 
-      - name: Comment on PR
+      - name: Comment on PR if Generation Fails
         if: ${{ failure() && !contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
         env:
           GITHUB_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}

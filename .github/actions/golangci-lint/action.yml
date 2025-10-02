@@ -22,11 +22,11 @@ inputs:
     required: false
     default: "false"
   gati-role-arn:
-    description: ARN of the GATI role to assume for GitHub token
-    required: true
+    description: ARN of the GATI role to assume for GitHub token. Needed to commit fixes to the PR.
+    required: false
   gati-lambda-url:
-    description: URL of the GATI Lambda function to get the GitHub token
-    required: true
+    description: URL of the GATI Lambda function to get the GitHub token. Needed to commit fixes to the PR.
+    required: false
   gati-region:
     description: AWS region for the GATI Lambda function
     default: "us-west-2"
@@ -127,7 +127,7 @@ runs:
       run: |
         cat ./${{ steps.set-working-directory.outputs.golangci-lint-working-directory }}golangci-lint-report.xml
 
-    - name: Comment on PR
+    - name: Comment on PR if Lint Fails
       shell: bash
       if: ${{ failure() && inputs.fix-issues != 'true' }}
       env:
