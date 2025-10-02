@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
-	"github.com/smartcontractkit/quarantine"
 )
 
 //////////// SMOKE TESTS /////////////
