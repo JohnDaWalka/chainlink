@@ -3,8 +3,8 @@ module github.com/smartcontractkit/chainlink/core/scripts/cre/environment/exampl
 go 1.24.5
 
 require (
-	github.com/smartcontractkit/cre-sdk-go v0.5.1-0.20250818141131-0b979c98bab0
-	github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron v0.5.1-0.20250818141131-0b979c98bab0
+	github.com/smartcontractkit/cre-sdk-go v0.7.0
+	github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron v0.7.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

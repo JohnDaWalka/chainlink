@@ -80,9 +80,10 @@
       Level = 'debug'
       JSONConsole = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
 
       [Billing]
       URL = "billing-platform-service:2223"
@@ -100,9 +101,10 @@
       Level = 'debug'
       JSONConsole = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
 
       [Billing]
       URL = "billing-platform-service:2223"
@@ -120,9 +122,10 @@
       Level = 'debug'
       JSONConsole = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
 
       [Billing]
       URL = "billing-platform-service:2223"
@@ -140,9 +143,10 @@
       Level = 'debug'
       JSONConsole = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
 
       [Billing]
       URL = "billing-platform-service:2223"
@@ -160,9 +164,10 @@
       Level = 'debug'
       JSONConsole = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
 
       [Billing]
       URL = "billing-platform-service:2223"

@@ -5,7 +5,7 @@
   docker_cmd_params = ["-b", "0.5", "--mixed-mining"]
 
 [[blockchains]]
-  chain_id = "3360022319" 
+  chain_id = "3360022319"
   type = "tron"
   port = "9090"
   image = "tronbox/tre:dev"
@@ -46,7 +46,7 @@
 
   # Enable capabilities per chain with optional per-chain overrides
   [nodesets.chain_capabilities]
-    # Tron is configured as an EVM chain so we can use all the EVM capabilities. 
+    # Tron is configured as an EVM chain so we can use all the EVM capabilities.
     read-contract = ["1337", "3360022319"]
     write-evm = ["1337", "3360022319"]
 
@@ -81,9 +81,10 @@
       [CRE]
       EnableDKGRecipient = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
       """
 
   [[nodesets.node_specs]]
@@ -108,9 +109,10 @@
       [CRE]
       EnableDKGRecipient = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
       """
 
   [[nodesets.node_specs]]
@@ -135,9 +137,10 @@
       [CRE]
       EnableDKGRecipient = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
       """
 
   [[nodesets.node_specs]]
@@ -162,9 +165,10 @@
       [CRE]
       EnableDKGRecipient = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
       """
 
   [[nodesets.node_specs]]
@@ -189,7 +193,8 @@
       [CRE]
       EnableDKGRecipient = true
 
-      # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+      # Use this instead to allow downloading workflow artifacts from Gist
+      #URL = "https://gist.githubusercontent.com/"
       """

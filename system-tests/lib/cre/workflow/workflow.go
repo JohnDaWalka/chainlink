@@ -48,20 +48,27 @@ const (
 	errDeleteWorkflow          = "failed to delete workflow %q"
 )
 
-func RegisterWithContract(ctx context.Context, sc *seth.Client,
-	workflowRegistryAddr common.Address, typeVersion deployment.TypeAndVersion,
-	donID uint64, workflowName, binaryURL string,
+func RegisterWithContract(
+	ctx context.Context,
+	sc *seth.Client,
+	workflowRegistryAddr common.Address,
+	typeVersion deployment.TypeAndVersion,
+	donID uint64,
+	workflowName string,
+	binaryURL string,
 	configURL, secretsURL *string,
 	artifactsDirInContainer *string,
+	baseURLprefix *string,
 ) (string, error) {
 	// Download and decode workflow binary
+	// binaryURL has to be either http(s):// (for remotely-stored artifacts) or file:// (for locally-stored artifacts)
 	workflowData, err := libnet.DownloadAndDecodeBase64(ctx, binaryURL)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to download and decode workflow binary")
 	}
 
 	// Construct binary URL for container if needed
-	binaryURLToUse := constructArtifactURL(binaryURL, artifactsDirInContainer)
+	binaryURLToUse := constructArtifactURL(binaryURL, artifactsDirInContainer, baseURLprefix)
 
 	// Handle config URL if provided
 	var configData []byte
@@ -71,13 +78,13 @@ func RegisterWithContract(ctx context.Context, sc *seth.Client,
 		if err != nil {
 			return "", errors.Wrap(err, "failed to download workflow config")
 		}
-		configURLToUse = constructArtifactURL(*configURL, artifactsDirInContainer)
+		configURLToUse = constructArtifactURL(*configURL, artifactsDirInContainer, baseURLprefix)
 	}
 
 	// Handle secrets URL if provided
 	secretsURLToUse := ""
 	if secretsURL != nil && *secretsURL != "" {
-		secretsURLToUse = constructArtifactURL(*secretsURL, artifactsDirInContainer)
+		secretsURLToUse = constructArtifactURL(*secretsURL, artifactsDirInContainer, baseURLprefix)
 	}
 
 	// Generate workflow ID
@@ -207,11 +214,17 @@ func RemoveWorkflowArtifactsFromLocalEnv(artifactPaths ...string) error {
 	return nil
 }
 
-// constructArtifactURL constructs the appropriate URL based on whether artifacts are in a container
-func constructArtifactURL(originalURL string, artifactsDirInContainer *string) string {
+// constructArtifactURL either transforms the original URL to a file:// URL if artifactsDirInContainer is provided,
+// or adjusts the URL by stripping the baseURLprefix if provided. If neither is provided, it returns the original URL.
+func constructArtifactURL(originalURL string, artifactsDirInContainer, baseURLprefix *string) string {
 	if artifactsDirInContainer != nil {
 		return fmt.Sprintf(fileURLTemplate, *artifactsDirInContainer, filepath.Base(originalURL))
 	}
+
+	if baseURLprefix != nil {
+		return strings.TrimPrefix(originalURL, *baseURLprefix)
+	}
+
 	return originalURL
 }
 
