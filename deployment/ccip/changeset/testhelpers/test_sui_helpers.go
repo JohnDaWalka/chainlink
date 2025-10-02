@@ -946,6 +946,8 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 		return cldf.Environment{}, nil, nil, fmt.Errorf("failed load onstate chains %w", err)
 	}
 
+	fmt.Println("REMOTE TP PARAMS: ", state.SuiChains[suiChainSel].CCIPBurnMintTokenPool, state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolState, state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolOwnerId)
+
 	// ?? I thought this was convered during apply_dest_chain_update above ????
 	// add remote TP changeset
 	e, _, err = commoncs.ApplyChangesets(&testing.T{}, e, []commoncs.ConfiguredChangeSet{
@@ -964,6 +966,8 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 	if err != nil {
 		return cldf.Environment{}, nil, nil, err
 	}
+
+	fmt.Println("RAN ADDREMOTE TP")
 
 	suiTokenBytes, err := hex.DecodeString(strings.TrimPrefix(linkTokenObjectMetadataId, "0x"))
 	if err != nil {
