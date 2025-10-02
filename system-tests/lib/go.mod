@@ -451,7 +451,7 @@ require (
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250916164650-970686360fbf // indirect
 	github.com/smartcontractkit/chainlink-automation v0.8.1 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250918204703-3e80e7e85597 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250930201218-209ca2e30b73 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.4 // indirect
@@ -468,7 +468,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250912140847-cbfb1710ac76 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250929202151-2b9352259295 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20251002070647-dc7d22a6d3f1 // indirect
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251002070647-dc7d22a6d3f1 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250926230623-96c13ca2551d // indirect
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20250926230623-96c13ca2551d // indirect

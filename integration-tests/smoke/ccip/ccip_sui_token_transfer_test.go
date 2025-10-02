@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -51,7 +52,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 			ChainSelector:  sourceChain,
 			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
-			Amount:         1099999999999999984,
+			Amount:         1000000000000, // 1000Link with 1e9,
 		}),
 	})
 	require.NoError(t, err)
@@ -67,7 +68,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 			ChainSelector:  sourceChain,
 			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
-			Amount:         10000,
+			Amount:         100000000000, // 100Link with 1e9
 		}),
 	})
 	require.NoError(t, err)
@@ -76,29 +77,60 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	outputMapTransferToken, ok := rawOutputTransferToken.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
 	require.True(t, ok)
 
+	// Receiver Address
+	// ccipReceiverAddress := state.Chains[destChain].Receiver.Address()
+
+	// Token Pool setup on both SUI and EVM
+	updatedEnv, evmToken, _, err := testhelpers.HandleTokenAndPoolDeploymentForSUI(e.Env, sourceChain, destChain)
+	require.NoError(t, err)
 	tcs := []testhelpers.TestTransferRequest{
 		{
 			Name:           "Send token to EOA",
 			SourceChain:    sourceChain,
 			DestChain:      destChain,
-			Receiver:       state.Chains[destChain].Receiver.Address().Bytes(),
+			Receiver:       updatedEnv.BlockChains.EVMChains()[destChain].DeployerKey.From.Bytes(), // internally left padded to 32byte
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 			FeeToken:       outputMap.Objects.MintedLinkTokenObjectId,
 			SuiTokens: []testhelpers.SuiTokenAmount{
 				{
 					Token:  outputMapTransferToken.Objects.MintedLinkTokenObjectId,
-					Amount: 10,
+					Amount: 1000000000, // Send 1Link to EVM
 				},
 			},
-			ExpectedTokenBalances: []testhelpers.ExpectedBalance{},
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  evmToken,
+					Amount: big.NewInt(1e18),
+				},
+			},
 		},
+		// {
+		// 	Name:           "Send token to Receiver",
+		// 	SourceChain:    sourceChain,
+		// 	DestChain:      destChain,
+		// 	Receiver:       ccipReceiverAddress.Bytes(), // internally left padded to 32byte
+		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
+		// 	SuiTokens: []testhelpers.SuiTokenAmount{
+		// 		{
+		// 			Token:  outputMapTransferToken.Objects.MintedLinkTokenObjectId,
+		// 			Amount: 1000000000, // Send 1Link to EVM
+		// 		},
+		// 	},
+		// 	FeeToken: outputMap.Objects.MintedLinkTokenObjectId,
+		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+		// 		{
+		// 			Token:  evmToken,
+		// 			Amount: big.NewInt(1e18),
+		// 		},
+		// 	},
+		// },
 	}
 
-	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, e.Env, state, tcs)
+	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, updatedEnv, state, tcs)
 
 	err = testhelpers.ConfirmMultipleCommits(
 		t,
-		e.Env,
+		updatedEnv,
 		state,
 		startBlocks,
 		false,
@@ -108,12 +140,12 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 
 	execStates := testhelpers.ConfirmExecWithSeqNrsForAll(
 		t,
-		e.Env,
+		updatedEnv,
 		state,
 		testhelpers.SeqNumberRangeToSlice(expectedSeqNums),
 		startBlocks,
 	)
 	require.Equal(t, expectedExecutionStates, execStates)
 
-	testhelpers.WaitForTokenBalances(ctx, t, e.Env, expectedTokenBalances)
+	testhelpers.WaitForTokenBalances(ctx, t, updatedEnv, expectedTokenBalances)
 }

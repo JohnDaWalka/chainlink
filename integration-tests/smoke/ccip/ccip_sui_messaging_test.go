@@ -68,7 +68,7 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 			ChainSelector:  sourceChain,
 			TokenPackageId: suiState[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  suiState[sourceChain].LinkTokenTreasuryCapId,
-			Amount:         1099999999999999984,
+			Amount:         1000000000000, // 1000 Link with 1e9
 		}),
 	})
 	require.NoError(t, err)

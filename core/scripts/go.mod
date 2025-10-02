@@ -13,6 +13,8 @@ replace github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examp
 
 replace github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/web-trigger-based => ./cre/environment/examples/workflows/v1/proof-of-reserve/web-trigger-based
 
+// replace github.com/smartcontractkit/chainlink-ccip => ../../../chainlink-ccip
+
 // Uncomment to work with local version of crib-sdk
 // replace github.com/smartcontractkit/crib-sdk => ../../../crib-sdk
 
@@ -46,7 +48,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chainlink-automation v0.8.1
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250918204703-3e80e7e85597
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20250930201218-209ca2e30b73
 	github.com/smartcontractkit/chainlink-common v0.9.6
 	github.com/smartcontractkit/chainlink-data-streams v0.1.2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.49.0
@@ -493,7 +495,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250912140847-cbfb1710ac76 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20250910230900-fa42dad2d413 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20250929202151-2b9352259295 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20251002070647-dc7d22a6d3f1 // indirect
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251002070647-dc7d22a6d3f1 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250926230623-96c13ca2551d // indirect
