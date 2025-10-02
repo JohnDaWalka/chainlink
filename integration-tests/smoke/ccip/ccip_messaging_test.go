@@ -23,9 +23,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 
+	msg_hasher160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
-	msg_hasher160 "github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/message_hasher"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	mt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
@@ -573,7 +573,7 @@ func Test_CCIPMessaging_EVM2Solana(t *testing.T) {
 			solana.SystemProgramID,
 		}
 
-		extraArgs, err := ccipevm.SerializeClientSVMExtraArgsV1(message_hasher.ClientSVMExtraArgsV1{
+		extraArgs, err := ccipevm.SerializeClientSVMExtraArgsV1(msg_hasher160.ClientSVMExtraArgsV1{
 			AccountIsWritableBitmap:  solccip.GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts:                 accounts,
 			ComputeUnits:             1_000_000,

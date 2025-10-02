@@ -22,7 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"

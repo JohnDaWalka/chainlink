@@ -10,7 +10,7 @@ import (
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
 	suitx "github.com/block-vision/sui-go-sdk/transaction"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_1/message_hasher"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
