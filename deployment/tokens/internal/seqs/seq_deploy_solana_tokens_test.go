@@ -2,21 +2,18 @@ package seqs
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	chainsol "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
-	chainsolprovider "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana/provider"
+	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations/optest"
+	"github.com/smartcontractkit/chainlink/deployment/environment/memory"
 )
-
-var once sync.Once
 
 func Test_SeqDeploySolTokens(t *testing.T) {
 	t.Parallel()
@@ -27,19 +24,7 @@ func Test_SeqDeploySolTokens(t *testing.T) {
 
 	// Boots up a Solana testing chain in a container. This is done outside of the tests to
 	// avoid booting up the container for each test.
-	prov := chainsolprovider.NewCTFChainProvider(
-		t, chainSelector, chainsolprovider.CTFChainProviderConfig{
-			DeployerKeyGen: chainsolprovider.PrivateKeyRandom(),
-			Once:           &once,
-			ProgramsPath:   t.TempDir(),
-			ProgramIDs:     map[string]string{},
-		},
-	)
-	blockchain, err := prov.Initialize(t.Context())
-	require.NoError(t, err)
-
-	chain, ok := blockchain.(chainsol.Chain)
-	require.True(t, ok)
+	chains := cldf_chain.NewBlockChainsFromSlice(memory.NewMemoryChainsSol(t, 1, "")).SolanaChains()
 
 	tests := []struct {
 		name               string
@@ -86,7 +71,7 @@ func Test_SeqDeploySolTokens(t *testing.T) {
 
 				b    = optest.NewBundle(t)
 				deps = SeqDeploySolTokensDeps{
-					SolChains: map[uint64]chainsol.Chain{chainSelector: chain},
+					SolChains: chains,
 					AddrBook:  ab,
 					Datastore: ds,
 				}
