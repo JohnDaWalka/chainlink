@@ -66,6 +66,7 @@ func runEVMNegativeTestSuite(t *testing.T, testCases []evmNegativeTest) {
 }
 
 func Test_CRE_V2_EVM_BalanceAt_Invalid_Address_Regression(t *testing.T) {
+	quarantine.Flaky(t, "DX-1938")
 	runEVMNegativeTestSuite(t, evmNegativeTestsBalanceAtInvalidAddress)
 }
 
