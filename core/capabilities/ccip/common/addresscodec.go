@@ -12,13 +12,13 @@ var _ cciptypes.AddressCodec = &AddressCodec{}
 // AddressCodec is a struct that holds the chain specific address codecs and
 // implements a superset of the cciptypes.AddressCodec interface.
 type AddressCodec struct {
-	registeredAddressCodecMap map[string]ChainSpecificAddressCodec
+	RegisteredAddressCodecMap map[string]ChainSpecificAddressCodec
 }
 
 // NewAddressCodec is a constructor for NewAddressCodec
 func NewAddressCodec(registeredMap map[string]ChainSpecificAddressCodec) AddressCodec {
 	return AddressCodec{
-		registeredAddressCodecMap: registeredMap,
+		RegisteredAddressCodecMap: registeredMap,
 	}
 }
 
@@ -29,7 +29,7 @@ func (ac AddressCodec) AddressBytesToString(addr cciptypes.UnknownAddress, chain
 		return "", fmt.Errorf("failed to get chain family for selector %d: %w", chainSelector, err)
 	}
 
-	codec, exist := ac.registeredAddressCodecMap[family]
+	codec, exist := ac.RegisteredAddressCodecMap[family]
 	if !exist {
 		return "", fmt.Errorf("unsupported family for address decode type %s", family)
 	}
@@ -44,7 +44,7 @@ func (ac AddressCodec) TransmitterBytesToString(addr cciptypes.UnknownAddress, c
 		return "", fmt.Errorf("failed to get chain family for selector %d: %w", chainSelector, err)
 	}
 
-	codec, exist := ac.registeredAddressCodecMap[family]
+	codec, exist := ac.RegisteredAddressCodecMap[family]
 	if !exist {
 		return "", fmt.Errorf("unsupported family for transmitter decode type %s", family)
 	}
@@ -58,7 +58,7 @@ func (ac AddressCodec) AddressStringToBytes(addr string, chainSelector cciptypes
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain family for selector %d: %w", chainSelector, err)
 	}
-	codec, exist := ac.registeredAddressCodecMap[family]
+	codec, exist := ac.RegisteredAddressCodecMap[family]
 	if !exist {
 		return nil, fmt.Errorf("unsupported family for address decode type %s", family)
 	}
@@ -73,7 +73,7 @@ func (ac AddressCodec) OracleIDAsAddressBytes(oracleID uint8, chainSelector ccip
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain family for selector %d: %w", chainSelector, err)
 	}
-	codec, exist := ac.registeredAddressCodecMap[family]
+	codec, exist := ac.RegisteredAddressCodecMap[family]
 	if !exist {
 		return nil, fmt.Errorf("unsupported family for address decode type %s", family)
 	}
