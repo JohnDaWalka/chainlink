@@ -946,6 +946,25 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 		return cldf.Environment{}, nil, nil, fmt.Errorf("failed load onstate chains %w", err)
 	}
 
+	// ?? I thought this was convered during apply_dest_chain_update above ????
+	// add remote TP changeset
+	e, _, err = commoncs.ApplyChangesets(&testing.T{}, e, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.AddRemoteTP{}, sui_cs.AddRemoteTPConfig{
+			SuiChainSelector: suiChainSel,
+			TokenPoolTypes:   []string{"bnm"},
+
+			PoolPackageId:          state.SuiChains[suiChainSel].CCIPBurnMintTokenPool,
+			TokenpoolStateObjectId: state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolState,
+			TokenPoolOwnerCapId:    state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolOwnerId,
+			CoinObjectTypeArg:      linkTokenPkgId + "::link::LINK",
+			RemoteChainSelectors:   []uint64{evmChainSel},
+			RemotePoolAddressToAdd: []string{evmPool.Address().String()},
+		}),
+	})
+	if err != nil {
+		return cldf.Environment{}, nil, nil, err
+	}
+
 	suiTokenBytes, err := hex.DecodeString(strings.TrimPrefix(linkTokenObjectMetadataId, "0x"))
 	if err != nil {
 		return cldf.Environment{}, nil, nil, fmt.Errorf("Error while decoding suiToken")

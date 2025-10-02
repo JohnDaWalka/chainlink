@@ -76,7 +76,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 			ChainSelector:  sourceChain,
 			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
 			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
-			Amount:         100000000000, // 100Link with 1e9
+			Amount:         1000000000, // 1Link with 1e9
 		}),
 	})
 	require.NoError(t, err)
