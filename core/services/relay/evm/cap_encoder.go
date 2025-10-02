@@ -8,8 +8,8 @@ import (
 	consensustypes "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	commoncodec "github.com/smartcontractkit/chainlink-common/pkg/codec"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink-evm/pkg/abi"
+	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -28,7 +28,11 @@ var _ consensustypes.Encoder = (*capEncoder)(nil)
 
 func NewEVMEncoder(config *values.Map) (consensustypes.Encoder, error) {
 	// parse the "inner" encoder config - user-defined fields
-	wrappedSelector, err := config.Underlying[abiConfigFieldName].Unwrap()
+	abiConfig, ok := config.Underlying[abiConfigFieldName]
+	if !ok {
+		return nil, fmt.Errorf("required field %s is missing", abiConfigFieldName)
+	}
+	wrappedSelector, err := abiConfig.Unwrap()
 	if err != nil {
 		return nil, err
 	}

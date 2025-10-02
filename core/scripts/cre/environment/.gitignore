@@ -1,6 +1,7 @@
 # ctf binary artifacts
 compose/
 blockscout/
+binaries/
 
 # contract artifacts
 examples/contracts/abi
@@ -30,3 +31,4 @@ env_artifact/
 bin/
 artifact_paths.json
 *.b64
+state/

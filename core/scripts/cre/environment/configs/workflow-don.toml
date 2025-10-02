@@ -2,13 +2,13 @@
 [[blockchains]]
   type = "anvil"
   chain_id = "1337"
-  docker_cmd_params = ["-b", "5"]
+  docker_cmd_params = ["-b", "0.5", "--mixed-mining"]
 
 [[blockchains]]
   type = "anvil"
   chain_id = "2337"
   port = "8546"
-  docker_cmd_params = ["-b", "5"]
+  docker_cmd_params = ["-b", "0.5", "--mixed-mining"]
 
 [jd]
   # change to your version
@@ -32,29 +32,25 @@
 #  folder_location = "/absolute/path/to/crib/deployments/cre"
 #  provider = "kind"  # or "aws"
 
-[extra_capabilities]
-# uncomment as needed and adjust paths to enable these capabilities and have them copied to containers/pods
-# these default paths assume that binaries are placed in core/scripts/cre/environment/ folder
-# cron_capability_binary_path = "./cron"
-# consensus_capability_binary_path = "./consensus"
-# log_event_trigger_binary_path = "./logtrigger"
-# read_contract_capability_binary_path = "./readcontract"
-# evm_capability_binary_path = "./evm"
-# http_trigger_capability_binary_path = "./http_trigger"
-# http_action_capability_binary_path = "./http_action"
-
-# capabilities_configs.evm.<chain_id> section is used to configure EVM capability per chain_id only when
-# the evm_capability_binary_path is present in [extra_capabilities] section
-# if not present, the job for the EVM capability will pick the default values
-#[capabilities_configs.evm."1337"]
-#  logTriggerPollInterval = "1s"   # default "1s"
-#  receiverGasMinimum = "1"        # default "1"
-
 [[nodesets]]
   nodes = 5
+  name = "workflow"
+  don_types = ["workflow", "gateway"]
   override_mode = "each"
   http_port_range_start = 10100
-  name = "workflow"
+
+  bootstrap_node_index = 0 # added for visibility, index of the node in the nodeset that will act as a bootstrap
+  gateway_node_index = 0 # added for visibility, required when don_types include "gateway"
+  env_vars = { CL_EVM_CMD = "" }
+  capabilities = ["ocr3", "custom-compute", "web-api-target", "web-api-trigger", "vault", "cron", "http-action", "http-trigger", "consensus"]
+
+  # Enable capabilities per chain with optional per-chain overrides
+  [nodesets.chain_capabilities]
+    write-evm = ["1337", "2337"]
+    read-contract = ["1337", "2337"]
+    evm = ["1337"]
+
+  # See ./examples/workflow-don-overrides.toml to learn how to override capability configs
 
   [nodesets.db]
     image = "postgres:12.0"
@@ -78,15 +74,21 @@
       Endpoint = 'host.docker.internal:4317'
       ChipIngressEndpoint = 'chip-ingress:50051'
       InsecureConnection = true
+      ChipIngressInsecureConnection = true
       TraceSampleRatio = 1
       HeartbeatInterval = '30s'
+
+      [CRE]
+      EnableDKGRecipient = true
 
       # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+
+      [Billing]
+      URL = "billing-platform-service:2223"
+      TLSEnabled = false
       """
-      [nodesets.node_specs.node.env_vars]
-      CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
@@ -102,16 +104,23 @@
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
       ChipIngressEndpoint = 'chip-ingress:50051'
+      ChipIngressInsecureConnection = true
       InsecureConnection = true
       TraceSampleRatio = 1
       HeartbeatInterval = '30s'
 
+      [CRE]
+      EnableDKGRecipient = true
+      UseLocalTimeProvider = false
+
       # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+
+      [Billing]
+      URL = "billing-platform-service:2223"
+      TLSEnabled = false
       """
-      [nodesets.node_specs.node.env_vars]
-      CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
@@ -127,16 +136,23 @@
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
       ChipIngressEndpoint = 'chip-ingress:50051'
+      ChipIngressInsecureConnection = true
       InsecureConnection = true
       TraceSampleRatio = 1
       HeartbeatInterval = '30s'
 
+      [CRE]
+      EnableDKGRecipient = true
+      UseLocalTimeProvider = false
+
       # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+
+      [Billing]
+      URL = "billing-platform-service:2223"
+      TLSEnabled = false
       """
-      [nodesets.node_specs.node.env_vars]
-      CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
@@ -152,16 +168,23 @@
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
       ChipIngressEndpoint = 'chip-ingress:50051'
+      ChipIngressInsecureConnection = true
       InsecureConnection = true
       TraceSampleRatio = 1
       HeartbeatInterval = '30s'
 
+      [CRE]
+      EnableDKGRecipient = true
+      UseLocalTimeProvider = false
+
       # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+
+      [Billing]
+      URL = "billing-platform-service:2223"
+      TLSEnabled = false
       """
-      [nodesets.node_specs.node.env_vars]
-      CL_EVM_CMD=""
 
   [[nodesets.node_specs]]
     [nodesets.node_specs.node]
@@ -177,13 +200,20 @@
       Enabled = true
       Endpoint = 'host.docker.internal:4317'
       ChipIngressEndpoint = 'chip-ingress:50051'
+      ChipIngressInsecureConnection = true
       InsecureConnection = true
       TraceSampleRatio = 1
       HeartbeatInterval = '30s'
 
+      [CRE]
+      EnableDKGRecipient = true
+      UseLocalTimeProvider = false
+
       # Remove this bit to allow downloading workflows from remote sources
       [CRE.WorkflowFetcher]
       URL = "file:///home/chainlink/workflows"
+
+      [Billing]
+      URL = "billing-platform-service:2223"
+      TLSEnabled = false
       """
-      [nodesets.node_specs.node.env_vars]
-      CL_EVM_CMD=""

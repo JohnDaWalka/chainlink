@@ -16,6 +16,7 @@ import (
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	focr "github.com/smartcontractkit/chainlink-deployments-framework/offchain/ocr"
 	"github.com/smartcontractkit/chainlink/deployment"
 )
 
@@ -141,6 +142,7 @@ func NewNodes(
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
 	}
+	var nodes []*Node
 	for i := range cfg.NumNodes {
 		c := NewNodeConfig{
 			Port:           ports[cfg.NumBootstraps+i],
@@ -154,7 +156,21 @@ func NewNodes(
 		node := NewNode(t, c, configOpts...)
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
+
+		nodes = append(nodes, node)
 	}
+
+	// Funding (only non-bootstrap nodes)
+	for _, tonChain := range cfg.BlockChains.TonChains() {
+		fundNodesTon(t, tonChain, nodes)
+	}
+	for _, aptosChain := range cfg.BlockChains.AptosChains() {
+		fundNodesAptos(t, aptosChain, nodes)
+	}
+	for _, solChain := range cfg.BlockChains.SolanaChains() {
+		fundNodesSol(t, solChain, nodes)
+	}
+
 	return nodesByPeerID
 }
 
@@ -167,7 +183,6 @@ func NewMemoryEnvironmentFromChainsNodes(
 	var nodeIDs []string
 	for id := range nodes {
 		nodeIDs = append(nodeIDs, id)
-
 	}
 
 	return *cldf.NewEnvironment(
@@ -178,7 +193,7 @@ func NewMemoryEnvironmentFromChainsNodes(
 		nodeIDs, // Note these have the p2p_ prefix.
 		NewMemoryJobClient(nodes),
 		ctx,
-		cldf.XXXGenerateTestOCRSecrets(),
+		focr.XXXGenerateTestOCRSecrets(),
 		blockchains,
 	)
 }
@@ -235,7 +250,7 @@ func NewMemoryEnvironment(
 		nodeIDs,
 		NewMemoryJobClient(nodes),
 		t.Context,
-		cldf.XXXGenerateTestOCRSecrets(),
+		focr.XXXGenerateTestOCRSecrets(),
 		chains,
 	)
 }

@@ -1,9 +1,12 @@
 package v2
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -354,11 +357,11 @@ func newMockResponseCache() *mockResponseCache {
 func (m *mockResponseCache) Set(workflowID string, req gateway_common.OutboundHTTPRequest, response gateway_common.OutboundHTTPResponse) {
 }
 
-func (m *mockResponseCache) CachedFetch(workflowID string, req gateway_common.OutboundHTTPRequest, fetchFn func() gateway_common.OutboundHTTPResponse) gateway_common.OutboundHTTPResponse {
+func (m *mockResponseCache) CachedFetch(ctx context.Context, workflowID string, req gateway_common.OutboundHTTPRequest, fetchFn func() gateway_common.OutboundHTTPResponse) gateway_common.OutboundHTTPResponse {
 	return fetchFn()
 }
 
-func (m *mockResponseCache) DeleteExpired() int {
+func (m *mockResponseCache) DeleteExpired(ctx context.Context) int {
 	select {
 	case m.deleteExpiredCh <- struct{}{}:
 	default:
@@ -438,4 +441,105 @@ func createTestHandlerWithConfig(t *testing.T, cfg ServiceConfig) *gatewayHandle
 	require.NotNil(t, handler)
 
 	return handler
+}
+
+func TestCreateHTTPRequestCallback(t *testing.T) {
+	ctx := testutils.Context(t)
+
+	requestID := "test-request-id"
+	httpReq := network.HTTPRequest{
+		Method:  "POST",
+		URL:     "https://example.com/api",
+		Headers: map[string]string{"Content-Type": "application/json"},
+		Body:    []byte(`{"test": "data"}`),
+		Timeout: 5 * time.Second,
+	}
+	outboundReq := gateway_common.OutboundHTTPRequest{
+		Method:    "POST",
+		URL:       "https://example.com/api",
+		Headers:   map[string]string{"Content-Type": "application/json"},
+		Body:      []byte(`{"test": "data"}`),
+		TimeoutMs: 5000,
+	}
+
+	t.Run("successful HTTP request with latency measurement", func(t *testing.T) {
+		handler := createTestHandler(t)
+		mockHTTPClient := handler.httpClient.(*httpmocks.HTTPClient)
+
+		expectedResp := &network.HTTPResponse{
+			StatusCode: 200,
+			Headers:    map[string]string{"Content-Type": "application/json"},
+			Body:       []byte(`{"result": "success"}`),
+		}
+
+		mockHTTPClient.EXPECT().Send(mock.Anything, mock.Anything).Return(expectedResp, nil)
+
+		callback := handler.createHTTPRequestCallback(ctx, requestID, httpReq, outboundReq)
+		response := callback()
+
+		require.Equal(t, expectedResp.StatusCode, response.StatusCode)
+		require.Equal(t, expectedResp.Headers, response.Headers)
+		require.Equal(t, expectedResp.Body, response.Body)
+		require.Empty(t, response.ErrorMessage)
+		require.False(t, response.IsExternalEndpointError)
+		require.Positive(t, response.ExternalEndpointLatency)
+	})
+
+	t.Run("HTTP send error sets IsExternalEndpointError to true", func(t *testing.T) {
+		handler := createTestHandler(t)
+		mockHTTPClient := handler.httpClient.(*httpmocks.HTTPClient)
+
+		mockHTTPClient.EXPECT().Send(mock.Anything, mock.Anything).Return(nil, network.ErrHTTPSend)
+
+		callback := handler.createHTTPRequestCallback(ctx, requestID, httpReq, outboundReq)
+
+		response := callback()
+
+		require.NotEmpty(t, response.ErrorMessage, "Error message should not be empty")
+		require.Equal(t, network.ErrHTTPSend.Error(), response.ErrorMessage)
+		require.True(t, response.IsExternalEndpointError)
+		require.Positive(t, response.ExternalEndpointLatency)
+		require.Equal(t, 0, response.StatusCode)
+		require.Nil(t, response.Headers)
+		require.Nil(t, response.Body)
+	})
+
+	t.Run("HTTP read error sets IsExternalEndpointError to true", func(t *testing.T) {
+		handler := createTestHandler(t)
+		mockHTTPClient := handler.httpClient.(*httpmocks.HTTPClient)
+
+		mockHTTPClient.EXPECT().Send(mock.Anything, mock.Anything).Return(nil, network.ErrHTTPRead)
+
+		callback := handler.createHTTPRequestCallback(ctx, requestID, httpReq, outboundReq)
+
+		response := callback()
+
+		require.NotEmpty(t, response.ErrorMessage, "Error message should not be empty")
+		require.Equal(t, network.ErrHTTPRead.Error(), response.ErrorMessage)
+		require.True(t, response.IsExternalEndpointError)
+		require.Positive(t, response.ExternalEndpointLatency)
+		require.Equal(t, 0, response.StatusCode)
+		require.Nil(t, response.Headers)
+		require.Nil(t, response.Body)
+	})
+
+	t.Run("other errors set IsExternalEndpointError to false", func(t *testing.T) {
+		handler := createTestHandler(t)
+		mockHTTPClient := handler.httpClient.(*httpmocks.HTTPClient)
+
+		genericError := errors.New("some other network error")
+		mockHTTPClient.EXPECT().Send(mock.Anything, mock.Anything).Return(nil, genericError)
+
+		callback := handler.createHTTPRequestCallback(ctx, requestID, httpReq, outboundReq)
+
+		response := callback()
+
+		require.NotEmpty(t, response.ErrorMessage, "Error message should not be empty")
+		require.Equal(t, genericError.Error(), response.ErrorMessage)
+		require.False(t, response.IsExternalEndpointError)
+		require.Positive(t, response.ExternalEndpointLatency)
+		require.Equal(t, 0, response.StatusCode)
+		require.Nil(t, response.Headers)
+		require.Nil(t, response.Body)
+	})
 }

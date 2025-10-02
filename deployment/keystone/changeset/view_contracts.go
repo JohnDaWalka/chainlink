@@ -21,15 +21,16 @@ import (
 
 	capocr3types "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink/deployment/cre/ocr3"
 
 	forwarder "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/forwarder_1_0_0"
 	ocr3_capability "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/ocr3_capability_1_0_0"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	creforwarder "github.com/smartcontractkit/chainlink/deployment/cre/forwarder"
 
 	"github.com/smartcontractkit/chainlink/deployment/common/view"
 	common_v1_0 "github.com/smartcontractkit/chainlink/deployment/common/view/v1_0"
-	"github.com/smartcontractkit/chainlink/deployment/keystone/changeset/internal"
 )
 
 type KeystoneChainView struct {
@@ -285,15 +286,17 @@ func GenerateOCR3ConfigView(ctx context.Context, ocr3Cap ocr3_capability.OCR3Cap
 		return OCR3ConfigView{}, err
 	}
 	oracleConfig := OracleConfig{
-		MaxQueryLengthBytes:       cfg.MaxQueryLengthBytes,
-		MaxObservationLengthBytes: cfg.MaxObservationLengthBytes,
-		MaxReportLengthBytes:      cfg.MaxReportLengthBytes,
-		MaxOutcomeLengthBytes:     cfg.MaxOutcomeLengthBytes,
-		MaxReportCount:            cfg.MaxReportCount,
-		MaxBatchSize:              cfg.MaxBatchSize,
-		OutcomePruningThreshold:   cfg.OutcomePruningThreshold,
-		RequestTimeout:            cfg.RequestTimeout.AsDuration(),
-		UniqueReports:             true, // This is hardcoded to true in the OCR3 contract
+		ConsensusCapOffchainConfig: &ocr3.ConsensusCapOffchainConfig{
+			MaxQueryLengthBytes:       cfg.MaxQueryLengthBytes,
+			MaxObservationLengthBytes: cfg.MaxObservationLengthBytes,
+			MaxReportLengthBytes:      cfg.MaxReportLengthBytes,
+			MaxOutcomeLengthBytes:     cfg.MaxOutcomeLengthBytes,
+			MaxReportCount:            cfg.MaxReportCount,
+			MaxBatchSize:              cfg.MaxBatchSize,
+			OutcomePruningThreshold:   cfg.OutcomePruningThreshold,
+			RequestTimeout:            cfg.RequestTimeout.AsDuration(),
+		},
+		UniqueReports: true, // This is hardcoded to true in the OCR3 contract
 
 		DeltaProgressMillis:               millisecondsToUint32(publicConfig.DeltaProgress),
 		DeltaResendMillis:                 millisecondsToUint32(publicConfig.DeltaResend),
@@ -338,7 +341,7 @@ func GenerateForwarderView(ctx context.Context, f *forwarder.KeystoneForwarder, 
 		// If we don't have previous views, we will start from the deployment block number
 		// which is stored in the forwarder's type and version labels.
 		var deploymentBlock uint64
-		lblPrefix := internal.DeploymentBlockLabel + ": "
+		lblPrefix := creforwarder.DeploymentBlockLabel + ": "
 		tvStr, err := f.TypeAndVersion(nil)
 		if err != nil {
 			return nil, fmt.Errorf("error getting TypeAndVersion for forwarder: %w", err)

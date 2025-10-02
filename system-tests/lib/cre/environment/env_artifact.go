@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,10 +21,10 @@ import (
 	libc "github.com/smartcontractkit/chainlink/system-tests/lib/conversions"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crenode "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/node"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 )
 
 const (
-	ArtifactDirName  = "env_artifact"
 	ArtifactFileName = "env_artifact.json"
 	NOPAdminPrefix   = "0xaadd000000000000000000000000000000"
 )
@@ -71,6 +72,112 @@ type DONCapabilityConfig struct {
 	*capabilitiespb.CapabilityConfig
 }
 
+func (c *DONCapabilityConfig) UnmarshalJSON(data []byte) error {
+	if c.CapabilityConfig == nil {
+		c.CapabilityConfig = &capabilitiespb.CapabilityConfig{}
+	}
+
+	type Alias DONCapabilityConfig
+	var aux struct {
+		// allow standard JSON unmarshalling of all fields except RemoteConfig
+		*Alias
+
+		// use a map to hold any nested shape: RemoteTriggerConfig/RemoteTargetConfig/RemoteExecutableConfig
+		RemoteConfig map[string]json.RawMessage `json:"RemoteConfig,omitempty"`
+		// use a map to hold any methods, if present, to iterate later
+		MethodConfigs map[string]json.RawMessage `json:"method_configs,omitempty"`
+	}
+
+	aux.Alias = (*Alias)(c)
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.RemoteConfig != nil {
+		// parse the remote config based on the key
+		switch {
+		case aux.RemoteConfig["RemoteTriggerConfig"] != nil:
+			var rt capabilitiespb.RemoteTriggerConfig
+			if err := json.Unmarshal(aux.RemoteConfig["RemoteTriggerConfig"], &rt); err != nil {
+				return err
+			}
+			c.RemoteConfig = &capabilitiespb.CapabilityConfig_RemoteTriggerConfig{
+				RemoteTriggerConfig: &rt,
+			}
+		case aux.RemoteConfig["RemoteTargetConfig"] != nil:
+			var tgt capabilitiespb.RemoteTargetConfig
+			if err := json.Unmarshal(aux.RemoteConfig["RemoteTargetConfig"], &tgt); err != nil {
+				return err
+			}
+			c.RemoteConfig = &capabilitiespb.CapabilityConfig_RemoteTargetConfig{
+				RemoteTargetConfig: &tgt,
+			}
+		case aux.RemoteConfig["RemoteExecutableConfig"] != nil:
+			var ex capabilitiespb.RemoteExecutableConfig
+			if err := json.Unmarshal(aux.RemoteConfig["RemoteExecutableConfig"], &ex); err != nil {
+				return err
+			}
+			c.RemoteConfig = &capabilitiespb.CapabilityConfig_RemoteExecutableConfig{
+				RemoteExecutableConfig: &ex,
+			}
+		default:
+			keys := make([]string, 0, len(aux.RemoteConfig))
+			for k := range aux.RemoteConfig {
+				keys = append(keys, k)
+			}
+			return fmt.Errorf("unknown remote config type in capability config, keys: %v", keys)
+		}
+	}
+
+	if aux.MethodConfigs != nil {
+		methodConfigs := make(map[string]*capabilitiespb.CapabilityMethodConfig, len(aux.MethodConfigs))
+		for methodName, methodConfig := range aux.MethodConfigs {
+			var methodRemoteConfig map[string]json.RawMessage
+			if err := json.Unmarshal(methodConfig, &methodRemoteConfig); err != nil {
+				return err
+			}
+
+			var innerRemoteConfig map[string]json.RawMessage
+			if err := json.Unmarshal(methodRemoteConfig["RemoteConfig"], &innerRemoteConfig); err != nil {
+				return err
+			}
+			switch {
+			case innerRemoteConfig["RemoteTriggerConfig"] != nil:
+				var rt capabilitiespb.RemoteTriggerConfig
+				if err := json.Unmarshal(innerRemoteConfig["RemoteTriggerConfig"], &rt); err != nil {
+					return err
+				}
+				methodConfigs[methodName] = &capabilitiespb.CapabilityMethodConfig{
+					RemoteConfig: &capabilitiespb.CapabilityMethodConfig_RemoteTriggerConfig{
+						RemoteTriggerConfig: &rt,
+					},
+				}
+			case innerRemoteConfig["RemoteExecutableConfig"] != nil:
+				var ex capabilitiespb.RemoteExecutableConfig
+				if err := json.Unmarshal(innerRemoteConfig["RemoteExecutableConfig"], &ex); err != nil {
+					return err
+				}
+				methodConfigs[methodName] = &capabilitiespb.CapabilityMethodConfig{
+					RemoteConfig: &capabilitiespb.CapabilityMethodConfig_RemoteExecutableConfig{
+						RemoteExecutableConfig: &ex,
+					},
+				}
+			default:
+				keys := make([]string, 0, len(innerRemoteConfig))
+				for k := range innerRemoteConfig {
+					keys = append(keys, k)
+				}
+				return fmt.Errorf("unknown method config type for method %s, unknown config value keys: %s", methodName, strings.Join(keys, ","))
+			}
+		}
+
+		c.MethodConfigs = methodConfigs
+	}
+
+	return nil
+}
+
 type BootstrapNodeArtifact struct {
 	Name       string `json:"name"`
 	NOP        string `json:"nop"`
@@ -87,20 +194,22 @@ type NOPArtifact struct {
 }
 
 func DumpArtifact(
+	absPath string,
 	datastore datastore.AddressRefStore,
 	addressBook cldf_deployment.AddressBook,
 	jdOutput jd.Output,
 	donTopology cre.DonTopology,
 	offchainClient cldf_offchain.Client,
-	capabilityFactoryFns []cre.DONCapabilityWithConfigFactoryFn,
+	capabilityRegistryFns []cre.CapabilityRegistryConfigFn,
+	nodeSets []*cre.CapabilitiesAwareNodeSet,
 ) (string, error) {
-	artifact, err := GenerateArtifact(datastore, addressBook, jdOutput, donTopology, offchainClient, capabilityFactoryFns)
+	artifact, err := GenerateArtifact(datastore, addressBook, jdOutput, donTopology, offchainClient, capabilityRegistryFns, nodeSets)
 	if err != nil {
 		return "", pkgerrors.Wrap(err, "failed to generate environment artifact")
 	}
 
 	// Let's save the artifact to disk
-	artifactPath, err := persistArtifact(artifact)
+	artifactPath, err := persistArtifact(absPath, artifact)
 	if err != nil {
 		return "", pkgerrors.Wrap(err, "failed to persist environment artifact")
 	}
@@ -113,7 +222,8 @@ func GenerateArtifact(
 	jdOutput jd.Output,
 	donTopology cre.DonTopology,
 	offchainClient cldf_offchain.Client,
-	capabilityFactoryFns []cre.DONCapabilityWithConfigFactoryFn,
+	capabilityRegistryFns []cre.CapabilityRegistryConfigFn,
+	nodeSets []*cre.CapabilitiesAwareNodeSet,
 ) (*EnvArtifact, error) {
 	var err error
 
@@ -158,9 +268,17 @@ func GenerateArtifact(
 
 		donArtifact.F = libc.MustSafeUint8((len(workerNodes) - 1) / 3)
 
-		for _, factoryFn := range capabilityFactoryFns {
-			capabilities := factoryFn(don.Flags)
-			for _, capability := range capabilities {
+		for _, capabilityFn := range capabilityRegistryFns {
+			if capabilityFn == nil {
+				continue
+			}
+
+			capabilitiesFn, capabilitiesFnErr := capabilityFn(don.Flags, nodeSets[i])
+			if capabilitiesFnErr != nil {
+				return nil, pkgerrors.Wrap(capabilitiesFnErr, "failed to get capabilities from capability registry function")
+			}
+
+			for _, capability := range capabilitiesFn {
 				donArtifact.Capabilities = append(donArtifact.Capabilities, DONCapabilityArtifact{
 					Capability: capabilities_registry.CapabilitiesRegistryCapability{
 						Version:        capability.Capability.Version,
@@ -225,20 +343,45 @@ func GenerateArtifact(
 	return &artifact, nil
 }
 
-func persistArtifact(artifact *EnvArtifact) (string, error) {
-	err := os.MkdirAll(ArtifactDirName, 0755)
+func persistArtifact(absPath string, artifact *EnvArtifact) (string, error) {
+	err := os.MkdirAll(filepath.Dir(absPath), 0755)
 	if err != nil {
 		return "", pkgerrors.Wrap(err, "failed to create directory for the environment artifact")
 	}
-	err = WriteJSONFile(filepath.Join(ArtifactDirName, ArtifactFileName), artifact)
+
+	err = WriteJSONFile(absPath, artifact)
 	if err != nil {
 		return "", pkgerrors.Wrap(err, "failed to write environment artifact to file")
 	}
 
-	absPath, absPathErr := filepath.Abs(filepath.Join(ArtifactDirName, ArtifactFileName))
-	if absPathErr != nil {
-		return "", pkgerrors.Wrap(absPathErr, "failed to get absolute path for the environment artifact")
+	return absPath, nil
+}
+
+func ReadEnvArtifact(absPath string) (*EnvArtifact, error) {
+	var artifact EnvArtifact
+
+	content, readErr := os.ReadFile(absPath)
+	if readErr != nil {
+		return nil, pkgerrors.Wrapf(readErr, "failed to read environment artifact from %s. Make sure that local CRE environment is running", absPath)
 	}
 
-	return absPath, nil
+	if err := json.Unmarshal(content, &artifact); err != nil {
+		return nil, pkgerrors.Wrap(err, "failed to unmarshal environment artifact")
+	}
+
+	return &artifact, nil
+}
+
+func MustEnvArtifactAbsPath(relativePathToRepoRoot string) string {
+	path, err := filepath.Abs(filepath.Join(relativePathToRepoRoot, envconfig.StateDirname, ArtifactFileName))
+	if err != nil {
+		panic(err)
+	}
+
+	return path
+}
+
+func EnvArtifactFileExists(relativePathToRepoRoot string) bool {
+	_, statErr := os.Stat(MustEnvArtifactAbsPath(relativePathToRepoRoot))
+	return statErr == nil
 }

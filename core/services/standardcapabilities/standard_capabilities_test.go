@@ -66,7 +66,7 @@ func (k *kvstoreMock) PruneExpiredEntries(ctx context.Context, maxAge time.Durat
 	return 0, nil
 }
 
-type keystoreMock struct{}
+type keystoreMock struct{ core.UnimplementedKeystore }
 
 func (k *keystoreMock) Accounts(ctx context.Context) (accounts []string, err error) {
 	return nil, nil
@@ -111,7 +111,9 @@ func (o *oracleMock) Close(ctx context.Context) error {
 	return nil
 }
 
-type gatewayConnectorMock struct{}
+type gatewayConnectorMock struct {
+	core.UnimplementedGatewayConnector
+}
 
 func (g *gatewayConnectorMock) Start(context.Context) error {
 	return nil
@@ -122,6 +124,10 @@ func (g *gatewayConnectorMock) Close() error {
 }
 
 func (g *gatewayConnectorMock) AddHandler(ctx context.Context, methods []string, handler core.GatewayConnectorHandler) error {
+	return nil
+}
+
+func (g *gatewayConnectorMock) RemoveHandler(ctx context.Context, methods []string) error {
 	return nil
 }
 

@@ -15,6 +15,7 @@ import (
 	gateway_common "github.com/smartcontractkit/chainlink-common/pkg/types/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities/v2/metrics"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -33,7 +34,9 @@ func createTestWorkflowMetadataHandler(t *testing.T) (*WorkflowMetadataHandler, 
 	}
 
 	cfg := WithDefaults(ServiceConfig{})
-	handler := NewWorkflowMetadataHandler(lggr, cfg, mockDon, donConfig)
+	testMetrics, err := metrics.NewMetrics()
+	require.NoError(t, err)
+	handler := NewWorkflowMetadataHandler(lggr, cfg, mockDon, donConfig, testMetrics)
 	return handler, mockDon, donConfig
 }
 
@@ -144,19 +147,17 @@ func TestSyncMetadataMultipleWorkflows(t *testing.T) {
 
 func TestSendMetadataPullRequest(t *testing.T) {
 	handler, mockDon, donConfig := createTestWorkflowMetadataHandler(t)
-	ctx := testutils.Context(t)
 	for _, member := range donConfig.Members {
-		mockDon.EXPECT().SendToNode(ctx, member.Address, mock.Anything).Return(nil).Once()
+		mockDon.EXPECT().SendToNode(mock.Anything, member.Address, mock.Anything).Return(nil).Once()
 	}
 
-	err := handler.sendMetadataPullRequest(ctx)
+	err := handler.sendMetadataPullRequest()
 	require.NoError(t, err)
 	mockDon.AssertExpectations(t)
 }
 
 func TestSendMetadataPullRequestWithErrors(t *testing.T) {
 	handler, mockDon, donConfig := createTestWorkflowMetadataHandler(t)
-	ctx := testutils.Context(t)
 
 	// Mock errors for some nodes
 	expectedErrors := []error{
@@ -166,10 +167,10 @@ func TestSendMetadataPullRequestWithErrors(t *testing.T) {
 	}
 
 	for i, member := range donConfig.Members {
-		mockDon.EXPECT().SendToNode(ctx, member.Address, mock.Anything).Return(expectedErrors[i]).Once()
+		mockDon.EXPECT().SendToNode(mock.Anything, member.Address, mock.Anything).Return(expectedErrors[i]).Once()
 	}
 
-	err := handler.sendMetadataPullRequest(ctx)
+	err := handler.sendMetadataPullRequest()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "connection failed")
 	require.Contains(t, err.Error(), "timeout")
@@ -179,15 +180,14 @@ func TestSendMetadataPullRequestWithErrors(t *testing.T) {
 
 func TestSendMetadataPullRequestVerifyPayload(t *testing.T) {
 	handler, mockDon, donConfig := createTestWorkflowMetadataHandler(t)
-	ctx := testutils.Context(t)
 	// Capture the request payload
 	var capturedReq *jsonrpc.Request[json.RawMessage]
-	mockDon.On("SendToNode", ctx, mock.AnythingOfType("string"), mock.Anything).
+	mockDon.On("SendToNode", mock.Anything, mock.AnythingOfType("string"), mock.Anything).
 		Run(func(args mock.Arguments) {
 			capturedReq = args.Get(2).(*jsonrpc.Request[json.RawMessage])
 		}).Return(nil)
 
-	err := handler.sendMetadataPullRequest(ctx)
+	err := handler.sendMetadataPullRequest()
 	require.NoError(t, err)
 
 	require.Equal(t, jsonrpc.JsonRpcVersion, capturedReq.Version)
@@ -940,6 +940,67 @@ func TestWorkflowMetadataHandler_Authorize(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "JWT digest does not match request digest")
 		require.Nil(t, key)
+	})
+
+	t.Run("JWT replay protection", func(t *testing.T) {
+		params := json.RawMessage(`{"test": "data"}`)
+		req := &jsonrpc.Request[json.RawMessage]{
+			Version: "2.0",
+			ID:      "test-request-id-replay",
+			Method:  gateway_common.MethodWorkflowExecute,
+			Params:  &params,
+		}
+
+		token, err := utils.CreateRequestJWT(*req)
+		require.NoError(t, err)
+
+		tokenString, err := token.SignedString(privateKey)
+		require.NoError(t, err)
+
+		key, err := handler.Authorize(workflowID, tokenString, req)
+		require.NoError(t, err)
+		require.NotNil(t, key)
+
+		// Second authorization with same JWT should fail (replay attack)
+		key, err = handler.Authorize(workflowID, tokenString, req)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "JWT token has already been used. Please generate a new one with new id (jti)")
+		require.Nil(t, key)
+	})
+
+	t.Run("different JWT IDs should work", func(t *testing.T) {
+		params := json.RawMessage(`{"test": "data"}`)
+		req1 := &jsonrpc.Request[json.RawMessage]{
+			Version: "2.0",
+			ID:      "test-request-id-1",
+			Method:  gateway_common.MethodWorkflowExecute,
+			Params:  &params,
+		}
+
+		req2 := &jsonrpc.Request[json.RawMessage]{
+			Version: "2.0",
+			ID:      "test-request-id-2",
+			Method:  gateway_common.MethodWorkflowExecute,
+			Params:  &params,
+		}
+
+		token1, err := utils.CreateRequestJWT(*req1)
+		require.NoError(t, err)
+		tokenString1, err := token1.SignedString(privateKey)
+		require.NoError(t, err)
+
+		key1, err := handler.Authorize(workflowID, tokenString1, req1)
+		require.NoError(t, err)
+		require.NotNil(t, key1)
+
+		token2, err := utils.CreateRequestJWT(*req2)
+		require.NoError(t, err)
+		tokenString2, err := token2.SignedString(privateKey)
+		require.NoError(t, err)
+
+		key2, err := handler.Authorize(workflowID, tokenString2, req2)
+		require.NoError(t, err)
+		require.NotNil(t, key2)
 	})
 }
 

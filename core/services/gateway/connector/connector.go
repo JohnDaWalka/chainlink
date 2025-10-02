@@ -50,6 +50,8 @@ type GatewayConnectorHandler interface {
 }
 
 type gatewayConnector struct {
+	core.UnimplementedGatewayConnector
+
 	services.StateMachine
 
 	config      *ConnectorConfig
@@ -165,6 +167,21 @@ func (c *gatewayConnector) AddHandler(ctx context.Context, methods []string, han
 	return nil
 }
 
+func (c *gatewayConnector) RemoveHandler(ctx context.Context, methods []string) error {
+	for _, method := range methods {
+		_, exists := c.handlers[method]
+		if !exists {
+			return fmt.Errorf("handler for method %s does not exist", method)
+		}
+	}
+
+	// remove all or nothing
+	for _, method := range methods {
+		delete(c.handlers, method)
+	}
+	return nil
+}
+
 func (c *gatewayConnector) AwaitConnection(ctx context.Context, gatewayID string) error {
 	gateway, ok := c.gateways[gatewayID]
 	if !ok {
@@ -228,7 +245,9 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 			// do not break on error. HandleGatewayMessage handles errors
 			// by sending a response back to the Gateway.
 			err = handler.HandleGatewayMessage(ctx, gatewayState.config.Id, &req)
-			c.lggr.Warnw("failed to handle message from Gateway", "id", gatewayState.config.Id, "method", req.Method, "err", err)
+			if err != nil {
+				c.lggr.Warnw("failed to handle message from Gateway", "id", gatewayState.config.Id, "method", req.Method, "err", err)
+			}
 		}
 	}
 }

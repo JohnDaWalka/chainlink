@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common/aggregation"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/capabilities/v2/metrics"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -25,6 +26,13 @@ type workflowReference struct {
 	workflowOwner string
 	workflowName  string
 	workflowTag   string
+}
+
+// jwtReplayCache manages used JWT IDs to prevent replay attacks
+type jwtReplayCache struct {
+	mu            sync.RWMutex
+	cleanupPeriod time.Duration
+	cache         map[string]time.Time // jti -> timestamp
 }
 
 type WorkflowMetadataHandler struct {
@@ -39,10 +47,12 @@ type WorkflowMetadataHandler struct {
 	don             handlers.DON
 	donConfig       *config.DONConfig
 	stopCh          services.StopChan
+	metrics         *metrics.Metrics
+	jwtCache        *jwtReplayCache // JWT replay protection cache
 }
 
 // NewWorkflowMetadataHandler creates a new WorkflowMetadataHandler.
-func NewWorkflowMetadataHandler(lggr logger.Logger, cfg ServiceConfig, don handlers.DON, donConfig *config.DONConfig) *WorkflowMetadataHandler {
+func NewWorkflowMetadataHandler(lggr logger.Logger, cfg ServiceConfig, don handlers.DON, donConfig *config.DONConfig, metrics *metrics.Metrics) *WorkflowMetadataHandler {
 	// f+1 identical responses from workflow are needed for workflow metadata to be registered
 	threshold := donConfig.F + 1
 	return &WorkflowMetadataHandler{
@@ -50,20 +60,28 @@ func NewWorkflowMetadataHandler(lggr logger.Logger, cfg ServiceConfig, don handl
 		authorizedKeys:  make(map[string]map[gateway.AuthorizedKey]struct{}),
 		workflowRefToID: make(map[workflowReference]string),
 		workflowIDToRef: make(map[string]workflowReference),
-		agg:             aggregation.NewWorkflowMetadataAggregator(lggr, threshold, time.Duration(cfg.CleanUpPeriodMs)*time.Millisecond),
+		agg:             aggregation.NewWorkflowMetadataAggregator(lggr, threshold, time.Duration(cfg.CleanUpPeriodMs)*time.Millisecond, metrics),
 		don:             don,
 		donConfig:       donConfig,
 		config:          cfg,
 		stopCh:          make(services.StopChan),
+		metrics:         metrics,
+		jwtCache:        newJWTReplayCache(time.Duration(cfg.CleanUpPeriodMs) * time.Millisecond),
 	}
 }
 
 func (h *WorkflowMetadataHandler) Authorize(workflowID string, token string, req *jsonrpc.Request[json.RawMessage]) (*gateway.AuthorizedKey, error) {
-	_, signer, err := utils.VerifyRequestJWT[json.RawMessage](token, *req)
+	claims, signer, err := utils.VerifyRequestJWT(token, *req)
 	if err != nil {
 		h.lggr.Errorw("Failed to verify JWT", "error", err)
 		return nil, err
 	}
+
+	if h.jwtCache.isReplay(claims.ID) {
+		h.lggr.Warnw("JWT token has already been used", "workflowID", workflowID, "signer", signer.Hex(), "jti", claims.ID)
+		return nil, errors.New("JWT token has already been used. Please generate a new one with new id (jti)")
+	}
+
 	keys, exists := h.authorizedKeys[workflowID]
 	if !exists {
 		h.lggr.Errorw("Workflow ID not found in authorized keys", "workflowID", workflowID)
@@ -77,6 +95,8 @@ func (h *WorkflowMetadataHandler) Authorize(workflowID string, token string, req
 		h.lggr.Errorw("Signer not found in authorized keys", "signer", signer.Hex())
 		return nil, errors.New("signer not found in authorized keys")
 	}
+	h.jwtCache.recordUsage(claims.ID)
+
 	return &key, nil
 }
 
@@ -125,7 +145,11 @@ func (h *WorkflowMetadataHandler) syncMetadata() {
 
 // sendMetadataPullRequest sends a request to all nodes in the DON to pull the latest metadata.
 // no retries are performed, as the caller is expected to poll periodically.
-func (h *WorkflowMetadataHandler) sendMetadataPullRequest(ctx context.Context) error {
+func (h *WorkflowMetadataHandler) sendMetadataPullRequest() error {
+	timeout := time.Duration(h.config.MetadataPullRequestTimeoutMs) * time.Millisecond
+	ctx, cancel := h.stopCh.CtxWithTimeout(timeout)
+	defer cancel()
+
 	req := &jsonrpc.Request[json.RawMessage]{
 		Version: jsonrpc.JsonRpcVersion,
 		ID:      gateway.GetRequestID(gateway.MethodPullWorkflowMetadata),
@@ -133,8 +157,10 @@ func (h *WorkflowMetadataHandler) sendMetadataPullRequest(ctx context.Context) e
 	}
 	var combinedErr error
 	for _, member := range h.donConfig.Members {
+		h.metrics.Trigger.IncrementCapabilityRequestCount(ctx, member.Address, gateway.MethodPullWorkflowMetadata, h.lggr)
 		err := h.don.SendToNode(ctx, member.Address, req)
 		if err != nil {
+			h.metrics.Trigger.IncrementCapabilityRequestFailures(ctx, member.Address, gateway.MethodPullWorkflowMetadata, h.lggr)
 			combinedErr = errors.Join(combinedErr, fmt.Errorf("failed to send pull request to node %s: %w", member.Address, err))
 		}
 	}
@@ -190,12 +216,20 @@ func (h *WorkflowMetadataHandler) Start(ctx context.Context) error {
 			return err
 		}
 		h.runTicker(time.Duration(h.config.MetadataPullIntervalMs)*time.Millisecond, func() {
-			err2 := h.sendMetadataPullRequest(ctx)
+			err2 := h.sendMetadataPullRequest()
 			if err2 != nil {
 				h.lggr.Errorw("Failed to send pull request", "error", err2)
 			}
 		})
 		h.runTicker(time.Duration(h.config.MetadataAggregationIntervalMs)*time.Millisecond, h.syncMetadata)
+
+		h.runTicker(h.jwtCache.cleanupPeriod, func() {
+			now := time.Now()
+			expiredCount := h.jwtCache.cleanupOldEntries(now.Add(-h.jwtCache.cleanupPeriod))
+			h.metrics.Trigger.IncrementJwtCacheCleanUpCount(context.Background(), int64(expiredCount), h.lggr)
+			h.metrics.Trigger.RecordJwtCacheSize(context.Background(), int64(len(h.jwtCache.cache)), h.lggr)
+			h.lggr.Debugw("Workflow execution cache cleanup completed", "expired_entries", expiredCount, "remaining_entries", len(h.jwtCache.cache))
+		})
 		return nil
 	})
 }
@@ -267,4 +301,40 @@ func (h *WorkflowMetadataHandler) Close() error {
 		close(h.stopCh)
 		return nil
 	})
+}
+
+func newJWTReplayCache(cleanupPeriod time.Duration) *jwtReplayCache {
+	return &jwtReplayCache{
+		cache:         make(map[string]time.Time),
+		cleanupPeriod: cleanupPeriod,
+	}
+}
+
+func (cache *jwtReplayCache) isReplay(jti string) bool {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	_, exists := cache.cache[jti]
+	return exists
+}
+
+func (cache *jwtReplayCache) recordUsage(jti string) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.cache[jti] = time.Now()
+}
+
+// cleanupOldEntries removes expired entries from the cache
+func (cache *jwtReplayCache) cleanupOldEntries(cutoff time.Time) int {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	var expiredCount int
+	for jti, createdAt := range cache.cache {
+		if createdAt.Before(cutoff) {
+			delete(cache.cache, jti)
+			expiredCount++
+		}
+	}
+	return expiredCount
 }

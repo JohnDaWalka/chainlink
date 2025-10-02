@@ -27,6 +27,9 @@ var _ cldf.ChangeSet[RegisterTokenAdminRegistryConfig] = RegisterTokenAdminRegis
 var _ cldf.ChangeSet[TransferAdminRoleTokenAdminRegistryConfig] = TransferAdminRoleTokenAdminRegistry
 var _ cldf.ChangeSet[AcceptAdminRoleTokenAdminRegistryConfig] = AcceptAdminRoleTokenAdminRegistry
 
+// use this changeset to upgrade token admin registry from v0.1.0 to v0.1.1
+var _ cldf.ChangeSet[UpgradeTokenAdminRegistryConfig] = UpgradeTokenAdminRegistry
+
 // use this changeset to set pool on token admin registry
 var _ cldf.ChangeSet[SetPoolConfig] = SetPool
 
@@ -538,6 +541,65 @@ func AcceptAdminRoleTokenAdminRegistry(e cldf.Environment, cfg AcceptAdminRoleTo
 	return cldf.ChangesetOutput{}, nil
 }
 
+type UpgradeTokenAdminRegistryConfig struct {
+	ChainSelector uint64
+	TokenPubKeys  []solana.PublicKey
+}
+
+func (cfg UpgradeTokenAdminRegistryConfig) Validate(e cldf.Environment, chainState solanastateview.CCIPChainState) error {
+	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
+	if err := chainState.ValidateRouterConfig(chain); err != nil {
+		return err
+	}
+
+	for _, tokenPubKey := range cfg.TokenPubKeys {
+		if err := chainState.CommonValidation(e, cfg.ChainSelector, tokenPubKey); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func UpgradeTokenAdminRegistry(e cldf.Environment, cfg UpgradeTokenAdminRegistryConfig) (cldf.ChangesetOutput, error) {
+	e.Logger.Infow("UpgradeTokenAdminRegistry", "cfg", cfg)
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+	chainState, ok := state.SolChains[cfg.ChainSelector]
+	if !ok {
+		return cldf.ChangesetOutput{}, fmt.Errorf("chain %d not found in environment", cfg.ChainSelector)
+	}
+	if err := cfg.Validate(e, chainState); err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+	chain := e.BlockChains.SolanaChains()[cfg.ChainSelector]
+	routerProgramAddress, routerConfigPDA, _ := chainState.GetRouterInfo()
+	solRouter.SetProgramID(routerProgramAddress)
+
+	for _, tokenPubKey := range cfg.TokenPubKeys {
+		tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
+
+		// this call is permissionless so anyone can call it. We'll just call it from the deployer key
+		instruction, err := solRouter.NewUpgradeTokenAdminRegistryFromV1Instruction(
+			routerConfigPDA,
+			tokenAdminRegistryPDA,
+			tokenPubKey,
+			chain.DeployerKey.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to generate instructions: %w", err)
+		}
+		if err := chain.Confirm([]solana.Instruction{instruction}); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
+		}
+	}
+
+	return cldf.ChangesetOutput{}, nil
+}
+
 // SET POOL
 
 type SetPoolTokenConfig struct {
@@ -545,7 +607,6 @@ type SetPoolTokenConfig struct {
 	PoolType          cldf.ContractType
 	Metadata          string
 	SkipRegistryCheck bool // set to true when you want to register and set pool in the same proposal
-	WritableIndexes   []uint8
 }
 
 type SetPoolConfig struct {
@@ -637,6 +698,10 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 		tokenAdminRegistryPDA, _, _ := solState.FindTokenAdminRegistryPDA(tokenPubKey, routerProgramAddress)
 		lookupTablePubKey := chainState.TokenPoolLookupTable[tokenPubKey][tokenConfig.PoolType][tokenConfig.Metadata]
 
+		writableIndexes := []uint8{3, 4, 7}
+		if tokenConfig.PoolType == shared.CCTPTokenPool {
+			writableIndexes = []uint8{4, 5, 7, 10, 16}
+		}
 		var currentAdmin solana.PublicKey
 		// if skip registry check is true, then we are registering and setting pool in the same batch, so while generating the instruction, we will use the timelock signer as the current admin
 		if tokenConfig.SkipRegistryCheck {
@@ -649,7 +714,7 @@ func SetPool(e cldf.Environment, cfg SetPoolConfig) (cldf.ChangesetOutput, error
 			currentAdmin = tokenAdminRegistryAccount.Administrator
 		}
 		base := solRouter.NewSetPoolInstruction(
-			tokenConfig.WritableIndexes,
+			writableIndexes,
 			routerConfigPDA,
 			tokenAdminRegistryPDA,
 			tokenPubKey,
