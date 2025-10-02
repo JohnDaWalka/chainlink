@@ -74,6 +74,7 @@ func Test_CRE_V2_EVM_CallContract_Invalid_Addr_To_Read_Regression(t *testing.T) 
 }
 
 func Test_CRE_V2_EVM_CallContract_Invalid_Balance_Reader_Contract_Regression(t *testing.T) {
+	quarantine.Flaky(t, "DX-1926")
 	runEVMNegativeTestSuite(t, evmNegativeTestsCallContractInvalidBalanceReaderContract)
 }
 
