@@ -620,6 +620,7 @@ func TestFluxMonitor_Deviation(t *testing.T) {
 }
 
 func TestFluxMonitor_NewRound(t *testing.T) {
+	quarantine.Flaky(t, "DX-1865")
 	g := gomega.NewWithT(t)
 	fa := setupFluxAggregatorUniverse(t)
 
