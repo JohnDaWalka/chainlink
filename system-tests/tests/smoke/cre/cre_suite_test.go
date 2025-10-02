@@ -142,7 +142,7 @@ func Test_CRE_V2_EVM_Suite(t *testing.T) {
 	topology := os.Getenv("TOPOLOGY_NAME")
 	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 	// TODO: remove this when OCR works properly with multiple chains in Local CRE
-	testEnv.WrappedBlockchainOutputs = []*cre.WrappedBlockchainOutput{testEnv.WrappedBlockchainOutputs[0]}
+	//testEnv.WrappedBlockchainOutputs = []*cre.WrappedBlockchainOutput{testEnv.WrappedBlockchainOutputs[0]}
 
 	t.Run("[v2] EVM Write - "+topology, func(t *testing.T) {
 		priceProvider, porWfCfg := beforePoRTest(t, testEnv, "por-workflowV2", PoRWFV2Location)
