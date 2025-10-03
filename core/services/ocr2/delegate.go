@@ -7,13 +7,10 @@ import (
 	stderrors "errors"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/jonboulle/clockwork"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -22,7 +19,6 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
-	kvdb "github.com/smartcontractkit/libocr/offchainreporting2plus/keyvaluedatabase"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -33,13 +29,9 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/vault/vaulttypes"
 	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 	syncerV2 "github.com/smartcontractkit/chainlink/v2/core/services/workflows/syncer/v2"
 
-	"github.com/smartcontractkit/smdkg/dkgocr/oracleargs"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins/ocr3"
@@ -56,12 +48,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	gatewayconnector "github.com/smartcontractkit/chainlink/v2/core/capabilities/gateway_connector"
-	vaultcap "github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
@@ -77,7 +67,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/autotelemetry21"
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
-	vaultocrplugin "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/vault"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -90,7 +79,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/streams"
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
@@ -642,195 +630,7 @@ func (d *Delegate) newServicesVaultPlugin(
 	wrapper *gatewayconnector.ServiceWrapper,
 	syncer syncerV2.WorkflowRegistrySyncer,
 ) (srvs []job.ServiceCtx, err error) {
-	spec := jb.OCR2OracleSpec
-
-	cfg := &vaultocrplugin.Config{}
-	err = json.Unmarshal(spec.PluginConfig.Bytes(), cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to unmarshal plugin config: %w", err)
-	}
-
-	if wrapper == nil {
-		return nil, errors.New("failed to instantiate vault plugin: gateway service wrapper is not configured")
-	}
-
-	dkgRecipientKeys, err := d.dkgRecipientKs.GetAll()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DKG recipient keys: %w", err)
-	}
-	if len(dkgRecipientKeys) == 0 {
-		return nil, errors.New("failed to instantiate vault plugin: no DKG recipient keys found")
-	}
-	dkgRecipientKey := dkgRecipientKeys[0]
-
-	gwconnector := wrapper.GetGatewayConnector()
-	if gwconnector == nil {
-		return nil, errors.New("failed to instantiate vault plugin: gateway connector is not set")
-	}
-
-	requestStore := requests.NewStore[*vaulttypes.Request]()
-	clock := clockwork.NewRealClock()
-	expiryDuration := cfg.RequestExpiryDuration.Duration()
-	requestStoreHandler := requests.NewHandler(lggr, requestStore, clock, expiryDuration)
-	lpk := vaultcap.NewLazyPublicKey()
-	vaultCapability := vaultcap.NewCapability(lggr, clock, expiryDuration, requestStoreHandler, vaultcap.NewRequestAuthorizer(lggr, syncer), capabilitiesRegistry, lpk)
-	srvs = append(srvs, vaultCapability)
-
-	handler, err := vaultcap.NewGatewayHandler(capabilitiesRegistry, vaultCapability, gwconnector, d.lggr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to create vault handler: %w", err)
-	}
-	srvs = append(srvs, handler)
-
-	rid, err := spec.RelayID()
-	if err != nil {
-		return nil, ErrJobSpecNoRelayer{PluginName: string(types.VaultPlugin), Err: err}
-	}
-
-	relayer, err := d.Get(rid)
-	if err != nil {
-		return nil, ErrRelayNotEnabled{Err: err, Relay: spec.Relay, PluginName: string(types.VaultPlugin)}
-	}
-
-	provider, err := relayer.NewPluginProvider(ctx, types.RelayArgs{
-		ExternalJobID: jb.ExternalJobID,
-		JobID:         jb.ID,
-		OracleSpecID:  spec.ID,
-		ContractID:    spec.ContractID,
-		New:           d.isNewlyCreatedJob,
-		RelayConfig:   spec.RelayConfig.Bytes(),
-		ProviderType:  string(types.OCR3Capability),
-	}, types.PluginArgs{
-		TransmitterID: spec.TransmitterID.String,
-		PluginConfig:  spec.PluginConfig.Bytes(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	srvs = append(srvs, provider)
-
-	oracleEndpoint := d.monitoringEndpointGen.GenMonitoringEndpoint(
-		rid.Network,
-		rid.ChainID,
-		spec.ContractID,
-		synchronization.TelemetryType(types.VaultPlugin),
-	)
-
-	ocrLogger := ocrcommon.NewOCRWrapper(lggr, d.cfg.OCR2().TraceLogging(), func(ctx context.Context, msg string) {
-		lggr.ErrorIf(d.jobORM.RecordError(ctx, jb.ID, msg), "unable to record error")
-	})
-	srvs = append(srvs, ocrLogger)
-
-	fullPath := filepath.Join(d.cfg.OCR2().KeyValueStoreRootDir(), jb.ExternalJobID.String())
-	err = utils.EnsureDirAndMaxPerms(fullPath, os.FileMode(0700))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create key value store directory: %w", err)
-	}
-	kvFactory := kvdb.NewBadgerKeyValueDatabaseFactory(fullPath)
-
-	keyBundles := map[string]ocr2key.KeyBundle{
-		string(chaintype.EVM): kb,
-	}
-	onchainKeyringAdapter, err := ocrcommon.NewOCR3OnchainKeyringMultiChainAdapter(keyBundles, lggr)
-	if err != nil {
-		return nil, err
-	}
-
-	oracleArgs := libocr2.OCR3_1OracleArgs[[]byte]{
-		BinaryNetworkEndpointFactory: d.peerWrapper.Peer3_1,
-		V2Bootstrappers:              bootstrapPeers,
-		ContractConfigTracker:        provider.ContractConfigTracker(),
-		ContractTransmitter: vaultocrplugin.NewTransmitter(
-			lggr,
-			ocrtypes.Account(spec.TransmitterID.String),
-			requestStoreHandler,
-		),
-		Database:                ocrDB,
-		KeyValueDatabaseFactory: kvFactory,
-		LocalConfig:             lc,
-		Logger:                  ocrLogger,
-		MonitoringEndpoint:      oracleEndpoint,
-		OffchainConfigDigester:  provider.OffchainConfigDigester(),
-		OffchainKeyring:         kb,
-		OnchainKeyring:          onchainKeyringAdapter,
-		MetricsRegisterer:       prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
-	}
-	rpf, err := vaultocrplugin.NewReportingPluginFactory(
-		lggr,
-		requestStore,
-		vaultocrplugin.NewVaultORM(d.ds),
-		&dkgRecipientKey,
-		lpk,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate vault plugin: failed to create reporting plugin factory: %w", err)
-	}
-	oracleArgs.ReportingPluginFactory = rpf
-
-	oracle, err := libocr2.NewOracle(oracleArgs)
-	if err != nil {
-		return nil, err
-	}
-	srvs = append(srvs, job.NewServiceAdapter(oracle))
-
-	// Add a DKG oracle in-parallel to populate key shares.
-	dkgLogger := logger.Sugared(lggr.With("vaultDependency", "dkg", "dkgContractID", cfg.DKG.ContractID))
-	dkgOcrLogger := ocrcommon.NewOCRWrapper(dkgLogger, d.cfg.OCR2().TraceLogging(), func(ctx context.Context, msg string) {
-		dkgLogger.ErrorIf(d.jobORM.RecordError(ctx, jb.ID, msg), "unable to record error")
-	})
-	srvs = append(srvs, dkgOcrLogger)
-
-	dkgProvider, err := relayer.NewPluginProvider(ctx, types.RelayArgs{
-		ExternalJobID: jb.ExternalJobID,
-		JobID:         jb.ID,
-		OracleSpecID:  spec.ID,
-		ContractID:    cfg.DKG.ContractID,
-		New:           d.isNewlyCreatedJob,
-		RelayConfig:   spec.RelayConfig.Bytes(),
-		ProviderType:  string(types.OCR3Capability),
-	}, types.PluginArgs{
-		TransmitterID: spec.TransmitterID.String,
-		PluginConfig:  []byte{},
-	})
-	if err != nil {
-		return nil, err
-	}
-	srvs = append(srvs, dkgProvider)
-
-	fullPathDKG := filepath.Join(d.cfg.OCR2().KeyValueStoreRootDir(), jb.ExternalJobID.String(), "_dkg")
-	err = utils.EnsureDirAndMaxPerms(fullPathDKG, os.FileMode(0700))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create key value store directory: %w", err)
-	}
-	dkgOracleEndpoint := d.monitoringEndpointGen.GenMonitoringEndpoint(
-		rid.Network,
-		rid.ChainID,
-		cfg.DKG.ContractID,
-		synchronization.TelemetryType(types.DKG),
-	)
-
-	dkgOracleArgs := oracleargs.OCR3_1OracleArgsForSanMarinoDKG(
-		d.peerWrapper.Peer3_1,
-		bootstrapPeers,
-		dkgProvider.ContractConfigTracker(),
-		ocrDB,
-		kvdb.NewBadgerKeyValueDatabaseFactory(fullPathDKG),
-		lc,
-		dkgOcrLogger,
-		prometheus.WrapRegistererWith(map[string]string{"job_name": string(types.DKG)}, prometheus.DefaultRegisterer),
-		dkgOracleEndpoint,
-		dkgProvider.OffchainConfigDigester(),
-		kb,
-		dkgRecipientKey,
-		vaultocrplugin.NewVaultORM(d.ds),
-		common.HexToAddress(cfg.DKG.ContractID),
-	)
-	dkgOracle, err := libocr2.NewOracle(dkgOracleArgs)
-	if err != nil {
-		return nil, err
-	}
-	srvs = append(srvs, job.NewServiceAdapter(dkgOracle))
-
+	// Comment
 	return srvs, nil
 }
 
