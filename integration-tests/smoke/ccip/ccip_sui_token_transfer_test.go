@@ -308,27 +308,27 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 	// fmt.Println("TOKENBALANCE TEST: RECEIVER: ", suiAddrStr, " TOKENN: ", suiTokenHex)
 
 	tcs := []testhelpers.TestTransferRequest{
-		// {
-		// 	Name:             "Send token to EOA",
-		// 	SourceChain:      sourceChain,
-		// 	DestChain:        destChain,
-		// 	Receiver:         receiverByte, // reciever contract pkgId
-		// 	TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
-		// 	ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
-		// 	Tokens: []router.ClientEVMTokenAmount{
-		// 		{
-		// 			Token:  evmToken.Address(),
-		// 			Amount: big.NewInt(1e18),
-		// 		},
-		// 	},
-		// 	ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, suiAddr),
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{
-		// 			Token:  suiTokenBytes,
-		// 			Amount: big.NewInt(1e9),
-		// 		},
-		// 	},
-		// },
+		{
+			Name:             "Send token to EOA",
+			SourceChain:      sourceChain,
+			DestChain:        destChain,
+			Receiver:         receiverByte, // reciever contract pkgId
+			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
+			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
+			Tokens: []router.ClientEVMTokenAmount{
+				{
+					Token:  evmToken.Address(),
+					Amount: big.NewInt(1e18),
+				},
+			},
+			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, suiAddr),
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  suiTokenBytes,
+					Amount: big.NewInt(1e9),
+				},
+			},
+		},
 		{
 			Name:             "Send token to an Object",
 			SourceChain:      sourceChain,
