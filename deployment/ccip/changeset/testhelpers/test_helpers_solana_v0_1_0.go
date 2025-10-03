@@ -2,6 +2,7 @@ package testhelpers
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -2077,7 +2078,7 @@ func TransferMultiple(
 			case chainsel.FamilyEVM:
 				destFamily, err := chainsel.GetSelectorFamily(tt.DestChain)
 				require.NoError(t, err)
-				if destFamily == chainsel.FamilySolana {
+				if destFamily == chainsel.FamilySolana || destFamily == chainsel.FamilySui {
 					// for EVM2Solana token transfer we need to use tokenReceiver instead logical receiver
 					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiverATA, tt.ExpectedTokenBalances)
 				} else {
@@ -2219,6 +2220,11 @@ func WaitForTokenBalances(
 					receiver := aptos.AccountAddress{}
 					copy(receiver[32-len(id.receiver):], id.receiver)
 					WaitForTokenBalanceAptos(ctx, t, fungibleAssetMetadata, receiver, env.BlockChains.AptosChains()[chainSelector], expectedBalance)
+				case chainsel.FamilySui:
+					tokenHex := "0x" + hex.EncodeToString(id.token)
+					tokenReceiverHex := "0x" + hex.EncodeToString(id.receiver)
+					fmt.Println("Waiting for TokenBalance sui: ", tokenHex, tokenReceiverHex)
+					WaitForTokenBalanceSui(ctx, t, tokenHex, tokenReceiverHex, env.BlockChains.SuiChains()[chainSelector], balance)
 				default:
 				}
 				return nil

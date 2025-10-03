@@ -8,12 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
 	suitx "github.com/block-vision/sui-go-sdk/transaction"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
@@ -29,7 +31,9 @@ import (
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
+	"github.com/stretchr/testify/require"
 
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	sui_module_bnmtp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_token_pools/burn_mint_token_pool"
@@ -996,4 +1000,28 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 	}
 
 	return e, evmToken, evmPool, nil
+}
+
+func WaitForTokenBalanceSui(
+	ctx context.Context,
+	t *testing.T,
+	fungibleAsset string,
+	account string,
+	chain cldf_sui.Chain,
+	expected *big.Int,
+) {
+	require.Eventually(t, func() bool {
+		balanceReq := models.SuiXGetBalanceRequest{
+			Owner:    account,
+			CoinType: fungibleAsset + "::link::LINK", // Sui Link token Type
+		}
+
+		response, err := chain.Client.SuiXGetBalance(ctx, balanceReq)
+		require.NoError(t, err)
+
+		balance, ok := new(big.Int).SetString(response.TotalBalance, 10)
+		require.True(t, ok)
+
+		return balance == expected
+	}, tests.WaitTimeout(t), 500*time.Millisecond)
 }

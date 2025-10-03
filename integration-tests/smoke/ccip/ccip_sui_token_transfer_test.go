@@ -295,11 +295,12 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 
 	tcs := []testhelpers.TestTransferRequest{
 		{
-			Name:           "Send token to EOA",
-			SourceChain:    sourceChain,
-			DestChain:      destChain,
-			Receiver:       receiverByte, // reciever contract pkgId
-			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
+			Name:             "Send token to EOA",
+			SourceChain:      sourceChain,
+			DestChain:        destChain,
+			Receiver:         receiverByte, // reciever contract pkgId
+			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
+			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
 			Tokens: []router.ClientEVMTokenAmount{
 				{
 					Token:  evmToken.Address(),
