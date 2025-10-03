@@ -144,53 +144,11 @@ func StartBeholder(t *testing.T, testLogger zerolog.Logger, testEnv *ttypes.Test
 
 	beholderMsgChan, beholderErrChan := beholder.SubscribeToBeholderMessages(listenerCtx, messageTypes)
 
-	// Wait to allow Beholder to fully initialize, it helps to avoid flakiness in tests
-	initTimeout := 5 * time.Second
-	testLogger.Info().Dur("timeout", initTimeout).Msg("Forcefully waiting for Beholder to warm up...")
-	time.Sleep(initTimeout)
-
-	drainChannels(listenerCtx, t, testLogger, beholderMsgChan, beholderErrChan) // drain any messages that arrived during initialization
+	// No more draining - let all messages through for processing
+	// The consumer is ready and any messages received are legitimate
+	testLogger.Info().Msg("Beholder listener ready - all messages will be processed")
 
 	return listenerCtx, beholderMsgChan, beholderErrChan
-}
-
-// Drains any remaining messages from the channels to avoid processing stale messages
-func drainChannels(ctx context.Context, t *testing.T, testLogger zerolog.Logger, messageChan <-chan proto.Message, kafkaErrChan <-chan error) {
-	t.Helper()
-
-	testLogger.Info().Msg("Starting async drain of Beholder channels for stale messages...")
-	msgCount := 0
-	errCount := 0
-
-	// Drain messages for up to 500ms
-	drainTimeout := time.After(500 * time.Millisecond)
-
-	for {
-		select {
-		case msg := <-messageChan:
-			msgCount++
-			switch msg.(type) {
-			case *workflowevents.UserLogs:
-				testLogger.Debug().Msg("Drained UserLogs message")
-			case *commonevents.BaseMessage:
-				testLogger.Debug().Msg("Drained BaseMessage")
-			default:
-				testLogger.Debug().Msgf("Drained unknown message type: %T", msg)
-			}
-
-		case err := <-kafkaErrChan:
-			errCount++
-			testLogger.Debug().Err(err).Msg("Drained error message")
-
-		case <-drainTimeout:
-			if msgCount > 0 || errCount > 0 {
-				testLogger.Info().Int("messages_drained", msgCount).Int("errors_drained", errCount).Msg("Finished draining Beholder channels")
-			} else {
-				testLogger.Info().Msg("No stale Beholder messages found in channels")
-			}
-			return
-		}
-	}
 }
 
 /*
