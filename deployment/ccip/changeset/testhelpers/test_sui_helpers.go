@@ -1020,9 +1020,10 @@ func WaitForTokenBalanceSui(
 		require.NoError(t, err)
 
 		fmt.Println("RESPONSE: ", response)
+
 		balance, ok := new(big.Int).SetString(response.TotalBalance, 10)
 		require.True(t, ok)
 
-		return balance == expected
+		return balance.Cmp(expected) == 0
 	}, tests.WaitTimeout(t), 500*time.Millisecond)
 }
