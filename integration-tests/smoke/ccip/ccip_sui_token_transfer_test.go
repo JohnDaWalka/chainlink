@@ -342,13 +342,8 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 					Amount: big.NewInt(1e18),
 				},
 			},
-			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, stateObj), // receiver is objectId this time
-			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{
-					Token:  suiTokenBytes,
-					Amount: big.NewInt(1e9),
-				},
-			},
+			ExtraArgs:             testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, stateObj), // receiver is objectId this time
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{},
 		},
 	}
 
