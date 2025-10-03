@@ -553,19 +553,16 @@ jobs:
           only-modules: "true"
       - name: Install protoc-gen-go-wsrpc
         run: curl https://github.com/smartcontractkit/wsrpc/raw/main/cmd/protoc-gen-go-wsrpc/protoc-gen-go-wsrpc --output $HOME/go/bin/protoc-gen-go-wsrpc && chmod +x $HOME/go/bin/protoc-gen-go-wsrpc
-      - name: make generate
+      - name: Generate and Go Mod Tidy
         run: |
           make rm-mocked
           make generate
-      - name: Ensure clean after generate
+          make gomodtidy
+
+      - name: Ensure clean after generate and tidy
         run: |
           git add --all
           git diff --stat --cached --exit-code
-      - run: make gomodtidy
-      - name: Ensure clean after tidy
-        run: |
-          git add --all
-          git diff --minimal --cached --exit-code
 
       # If asked to fix issues, set up Git user and GitHub token to make the commit.
       - name: Set up Git user to commit fixes
