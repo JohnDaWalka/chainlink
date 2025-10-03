@@ -125,8 +125,8 @@ jobs:
       checks: write
       # To commit changes made by golangci-lint-action.
       contents: write
-      # For golangci-lint-action's `only-new-issues` option.
-      pull-requests: read
+      # For golangci-lint-action's `only-new-issues` option and to comment on the PR
+      pull-requests: write
     runs-on: ${{ needs.runner-config.outputs.lint-runner }}
     strategy:
       fail-fast: false
@@ -539,6 +539,11 @@ jobs:
     name: Clean Go Tidy & Generate
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu22.04-8cores-32GB
+    permissions:
+      # To commit changes made by generate and gomodtidy.
+      contents: write
+      # To comment on the PR.
+      pull-requests: write
     env:
       AUTO_FIX: ${{ contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
     defaults:
