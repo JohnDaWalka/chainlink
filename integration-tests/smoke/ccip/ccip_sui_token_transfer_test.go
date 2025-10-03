@@ -7,12 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/onramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_from_mint_token_pool"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -85,8 +82,23 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	outputMapTransferToken, ok := rawOutputTransferToken.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
 	require.True(t, ok)
 
+	// mint more token
+	_, transferTokenOutput1, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			Amount:         2000000000, // 1Link with 1e9
+		}),
+	})
+	require.NoError(t, err)
+
+	rawOutputTransferToken1 := transferTokenOutput1[0].Reports[0]
+	outputMapTransferToken1, ok := rawOutputTransferToken1.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
+	require.True(t, ok)
+
 	// Receiver Address
-	// ccipReceiverAddress := state.Chains[destChain].Receiver.Address()
+	ccipReceiverAddress := state.Chains[destChain].Receiver.Address()
 
 	// Token Pool setup on both SUI and EVM
 	updatedEnv, evmToken, _, err := testhelpers.HandleTokenAndPoolDeploymentForSUI(e.Env, sourceChain, destChain) // SourceChain = SUI, destChain = EVM
@@ -112,26 +124,26 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	Name:           "Send token to Receiver",
-		// 	SourceChain:    sourceChain,
-		// 	DestChain:      destChain,
-		// 	Receiver:       ccipReceiverAddress.Bytes(), // internally left padded to 32byte
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// 	SuiTokens: []testhelpers.SuiTokenAmount{
-		// 		{
-		// 			Token:  outputMapTransferToken.Objects.MintedLinkTokenObjectId,
-		// 			Amount: 1000000000, // Send 1Link to EVM
-		// 		},
-		// 	},
-		// 	FeeToken: outputMap.Objects.MintedLinkTokenObjectId,
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{
-		// 			Token:  evmToken,
-		// 			Amount: big.NewInt(1e18),
-		// 		},
-		// 	},
-		// },
+		{
+			Name:           "Send token to Receiver",
+			SourceChain:    sourceChain,
+			DestChain:      destChain,
+			Receiver:       ccipReceiverAddress.Bytes(), // internally left padded to 32byte
+			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
+			SuiTokens: []testhelpers.SuiTokenAmount{
+				{
+					Token:  outputMapTransferToken1.Objects.MintedLinkTokenObjectId,
+					Amount: 2000000000, // Send 1Link to EVM
+				},
+			},
+			FeeToken: outputMap.Objects.MintedLinkTokenObjectId,
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  evmToken.Address().Bytes(),
+					Amount: big.NewInt(2e18),
+				},
+			},
+		},
 	}
 
 	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, updatedEnv, state, tcs)
@@ -209,7 +221,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 	copy(suiAddr[:], addrBytes)
 
 	// Token Pool setup on both SUI and EVM
-	updatedEnv, evmToken, evmTokenPool, err := testhelpers.HandleTokenAndPoolDeploymentForSUI(e.Env, destChain, sourceChain) // sourceChain=EVM, destChain=SUI
+	updatedEnv, evmToken, _, err := testhelpers.HandleTokenAndPoolDeploymentForSUI(e.Env, destChain, sourceChain) // sourceChain=EVM, destChain=SUI
 	require.NoError(t, err)
 
 	state, err = stateview.LoadOnchainState(e.Env)
@@ -272,28 +284,28 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 	recieverObjectIds := [][32]byte{clockObj, stateObj}
 
 	// getPoolBySourceToken
-	onRamp, err := onramp.NewOnRamp(state.Chains[sourceChain].OnRamp.Address(), e.Env.BlockChains.EVMChains()[sourceChain].Client)
-	require.NoError(t, err)
+	// onRamp, err := onramp.NewOnRamp(state.Chains[sourceChain].OnRamp.Address(), e.Env.BlockChains.EVMChains()[sourceChain].Client)
+	// require.NoError(t, err)
 
-	poolAddr, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, destChain, evmToken.Address())
-	require.NoError(t, err)
+	// poolAddr, err := onRamp.GetPoolBySourceToken(&bind.CallOpts{}, destChain, evmToken.Address())
+	// require.NoError(t, err)
 
-	fmt.Println("POOL ADDR: ", poolAddr)
+	// fmt.Println("POOL ADDR: ", poolAddr)
 
 	// getRemoteToken
-	tp, err := burn_from_mint_token_pool.NewBurnFromMintTokenPool(evmTokenPool.Address(), e.Env.BlockChains.EVMChains()[sourceChain].Client)
-	require.NoError(t, err)
+	// tp, err := burn_from_mint_token_pool.NewBurnFromMintTokenPool(evmTokenPool.Address(), e.Env.BlockChains.EVMChains()[sourceChain].Client)
+	// require.NoError(t, err)
 
-	remoteToken, err := tp.GetRemoteToken(&bind.CallOpts{}, destChain)
-	require.NoError(t, err)
+	// remoteToken, err := tp.GetRemoteToken(&bind.CallOpts{}, destChain)
+	// require.NoError(t, err)
 
-	remotePool, err := tp.GetRemotePools(&bind.CallOpts{}, destChain)
-	require.NoError(t, err)
+	// remotePool, err := tp.GetRemotePools(&bind.CallOpts{}, destChain)
+	// require.NoError(t, err)
 
-	fmt.Println("REMOTETOKEN: ", remoteToken)
-	fmt.Println("REMOTEPOOL: ", remotePool)
+	// fmt.Println("REMOTETOKEN: ", remoteToken)
+	// fmt.Println("REMOTEPOOL: ", remotePool)
 
-	fmt.Println("TOKENBALANCE TEST: RECEIVER: ", suiAddrStr, " TOKENN: ", suiTokenHex)
+	// fmt.Println("TOKENBALANCE TEST: RECEIVER: ", suiAddrStr, " TOKENN: ", suiTokenHex)
 
 	tcs := []testhelpers.TestTransferRequest{
 		{
@@ -310,6 +322,27 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 				},
 			},
 			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, suiAddr),
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  suiTokenBytes,
+					Amount: big.NewInt(1e9),
+				},
+			},
+		},
+		{
+			Name:             "Send token to an Object",
+			SourceChain:      sourceChain,
+			DestChain:        destChain,
+			Receiver:         receiverByte, // reciever contract pkgId
+			TokenReceiverATA: stateObj[:],  // tokenReciever extracted from extraArgs (the object that actually gets the token)
+			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
+			Tokens: []router.ClientEVMTokenAmount{
+				{
+					Token:  evmToken.Address(),
+					Amount: big.NewInt(1e18),
+				},
+			},
+			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, stateObj), // receiver is objectId this time
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				{
 					Token:  suiTokenBytes,
