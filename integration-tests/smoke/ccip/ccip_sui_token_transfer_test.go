@@ -182,7 +182,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 
 	deployerSourceChain := e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey
 	var suiTokenAddr [32]byte
-	suiTokenHex := state.SuiChains[destChain].LinkTokenCoinMetadataId
+	suiTokenHex := state.SuiChains[destChain].LinkTokenAddress
 	suiTokenHex = strings.TrimPrefix(suiTokenHex, "0x")
 
 	suiTokenBytes, err := hex.DecodeString(suiTokenHex)
