@@ -341,6 +341,7 @@ func (s *registrySyncer) Sync(ctx context.Context, isInitialSync bool) error {
 		if err != nil {
 			s.lggr.Warnw("failed to sync with local registry, using remote registry instead", "error", err)
 		} else {
+			s.lggr.Debugw("initial registry", "registry", latestRegistry)
 			latestRegistry.Logger = s.lggr
 			latestRegistry.GetPeerID = s.getPeerID
 		}
