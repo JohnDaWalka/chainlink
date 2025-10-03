@@ -1,6 +1,4 @@
---args is CCIPReceiverStateObjectId OwnerCapObjectId SuiLinkTokenObjectId(newly minted one) myEOA
-
-sui client call --package 0xf0d56d2a87f35ab0cbf21f15e9ff0220553633dfa5856474f707baf2b148c5a1 --module dummy_receiver --function receive_and_send_coin --type-args 0xabadadbac6b415c4487d5be2620062f81e317269f4a872d59153bacb469683b3::link::LINK --args 0xffa55df38c762e3c4ac661af441d19da5bd2a1bfbe1d6329c24cc10b4bb119be 0x4935639db0666e76da4938a3edd1600cbf116e967c6b38e59d91312114805402 0x4ccf9f5fa3ce6d55353b93459013727afea4684dda48409018c2fbdca17b5f09 0x0072359848c7d73b21ff1c12f2fcd892c83f2f6b6cc177bce5e3123c8004aafc --gas-budget 50000000module github.com/smartcontractkit/chainlink/deployment
+module github.com/smartcontractkit/chainlink/deployment
 
 go 1.24.5
 
