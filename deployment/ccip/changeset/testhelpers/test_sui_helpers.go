@@ -1,6 +1,7 @@
 package testhelpers
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -29,10 +30,10 @@ import (
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 
-	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip_burn_mint_token_pool"
-
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	sui_module_bnmtp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_token_pools/burn_mint_token_pool"
+	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip_burn_mint_token_pool"
 )
 
 type SuiSendRequest struct {
@@ -948,26 +949,32 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 
 	fmt.Println("REMOTE TP PARAMS: ", state.SuiChains[suiChainSel].CCIPBurnMintTokenPool, state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolState, state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolOwnerId)
 
-	// ?? I thought this was convered during apply_dest_chain_update above ????
-	// add remote TP changeset
-	e, _, err = commoncs.ApplyChangesets(&testing.T{}, e, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.AddRemoteTP{}, sui_cs.AddRemoteTPConfig{
-			SuiChainSelector: suiChainSel,
-			TokenPoolTypes:   []string{"bnm"},
-
-			PoolPackageId:          state.SuiChains[suiChainSel].CCIPBurnMintTokenPool,
-			TokenpoolStateObjectId: state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolState,
-			TokenPoolOwnerCapId:    state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolOwnerId,
-			CoinObjectTypeArg:      linkTokenPkgId + "::link::LINK",
-			RemoteChainSelectors:   []uint64{evmChainSel},
-			RemotePoolAddressToAdd: []string{evmPool.Address().String()},
-		}),
-	})
+	// ensure tokenPool is added
+	// (ctx context.Context, opts *bind.CallOpts, typeArgs []string, state bind.Object, remoteChainSelector uint64)
+	bmtp, err := sui_module_bnmtp.NewBurnMintTokenPool(state.SuiChains[suiChainSel].CCIPBurnMintTokenPool, e.BlockChains.SuiChains()[suiChainSel].Client)
 	if err != nil {
 		return cldf.Environment{}, nil, nil, err
 	}
 
-	fmt.Println("RAN ADDREMOTE TP")
+	val, err := bmtp.DevInspect().GetRemotePools(context.Background(), &suiBind.CallOpts{
+		Signer:           e.BlockChains.SuiChains()[suiChainSel].Signer,
+		WaitForExecution: true,
+	}, []string{linkTokenPkgId + "::link::LINK"}, suiBind.Object{Id: state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolState}, evmChainSel)
+	if err != nil {
+		return cldf.Environment{}, nil, nil, err
+	}
+
+	fmt.Println("REMOTE POOLS ON SUII: ", val)
+
+	val1, err := bmtp.DevInspect().IsRemotePool(context.Background(), &suiBind.CallOpts{
+		Signer:           e.BlockChains.SuiChains()[suiChainSel].Signer,
+		WaitForExecution: true,
+	}, []string{linkTokenPkgId + "::link::LINK"}, suiBind.Object{Id: state.SuiChains[suiChainSel].CCIPBurnMintTokenPoolState}, evmChainSel, evmPool.Address().Bytes())
+	if err != nil {
+		return cldf.Environment{}, nil, nil, err
+	}
+
+	fmt.Println("IS REMOTE POOL ON SUII: ", val1, evmPool.Address().Bytes())
 
 	suiTokenBytes, err := hex.DecodeString(strings.TrimPrefix(linkTokenObjectMetadataId, "0x"))
 	if err != nil {
