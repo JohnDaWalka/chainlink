@@ -116,6 +116,8 @@ jobs:
     needs: [filter, run-frequency, runner-config]
     # We don't directly merge dependabot PRs to not waste the resources.
     if: ${{ (github.event_name == 'pull_request' ||  github.event_name == 'schedule') && github.actor != 'dependabot[bot]' }}
+    env:
+      AUTO_FIX: ${{ contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
     permissions:
       # To assume aws role.
       id-token: write
@@ -147,11 +149,40 @@ jobs:
         timeout-minutes: 20
         with:
           go-directory: ${{ matrix.modules }}
-          # Enables us to commit fixes to the PR
-          fix-issues: ${{ contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
-          gati-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_CI_AUTO_PR_TOKEN_ISSUER_ROLE_ARN }}
-          gati-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
-          gati-region: ${{ secrets.AWS_REGION }}
+          fix-issues: ${{ env.AUTO_FIX }}
+
+      - name: Set up Git user to commit fixes
+        if: ${{ failure() && env.AUTO_FIX }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup GitHub Token to commit fixes
+        if: ${{ failure() && env.AUTO_FIX }}
+        id: setup-github-token
+        uses: smartcontractkit/.github/actions/setup-github-token@ef78fa97bf3c77de6563db1175422703e9e6674f # setup-github-token@0.1.2
+        with:
+          aws-role-arn: ${{ secrets.AWS_OIDC_CHAINLINK_CI_AUTO_PR_TOKEN_ISSUER_ROLE_ARN }}
+          aws-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-role-duration-seconds: "1800"
+
+      - name: Commit golangci-lint fixes
+        if: ${{ failure() && env.AUTO_FIX }}
+        uses: planetscale/ghcommit-action@322be9669498a4be9ce66efc1169f8f43f6bd883 # v0.2.17
+        with:
+          commit_message: "🤖 golangci-lint fixes"
+          repo: ${{ github.repository }}
+          branch: ${{ github.head_ref || github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{steps.setup-github-token.outputs.access-token}}
+
+      - name: Comment on PR if Lint Fails
+        if: ${{ failure() && !env.AUTO_FIX }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your linting issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
 
       - name: Notify Slack
         if: ${{ failure() && needs.run-frequency.outputs.one-per-day-frequency == 'true' }}
@@ -526,17 +557,26 @@ jobs:
         run: |
           make rm-mocked
           make generate
+      - name: Ensure clean after generate
+        run: |
+          git add --all
+          git diff --stat --cached --exit-code
+      - run: make gomodtidy
+      - name: Ensure clean after tidy
+        run: |
+          git add --all
+          git diff --minimal --cached --exit-code
 
       # If asked to fix issues, set up Git user and GitHub token to make the commit.
       - name: Set up Git user to commit fixes
-        if: ${{ always() && contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'auto-fix') }}
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Setup GitHub Token to commit fixes
-        if: ${{ always() && contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
+        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'auto-fix') }}
         id: setup-github-token
         uses: smartcontractkit/.github/actions/setup-github-token@ef78fa97bf3c77de6563db1175422703e9e6674f # setup-github-token@0.1.2
         with:
@@ -558,8 +598,8 @@ jobs:
       - name: Comment on PR if Generation Fails
         if: ${{ failure() && !contains( github.event.pull_request.labels.*.name, 'auto-fix') }}
         env:
-          GITHUB_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
-          GH_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your generation issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
 
   run-frequency:
