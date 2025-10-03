@@ -182,7 +182,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your linting issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want to try automatically committing fixes for your linting issues in CI, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
 
       - name: Notify Slack
         if: ${{ failure() && needs.run-frequency.outputs.one-per-day-frequency == 'true' }}
@@ -604,7 +604,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want me to try to automatically fix your generation issues, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
+        run: gh pr comment ${{ github.event.pull_request.number }} --body 'If you want automatically committing fixes for your go tidy and generate issues in CI, you can add the `auto-fix` label to the PR.' -R ${{ github.repository }}
 
   run-frequency:
     name: Run frequency
