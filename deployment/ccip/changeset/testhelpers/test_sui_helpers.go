@@ -1019,6 +1019,7 @@ func WaitForTokenBalanceSui(
 		response, err := chain.Client.SuiXGetBalance(ctx, balanceReq)
 		require.NoError(t, err)
 
+		fmt.Println("RESPONSE: ", response)
 		balance, ok := new(big.Int).SetString(response.TotalBalance, 10)
 		require.True(t, ok)
 

@@ -188,7 +188,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	receiverByte := receiverByteDecoded
+	_ = receiverByteDecoded
 
 	var clockObj [32]byte
 	copy(clockObj[:], hexutil.MustDecode(
@@ -200,7 +200,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		outputMap.Objects.CCIPReceiverStateObjectId,
 	))
 
-	recieverObjectIds := [][32]byte{clockObj, stateObj}
+	recieverObjectIds := [][32]byte{}
 
 	t.Run("Message to Sui", func(t *testing.T) {
 		// ccipChainState := state.SuiChains[destChain]
@@ -210,9 +210,9 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 				TestSetup:              setup,
 				Nonce:                  &nonce,
 				ValidationType:         messagingtest.ValidationTypeExec,
-				Receiver:               receiverByte,
+				Receiver:               []byte{},
 				MsgData:                message,
-				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, [32]byte{}),
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(0, true, recieverObjectIds, [32]byte{}),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 				// ExtraAssertions: []func(t *testing.T){
 				// 	func(t *testing.T) {

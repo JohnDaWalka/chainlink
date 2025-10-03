@@ -293,6 +293,8 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 	fmt.Println("REMOTETOKEN: ", remoteToken)
 	fmt.Println("REMOTEPOOL: ", remotePool)
 
+	fmt.Println("TOKENBALANCE TEST: RECEIVER: ", suiAddrStr, " TOKENN: ", suiTokenHex)
+
 	tcs := []testhelpers.TestTransferRequest{
 		{
 			Name:             "Send token to EOA",
