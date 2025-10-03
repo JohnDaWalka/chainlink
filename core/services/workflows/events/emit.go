@@ -53,7 +53,10 @@ func EmitWorkflowStatusChangedEventV2(
 	// Prepare v2 event data
 	creInfo := buildCREMetadataV2(labels)
 	workflow := buildWorkflowV2(labels, binaryURL, configURL)
-	txInfo := buildTxInfo(head)
+	txInfo := &eventsv2.TransactionInfo{
+		ChainSelector: labels[platform.WorkflowRegistryChainSelector],
+		TxHash:        hex.EncodeToString(head.Hash),
+	}
 
 	// Debug log organization ID for v2 workflow status events
 	if orgID, exists := labels[platform.KeyOrganizationID]; exists {
@@ -552,7 +555,7 @@ func buildCREMetadataV2(kvs map[string]string) *eventsv2.CreInfo {
 
 	m.WorkflowRegistryAddress = kvs[platform.WorkflowRegistryAddress]
 	m.WorkflowRegistryVersion = kvs[platform.WorkflowRegistryVersion]
-	m.WorkflowRegistryChain = kvs[platform.WorkflowRegistryChain]
+	m.WorkflowRegistryChain = kvs[platform.WorkflowRegistryChainSelector]
 	m.EngineVersion = kvs[platform.EngineVersion]
 	m.CapabilitiesRegistryVersion = kvs[platform.CapabilitiesRegistryVersion]
 	m.DonVersion = kvs[platform.DonVersion]
@@ -581,12 +584,4 @@ func buildWorkflowV2(kvs map[string]string, binaryURL, configURL string) *events
 	w.ConfigURL = configURL
 
 	return w
-}
-
-func buildTxInfo(head *types.Head) *eventsv2.TransactionInfo {
-	return &eventsv2.TransactionInfo{
-		ChainSelector: "", // TODO CRE-887 add chain selector to tx info
-		TxHash:        hex.EncodeToString(head.Hash),
-		GasCost:       "", // TODO CRE-886 add gas cost to tx info
-	}
 }
