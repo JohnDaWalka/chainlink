@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// run CI plz 
+
 type Duration time.Duration
 
 func (d *Duration) UnmarshalJSON(b []byte) error {
