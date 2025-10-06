@@ -95,6 +95,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/multicall3"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/weth9"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/burn_mint_with_external_minter_fast_transfer_token_pool"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/hybrid_with_external_minter_fast_transfer_token_pool"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/bindings/signer_registry"
@@ -829,7 +830,39 @@ func (c CCIPOnChainState) GetEVMChainState(env cldf.Environment, chainSelector u
 	return chain, chainState, nil
 }
 
-func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
+func (c CCIPOnChainState) UpdateMCMSStateWithAddressFromDatastoreForChain(e cldf.Environment, selector uint64, qualifier string) error {
+	mcmsStateWithQualifier, err := commonstate.MaybeLoadMCMSWithTimelockStateDataStoreWithQualifier(e, []uint64{selector}, qualifier)
+	if err != nil {
+		return fmt.Errorf("failed to load mcms state from datastore with qualifier %s: %w", qualifier, err)
+	}
+	for chainSelector, mcmsState := range mcmsStateWithQualifier {
+		if chainState, ok := c.EVMChainState(chainSelector); ok {
+			chainState.MCMSWithTimelockState = *mcmsState
+			chainState.ABIByAddress[mcmsState.ProposerMcm.Address().Hex()] = gethwrappers.ManyChainMultiSigABI
+			chainState.ABIByAddress[mcmsState.CancellerMcm.Address().Hex()] = gethwrappers.ManyChainMultiSigABI
+			chainState.ABIByAddress[mcmsState.BypasserMcm.Address().Hex()] = gethwrappers.ManyChainMultiSigABI
+			chainState.ABIByAddress[mcmsState.Timelock.Address().Hex()] = gethwrappers.RBACTimelockABI
+			chainState.ABIByAddress[mcmsState.CallProxy.Address().Hex()] = gethwrappers.CallProxyABI
+			// write back to state
+			c.WriteEVMChainState(chainSelector, chainState)
+		}
+	}
+	return nil
+}
+
+type LoadOption func(*loadStateOpts)
+
+type loadStateOpts struct {
+	loadLegacyContracts bool
+}
+
+func WithLoadLegacyContracts(load bool) LoadOption {
+	return func(c *loadStateOpts) {
+		c.loadLegacyContracts = load
+	}
+}
+
+func LoadOnchainState(e cldf.Environment, opts ...LoadOption) (CCIPOnChainState, error) {
 	solanaState, err := LoadOnchainStateSolana(e)
 	if err != nil {
 		return CCIPOnChainState{}, err
@@ -857,11 +890,15 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 		evmMu:       &sync.RWMutex{},
 	}
 	for chainSelector, chain := range e.BlockChains.EVMChains() {
-		addresses, err := commonstate.AddressesForChain(e, chainSelector, "")
-		if err != nil {
+		// get all addresses for chain from addressbook
+		// here we do not load addresses from datastore as there can be multiple
+		// contracts of the same type and version in datastore which can lead to
+		// ambiguity while loading the state
+		addresses, err := e.ExistingAddresses.AddressesForChain(chainSelector)
+		if err != nil && !errors.Is(err, cldf.ErrChainNotFound) {
 			return state, fmt.Errorf("failed to get addresses for chain %d: %w", chainSelector, err)
 		}
-		chainState, err := LoadChainState(e.GetContext(), chain, addresses)
+		chainState, err := LoadChainState(e.GetContext(), chain, addresses, opts...)
 		if err != nil {
 			return state, err
 		}
@@ -871,7 +908,12 @@ func LoadOnchainState(e cldf.Environment) (CCIPOnChainState, error) {
 }
 
 // LoadChainState Loads all state for a chain into state
-func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[string]cldf.TypeAndVersion) (evm.CCIPChainState, error) {
+func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[string]cldf.TypeAndVersion, opts ...LoadOption) (evm.CCIPChainState, error) {
+	config := &loadStateOpts{}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	var state evm.CCIPChainState
 	mcmsWithTimelock, err := commonstate.MaybeLoadMCMSWithTimelockChainState(chain, addresses)
 	if err != nil {
@@ -1002,13 +1044,6 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			}
 			state.TestRouter = r
 			state.ABIByAddress[address] = router.RouterABI
-		case cldf.NewTypeAndVersion(ccipshared.FeeQuoter, deployment.Version1_6_0).String():
-			fq, err := fee_quoter.NewFeeQuoter(common.HexToAddress(address), chain.Client)
-			if err != nil {
-				return state, err
-			}
-			state.FeeQuoter = fq
-			state.ABIByAddress[address] = fee_quoter.FeeQuoterABI
 		case cldf.NewTypeAndVersion(ccipshared.USDCToken, deployment.Version1_0_0).String():
 			ut, err := burn_mint_erc677.NewBurnMintERC677(common.HexToAddress(address), chain.Client)
 			if err != nil {
@@ -1257,8 +1292,11 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			}
 			state.ERC677Tokens[ccipshared.TokenSymbol(symbol)] = tok
 			state.ABIByAddress[address] = erc677.ERC677ABI
-		// legacy addresses below
+		// legacy addresses below are commented out to avoid loading them by default, to be uncommented for migrations
 		case cldf.NewTypeAndVersion(ccipshared.OnRamp, deployment.Version1_5_0).String():
+			if !config.loadLegacyContracts {
+				continue
+			}
 			onRampC, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
@@ -1273,6 +1311,9 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			state.EVM2EVMOnRamp[sCfg.DestChainSelector] = onRampC
 			state.ABIByAddress[address] = evm_2_evm_onramp.EVM2EVMOnRampABI
 		case cldf.NewTypeAndVersion(ccipshared.OffRamp, deployment.Version1_5_0).String():
+			if !config.loadLegacyContracts {
+				continue
+			}
 			offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
@@ -1287,6 +1328,9 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			state.EVM2EVMOffRamp[sCfg.SourceChainSelector] = offRamp
 			state.ABIByAddress[address] = evm_2_evm_offramp.EVM2EVMOffRampABI
 		case cldf.NewTypeAndVersion(ccipshared.CommitStore, deployment.Version1_5_0).String():
+			if !config.loadLegacyContracts {
+				continue
+			}
 			commitStore, err := commit_store.NewCommitStore(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
@@ -1301,6 +1345,9 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			state.CommitStore[sCfg.SourceChainSelector] = commitStore
 			state.ABIByAddress[address] = commit_store.CommitStoreABI
 		case cldf.NewTypeAndVersion(ccipshared.PriceRegistry, deployment.Version1_2_0).String():
+			if !config.loadLegacyContracts {
+				continue
+			}
 			pr, err := price_registry_1_2_0.NewPriceRegistry(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
@@ -1308,6 +1355,9 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 			state.PriceRegistry = pr
 			state.ABIByAddress[address] = price_registry_1_2_0.PriceRegistryABI
 		case cldf.NewTypeAndVersion(ccipshared.RMN, deployment.Version1_5_0).String():
+			if !config.loadLegacyContracts {
+				continue
+			}
 			rmnC, err := rmn_contract.NewRMNContract(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
@@ -1404,6 +1454,20 @@ func LoadChainState(ctx context.Context, chain cldf_evm.Chain, addresses map[str
 				state.ABIByAddress[address] = gethwrappers.ManyChainMultiSigABI
 				continue
 			}
+			// New versions of the EVM FeeQuoter are developed to support new chain families.
+			// The FeeQuoter added to state should be the FeeQuoter in the environment with the highest version.
+			if tvStr.Type == ccipshared.FeeQuoter {
+				if state.FeeQuoter == nil || tvStr.Version.GreaterThan(state.FeeQuoterVersion) {
+					fq, err := fee_quoter.NewFeeQuoter(common.HexToAddress(address), chain.Client)
+					if err != nil {
+						return state, err
+					}
+					state.FeeQuoter = fq
+					state.FeeQuoterVersion = &tvStr.Version
+					state.ABIByAddress[address] = fee_quoter.FeeQuoterABI
+				}
+				continue
+			}
 			return state, fmt.Errorf("unknown contract %s", tvStr)
 		}
 	}
@@ -1453,6 +1517,20 @@ func ValidateChain(env cldf.Environment, state CCIPOnChainState, chainSel uint64
 		if mcmsCfg != nil {
 			err = mcmsCfg.ValidateSolana(env, chainSel)
 			if err != nil {
+				return err
+			}
+		}
+	case chain_selectors.FamilyAptos:
+		chain, ok := env.BlockChains.AptosChains()[chainSel]
+		if !ok {
+			return fmt.Errorf("aptos chain with selector %d does not exist in environment", chainSel)
+		}
+		s, ok := state.AptosChains[chainSel]
+		if !ok {
+			return fmt.Errorf("%s does not exist in state", chain)
+		}
+		if mcmsCfg != nil {
+			if err := mcmsCfg.ValidateAptos(chain, s.MCMSAddress); err != nil {
 				return err
 			}
 		}
