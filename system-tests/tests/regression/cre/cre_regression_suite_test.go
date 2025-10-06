@@ -16,7 +16,7 @@ import (
 var v2RegistriesFlags = []string{"--with-contracts-version", "v2"}
 
 /*
-To execute tests locally start the local CRE first:
+To execute tests locally, start the local CRE first:
 Inside the `core/scripts/cre/environment` directory
  1. Ensure the necessary capabilities (i.e. readcontract, http-trigger, http-action) are listed in the environment configuration
  2. Identify the appropriate topology that you want to test
