@@ -151,4 +151,8 @@ func Test_CRE_V2_EVM_Suite(t *testing.T) {
 	t.Run("[v2] EVM Read - "+topology, func(t *testing.T) {
 		ExecuteEVMReadTest(t, testEnv)
 	})
+
+	t.Run("[v2] EVM LogTrigger - "+topology, func(t *testing.T) {
+		ExecuteEVMLogTriggerTest(t, testEnv)
+	})
 }

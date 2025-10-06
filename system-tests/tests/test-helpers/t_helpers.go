@@ -45,6 +45,7 @@ import (
 	evmwrite_negative_config "github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/evm/evmwrite-negative/config"
 	http_negative_config "github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/http/config"
 	evmread_config "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evm/evmread/config"
+	logtrigger_config "github.com/smartcontractkit/chainlink/system-tests/tests/smoke/cre/evm/logtrigger/config"
 	ttypes "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers/configuration"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -296,6 +297,7 @@ type WorkflowConfig interface {
 		HTTPWorkflowConfig |
 		consensus_negative_config.Config |
 		evmread_config.Config |
+		logtrigger_config.Config |
 		evmread_negative_config.Config |
 		evmwrite_negative_config.Config |
 		http_negative_config.Config
@@ -399,6 +401,12 @@ func workflowConfigFactory[T WorkflowConfig](t *testing.T, testLogger zerolog.Lo
 			workflowConfigFilePath = workflowCfgFilePath
 			require.NoError(t, configErr, "failed to create evmread workflow config file")
 			testLogger.Info().Msg("EVM Read workflow config file created.")
+
+		case *logtrigger_config.Config:
+			workflowCfgFilePath, configErr := CreateWorkflowYamlConfigFile(workflowName, cfg)
+			workflowConfigFilePath = workflowCfgFilePath
+			require.NoError(t, configErr, "failed to create logtrigger workflow config file")
+			testLogger.Info().Msg("EVM LogTrigger workflow config file created.")
 
 		case *evmread_negative_config.Config:
 			workflowCfgFilePath, configErr := CreateWorkflowYamlConfigFile(workflowName, cfg)
