@@ -99,6 +99,16 @@ type evtHandler interface {
 	Handle(ctx context.Context, event Event) error
 }
 
+type NoopEventHandler struct{}
+
+func (h *NoopEventHandler) Handle(ctx context.Context, event Event) error {
+	return nil
+}
+
+func (h *NoopEventHandler) Close() error {
+	return nil
+}
+
 type donNotifier interface {
 	WaitForDon(ctx context.Context) (capabilities.DON, error)
 }

@@ -1153,101 +1153,128 @@ func newCREServices(
 					globalLogger.Debugw("Created WorkflowRegistrySyncer V1")
 
 				case 2:
-					var fetcherFunc wftypes.FetcherFunc
-					var retrieverFunc wftypes.LocationRetrieverFunc
-					if opts.FetcherFunc == nil {
-						if gatewayConnectorWrapper == nil {
-							return nil, errors.New("unable to create workflow registry syncer without gateway connector")
-						}
-						if storageClient == nil {
-							return nil, errors.New("unable to create workflow registry syncer without storage client")
-						}
-						fetcher := syncerV2.NewFetcherService(lggr, gatewayConnectorWrapper, storageClient)
-						fetcherFunc = fetcher.Fetch
-						retrieverFunc = fetcher.RetrieveURL
-						srvcs = append(srvcs, fetcher)
-					} else {
-						fetcherFunc = opts.FetcherFunc
-						retrieverFunc = nil
-					}
-
-					artifactsStore, err := artifactsV2.NewStore(lggr, artifactsV2.NewWorkflowRegistryDS(ds, globalLogger),
-						fetcherFunc,
-						retrieverFunc,
-						clockwork.NewRealClock(), key, custmsg.NewLabeler(), artifactsV2.WithMaxArtifactSize(
-							artifactsV2.ArtifactConfig{
-								MaxBinarySize:  uint64(capCfg.WorkflowRegistry().MaxBinarySize()),
-								MaxSecretsSize: uint64(capCfg.WorkflowRegistry().MaxEncryptedSecretsSize()),
-								MaxConfigSize:  uint64(capCfg.WorkflowRegistry().MaxConfigSize()),
+					// If the gateway isn't configured, then that means we won't be able to fetch any workflows.
+					// In this case, let's create a read-only syncer that allows us to check allowlisted events.
+					if gatewayConnectorWrapper == nil && opts.FetcherFunc == nil {
+						wfSyncer, err := syncerV2.NewWorkflowRegistry(
+							lggr,
+							crFactory,
+							capCfg.WorkflowRegistry().Address(),
+							syncerV2.Config{
+								QueryCount:   100,
+								SyncStrategy: syncerV2.SyncStrategy(capCfg.WorkflowRegistry().SyncStrategy()),
 							},
-						),
-						artifactsV2.WithConfig(artifactsV2.StoreConfig{
-							ArtifactStorageHost: capCfg.WorkflowRegistry().WorkflowStorage().ArtifactStorageHost(),
-						}))
-					if err != nil {
-						return nil, fmt.Errorf("unable to create artifact store: %w", err)
-					}
-
-					engineRegistry := syncerV2.NewEngineRegistry()
-
-					// Create OrgResolver for workflow owner organization resolution
-					var orgResolver orgresolver.OrgResolver
-					if cfg.CRE().Linking().URL() != "" {
-						orgResolverConfig := orgresolver.Config{
-							URL:                           cfg.CRE().Linking().URL(),
-							TLSEnabled:                    cfg.CRE().Linking().TLSEnabled(),
-							WorkflowRegistryAddress:       capCfg.WorkflowRegistry().Address(),
-							WorkflowRegistryChainSelector: wrChainDetails.ChainSelector,
-						}
-						orgResolver, err = orgresolver.NewOrgResolver(orgResolverConfig, globalLogger)
+							&syncerV2.NoopEventHandler{},
+							workflowDonNotifier,
+							syncerV2.NewEngineRegistry(),
+						)
 						if err != nil {
-							return nil, fmt.Errorf("failed to create org resolver: %w", err)
+							return nil, fmt.Errorf("unable to create workflow registry syncer: %w", err)
 						}
-						srvcs = append(srvcs, orgResolver)
+
+						srvcs = append(srvcs, wfSyncer)
+						globalLogger.Debugw("Created WorkflowRegistrySyncer V2 in read-only mode")
 					} else {
-						globalLogger.Warn("OrgResolver not created - no linking service URL configured")
+						var fetcherFunc wftypes.FetcherFunc
+						var retrieverFunc wftypes.LocationRetrieverFunc
+						if opts.FetcherFunc == nil {
+							if gatewayConnectorWrapper == nil {
+								return nil, errors.New("unable to create workflow registry syncer without gateway connector")
+							}
+							if storageClient == nil {
+								return nil, errors.New("unable to create workflow registry syncer without storage client")
+							}
+							fetcher := syncerV2.NewFetcherService(lggr, gatewayConnectorWrapper, storageClient)
+							fetcherFunc = fetcher.Fetch
+							retrieverFunc = fetcher.RetrieveURL
+							srvcs = append(srvcs, fetcher)
+						} else {
+							fetcherFunc = opts.FetcherFunc
+							retrieverFunc = nil
+						}
+
+						artifactsStore, err := artifactsV2.NewStore(lggr, artifactsV2.NewWorkflowRegistryDS(ds, globalLogger),
+							fetcherFunc,
+							retrieverFunc,
+							clockwork.NewRealClock(), key, custmsg.NewLabeler(), artifactsV2.WithMaxArtifactSize(
+								artifactsV2.ArtifactConfig{
+									MaxBinarySize:  uint64(capCfg.WorkflowRegistry().MaxBinarySize()),
+									MaxSecretsSize: uint64(capCfg.WorkflowRegistry().MaxEncryptedSecretsSize()),
+									MaxConfigSize:  uint64(capCfg.WorkflowRegistry().MaxConfigSize()),
+								},
+							),
+							artifactsV2.WithConfig(artifactsV2.StoreConfig{
+								ArtifactStorageHost: capCfg.WorkflowRegistry().WorkflowStorage().ArtifactStorageHost(),
+							}))
+						if err != nil {
+							return nil, fmt.Errorf("unable to create artifact store: %w", err)
+						}
+
+						engineRegistry := syncerV2.NewEngineRegistry()
+
+						// Create OrgResolver for workflow owner organization resolution
+						var orgResolver orgresolver.OrgResolver
+						if cfg.CRE().Linking().URL() != "" {
+							orgResolverConfig := orgresolver.Config{
+								URL:                           cfg.CRE().Linking().URL(),
+								TLSEnabled:                    cfg.CRE().Linking().TLSEnabled(),
+								WorkflowRegistryAddress:       capCfg.WorkflowRegistry().Address(),
+								WorkflowRegistryChainSelector: wrChainDetails.ChainSelector,
+							}
+							orgResolver, err = orgresolver.NewOrgResolver(orgResolverConfig, globalLogger)
+							if err != nil {
+								return nil, fmt.Errorf("failed to create org resolver: %w", err)
+							}
+							srvcs = append(srvcs, orgResolver)
+						} else {
+							globalLogger.Warn("OrgResolver not created - no linking service URL configured")
+						}
+
+						eventHandler, err := syncerV2.NewEventHandler(
+							lggr,
+							workflowstore.NewInMemoryStore(lggr, clockwork.NewRealClock()),
+							dontimeStore,
+							opts.UseLocalTimeProvider,
+							opts.CapabilitiesRegistry,
+							engineRegistry,
+							custmsg.NewLabeler(),
+							engineLimiters,
+							workflowRateLimiter,
+							workflowLimits,
+							artifactsStore,
+							key,
+							syncerV2.WithBillingClient(billingClient),
+							syncerV2.WithWorkflowRegistry(capCfg.WorkflowRegistry().Address(), strconv.FormatUint(wrChainDetails.ChainSelector, 10)),
+							syncerV2.WithOrgResolver(orgResolver),
+						)
+						if err != nil {
+							return nil, fmt.Errorf("unable to create workflow registry event handler: %w", err)
+						}
+
+						if gatewayConnectorWrapper == nil {
+							eventHandler = noopEventHandler()
+						}
+
+						wfSyncer, err := syncerV2.NewWorkflowRegistry(
+							lggr,
+							crFactory,
+							capCfg.WorkflowRegistry().Address(),
+							syncerV2.Config{
+								QueryCount:   100,
+								SyncStrategy: syncerV2.SyncStrategy(capCfg.WorkflowRegistry().SyncStrategy()),
+							},
+							eventHandler,
+							workflowDonNotifier,
+							engineRegistry,
+						)
+						if err != nil {
+							return nil, fmt.Errorf("unable to create workflow registry syncer: %w", err)
+						}
+
+						srvcs = append(srvcs, wfSyncer)
+						globalLogger.Debugw("Created WorkflowRegistrySyncer V2")
+
 					}
-
-					eventHandler, err := syncerV2.NewEventHandler(
-						lggr,
-						workflowstore.NewInMemoryStore(lggr, clockwork.NewRealClock()),
-						dontimeStore,
-						opts.UseLocalTimeProvider,
-						opts.CapabilitiesRegistry,
-						engineRegistry,
-						custmsg.NewLabeler(),
-						engineLimiters,
-						workflowRateLimiter,
-						workflowLimits,
-						artifactsStore,
-						key,
-						syncerV2.WithBillingClient(billingClient),
-						syncerV2.WithWorkflowRegistry(capCfg.WorkflowRegistry().Address(), strconv.FormatUint(wrChainDetails.ChainSelector, 10)),
-						syncerV2.WithOrgResolver(orgResolver),
-					)
-					if err != nil {
-						return nil, fmt.Errorf("unable to create workflow registry event handler: %w", err)
-					}
-
-					wfSyncer, err := syncerV2.NewWorkflowRegistry(
-						lggr,
-						crFactory,
-						capCfg.WorkflowRegistry().Address(),
-						syncerV2.Config{
-							QueryCount:   100,
-							SyncStrategy: syncerV2.SyncStrategy(capCfg.WorkflowRegistry().SyncStrategy()),
-						},
-						eventHandler,
-						workflowDonNotifier,
-						engineRegistry,
-					)
-					if err != nil {
-						return nil, fmt.Errorf("unable to create workflow registry syncer: %w", err)
-					}
-
-					srvcs = append(srvcs, wfSyncer)
-					globalLogger.Debugw("Created WorkflowRegistrySyncer V2")
-
 				default:
 					return nil, fmt.Errorf("unsupported WorkflowRegistry contract version %s", wrVersion)
 				}
