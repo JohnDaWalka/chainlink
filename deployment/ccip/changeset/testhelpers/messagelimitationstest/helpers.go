@@ -158,6 +158,8 @@ func Run(tc TestCase) TestCaseOutput {
 			errorMsg = "execution reverted"
 		case chain_selectors.FamilyAptos:
 			errorMsg = "transaction reverted:"
+		case chain_selectors.FamilySui:
+			errorMsg = "transaction reverted:"
 		default:
 			tc.T.Fatalf("unsupported source chain family %v", family)
 		}
