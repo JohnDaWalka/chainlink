@@ -2,6 +2,7 @@ package testhelpers
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,12 +35,12 @@ import (
 
 	aptos_fee_quoter "github.com/smartcontractkit/chainlink-aptos/bindings/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-aptos/bindings/helpers"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/usdc_token_pool"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_0/base_token_pool"
@@ -574,7 +575,7 @@ func SendRequestSui(
 	state stateview.CCIPOnChainState,
 	cfg *ccipclient.CCIPSendReqConfig,
 ) (*ccipclient.AnyMsgSentEvent, error) {
-	return SendSuiRequestViaChainWriter(e, cfg)
+	return SendSuiCCIPRequest(e, cfg)
 }
 
 func SendRequestSol(
@@ -2044,7 +2045,7 @@ func TransferMultiple(
 			case chainsel.FamilyEVM:
 				destFamily, err := chainsel.GetSelectorFamily(tt.DestChain)
 				require.NoError(t, err)
-				if destFamily == chainsel.FamilySolana {
+				if destFamily == chainsel.FamilySolana || destFamily == chainsel.FamilySui {
 					// for EVM2Solana token transfer we need to use tokenReceiver instead logical receiver
 					expectedTokenBalances.add(tt.DestChain, tt.TokenReceiverATA, tt.ExpectedTokenBalances)
 				} else {
@@ -2186,6 +2187,10 @@ func WaitForTokenBalances(
 					receiver := aptos.AccountAddress{}
 					copy(receiver[32-len(id.receiver):], id.receiver)
 					WaitForTokenBalanceAptos(ctx, t, fungibleAssetMetadata, receiver, env.BlockChains.AptosChains()[chainSelector], expectedBalance)
+				case chainsel.FamilySui:
+					tokenHex := "0x" + hex.EncodeToString(id.token)
+					tokenReceiverHex := "0x" + hex.EncodeToString(id.receiver)
+					WaitForTokenBalanceSui(ctx, t, tokenHex, tokenReceiverHex, env.BlockChains.SuiChains()[chainSelector], balance)
 				default:
 				}
 				return nil

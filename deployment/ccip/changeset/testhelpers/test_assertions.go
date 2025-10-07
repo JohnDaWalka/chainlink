@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/block-vision/sui-go-sdk/models"
+	"github.com/block-vision/sui-go-sdk/sui"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
@@ -24,7 +26,7 @@ import (
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/fee_quoter"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	solconfig "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
@@ -41,10 +43,14 @@ import (
 	cldf_aptos "github.com/smartcontractkit/chainlink-deployments-framework/chain/aptos"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf_solana "github.com/smartcontractkit/chainlink-deployments-framework/chain/solana"
+	cldf_sui "github.com/smartcontractkit/chainlink-deployments-framework/chain/sui"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
+
+	sui_module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
+	sui_ccip_offramp "github.com/smartcontractkit/chainlink-sui/bindings/packages/offramp"
 )
 
 func ConfirmGasPriceUpdatedForAll(
@@ -245,6 +251,16 @@ func ConfirmCommitForAllWithExpectedSeqNums(
 					expectedSeqNum,
 					true,
 				))
+			case chainsel.FamilySui:
+				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeSui(
+					t,
+					srcChain,
+					e.BlockChains.SuiChains()[dstChain],
+					state.SuiChains[dstChain].OffRampAddress,
+					startBlock,
+					expectedSeqNum,
+					true,
+				))
 			case chainsel.FamilyAptos:
 				return commonutils.JustError(ConfirmCommitWithExpectedSeqNumRangeAptos(
 					t,
@@ -374,6 +390,17 @@ func ConfirmMultipleCommits(
 					srcChain,
 					env.BlockChains.AptosChains()[destChain],
 					state.AptosChains[destChain].CCIPAddress,
+					startBlocks[destChain],
+					seqRange,
+					enforceSingleCommit,
+				)
+				return err
+			case chainsel.FamilySui:
+				_, err := ConfirmCommitWithExpectedSeqNumRangeSui(
+					t,
+					srcChain,
+					env.BlockChains.SuiChains()[destChain],
+					state.SuiChains[destChain].OffRampAddress,
 					startBlocks[destChain],
 					seqRange,
 					enforceSingleCommit,
@@ -696,6 +723,154 @@ func AptosEventEmitter[T any](
 	return ch, errChan
 }
 
+func SuiEventEmitter[T any](
+	t *testing.T,
+	client sui.ISuiAPI,
+	packageId, moduleName, event string,
+	done chan any,
+) (<-chan struct {
+	Event   T
+	Version string
+}, <-chan error) {
+	ch := make(chan struct {
+		Event   T
+		Version string
+	}, 200)
+	errChan := make(chan error)
+	limit := uint64(50)
+	var lastSeenTxDigest string
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 2)
+		defer ticker.Stop()
+
+		for {
+			for {
+				// As this can take a few iterations if there are many events, check for done before each request
+				select {
+				case <-done:
+					return
+				default:
+				}
+				eventFilter := models.EventFilterByMoveEventType{
+					MoveEventType: fmt.Sprintf("%s::%s::%s", packageId, moduleName, event),
+				}
+
+				events, err := client.SuiXQueryEvents(t.Context(), models.SuiXQueryEventsRequest{
+					SuiEventFilter:  eventFilter,
+					Limit:           limit,
+					DescendingOrder: false,
+				})
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				if len(events.Data) == 0 {
+					// No new events found
+					break
+				}
+
+				for _, ev := range events.Data {
+					if ev.Id.TxDigest == lastSeenTxDigest {
+						continue // skip duplicates
+					}
+					lastSeenTxDigest = ev.Id.TxDigest
+
+					var out T
+					if err := codec.DecodeAptosJsonValue(ev.ParsedJson, &out); err != nil {
+						errChan <- err
+						continue
+					}
+
+					ch <- struct {
+						Event   T
+						Version string
+					}{
+						Event:   out,
+						Version: ev.Id.EventSeq, // use the actual version
+					}
+				}
+
+			}
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				continue
+			}
+		}
+	}()
+	return ch, errChan
+}
+
+func ConfirmCommitWithExpectedSeqNumRangeSui(
+	t *testing.T,
+	srcSelector uint64,
+	dest cldf_sui.Chain,
+	offRampAddress string,
+	startVersion *uint64,
+	expectedSeqNumRange ccipocr3.SeqNumRange,
+	enforceSingleCommit bool,
+) (any, error) {
+	// Bound the offRamp
+	boundOffRamp, err := sui_ccip_offramp.NewOfframp(offRampAddress, dest.Client)
+	require.NoError(t, err)
+
+	done := make(chan any)
+	defer close(done)
+	sink, errChan := SuiEventEmitter[sui_module_offramp.CommitReportAccepted](t, dest.Client, boundOffRamp.Address(), "offramp", "CommitReportAccepted", done)
+
+	timeout := time.NewTimer(tests.WaitTimeout(t))
+	defer timeout.Stop()
+
+	seenMessages := NewCommitReportTracker(srcSelector, expectedSeqNumRange)
+
+	verifyCommitReport := func(report sui_module_offramp.CommitReportAccepted) bool {
+		processRoots := func(roots []sui_module_offramp.MerkleRoot) bool {
+			for _, mr := range roots {
+				t.Logf("(Sui) Received commit report for [%d, %d] on selector %d from source selector %d expected seq nr range %s, token prices: %v",
+					mr.MinSeqNr, mr.MaxSeqNr, dest.Selector, srcSelector, expectedSeqNumRange.String(), report.PriceUpdates.TokenPriceUpdates,
+				)
+				seenMessages.visitCommitReport(srcSelector, mr.MinSeqNr, mr.MaxSeqNr)
+
+				if mr.SourceChainSelector == srcSelector && uint64(expectedSeqNumRange.Start()) >= mr.MinSeqNr && uint64(expectedSeqNumRange.End()) <= mr.MaxSeqNr {
+					t.Logf("(Sui) All sequence numbers committed in a single report [%d, %d]",
+						expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+					)
+					return true
+				}
+
+				if !enforceSingleCommit && seenMessages.allCommited(srcSelector) {
+					t.Logf(
+						"(Sui) All sequence numbers already committed from range [%d, %d]",
+						expectedSeqNumRange.Start(), expectedSeqNumRange.End(),
+					)
+					return true
+				}
+			}
+			return false
+		}
+
+		return processRoots(report.BlessedMerkleRoots) || processRoots(report.UnblessedMerkleRoots)
+	}
+
+	for {
+		select {
+		case event := <-sink:
+			verified := verifyCommitReport(event.Event)
+			if verified {
+				return &event.Event, nil
+			}
+		case err := <-errChan:
+			require.NoError(t, err)
+		case <-timeout.C:
+			return nil, fmt.Errorf("(sui) timed out after waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				dest.Selector, srcSelector, expectedSeqNumRange.String())
+		}
+	}
+}
+
 func ConfirmCommitWithExpectedSeqNumRangeAptos(
 	t *testing.T,
 	srcSelector uint64,
@@ -832,6 +1007,18 @@ func ConfirmExecWithSeqNrsForAll(
 					srcChain,
 					e.BlockChains.AptosChains()[dstChain],
 					state.AptosChains[dstChain].CCIPAddress,
+					startBlock,
+					seqRange,
+				)
+				if err != nil {
+					return err
+				}
+			case chainsel.FamilySui:
+				innerExecutionStates, err = ConfirmExecWithExpectedSeqNrsSui(
+					t,
+					srcChain,
+					e.BlockChains.SuiChains()[dstChain],
+					state.SuiChains[dstChain].OffRampAddress,
 					startBlock,
 					seqRange,
 				)
@@ -1064,6 +1251,82 @@ func ConfirmExecWithExpectedSeqNrsAptos(
 		case <-timeout.C:
 			return nil, fmt.Errorf("(Aptos) timed out waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence numbers %+v",
 				dest.Selector, offRampAddress.String(), srcSelector, expectedSeqNrs)
+		}
+	}
+}
+
+func ConfirmExecWithExpectedSeqNrsSui(
+	t *testing.T,
+	srcSelector uint64,
+	dest cldf_sui.Chain,
+	offRampAddress string,
+	startVersion *uint64,
+	expectedSeqNrs []uint64,
+) (executionStates map[uint64]int, err error) {
+	if startVersion != nil {
+		t.Logf("[DEBUG] startVersion = %d", *startVersion)
+	} else {
+		t.Log("[DEBUG] startVersion = nil (streaming from latest)")
+	}
+
+	if len(expectedSeqNrs) == 0 {
+		t.Log("[DEBUG] expectedSeqNrs is empty")
+		return nil, errors.New("no expected sequence numbers provided")
+	}
+
+	done := make(chan any)
+	defer close(done)
+
+	t.Log("[DEBUG] Subscribing to Sui events...", offRampAddress)
+	sink, errChan := SuiEventEmitter[module_offramp.ExecutionStateChanged](t, dest.Client, offRampAddress, "offramp", "ExecutionStateChanged", done)
+
+	t.Log("[DEBUG] Event subscription established")
+
+	executionStates = make(map[uint64]int)
+	seqNrsToWatch := make(map[uint64]bool)
+	for _, seqNr := range expectedSeqNrs {
+		seqNrsToWatch[seqNr] = true
+	}
+	t.Logf("[DEBUG] Watching for sequence numbers: %+v", seqNrsToWatch)
+
+	timeout := time.NewTimer(tests.WaitTimeout(t))
+	defer timeout.Stop()
+
+	for {
+		select {
+		case event := <-sink:
+			t.Logf("[DEBUG] Received event: %+v", event)
+
+			if !seqNrsToWatch[event.Event.SequenceNumber] {
+				t.Logf("[DEBUG] Ignoring event with unexpected sequence number: %d", event.Event.SequenceNumber)
+				continue
+			}
+
+			if event.Event.SourceChainSelector != srcSelector {
+				t.Logf("[DEBUG] Ignoring event with unexpected source chain selector: got %d, expected %d",
+					event.Event.SourceChainSelector, srcSelector)
+				continue
+			}
+
+			if seqNrsToWatch[event.Event.SequenceNumber] && event.Event.SourceChainSelector == srcSelector {
+				t.Logf("(Sui) received ExecutionStateChanged (state %s) on chain %d (offramp %s) with expected sequence number %d (tx %d)",
+					executionStateToString(event.Event.State), dest.Selector, offRampAddress, event.Event.SequenceNumber, event.Version,
+				)
+				if event.Event.State == EXECUTION_STATE_INPROGRESS {
+					continue
+				}
+				executionStates[event.Event.SequenceNumber] = int(event.Event.State)
+				delete(seqNrsToWatch, event.Event.SequenceNumber)
+				if len(seqNrsToWatch) == 0 {
+					return executionStates, nil
+				}
+			}
+
+		case err := <-errChan:
+			require.NoError(t, err)
+		case <-timeout.C:
+			return nil, fmt.Errorf("(Sui) timed out waiting for ExecutionStateChanged on chain %d (offramp %s) from chain %d with expected sequence numbers %+v",
+				dest.Selector, offRampAddress, srcSelector, expectedSeqNrs)
 		}
 	}
 }
