@@ -14,7 +14,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -53,14 +52,8 @@ const (
 )
 
 func TestConfigureCapabilitiesRegistry(t *testing.T) {
-	fixture := setupCapabilitiesRegistryTest(t)
-	t.Run("select by address", func(t *testing.T) {
-		suite(t, fixture)
-	})
-
 	t.Run("select by qualifier", func(t *testing.T) {
-		fixture.configureInput.CapabilitiesRegistryAddress = ""
-		fixture.configureInput.Qualifier = fixture.qualifier
+		fixture := setupCapabilitiesRegistryTest(t)
 		suite(t, fixture)
 	})
 }
@@ -165,8 +158,8 @@ func suite(t *testing.T, fixture *testFixture) {
 
 func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 	originalInput := ConfigureCapabilitiesRegistryInput{
-		ChainSelector:               123456789,
-		CapabilitiesRegistryAddress: "0x1234567890123456789012345678901234567890",
+		ChainSelector: 123456789,
+		Qualifier:     "some-qualifier",
 		MCMSConfig: &ocr3.MCMSConfig{
 			MinDuration: 30 * time.Second,
 		},
@@ -246,7 +239,7 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 		// Verify the YAML contains expected fields
 		yamlStr := string(yamlData)
 		assert.Contains(t, yamlStr, "chainSelector:", "should contain chainSelector field")
-		assert.Contains(t, yamlStr, "capabilitiesRegistryAddress:", "should contain capabilitiesRegistryAddress field")
+		assert.Contains(t, yamlStr, "qualifier:", "should contain qualifier field")
 		assert.Contains(t, yamlStr, "mcmsConfig:", "should contain mcmsConfig field")
 		assert.Contains(t, yamlStr, "nops:", "should contain nops field")
 		assert.Contains(t, yamlStr, "capabilities:", "should contain capabilities field")
@@ -266,7 +259,7 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 
 		// Verify all fields are correctly deserialized
 		assert.Equal(t, originalInput.ChainSelector, unmarshaledInput.ChainSelector)
-		assert.Equal(t, originalInput.CapabilitiesRegistryAddress, unmarshaledInput.CapabilitiesRegistryAddress)
+		assert.Equal(t, originalInput.Qualifier, unmarshaledInput.Qualifier)
 		assert.Equal(t, originalInput.MCMSConfig, unmarshaledInput.MCMSConfig)
 		assert.Equal(t, originalInput.Nops, unmarshaledInput.Nops)
 		assert.Equal(t, originalInput.Capabilities, unmarshaledInput.Capabilities)
@@ -277,9 +270,9 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 	t.Run("partial input with omitempty", func(t *testing.T) {
 		// Test with minimal input (only required fields)
 		minimalInput := ConfigureCapabilitiesRegistryInput{
-			ChainSelector:               123456789,
-			CapabilitiesRegistryAddress: "0x1234567890123456789012345678901234567890",
-			MCMSConfig:                  nil,
+			ChainSelector: 123456789,
+			Qualifier:     "some-qualifier",
+			MCMSConfig:    nil,
 			// Omit optional fields (nops, capabilities, nodes, dons)
 		}
 
@@ -290,8 +283,7 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 
 		// Should contain required fields
 		assert.Contains(t, yamlStr, "chainSelector:")
-		assert.Contains(t, yamlStr, "capabilitiesRegistryAddress:")
-
+		assert.Contains(t, yamlStr, "qualifier:")
 		// Should NOT contain optional fields due to omitempty
 		assert.NotContains(t, yamlStr, "nops:")
 		assert.NotContains(t, yamlStr, "capabilities:")
@@ -305,8 +297,8 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, minimalInput.ChainSelector, unmarshaledMinimal.ChainSelector)
-		assert.Equal(t, minimalInput.CapabilitiesRegistryAddress, unmarshaledMinimal.CapabilitiesRegistryAddress)
 		assert.Equal(t, minimalInput.MCMSConfig, unmarshaledMinimal.MCMSConfig)
+		assert.Equal(t, minimalInput.Qualifier, unmarshaledMinimal.Qualifier)
 		assert.Empty(t, unmarshaledMinimal.Nops)
 		assert.Empty(t, unmarshaledMinimal.Capabilities)
 		assert.Empty(t, unmarshaledMinimal.Nodes)
@@ -317,7 +309,7 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 func TestConfigureCapabilitiesRegistryInput_YAMLFromFile(t *testing.T) {
 	yamlConfig := `
 chainSelector: 421614
-capabilitiesRegistryAddress: "0x1234567890123456789012345678901234567890"
+qualifier: "some-qualifier"
 useMCMS: true
 nops:
   - admin: "0x1111111111111111111111111111111111111111"
@@ -363,7 +355,7 @@ dons:
 
 	// Verify the parsed values
 	assert.Equal(t, uint64(421614), input.ChainSelector)
-	assert.Equal(t, "0x1234567890123456789012345678901234567890", input.CapabilitiesRegistryAddress)
+	assert.Equal(t, "some-qualifier", input.Qualifier)
 	assert.Nil(t, input.MCMSConfig)
 
 	require.Len(t, input.Nops, 2)
@@ -418,6 +410,7 @@ dons:
 func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 	lggr := logger.Test(t)
 	env, chainSelector := cre.BuildMinimalEnvironment(t, lggr)
+	mcmsQualifier := "test-capabilities-registry-v2-mcms"
 
 	// Deploy MCMS infrastructure first
 	t.Log("Setting up MCMS infrastructure...")
@@ -438,11 +431,13 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 	t.Log("Running deployment changeset...")
 	deployOutput, err := DeployCapabilitiesRegistry{}.Apply(mcmsEnv, DeployCapabilitiesRegistryInput{
 		ChainSelector: chainSelector,
-		Qualifier:     "test-capabilities-registry-v2-mcms",
+		Qualifier:     mcmsQualifier,
 	})
 	require.NoError(t, err, "failed to apply deployment changeset")
 	t.Logf("Deployment result: err=%v, output=%v", err, deployOutput)
 	require.Len(t, deployOutput.Reports, 1, "deployment should produce exactly one report")
+
+	mcmsEnv.DataStore = deployOutput.DataStore.Seal()
 
 	deployReport := deployOutput.Reports[0]
 	deployReportOutput := deployReport.Output.(contracts.DeployCapabilitiesRegistryOutput)
@@ -550,8 +545,7 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 
 	// Create the input with MCMS enabled
 	configureInput := ConfigureCapabilitiesRegistryInput{
-		ChainSelector:               chainSelector,
-		CapabilitiesRegistryAddress: capabilitiesRegistryAddress,
+		ChainSelector: chainSelector,
 		MCMSConfig: &ocr3.MCMSConfig{
 			MinDuration: 30 * time.Second,
 		},
@@ -559,11 +553,12 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 		Capabilities: capabilities,
 		Nodes:        nodes,
 		DONs:         DONs,
-		Qualifier:    "",
+		Qualifier:    mcmsQualifier,
 	}
 
 	return &testFixture{
 		env:                         mcmsEnv,
+		qualifier:                   mcmsQualifier,
 		chainSelector:               chainSelector,
 		capabilitiesRegistryAddress: capabilitiesRegistryAddress,
 		nops:                        nops,
@@ -589,10 +584,12 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 	require.NotNil(t, deployOutput, "deployment output should not be nil")
 	t.Logf("Deployment result: err=%v, output=%v", err, deployOutput)
 
-	capabilitiesRegistryAddress := deployOutput.DataStore.Addresses().Filter(datastore.AddressRefByQualifier(qualifier))[0].Address
-
 	// Replace the env datastore with the one with deployed contracts
 	env.DataStore = deployOutput.DataStore.Seal()
+
+	deployReport := deployOutput.Reports[0]
+	deployReportOutput := deployReport.Output.(contracts.DeployCapabilitiesRegistryOutput)
+	capabilitiesRegistryAddress := deployReportOutput.Address
 
 	// Setup test data
 	nops := []CapabilitiesRegistryNodeOperator{
@@ -710,20 +707,20 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 	}
 
 	configureInput := ConfigureCapabilitiesRegistryInput{
-		ChainSelector:               chainSelector,
-		CapabilitiesRegistryAddress: capabilitiesRegistryAddress,
-		MCMSConfig:                  nil,
-		Nops:                        nops,
-		Capabilities:                capabilities,
-		Nodes:                       nodes,
-		DONs:                        DONs,
+		ChainSelector: chainSelector,
+		MCMSConfig:    nil,
+		Nops:          nops,
+		Capabilities:  capabilities,
+		Nodes:         nodes,
+		DONs:          DONs,
+		Qualifier:     qualifier,
 	}
 
 	return &testFixture{
 		env:                         env,
 		chainSelector:               chainSelector,
-		qualifier:                   qualifier,
 		capabilitiesRegistryAddress: capabilitiesRegistryAddress,
+		qualifier:                   qualifier,
 		nops:                        nops,
 		capabilities:                capabilities,
 		nodes:                       nodes,
