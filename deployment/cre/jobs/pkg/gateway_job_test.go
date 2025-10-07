@@ -96,6 +96,10 @@ Name = 'Node 4'
 
 [gatewayConfig.HTTPClientConfig]
 MaxResponseBytes = 50000000
+AllowedSchemes = ['https']
+AllowedPorts = [443]
+BlockedIPs = []
+BlockedIPsCIDR = ['0.0.0.0/8', '10.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10', '224.0.0.0/4', '240.0.0.0/4']
 
 [gatewayConfig.NodeServerConfig]
 HandshakeTimeoutMillis = 1000
@@ -206,6 +210,10 @@ Name = 'Node 4'
 
 [gatewayConfig.HTTPClientConfig]
 MaxResponseBytes = 50000000
+AllowedSchemes = ['https']
+AllowedPorts = [443]
+BlockedIPs = []
+BlockedIPsCIDR = ['0.0.0.0/8', '10.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10', '224.0.0.0/4', '240.0.0.0/4']
 
 [gatewayConfig.NodeServerConfig]
 HandshakeTimeoutMillis = 1000
@@ -289,6 +297,10 @@ Name = 'Node 4'
 
 [gatewayConfig.HTTPClientConfig]
 MaxResponseBytes = 50000000
+AllowedSchemes = ['https']
+AllowedPorts = [443]
+BlockedIPs = []
+BlockedIPsCIDR = ['0.0.0.0/8', '10.0.0.0/8', '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10', '224.0.0.0/4', '240.0.0.0/4']
 
 [gatewayConfig.NodeServerConfig]
 HandshakeTimeoutMillis = 1000
