@@ -152,12 +152,12 @@ func (s *secretsFetcher) getSecretsForBatch(ctx context.Context, request *sdkpb.
 
 	logKeys := make([]string, 0, len(request.Requests))
 	for _, r := range request.Requests {
-		logKeys = append(logKeys, keyFor(s.workflowOwner, r.Namespace, r.Id))
+		logKeys = append(logKeys, keyFor("Owner1", r.Namespace, r.Id))
 		vp.Requests = append(vp.Requests, &vault.SecretRequest{
 			Id: &vault.SecretIdentifier{
 				Key:       r.Id,
 				Namespace: r.Namespace,
-				Owner:     s.workflowOwner,
+				Owner:     "Owner1",
 			},
 			EncryptionKeys: encryptionKeys,
 		})
@@ -205,7 +205,7 @@ func (s *secretsFetcher) getSecretsForBatch(ctx context.Context, request *sdkpb.
 
 	sdkResp := make([]*sdkpb.SecretResponse, 0, len(request.Requests))
 	for _, r := range request.Requests {
-		key := keyFor(s.workflowOwner, r.Namespace, r.Id)
+		key := keyFor("Owner1", r.Namespace, r.Id)
 		resp, ok := m[key]
 		if !ok {
 			errorMessage := "could not find response for the request: " + key
