@@ -89,11 +89,11 @@ require (
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20250916164650-970686360fbf
 	github.com/smartcontractkit/chainlink-automation v0.8.1
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251006185749-5bbcd3de2ec8
-	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250908144012-8184001834b5
-	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250908144012-8184001834b5
-	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251003215432-a8795d634f42
+	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
+	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5
+	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251007140624-a242e4bbd3dc
 	github.com/smartcontractkit/chainlink-data-streams v0.1.5
-	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251006145521-1bb51044b147
+	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251007112217-623f48bf0232
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003185510-17234095940f
 	github.com/smartcontractkit/chainlink-feeds v0.1.2-0.20250227211209-7cd000095135
 	github.com/smartcontractkit/chainlink-framework/capabilities v0.0.0-20250818175541-3389ac08a563
@@ -105,8 +105,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20250912140847-cbfb1710ac76
-	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20251006182808-ab6e6d838c48
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20251007053132-b56f70966ae5
+	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20251007010318-c9a7b2d44524
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20250916145228-cc9dd5b92c88
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250930221620-ce57bba04eab
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335
 	github.com/smartcontractkit/cre-sdk-go v0.7.1-0.20250919133015-2df149f34a81
