@@ -3,23 +3,33 @@ package ccip
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/math"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
+	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
+	mlt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagelimitationstest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -59,8 +69,6 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 	normalizedAddr, err := suiutil.ConvertStringToAddressBytes(suiSenderAddr)
 	require.NoError(t, err)
 
-	suiSenderByte := normalizedAddr[:]
-
 	// SUI FeeToken
 	// mint link token to use as feeToken
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
@@ -79,7 +87,7 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 
 	var (
 		nonce  uint64
-		sender = common.LeftPadBytes(suiSenderByte[:], 32)
+		sender = common.LeftPadBytes(normalizedAddr[:], 32)
 		out    messagingtest.TestCaseOutput
 		setup  = messagingtest.NewTestSetupWithDeployedEnv(
 			t,
@@ -92,9 +100,46 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 		)
 	)
 
-	_ = testcontext.Get(t)
+	// Get Sui FQ
+	ctx := testcontext.Get(t)
+
+	suiFeeQuoter, err := module_fee_quoter.NewFeeQuoter(
+		state.SuiChains[sourceChain].CCIPAddress,
+		e.Env.BlockChains.SuiChains()[sourceChain].Client)
+	require.NoError(t, err)
+
+	suiFeeQuoterDestChainConfig, err := suiFeeQuoter.DevInspect().GetDestChainConfig(ctx, &suiBind.CallOpts{
+		Signer:           e.Env.BlockChains.SuiChains()[sourceChain].Signer,
+		WaitForExecution: true,
+	}, suiBind.Object{Id: state.SuiChains[sourceChain].CCIPObjectRef}, destChain)
+	require.NoError(t, err, "Failed to get destination chain config")
+
+	// For testing messages that revert on source
+	mltTestSetup := mlt.NewTestSetup(
+		t,
+		state,
+		sourceChain,
+		destChain,
+		common.HexToAddress(outputMap.Objects.MintedLinkTokenObjectId),
+		suiFeeQuoterDestChainConfig,
+		false, // testRouter
+		true,  // validateResp
+		mlt.WithDeployedEnv(e),
+	)
+
+	invalidDestChainSelectorTestSetup := mlt.NewTestSetup(
+		t,
+		state,
+		sourceChain,
+		destChain,
+		common.HexToAddress("0x0"),
+		suiFeeQuoterDestChainConfig,
+		false, // testRouter
+		true,  // validateResp
+		mlt.WithDeployedEnv(e),
+	)
+
 	t.Run("Message to EVM - Should Succeed", func(t *testing.T) {
-		require.NoError(t, err)
 		out = messagingtest.Run(t,
 			messagingtest.TestCase{
 				TestSetup:              setup,
@@ -105,145 +150,140 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 				Replayed:               true,
 				FeeToken:               outputMap.Objects.MintedLinkTokenObjectId,
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-				ExtraAssertions: []func(t *testing.T){
-					func(t *testing.T) {
+			},
+		)
+	})
 
-					},
+	t.Run("Max Data Bytes - Should Succeed", func(t *testing.T) {
+		latestHead, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
+		require.NoError(t, err)
+		message := []byte(strings.Repeat("0", int(sui_deployment.DefaultCCIPSeqConfig.MaxDataBytes)))
+		messagingtest.Run(t,
+			messagingtest.TestCase{
+				TestSetup:      setup,
+				ValidationType: messagingtest.ValidationTypeExec,
+				FeeToken:       outputMap.Objects.MintedLinkTokenObjectId,
+				Receiver:       state.Chains[destChain].Receiver.Address().Bytes(),
+				MsgData:        message,
+				// Just ensuring enough gas is provided to execute the message, doesn't matter if it's way too much
+				ExtraArgs:              testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(300000), false),
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
+				ExtraAssertions: []func(t *testing.T){
+					func(t *testing.T) { assertEvmMessageReceived(ctx, t, state, destChain, latestHead, message) },
 				},
 			},
 		)
 	})
 
-	// t.Run("Max Data Bytes - Should Succeed", func(t *testing.T) {
-	// 	latestHead, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
-	// 	require.NoError(t, err)
-	// 	message := []byte(strings.Repeat("0", int(aptosFeeQuoterDestChainConfig.MaxDataBytes)))
-	// 	messagingtest.Run(t,
-	// 		messagingtest.TestCase{
-	// 			TestSetup:      setup,
-	// 			ValidationType: messagingtest.ValidationTypeExec,
-	// 			FeeToken:       nativeFeeToken,
-	// 			Receiver:       ccipReceiverAddress,
-	// 			MsgData:        message,
-	// 			// Just ensuring enough gas is provided to execute the message, doesn't matter if it's way too much
-	// 			ExtraArgs:              testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(300000), false),
-	// 			ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-	// 			ExtraAssertions: []func(t *testing.T){
-	// 				func(t *testing.T) { assertEvmMessageReceived(ctx, t, state, destChain, latestHead, message) },
-	// 			},
-	// 		},
-	// 	)
-	// })
+	t.Run("Max Gas Limit - Should Succeed", func(t *testing.T) {
+		latestHead, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
+		require.NoError(t, err)
+		message := []byte("Hello EVM, from Sui!")
+		messagingtest.Run(t,
+			messagingtest.TestCase{
+				TestSetup:              setup,
+				ValidationType:         messagingtest.ValidationTypeExec,
+				FeeToken:               outputMap.Objects.MintedLinkTokenObjectId,
+				Receiver:               state.Chains[destChain].Receiver.Address().Bytes(),
+				MsgData:                message,
+				ExtraArgs:              testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(int64(sui_deployment.DefaultCCIPSeqConfig.MaxPerMsgGasLimit)), false),
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
+				ExtraAssertions: []func(t *testing.T){
+					func(t *testing.T) { assertEvmMessageReceived(ctx, t, state, destChain, latestHead, message) },
+				},
+			},
+		)
+	})
 
-	// t.Run("Max Gas Limit - Should Succeed", func(t *testing.T) {
-	// 	latestHead, err := testhelpers.LatestBlock(ctx, e.Env, destChain)
-	// 	require.NoError(t, err)
-	// 	message := standardMessage
-	// 	messagingtest.Run(t,
-	// 		messagingtest.TestCase{
-	// 			TestSetup:              setup,
-	// 			ValidationType:         messagingtest.ValidationTypeExec,
-	// 			FeeToken:               nativeFeeToken,
-	// 			Receiver:               ccipReceiverAddress,
-	// 			MsgData:                message,
-	// 			ExtraArgs:              testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(int64(aptosFeeQuoterDestChainConfig.MaxPerMsgGasLimit)), false),
-	// 			ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-	// 			ExtraAssertions: []func(t *testing.T){
-	// 				func(t *testing.T) { assertEvmMessageReceived(ctx, t, state, destChain, latestHead, message) },
-	// 			},
-	// 		},
-	// 	)
-	// })
+	t.Run("Max Data Bytes + 1 - Should Fail", func(t *testing.T) {
+		message := []byte(strings.Repeat("0", int(sui_deployment.DefaultCCIPSeqConfig.MaxDataBytes)+1))
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Max Data Bytes + 1 - Should Fail",
+			Msg: testhelpers.SuiSendRequest{
+				Receiver:  state.Chains[destChain].Receiver.Address().Bytes(),
+				Data:      message,
+				FeeToken:  outputMap.Objects.MintedLinkTokenObjectId,
+				ExtraArgs: nil,
+			},
+			ExpRevert: true,
+		})
+	})
 
-	// t.Run("Max Data Bytes + 1 - Should Fail", func(t *testing.T) {
-	// 	message := []byte(strings.Repeat("0", int(aptosFeeQuoterDestChainConfig.MaxDataBytes)+1))
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Max Data Bytes + 1 - Should Fail",
-	// 		Msg: testhelpers.AptosSendRequest{
-	// 			Receiver:  ccipReceiverAddress,
-	// 			Data:      message,
-	// 			FeeToken:  aptosNativeFeeTokenAddress,
-	// 			ExtraArgs: nil,
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	t.Run("Max Data Bytes + 1 to EOA - Should Fail", func(t *testing.T) {
+		message := []byte(strings.Repeat("0", int(sui_deployment.DefaultCCIPSeqConfig.MaxDataBytes)+1))
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Max Data Bytes + 1 to EOA - Should Fail",
+			Msg: testhelpers.SuiSendRequest{
+				Receiver:  e.Env.BlockChains.EVMChains()[destChain].DeployerKey.From[:], // Sending to EOA
+				Data:      message,
+				FeeToken:  outputMap.Objects.MintedLinkTokenObjectId,
+				ExtraArgs: nil,
+			},
+			ExpRevert: true,
+		})
+	})
 
-	// t.Run("Max Data Bytes + 1 to EOA - Should Fail", func(t *testing.T) {
-	// 	message := []byte(strings.Repeat("0", int(aptosFeeQuoterDestChainConfig.MaxDataBytes)+1))
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Max Data Bytes + 1 to EOA - Should Fail",
-	// 		Msg: testhelpers.AptosSendRequest{
-	// 			Receiver:  e.Env.BlockChains.EVMChains()[destChain].DeployerKey.From[:], // Sending to EOA
-	// 			Data:      message,
-	// 			FeeToken:  aptosNativeFeeTokenAddress,
-	// 			ExtraArgs: nil,
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	t.Run("Max Gas Limit + 1 - Should Fail", func(t *testing.T) {
+		message := []byte("Hello EVM, from Sui!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Max Gas Limit + 1 - Should Fail",
+			Msg: testhelpers.SuiSendRequest{
+				Receiver:  e.Env.BlockChains.EVMChains()[destChain].DeployerKey.From[:],
+				Data:      message,
+				FeeToken:  outputMap.Objects.MintedLinkTokenObjectId,
+				ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(int64(sui_deployment.DefaultCCIPSeqConfig.MaxPerMsgGasLimit)+1), false),
+			},
+			ExpRevert: true,
+		})
+	})
 
-	// t.Run("Max Gas Limit + 1 - Should Fail", func(t *testing.T) {
-	// 	message := standardMessage
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Max Gas Limit + 1 - Should Fail",
-	// 		Msg: testhelpers.AptosSendRequest{
-	// 			Receiver:  ccipReceiverAddress,
-	// 			Data:      message,
-	// 			FeeToken:  aptosNativeFeeTokenAddress,
-	// 			ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(int64(aptosFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1), false),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	t.Run("Missing ExtraArgs - Should Fail", func(t *testing.T) {
+		message := []byte("Hello EVM, from Sui!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Missing ExtraArgs - Should Fail",
+			Msg: testhelpers.SuiSendRequest{
+				Receiver:  state.Chains[destChain].Receiver.Address().Bytes(),
+				Data:      message,
+				FeeToken:  outputMap.Objects.MintedLinkTokenObjectId,
+				ExtraArgs: []byte{},
+			},
+			ExpRevert: true,
+		})
+	})
 
-	// t.Run("Missing ExtraArgs - Should Fail", func(t *testing.T) {
-	// 	message := standardMessage
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Missing ExtraArgs - Should Fail",
-	// 		Msg: testhelpers.AptosSendRequest{
-	// 			Receiver:  ccipReceiverAddress,
-	// 			Data:      message,
-	// 			FeeToken:  aptosNativeFeeTokenAddress,
-	// 			ExtraArgs: []byte{},
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	t.Run("Send message to invalid receiver - Should Fail", func(t *testing.T) {
+		message := []byte("Hello EVM, from Sui!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Send message to invalid receiver - Should Fail",
+			Msg: testhelpers.SuiSendRequest{
+				Receiver:  []byte("0x0000"),
+				Data:      message,
+				FeeToken:  outputMap.Objects.MintedLinkTokenObjectId,
+				ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(300000), false),
+			},
+			ExpRevert: true,
+		})
+	})
 
-	// t.Run("Send message to invalid receiver - Should Fail", func(t *testing.T) {
-	// 	message := standardMessage
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Send message to invalid receiver - Should Fail",
-	// 		Msg: testhelpers.AptosSendRequest{
-	// 			Receiver:  []byte("0x0000"),
-	// 			Data:      message,
-	// 			FeeToken:  aptosNativeFeeTokenAddress,
-	// 			ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(300000), false),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
-
-	// t.Run("Send message to invalid chain selector - Should Fail", func(t *testing.T) {
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: invalidDestChainSelectorTestSetup,
-	// 		Name:      "Send message to invalid chain selector - Should Fail",
-	// 		Msg: testhelpers.AptosSendRequest{
-	// 			Receiver:  ccipReceiverAddress,
-	// 			Data:      message,
-	// 			FeeToken:  aptosNativeFeeTokenAddress,
-	// 			ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(300000), false),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	t.Run("Send message to invalid chain selector - Should Fail", func(t *testing.T) {
+		message := []byte("Hello EVM, from Sui!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: invalidDestChainSelectorTestSetup,
+			Name:      "Send message to invalid chain selector - Should Fail",
+			Msg: testhelpers.SuiSendRequest{
+				Receiver:  state.Chains[destChain].Receiver.Address().Bytes(),
+				Data:      message,
+				FeeToken:  outputMap.Objects.MintedLinkTokenObjectId,
+				ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(300000), false),
+			},
+			ExpRevert: true,
+		})
+	})
 
 	fmt.Printf("out: %v\n", out)
 }
@@ -281,6 +321,11 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 			sender,
 			false, // test router
 		)
+
+		// Tokens
+		nativeFeeToken = "0x0"
+		evmLinkToken   = state.Chains[sourceChain].LinkToken
+		wethToken      = state.Chains[sourceChain].Weth9
 	)
 
 	// Deploy SUI Reciever
@@ -341,155 +386,180 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		)
 	})
 
-	// t.Run("Max Data Bytes - Should Succeed", func(t *testing.T) {
-	// 	message := []byte(strings.Repeat("0", int(srcFeeQuoterDestChainConfig.MaxDataBytes)))
-	// 	messagingtest.Run(t,
-	// 		messagingtest.TestCase{
-	// 			TestSetup:      setup,
-	// 			Nonce:          &nonce,
-	// 			ValidationType: messagingtest.ValidationTypeExec,
-	// 			Receiver:       ccipChainState.ReceiverAddress[:],
-	// 			MsgData:        message,
-	// 			// true for out of order execution, which is necessary and enforced for Aptos
-	// 			ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, true),
-	// 			ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-	// 			FeeToken:               nativeFeeToken,
-	// 			ExtraAssertions: []func(t *testing.T){
-	// 				func(t *testing.T) { assertAptosMessageReceivedMatchesSource(t, e, destChain, receiver, message, 1) },
-	// 			},
-	// 		},
-	// 	)
-	// })
+	ctx := testcontext.Get(t)
+	srcFeeQuoterDestChainConfig, err := state.Chains[sourceChain].FeeQuoter.GetDestChainConfig(&bind.CallOpts{Context: ctx}, destChain)
+	require.NoError(t, err, "Failed to get destination chain config")
 
-	// t.Run("Fee Token (LINK) - Should Succeed", func(t *testing.T) {
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	messagingtest.Run(t,
-	// 		messagingtest.TestCase{
-	// 			TestSetup:      setup,
-	// 			Nonce:          &nonce,
-	// 			ValidationType: messagingtest.ValidationTypeExec,
-	// 			Receiver:       ccipChainState.ReceiverAddress[:],
-	// 			MsgData:        message,
-	// 			// true for out of order execution, which is necessary and enforced for Aptos
-	// 			ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, true),
-	// 			ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-	// 			FeeToken:               evmLinkToken.Address().String(),
-	// 			ExtraAssertions: []func(t *testing.T){
-	// 				func(t *testing.T) { assertAptosMessageReceivedMatchesSource(t, e, destChain, receiver, message, 2) },
-	// 			},
-	// 		},
-	// 	)
-	// })
+	// grant mint role
+	tx, err := evmLinkToken.GrantMintRole(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, common.BytesToAddress(sender))
+	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
+	require.NoError(t, err)
 
-	// t.Run("Fee Token (WETH) - Should Succeed", func(t *testing.T) {
-	// 	t.Skip("TODO: Unskip this test when fixed, it fails with low level call ERC20 revert")
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	messagingtest.Run(t,
-	// 		messagingtest.TestCase{
-	// 			TestSetup:      setup,
-	// 			Nonce:          &nonce,
-	// 			ValidationType: messagingtest.ValidationTypeExec,
-	// 			Receiver:       ccipChainState.ReceiverAddress[:],
-	// 			MsgData:        message,
-	// 			// true for out of order execution, which is necessary and enforced for Aptos
-	// 			ExtraArgs:              testhelpers.MakeEVMExtraArgsV2(100000, true),
-	// 			ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-	// 			FeeToken:               wethToken.Address().String(),
-	// 			ExtraAssertions: []func(t *testing.T){
-	// 				func(t *testing.T) { assertAptosMessageReceivedMatchesSource(t, e, destChain, receiver, message, 2) },
-	// 			},
-	// 		},
-	// 	)
-	// })
+	// mint token and approve to router
+	tx, err = evmLinkToken.Mint(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, common.BytesToAddress(sender), deployment.E18Mult(10_000))
+	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
+	require.NoError(t, err)
 
-	// t.Run("Max Data Bytes + 1 - Should Fail", func(t *testing.T) {
-	// 	message := []byte(strings.Repeat("0", int(srcFeeQuoterDestChainConfig.MaxDataBytes)+1))
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Max Data Bytes + 1 - Should Fail",
-	// 		Msg: router.ClientEVM2AnyMessage{
-	// 			Receiver:  ccipChainState.ReceiverAddress[:],
-	// 			Data:      message,
-	// 			FeeToken:  common.HexToAddress(nativeFeeToken),
-	// 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(uint64(srcFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1, true),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	tx, err = evmLinkToken.Approve(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, state.Chains[sourceChain].Router.Address(), math.MaxBig256)
+	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
+	require.NoError(t, err)
 
-	// t.Run("Max Data Bytes + 1 to EOA - Should Fail", func(t *testing.T) {
-	// 	atposEOAAddress := e.Env.BlockChains.AptosChains()[destChain].DeployerSigner.AccountAddress()
-	// 	message := []byte(strings.Repeat("0", int(srcFeeQuoterDestChainConfig.MaxDataBytes)+1))
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Max Data Bytes + 1 to EOA - Should Fail",
-	// 		Msg: router.ClientEVM2AnyMessage{
-	// 			Receiver:  atposEOAAddress[:], // Sending to EOA
-	// 			Data:      message,
-	// 			FeeToken:  common.HexToAddress(nativeFeeToken),
-	// 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(uint64(srcFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1, true),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	// Deposit 1 ETH to get WETH
+	wethTransactOpts := *e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey
+	wethTransactOpts.Value = deployment.E18Mult(1)
+	tx, err = wethToken.Deposit(&wethTransactOpts)
+	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
+	require.NoError(t, err)
 
-	// t.Run("Missing ExtraArgs - Should Fail", func(t *testing.T) {
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Missing ExtraArgs - Should Fail",
-	// 		Msg: router.ClientEVM2AnyMessage{
-	// 			Receiver:  ccipChainState.ReceiverAddress[:],
-	// 			Data:      message,
-	// 			FeeToken:  common.HexToAddress(nativeFeeToken),
-	// 			ExtraArgs: []byte{},
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	tx, err = wethToken.Approve(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, state.Chains[sourceChain].Router.Address(), math.MaxBig256)
+	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
+	require.NoError(t, err)
 
-	// t.Run("OutOfOrder Execution False - Should Fail", func(t *testing.T) {
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "OutOfOrder Execution False - Should Fail",
-	// 		Msg: router.ClientEVM2AnyMessage{
-	// 			Receiver:  ccipChainState.ReceiverAddress[:],
-	// 			Data:      message,
-	// 			FeeToken:  common.HexToAddress(nativeFeeToken),
-	// 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100000, false),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	// For testing messages that revert on source
+	mltTestSetup := mlt.NewTestSetup(
+		t,
+		state,
+		sourceChain,
+		destChain,
+		common.HexToAddress("0x0"),
+		srcFeeQuoterDestChainConfig,
+		false, // testRouter
+		true,  // validateResp
+		mlt.WithDeployedEnv(e),
+	)
 
-	// t.Run("Send message to invalid receiver - Should Fail", func(t *testing.T) {
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: mltTestSetup,
-	// 		Name:      "Send message to invalid receiver - Should Fail",
-	// 		Msg: router.ClientEVM2AnyMessage{
-	// 			Receiver:  []byte("0x000"),
-	// 			Data:      message,
-	// 			FeeToken:  common.HexToAddress(nativeFeeToken),
-	// 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100000, false),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	invalidDestChainSelectorTestSetup := mlt.NewTestSetup(
+		t,
+		state,
+		sourceChain,
+		destChain,
+		common.HexToAddress("0x0"),
+		srcFeeQuoterDestChainConfig,
+		false, // testRouter
+		true,  // validateResp
+		mlt.WithDeployedEnv(e),
+	)
 
-	// t.Run("Send message to invalid chain selector - Should Fail", func(t *testing.T) {
-	// 	message := []byte("Hello Aptos, from EVM!")
-	// 	mlt.Run(mlt.TestCase{
-	// 		TestSetup: invalidDestChainSelectorTestSetup,
-	// 		Name:      "Send message to invalid chain selector - Should Fail",
-	// 		Msg: router.ClientEVM2AnyMessage{
-	// 			Receiver:  ccipChainState.ReceiverAddress[:],
-	// 			Data:      message,
-	// 			FeeToken:  common.HexToAddress(nativeFeeToken),
-	// 			ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100000, false),
-	// 		},
-	// 		ExpRevert: true,
-	// 	})
-	// })
+	t.Run("Max Data Bytes - Should Succeed", func(t *testing.T) {
+		message := []byte(strings.Repeat("0", int(srcFeeQuoterDestChainConfig.MaxDataBytes)))
+		messagingtest.Run(t,
+			messagingtest.TestCase{
+				TestSetup:      setup,
+				Nonce:          &nonce,
+				ValidationType: messagingtest.ValidationTypeExec,
+				Receiver:       receiverByte,
+				MsgData:        message,
+				// true for out of order execution, which is necessary and enforced for Sui
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, [32]byte{}),
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
+			},
+		)
+	})
+
+	t.Run("Fee Token (LINK) - Should Succeed", func(t *testing.T) {
+		message := []byte("Hello Sui, from EVM!")
+		messagingtest.Run(t,
+			messagingtest.TestCase{
+				TestSetup:      setup,
+				Nonce:          &nonce,
+				ValidationType: messagingtest.ValidationTypeExec,
+				Receiver:       receiverByte,
+				MsgData:        message,
+				// true for out of order execution, which is necessary and enforced for Sui
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, [32]byte{}),
+				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
+				FeeToken:               state.Chains[sourceChain].LinkToken.Address().String(),
+			},
+		)
+	})
+
+	t.Run("Max Data Bytes + 1 - Should Fail", func(t *testing.T) {
+		message := []byte(strings.Repeat("0", int(srcFeeQuoterDestChainConfig.MaxDataBytes)+1))
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Max Data Bytes + 1 - Should Fail",
+			Msg: router.ClientEVM2AnyMessage{
+				Receiver:  receiverByte,
+				Data:      message,
+				FeeToken:  common.HexToAddress(nativeFeeToken),
+				ExtraArgs: testhelpers.MakeSuiExtraArgs(uint64(srcFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1, true, recieverObjectIds, [32]byte{}),
+			},
+			ExpRevert: true,
+		})
+	})
+
+	t.Run("Max Data Bytes + 1 to EOA - Should Fail", func(t *testing.T) {
+		message := []byte(strings.Repeat("0", int(srcFeeQuoterDestChainConfig.MaxDataBytes)+1))
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Max Data Bytes + 1 to EOA - Should Fail",
+			Msg: router.ClientEVM2AnyMessage{
+				Receiver:  receiverByte, // Sending to EOA
+				Data:      message,
+				FeeToken:  common.HexToAddress(nativeFeeToken),
+				ExtraArgs: testhelpers.MakeSuiExtraArgs(uint64(srcFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1, true, recieverObjectIds, [32]byte{}),
+			},
+			ExpRevert: true,
+		})
+	})
+
+	t.Run("Missing ExtraArgs - Should Fail", func(t *testing.T) {
+		message := []byte("Hello Sui, from EVM!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Missing ExtraArgs - Should Fail",
+			Msg: router.ClientEVM2AnyMessage{
+				Receiver:  receiverByte,
+				Data:      message,
+				FeeToken:  common.HexToAddress(nativeFeeToken),
+				ExtraArgs: []byte{},
+			},
+			ExpRevert: true,
+		})
+	})
+
+	t.Run("OutOfOrder Execution False - Should Fail", func(t *testing.T) {
+		message := []byte("Hello Sui, from EVM!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "OutOfOrder Execution False - Should Fail",
+			Msg: router.ClientEVM2AnyMessage{
+				Receiver:  receiverByte,
+				Data:      message,
+				FeeToken:  common.HexToAddress(nativeFeeToken),
+				ExtraArgs: testhelpers.MakeSuiExtraArgs(100000, false, recieverObjectIds, [32]byte{}),
+			},
+			ExpRevert: true,
+		})
+	})
+
+	t.Run("Send message to invalid receiver - Should Fail", func(t *testing.T) {
+		message := []byte("Hello Sui, from EVM!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: mltTestSetup,
+			Name:      "Send message to invalid receiver - Should Fail",
+			Msg: router.ClientEVM2AnyMessage{
+				Receiver:  []byte("0x000"),
+				Data:      message,
+				FeeToken:  common.HexToAddress(nativeFeeToken),
+				ExtraArgs: testhelpers.MakeSuiExtraArgs(100000, false, recieverObjectIds, [32]byte{}),
+			},
+			ExpRevert: true,
+		})
+	})
+
+	t.Run("Send message to invalid chain selector - Should Fail", func(t *testing.T) {
+		message := []byte("Hello Sui, from EVM!")
+		mlt.Run(mlt.TestCase{
+			TestSetup: invalidDestChainSelectorTestSetup,
+			Name:      "Send message to invalid chain selector - Should Fail",
+			Msg: router.ClientEVM2AnyMessage{
+				Receiver:  receiverByte,
+				Data:      message,
+				FeeToken:  common.HexToAddress(nativeFeeToken),
+				ExtraArgs: testhelpers.MakeSuiExtraArgs(100000, false, recieverObjectIds, [32]byte{}),
+			},
+			ExpRevert: true,
+		})
+	})
 }

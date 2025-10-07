@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	sui_feequoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -56,6 +57,10 @@ func NewTestSetup(
 		aptosFeeQuoterDestChainConfig, ok := ts.SrcFeeQuoterDestChainConfig.(aptos_feequoter.DestChainConfig)
 		require.True(ts.T, ok, "expected Aptos Fee quoter destination chain config type")
 		ts.SrcFeeQuoterDestChainConfig = aptosFeeQuoterDestChainConfig
+	case chain_selectors.FamilySui:
+		suiFeeQuoterDestChainConfig, ok := ts.SrcFeeQuoterDestChainConfig.(sui_feequoter.DestChainConfig)
+		require.True(ts.T, ok, "expected Sui Fee quoter destination chain config type")
+		ts.SrcFeeQuoterDestChainConfig = suiFeeQuoterDestChainConfig
 	default:
 		ts.T.Fatalf("unsupported source chain family %v", family)
 	}
@@ -130,6 +135,10 @@ func Run(tc TestCase) TestCaseOutput {
 		aptosMsg, ok := tc.Msg.(testhelpers.AptosSendRequest)
 		require.True(tc.T, ok, "expected Aptos message type")
 		msgOpt = ccipclient.WithMessage(aptosMsg)
+	case chain_selectors.FamilySui:
+		suiMsg, ok := tc.Msg.(testhelpers.SuiSendRequest)
+		require.True(tc.T, ok, "expected Sui message type")
+		msgOpt = ccipclient.WithMessage(suiMsg)
 	default:
 		tc.T.Fatalf("unsupported source chain family %v", family)
 	}

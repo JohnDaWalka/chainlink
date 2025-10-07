@@ -97,6 +97,36 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	outputMapTransferToken1, ok := rawOutputTransferToken1.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
 	require.True(t, ok)
 
+	// mint more token
+	_, transferTokenOutput2, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			Amount:         3000000000, // 1Link with 1e9
+		}),
+	})
+	require.NoError(t, err)
+
+	rawOutputTransferToken2 := transferTokenOutput2[0].Reports[0]
+	outputMapTransferToken2, ok := rawOutputTransferToken2.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
+	require.True(t, ok)
+
+	// mint more token
+	_, transferTokenOutput3, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			Amount:         4000000000, // 1Link with 1e9
+		}),
+	})
+	require.NoError(t, err)
+
+	rawOutputTransferToken3 := transferTokenOutput3[0].Reports[0]
+	outputMapTransferToken3, ok := rawOutputTransferToken3.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
+	require.True(t, ok)
+
 	// Receiver Address
 	ccipReceiverAddress := state.Chains[destChain].Receiver.Address()
 
@@ -111,6 +141,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 			Receiver:       updatedEnv.BlockChains.EVMChains()[destChain].DeployerKey.From.Bytes(), // internally left padded to 32byte
 			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
 			FeeToken:       outputMap.Objects.MintedLinkTokenObjectId,
+			ExtraArgs:      testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(100000), true),
 			SuiTokens: []testhelpers.SuiTokenAmount{
 				{
 					Token:  outputMapTransferToken.Objects.MintedLinkTokenObjectId,
@@ -133,7 +164,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 			SuiTokens: []testhelpers.SuiTokenAmount{
 				{
 					Token:  outputMapTransferToken1.Objects.MintedLinkTokenObjectId,
-					Amount: 2000000000, // Send 1Link to EVM
+					Amount: 2000000000, // Send 2Link to EVM
 				},
 			},
 			FeeToken: outputMap.Objects.MintedLinkTokenObjectId,
@@ -144,49 +175,50 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	Name:           "Send token and message to EOA",
-		// 	SourceChain:    sourceChain,
-		// 	DestChain:      destChain,
-		// 	Receiver:       deployerDestChain.From.Bytes(),
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// 	Data:           []byte("Hello, World!"),
-		// 	AptosTokens: []testhelpers.AptosTokenAmount{
-		// 		{
-		// 			Token:  aptosToken,
-		// 			Amount: 1e8,
-		// 		},
-		// 	},
-		// 	FeeToken:  NativeFeeToken,
-		// 	ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(0), true),
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{
-		// 			Token:  evmToken.Address().Bytes(),
-		// 			Amount: big.NewInt(1e18),
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	Name:           "Send token and message to EOA without setting ExtraArgs",
-		// 	SourceChain:    sourceChain,
-		// 	DestChain:      destChain,
-		// 	Receiver:       deployerDestChain.From.Bytes(),
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// 	Data:           []byte("Hello, World!"),
-		// 	AptosTokens: []testhelpers.AptosTokenAmount{
-		// 		{
-		// 			Token:  aptosToken,
-		// 			Amount: 1e8,
-		// 		},
-		// 	},
-		// 	FeeToken: NativeFeeToken,
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{
-		// 			Token:  evmToken.Address().Bytes(),
-		// 			Amount: big.NewInt(1e18),
-		// 		},
-		// 	},
-		// },
+		{
+			Name:           "Send token and message to EOA",
+			SourceChain:    sourceChain,
+			DestChain:      destChain,
+			Data:           []byte("Hello, World!"),
+			Receiver:       updatedEnv.BlockChains.EVMChains()[destChain].DeployerKey.From.Bytes(), // internally left padded to 32byte
+			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
+			FeeToken:       outputMap.Objects.MintedLinkTokenObjectId,
+			ExtraArgs:      testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(0), true),
+			SuiTokens: []testhelpers.SuiTokenAmount{
+				{
+					Token:  outputMapTransferToken2.Objects.MintedLinkTokenObjectId,
+					Amount: 3000000000, // Send 3Link to EVM
+				},
+			},
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  evmToken.Address().Bytes(),
+					Amount: big.NewInt(3e18),
+				},
+			},
+		},
+
+		{
+			Name:           "Send token and message to EOA without setting ExtraArgs",
+			SourceChain:    sourceChain,
+			DestChain:      destChain,
+			Receiver:       updatedEnv.BlockChains.EVMChains()[destChain].DeployerKey.From.Bytes(), // internally left padded to 32byte
+			ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
+			Data:           []byte("Hello, World!"),
+			SuiTokens: []testhelpers.SuiTokenAmount{
+				{
+					Token:  outputMapTransferToken3.Objects.MintedLinkTokenObjectId,
+					Amount: 4000000000, // Send 4Link to EVM
+				},
+			},
+			FeeToken: outputMap.Objects.MintedLinkTokenObjectId,
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  evmToken.Address().Bytes(),
+					Amount: big.NewInt(4e18),
+				},
+			},
+		},
 	}
 
 	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, updatedEnv, state, tcs)
@@ -212,55 +244,7 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 
 	testhelpers.WaitForTokenBalances(ctx, t, updatedEnv, expectedTokenBalances)
 
-	// t.Run("Send token to CCIP Receiver with token amount set to 0 - should fail", func(t *testing.T) {
-	// 	msg := testhelpers.AptosSendRequest{
-	// 		Receiver:  common.LeftPadBytes(ccipReceiverAddress.Bytes(), 32), // left-pad 20-byte address up to 32 bytes to make it compatible with evm
-	// 		Data:      []byte("Hello, World!"),
-	// 		FeeToken:  aptosFeeToken,
-	// 		ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(0), true),
-	// 		TokenAmounts: []testhelpers.AptosTokenAmount{
-	// 			{
-	// 				Token:  aptosToken,
-	// 				Amount: 0,
-	// 			},
-	// 		}}
-
-	// 	baseOpts := []ccipclient.SendReqOpts{
-	// 		ccipclient.WithSourceChain(sourceChain),
-	// 		ccipclient.WithDestChain(destChain),
-	// 		ccipclient.WithTestRouter(false),
-	// 		ccipclient.WithMessage(msg),
-	// 	}
-
-	// 	_, err := testhelpers.SendRequest(e.Env, state, baseOpts...)
-	// 	assertAptosSourceRevertExpectedError(t, err, "transaction reverted", "E_CANNOT_SEND_ZERO_TOKENS")
-	// 	t.Log("Expected error: ", err)
-	// })
-
-	// t.Run("Send invalid token to CCIP Receiver - should fail", func(t *testing.T) {
-	// 	msg := testhelpers.AptosSendRequest{
-	// 		Receiver:  common.LeftPadBytes(ccipReceiverAddress.Bytes(), 32), // left-pad 20-byte address up to 32 bytes to make it compatible with evm
-	// 		Data:      []byte("Hello, World!"),
-	// 		FeeToken:  aptosFeeToken,
-	// 		ExtraArgs: testhelpers.MakeBCSEVMExtraArgsV2(big.NewInt(int64(aptosFeeQuoterDestChainConfig.MaxPerMsgGasLimit)+1), false),
-	// 		TokenAmounts: []testhelpers.AptosTokenAmount{
-	// 			{
-	// 				Token:  aptosInvalidToken,
-	// 				Amount: 1e8,
-	// 			},
-	// 		}}
-
-	// 	baseOpts := []ccipclient.SendReqOpts{
-	// 		ccipclient.WithSourceChain(sourceChain),
-	// 		ccipclient.WithDestChain(destChain),
-	// 		ccipclient.WithTestRouter(false),
-	// 		ccipclient.WithMessage(msg),
-	// 	}
-
-	// 	_, err := testhelpers.SendRequest(e.Env, state, baseOpts...)
-	// 	assertAptosSourceRevertExpectedError(t, err, "ABORTED", "invalid_input")
-	// 	t.Log("Expected error: ", err)
-	// })
+	// TODO: Add failure cases for Sui2EVM Token transfers
 
 }
 
@@ -416,47 +400,50 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{},
 		},
 
-		// {
-		// 	Name:           "Send token to EOA with gas limit set to 0",
-		// 	SourceChain:    sourceChain,
-		// 	DestChain:      destChain,
-		// 	Receiver:       deployerDestChain[:],
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// 	Tokens: []router.ClientEVMTokenAmount{
-		// 		{
-		// 			Token:  evmToken.Address(),
-		// 			Amount: big.NewInt(1e18),
-		// 		},
-		// 	},
-		// 	ExtraArgs: testhelpers.MakeEVMExtraArgsV2(0, true),
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{
-		// 			Token:  aptosToken[:],
-		// 			Amount: big.NewInt(1e8),
-		// 		},
-		// 	},
-		// },
-		// {
-		// 	Name:           "Send token and message to EOA",
-		// 	SourceChain:    sourceChain,
-		// 	DestChain:      destChain,
-		// 	Receiver:       deployerDestChain[:],
-		// 	Data:           []byte("Hello, World!"),
-		// 	ExpectedStatus: testhelpers.EXECUTION_STATE_SUCCESS,
-		// 	Tokens: []router.ClientEVMTokenAmount{
-		// 		{
-		// 			Token:  evmToken.Address(),
-		// 			Amount: big.NewInt(1e18),
-		// 		},
-		// 	},
-		// 	ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100000, true),
-		// 	ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-		// 		{
-		// 			Token:  aptosToken[:],
-		// 			Amount: big.NewInt(1e8),
-		// 		},
-		// 	},
-		// },
+		{
+			Name:             "Send token to EOA with gas limit set to 0",
+			SourceChain:      sourceChain,
+			DestChain:        destChain,
+			Receiver:         receiverByte, // reciever contract pkgId
+			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
+			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
+			Tokens: []router.ClientEVMTokenAmount{
+				{
+					Token:  evmToken.Address(),
+					Amount: big.NewInt(1e18),
+				},
+			},
+			ExtraArgs: testhelpers.MakeSuiExtraArgs(0, true, recieverObjectIds, suiAddr),
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  suiTokenBytes,
+					Amount: big.NewInt(1e9),
+				},
+			},
+		},
+
+		{
+			Name:             "Send token and message to EOA",
+			SourceChain:      sourceChain,
+			DestChain:        destChain,
+			Data:             []byte("Hello, World!"),
+			Receiver:         receiverByte, // reciever contract pkgId
+			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
+			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
+			Tokens: []router.ClientEVMTokenAmount{
+				{
+					Token:  evmToken.Address(),
+					Amount: big.NewInt(1e18),
+				},
+			},
+			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, suiAddr),
+			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
+				{
+					Token:  suiTokenBytes,
+					Amount: big.NewInt(1e9),
+				},
+			},
+		},
 	}
 
 	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, e.Env, state, tcs)
@@ -482,90 +469,15 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 
 	testhelpers.WaitForTokenBalances(ctx, t, e.Env, expectedTokenBalances)
 
-	// t.Run("Send token to CCIP Receiver setting gas above max gas allowed - should fail", func(t *testing.T) {
-	// 	msg := router.ClientEVM2AnyMessage{
-	// 		Receiver:  ccipChainState.ReceiverAddress[:],
-	// 		Data:      []byte("Hello, World!"),
-	// 		FeeToken:  evmToken.Address(),
-	// 		ExtraArgs: testhelpers.MakeEVMExtraArgsV2(uint64(srcFeeQuoterDestChainConfig.MaxPerMsgGasLimit), true),
-	// 		TokenAmounts: []router.ClientEVMTokenAmount{
-	// 			{
-	// 				Token:  evmToken.Address(),
-	// 				Amount: big.NewInt(1e8),
-	// 			},
-	// 		}}
-
-	// 	baseOpts := []ccipclient.SendReqOpts{
-	// 		ccipclient.WithSourceChain(sourceChain),
-	// 		ccipclient.WithDestChain(destChain),
-	// 		ccipclient.WithTestRouter(false),
-	// 		ccipclient.WithMessage(msg),
-	// 	}
-
-	// 	_, err := testhelpers.SendRequest(e.Env, state, baseOpts...)
-	// 	require.Error(t, err)
-	// 	require.Contains(t, err.Error(), "execution reverted")
-	// 	t.Log("Expected error: ", err)
-	// })
-
-	// t.Run("Send token to CCIP Receiver with token amount set to 0 - should fail", func(t *testing.T) {
-	// 	msg := router.ClientEVM2AnyMessage{
-	// 		Receiver:  ccipChainState.ReceiverAddress[:],
-	// 		Data:      []byte("Hello, World!"),
-	// 		FeeToken:  evmToken.Address(),
-	// 		ExtraArgs: testhelpers.MakeEVMExtraArgsV2(100, true),
-	// 		TokenAmounts: []router.ClientEVMTokenAmount{
-	// 			{
-	// 				Token:  evmToken.Address(),
-	// 				Amount: big.NewInt(0),
-	// 			},
-	// 		}}
-
-	// 	baseOpts := []ccipclient.SendReqOpts{
-	// 		ccipclient.WithSourceChain(sourceChain),
-	// 		ccipclient.WithDestChain(destChain),
-	// 		ccipclient.WithTestRouter(false),
-	// 		ccipclient.WithMessage(msg),
-	// 	}
-
-	// 	_, err := testhelpers.SendRequest(e.Env, state, baseOpts...)
-	// 	require.Error(t, err)
-	// 	require.Contains(t, err.Error(), "execution reverted")
-	// 	t.Log("Expected error: ", err)
-	// })
-
-	// t.Run("Send invalid token to CCIP Receiver - should fail", func(t *testing.T) {
-	// 	msg := router.ClientEVM2AnyMessage{
-	// 		Receiver:  ccipChainState.ReceiverAddress[:],
-	// 		Data:      []byte("Hello, World!"),
-	// 		FeeToken:  evmToken.Address(),
-	// 		ExtraArgs: testhelpers.MakeEVMExtraArgsV2(uint64(srcFeeQuoterDestChainConfig.MaxPerMsgGasLimit), true),
-	// 		TokenAmounts: []router.ClientEVMTokenAmount{
-	// 			{
-	// 				Token:  common.HexToAddress("0x0000000000000000000000000000000000000000"), // Invalid token
-	// 				Amount: big.NewInt(1e8),
-	// 			},
-	// 		}}
-
-	// 	baseOpts := []ccipclient.SendReqOpts{
-	// 		ccipclient.WithSourceChain(sourceChain),
-	// 		ccipclient.WithDestChain(destChain),
-	// 		ccipclient.WithTestRouter(false),
-	// 		ccipclient.WithMessage(msg),
-	// 	}
-
-	// 	_, err := testhelpers.SendRequest(e.Env, state, baseOpts...)
-	// 	require.Error(t, err)
-	// 	require.Contains(t, err.Error(), "execution reverted")
-	// 	t.Log("Expected error: ", err)
-	// })
-
+	// TODO: Add failure cases for EVM2Sui Token transfers
 }
 
+// TODO
 // ##############################################
 // # Lock Release Token Pool #
 // ##############################################
 
+// TODO
 // ##############################################
 // # Managed Token Pool #
 // ##############################################
