@@ -105,6 +105,19 @@ func (g GatewayJob) Resolve(gatewayNodeIdx int) (string, error) {
 		},
 		HTTPClientConfig: httpClientConfig{
 			MaxResponseBytes: 50_000_000,
+			AllowedSchemes:   []string{"https"},
+			AllowedPorts:     []int{443},
+			BlockedIPsCIDR: []string{
+				"0.0.0.0/8",      // local network
+				"10.0.0.0/8",     // private network
+				"127.0.0.0/8",    // loopback/local network
+				"169.254.0.0/16", // link-local (RFC 3927). Includes Cloud-provider metadata endpoint
+				"172.16.0.0/12",  // private network (RFC1918)
+				"192.168.0.0/16", // private network (RFC1918)
+				"100.64.0.0/10",  // carrier-grade NAT (RFC6598)
+				"224.0.0.0/4",    // multicast. Not valid for HTTP or TCP
+				"240.0.0.0/4",    // reserved
+			},
 		},
 		Dons: dons,
 	}
@@ -208,7 +221,11 @@ type member struct {
 }
 
 type httpClientConfig struct {
-	MaxResponseBytes int `toml:"MaxResponseBytes"`
+	MaxResponseBytes int      `toml:"MaxResponseBytes"`
+	AllowedSchemes   []string `toml:"AllowedSchemes"`
+	AllowedPorts     []int    `toml:"AllowedPorts"`
+	BlockedIPs       []string `toml:"BlockedIPs"`
+	BlockedIPsCIDR   []string `toml:"BlockedIPsCIDR"`
 }
 
 type nodeServerConfig struct {
