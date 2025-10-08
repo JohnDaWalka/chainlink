@@ -14,11 +14,11 @@ import (
 	evmRelayTypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
-var _ evmRelayTypes.ConfigPoller = &CapRegConfigPoller{}
+var _ evmRelayTypes.ConfigPoller = &CapRegConfigProvider{}
 
-// CapRegConfigPoller subscribes to the registrySyncer for on-chain changes in the Capability Registry.
+// CapRegConfigProvider subscribes to the registrySyncer for on-chain changes in the Capability Registry.
 // Parses config from on-chain Capability Config.
-type CapRegConfigPoller struct {
+type CapRegConfigProvider struct {
 	services.StateMachine
 	lggr logger.Logger
 
@@ -27,12 +27,12 @@ type CapRegConfigPoller struct {
 	capability  string
 }
 
-func NewCapRegConfigPoller(ctx context.Context, lggr logger.Logger, donID registrysyncer.DonID, capability string) (*CapRegConfigPoller, error) {
-	return newCapRegConfigPoller(ctx, lggr, donID, capability)
+func NewCapRegConfigProvider(ctx context.Context, lggr logger.Logger, donID registrysyncer.DonID, capability string) (*CapRegConfigProvider, error) {
+	return newCapRegConfigProvider(ctx, lggr, donID, capability)
 }
 
-func newCapRegConfigPoller(ctx context.Context, lggr logger.Logger, donID registrysyncer.DonID, capability string) (*CapRegConfigPoller, error) {
-	cp := &CapRegConfigPoller{
+func newCapRegConfigProvider(ctx context.Context, lggr logger.Logger, donID registrysyncer.DonID, capability string) (*CapRegConfigProvider, error) {
+	cp := &CapRegConfigProvider{
 		lggr:       logger.Named(lggr, "ConfigPoller"),
 		donID:      donID,
 		capability: capability,
@@ -54,9 +54,9 @@ func newCapRegConfigPoller(ctx context.Context, lggr logger.Logger, donID regist
 }
 
 // Subscribes to registry syncer for config changes
-var _ registrysyncer.Listener = &CapRegConfigPoller{}
+var _ registrysyncer.Listener = &CapRegConfigProvider{}
 
-func (cp *CapRegConfigPoller) OnNewRegistry(ctx context.Context, registry *registrysyncer.LocalRegistry) error {
+func (cp *CapRegConfigProvider) OnNewRegistry(ctx context.Context, registry *registrysyncer.LocalRegistry) error {
 	don, ok := registry.IDsToDONs[cp.donID]
 	if !ok {
 		cp.lggr.Warnw("DON not found in registry", "donID", cp.donID)
@@ -72,11 +72,11 @@ func (cp *CapRegConfigPoller) OnNewRegistry(ctx context.Context, registry *regis
 	// This config is on-chain in the Capability Registry
 	newOnChainConfig := capConfig.Config
 
+	/* TODO: We also want to handle these:
 	don.ID
-	don.
-		don.F
+	don.F
+	*/
 
-	// TODO: We also care if the DON config was updated
 	if !bytes.Equal(newOnChainConfig, cp.localConfig.OnchainConfig) {
 		cp.lggr.Infow("capability config updated", "donID", cp.donID, "capability", cp.capability)
 		cp.localConfig.OnchainConfig = newOnChainConfig
@@ -84,30 +84,30 @@ func (cp *CapRegConfigPoller) OnNewRegistry(ctx context.Context, registry *regis
 	return nil
 }
 
-func (cp *CapRegConfigPoller) Start() {}
+func (cp *CapRegConfigProvider) Start() {}
 
-func (cp *CapRegConfigPoller) Close() error {
+func (cp *CapRegConfigProvider) Close() error {
 	return nil
 }
 
 // Notify noop method
-func (cp *CapRegConfigPoller) Notify() <-chan struct{} {
+func (cp *CapRegConfigProvider) Notify() <-chan struct{} {
 	return nil
 }
 
 // Replay abstracts the logpoller.LogPoller Replay() implementation
-func (cp *CapRegConfigPoller) Replay(ctx context.Context, fromBlock int64) error {
+func (cp *CapRegConfigProvider) Replay(ctx context.Context, fromBlock int64) error {
 	return errors.New("Unimplemented")
 }
 
 // LatestConfigDetails returns the latest config details from the logs
-func (cp *CapRegConfigPoller) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest ocrtypes.ConfigDigest, err error) {
+func (cp *CapRegConfigProvider) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest ocrtypes.ConfigDigest, err error) {
 	// TODO: Do we need this?
 	return 0, ocrtypes.ConfigDigest{}, errors.New("Unimplemented")
 }
 
 // LatestConfig returns the latest config from the logs on a certain block
-func (cp *CapRegConfigPoller) LatestConfig(ctx context.Context, changedInBlock uint64) (ocrtypes.ContractConfig, error) {
+func (cp *CapRegConfigProvider) LatestConfig(ctx context.Context, changedInBlock uint64) (ocrtypes.ContractConfig, error) {
 	latestConfigSet := ocrtypes.ContractConfig{
 		ConfigDigest:          cp.localConfig.ConfigDigest,
 		ConfigCount:           cp.localConfig.ConfigCount,
@@ -123,7 +123,7 @@ func (cp *CapRegConfigPoller) LatestConfig(ctx context.Context, changedInBlock u
 }
 
 // LatestBlockHeight returns the latest block height from the logs
-func (cp *CapRegConfigPoller) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
+func (cp *CapRegConfigProvider) LatestBlockHeight(ctx context.Context) (blockHeight uint64, err error) {
 	// TODO: There's no reason for this poller to get the block height?
 	// TODO: We can return it if this gets called for some reason however.
 	/*

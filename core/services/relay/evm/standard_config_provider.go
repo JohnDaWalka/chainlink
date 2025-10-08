@@ -35,7 +35,7 @@ func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain le
 	}
 	if relayConfig.CapRegConfig {
 		// TODO: Plumbing for DonID + Capability Name?
-		cp, err := NewCapRegConfigPoller(ctx, lggr, donID, capability)
+		cp, err := NewCapRegConfigProvider(ctx, lggr, donID, capability)
 		if err != nil {
 			return nil, err
 		}

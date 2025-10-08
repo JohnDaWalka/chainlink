@@ -136,12 +136,12 @@ type NodeInfo struct {
 
 type LocalRegistry struct {
 	core.UnimplementedCapabilitiesRegistryMetadata
-
-	Logger            logger.Logger
-	GetPeerID         func() (types.PeerID, error)
-	IDsToDONs         map[DonID]DON
-	IDsToNodes        map[types.PeerID]NodeInfo
-	IDsToCapabilities map[string]Capability
+	LastSyncedBlockHeight string
+	Logger                logger.Logger
+	GetPeerID             func() (types.PeerID, error)
+	IDsToDONs             map[DonID]DON
+	IDsToNodes            map[types.PeerID]NodeInfo
+	IDsToCapabilities     map[string]Capability
 }
 
 func NewLocalRegistry(

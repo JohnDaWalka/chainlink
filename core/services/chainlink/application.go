@@ -682,6 +682,7 @@ func NewApplication(ctx context.Context, opts ApplicationOpts) (Application, err
 				Relayers:                       relayChainInterops,
 				MailMon:                        mailMon,
 				CapabilitiesRegistry:           opts.CapabilitiesRegistry,
+				RegistrySyncer:                 creServices.capabilityRegistrySyncer,
 				DonTimeStore:                   opts.DonTimeStore,
 				RetirementReportCache:          opts.RetirementReportCache,
 				GatewayConnectorServiceWrapper: creServices.gatewayConnectorWrapper,
@@ -869,6 +870,8 @@ type CREServices struct {
 	srvs []services.ServiceCtx
 
 	workflowRegistrySyncer syncerV2.WorkflowRegistrySyncer
+
+	capabilityRegistrySyncer registrysyncerV2.RegistrySyncer
 }
 
 func newCREServices(
@@ -935,6 +938,7 @@ func newCREServices(
 	}
 
 	var workflowRegistrySyncer syncerV2.WorkflowRegistrySyncer
+	var capRegSyncer registrysyncerV2.RegistrySyncer
 	var externalPeerWrapper p2ptypes.PeerWrapper
 	var don2donSharedPeer p2ptypes.SharedPeer
 	var streamConfig config.StreamConfig
@@ -1035,6 +1039,7 @@ func newCREServices(
 
 				registrySyncer.AddListener(wfLauncher)
 				srvcs = append(srvcs, wfLauncher, registrySyncer)
+				capRegSyncer = registrySyncer
 			case 2:
 				registrySyncer, err := registrysyncerV2.New(
 					globalLogger,
@@ -1049,6 +1054,7 @@ func newCREServices(
 
 				registrySyncer.AddListener(wfLauncher)
 				srvcs = append(srvcs, wfLauncher, registrySyncer)
+				capRegSyncer = registrySyncer
 			default:
 				return nil, fmt.Errorf("could not configure capability registry syncer with version: %d", externalRegistryVersion.Major())
 			}
@@ -1254,12 +1260,13 @@ func newCREServices(
 		opts.CapabilitiesRegistry.SetLocalRegistry(&capabilities.TestMetadataRegistry{})
 	}
 	return &CREServices{
-		workflowRateLimiter:     workflowRateLimiter,
-		workflowLimits:          workflowLimits,
-		gatewayConnectorWrapper: gatewayConnectorWrapper,
-		getPeerID:               getPeerID,
-		srvs:                    srvcs,
-		workflowRegistrySyncer:  workflowRegistrySyncer,
+		workflowRateLimiter:      workflowRateLimiter,
+		workflowLimits:           workflowLimits,
+		gatewayConnectorWrapper:  gatewayConnectorWrapper,
+		getPeerID:                getPeerID,
+		srvs:                     srvcs,
+		workflowRegistrySyncer:   workflowRegistrySyncer,
+		capabilityRegistrySyncer: capRegSyncer,
 	}, nil
 }
 

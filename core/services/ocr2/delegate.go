@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"log"
 	"os"
 	"path/filepath"
@@ -143,6 +144,7 @@ type Delegate struct {
 
 	legacyChains                   legacyevm.LegacyChainContainer // legacy: use relayers instead
 	capabilitiesRegistry           core.CapabilitiesRegistry
+	registrySyncer                 registrysyncer.RegistrySyncer
 	dontimeStore                   *dontime.Store
 	gatewayConnectorServiceWrapper *gatewayconnector.ServiceWrapper
 	WorkflowRegistrySyncer         syncerV2.WorkflowRegistrySyncer
@@ -253,6 +255,7 @@ type DelegateOpts struct {
 	Relayers                       RelayGetter
 	MailMon                        *mailbox.Monitor
 	CapabilitiesRegistry           core.CapabilitiesRegistry
+	RegistrySyncer                 registrysyncer.RegistrySyncer
 	DonTimeStore                   *dontime.Store
 	RetirementReportCache          retirement.RetirementReportCache
 	GatewayConnectorServiceWrapper *gatewayconnector.ServiceWrapper
@@ -855,6 +858,7 @@ func (d *Delegate) newDonTimePlugin(
 		return nil, ErrRelayNotEnabled{Err: err, Relay: spec.Relay, PluginName: "dontime"}
 	}
 
+	// TODO: We need to pass RegistrySyncer to PluginProvider
 	provider, err := relayer.NewPluginProvider(ctx, types.RelayArgs{
 		ExternalJobID: jb.ExternalJobID,
 		JobID:         jb.ID,

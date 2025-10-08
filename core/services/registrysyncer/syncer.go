@@ -3,6 +3,7 @@ package registrysyncer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -252,9 +253,12 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 
 	nodes := []kcr.INodeInfoProviderNodeInfo{}
 
-	err = s.reader.GetLatestValue(ctx, s.capabilitiesContract.ReadIdentifier("getNodes"), primitives.Unconfirmed, nil, &nodes)
+	head, err := s.reader.GetLatestValueWithHeadData(ctx, s.capabilitiesContract.ReadIdentifier("getNodes"), primitives.Unconfirmed, nil, &nodes)
 	if err != nil {
 		return nil, err
+	}
+	if head != nil {
+		return nil, errors.New("Received nil head")
 	}
 
 	idsToNodes := map[p2ptypes.PeerID]NodeInfo{}
@@ -286,11 +290,12 @@ func (s *registrySyncer) importOnchainRegistry(ctx context.Context) (*LocalRegis
 	}
 
 	return &LocalRegistry{
-		Logger:            s.lggr,
-		GetPeerID:         s.getPeerID,
-		IDsToDONs:         idsToDONs,
-		IDsToCapabilities: idsToCapabilities,
-		IDsToNodes:        idsToNodes,
+		Logger:                s.lggr,
+		LastSyncedBlockHeight: head.Height,
+		GetPeerID:             s.getPeerID,
+		IDsToDONs:             idsToDONs,
+		IDsToCapabilities:     idsToCapabilities,
+		IDsToNodes:            idsToNodes,
 	}, nil
 }
 
