@@ -95,6 +95,9 @@ func (s *secretsFetcher) GetSecrets(ctx context.Context, request *sdkpb.GetSecre
 		"success", strconv.FormatBool(err == nil),
 	).RecordGetSecretsDuration(ctx, time.Since(start).Milliseconds())
 
+	lggr := logger.With(s.lggr)
+	lggr.Debug("GetSecrets completed", "resp", resp, "err", err)
+
 	return resp, err
 }
 

@@ -498,16 +498,14 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 			e.metrics.UpdateWorkflowErrorDurationHistogram(ctx, int64(executionDuration.Seconds()))
 		}
 
-		executionLogger.Errorw("Workflow execution failed with module execution error", "status", executionStatus, "durationMs", executionDuration.Milliseconds())
+		executionLogger.Errorw("Workflow execution failed with module execution error", "status", executionStatus, "durationMs", executionDuration.Milliseconds(), "err", err)
 		_ = events.EmitExecutionFinishedEvent(ctx, e.loggerLabels, executionStatus, executionID, e.lggr)
 		e.cfg.Hooks.OnExecutionFinished(executionID, executionStatus)
 		e.cfg.Hooks.OnExecutionError(err.Error())
 		return
 	}
 
-	if e.cfg.DebugMode {
-		e.lggr.Debugw("User workflow execution result", "result", result.GetValue(), "err", result.GetError())
-	}
+	e.lggr.Debugw("User workflow execution result", "result", result.GetValue(), "err", result.GetError())
 
 	if len(result.GetError()) > 0 {
 		executionStatus = store.StatusErrored
@@ -639,9 +637,7 @@ func (e *Engine) emitUserLogs(ctx context.Context, userLogChan chan *protoevents
 			if !ok {
 				return
 			}
-			if e.cfg.DebugMode {
-				e.lggr.Debugf("User log: <<<%s>>>, local node timestamp: %s", logLine.Message, logLine.NodeTimestamp)
-			}
+			e.lggr.Debugf("User log: <<<%s>>>, local node timestamp: %s", logLine.Message, logLine.NodeTimestamp)
 			err := e.cfg.LocalLimiters.LogEvent.Check(ctx, count)
 			if err != nil {
 				var errBoundLimited limits.ErrorBoundLimited[int]
