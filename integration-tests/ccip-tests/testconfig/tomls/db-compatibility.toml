@@ -31,4 +31,4 @@ DBTag = '15.6'
 [[CCIP.Env.NewCLCluster.Nodes]]
 Name = 'node6'
 DBImage = 'postgres'
-DBTag = '15.6'
+DBTag = '18'
