@@ -81,7 +81,7 @@ func buildVrfUni(t *testing.T, db *sqlx.DB, cfg chainlink.GeneralConfig) vrfUniv
 	// Don't mock db interactions
 	prm := pipeline.NewORM(db, lggr, cfg.JobPipeline().MaxSuccessfulRuns())
 	btORM := bridges.NewORM(db)
-	ks := keystore.NewInMemory(db, utils.FastScryptParams, lggr)
+	ks := keystore.NewInMemory(db, utils.FastScryptParams, lggr.Infof)
 	_, dbConfig, evmConfig := txmgr.MakeTestConfigs(t)
 	evmKs := keys.NewChainStore(keystore.NewEthSigner(ks.Eth(), ec.ConfiguredChainID()), ec.ConfiguredChainID())
 	txm, err := txmgr.NewTxm(db, evmConfig, evmConfig.GasEstimator(), evmConfig.Transactions(), nil, dbConfig, dbConfig.Listener(), ec, logger.TestLogger(t), nil, evmKs, nil, nil, nil)
@@ -574,7 +574,7 @@ func Test_CheckFromAddressesExist(t *testing.T) {
 		ctx := testutils.Context(t)
 		db := pgtest.NewSqlxDB(t)
 		lggr := logger.TestLogger(t)
-		ks := keystore.NewInMemory(db, utils.FastScryptParams, lggr)
+		ks := keystore.NewInMemory(db, utils.FastScryptParams, lggr.Infof)
 		require.NoError(t, ks.Unlock(ctx, testutils.Password))
 
 		var fromAddresses []string
@@ -602,7 +602,7 @@ func Test_CheckFromAddressesExist(t *testing.T) {
 		ctx := testutils.Context(t)
 		db := pgtest.NewSqlxDB(t)
 		lggr := logger.TestLogger(t)
-		ks := keystore.NewInMemory(db, utils.FastScryptParams, lggr)
+		ks := keystore.NewInMemory(db, utils.FastScryptParams, lggr.Infof)
 		require.NoError(t, ks.Unlock(ctx, testutils.Password))
 
 		var fromAddresses []string
@@ -710,6 +710,7 @@ func Test_VRFV2PlusServiceFailsWhenVRFOwnerProvided(t *testing.T) {
 		PublicKey:     vuni.vrfkey.PublicKey.String(),
 		FromAddresses: []string{vuni.submitter.Hex()},
 		GasLanePrice:  chain.Config().EVM().GasEstimator().PriceMax(),
+		EVMChainID:    testutils.FixtureChainID.String(),
 	})
 	toml := "vrfOwnerAddress=\"0xF62fEFb54a0af9D32CDF0Db21C52710844c7eddb\"\n" + vs.Toml()
 	jb, err := vrfcommon.ValidatedVRFSpec(toml)

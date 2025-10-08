@@ -299,6 +299,11 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 		lcaC := LCAController{app}
 		authv2.GET("/find_lca", auth.RequiresRunRole(lcaC.FindLCA))
 
+		if build.IsDev() {
+			capContr := CapabilityController{app}
+			authv2.POST("/execute_capability", auth.RequiresRunRole(capContr.ExecuteCapability))
+		}
+
 		csakc := CSAKeysController{app}
 		authv2.GET("/keys/csa", csakc.Index)
 		authv2.POST("/keys/csa", auth.RequiresEditRole(csakc.Create))
@@ -357,6 +362,7 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 			{"starknet", NewStarkNetKeysController(app)},
 			{"aptos", NewAptosKeysController(app)},
 			{"tron", NewTronKeysController(app)},
+			{"sui", NewSuiKeysController(app)},
 			{"ton", NewTONKeysController(app)},
 		} {
 			authv2.GET("/keys/"+keys.path, keys.kc.Index)
@@ -372,6 +378,9 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 		authv2.DELETE("/keys/vrf/:keyID", auth.RequiresAdminRole(vrfkc.Delete))
 		authv2.POST("/keys/vrf/import", auth.RequiresAdminRole(vrfkc.Import))
 		authv2.POST("/keys/vrf/export/:keyID", auth.RequiresAdminRole(vrfkc.Export))
+
+		wfkc := WorkflowKeysController{app}
+		authv2.GET("/keys/workflow", wfkc.Index)
 
 		jc := JobsController{app}
 		authv2.GET("/jobs", paginatedRequest(jc.Index))

@@ -38,12 +38,13 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
+	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/retirement"
-	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/artifacts"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/dontime"
 	"github.com/smartcontractkit/chainlink-framework/multinode"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/compute"
 
@@ -80,6 +81,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/solkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/starkkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/suikey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tonkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/tronkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
@@ -91,6 +93,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
+	wftypes "github.com/smartcontractkit/chainlink/v2/core/services/workflows/types"
 	clsessions "github.com/smartcontractkit/chainlink/v2/core/sessions"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -137,6 +140,7 @@ var (
 	DefaultAptosKey    = aptoskey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultTronKey     = tronkey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultTONKey      = tonkey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
+	DefaultSuiKey      = suikey.MustNewInsecure(keystest.NewRandReaderFromSeed(KeyBigIntSeed))
 	DefaultVRFKey      = vrfkey.MustNewV2XXXTestingOnly(big.NewInt(KeyBigIntSeed))
 )
 
@@ -341,9 +345,9 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		}
 	}
 
-	var syncerFetcherFunc artifacts.FetcherFunc
+	var syncerFetcherFunc wftypes.FetcherFunc
 	for _, dep := range flagsAndDeps {
-		syncerFetcherFunc, _ = dep.(artifacts.FetcherFunc)
+		syncerFetcherFunc, _ = dep.(wftypes.FetcherFunc)
 		if syncerFetcherFunc != nil {
 			break
 		}
@@ -409,22 +413,23 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 
 	var evmFactoryConfigFn func(config *chainlink.EVMFactoryConfig)
 	// TODO BCF-2513 Stop injecting ethClient via override, instead use httptest.
-	if cfg.EVMEnabled() {
+	if cfg.EVMEnabled() && env.EVMPlugin.Cmd.Get() == "" {
 		if ethClient == nil {
 			ethClient = evmclient.NewNullClient(evmtest.MustGetDefaultChainID(t, cfg.EVMConfigs()), lggr)
 		}
-		chainId := ethClient.ConfiguredChainID()
+		chainID := ethClient.ConfiguredChainID()
 		evmFactoryConfigFn = func(fc *chainlink.EVMFactoryConfig) {
 			fc.GenEthClient = func(_ *big.Int) evmclient.Client {
-				if chainId.Cmp(evmtest.MustGetDefaultChainID(t, cfg.EVMConfigs())) != 0 {
-					t.Fatalf("expected eth client ChainID %d to match evm config chain id %d", chainId, evmtest.MustGetDefaultChainID(t, cfg.EVMConfigs()))
+				if chainID.Cmp(evmtest.MustGetDefaultChainID(t, cfg.EVMConfigs())) != 0 {
+					t.Fatalf("expected eth client ChainID %d to match evm config chain id %d", chainID, evmtest.MustGetDefaultChainID(t, cfg.EVMConfigs()))
 				}
 				return ethClient
 			}
 		}
 	}
-	keyStore := keystore.NewInMemory(ds, utils.FastScryptParams, lggr)
+	keyStore := keystore.NewInMemory(ds, utils.FastScryptParams, lggr.Infof)
 	require.NoError(t, keyStore.Unlock(ctx, Password))
+	logPubKeys(t, keyStore)
 
 	for _, dep := range flagsAndDeps {
 		switch v := dep.(type) {
@@ -445,6 +450,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 			FetcherFunc:             syncerFetcherFunc,
 			FetcherFactoryFn:        computeFetcherFactory,
 			BillingClient:           billingClient,
+			UseLocalTimeProvider:    cfg.CRE().UseLocalTimeProvider(),
 		},
 		Config:   cfg,
 		DS:       ds,
@@ -464,6 +470,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		RetirementReportCache:    retirement.NewRetirementReportCache(lggr, ds),
 		LLOTransmissionReaper:    llo.NewTransmissionReaper(ds, lggr, cfg.Mercury().Transmitter().ReaperFrequency(), cfg.Mercury().Transmitter().ReaperMaxAge()),
 		EVMFactoryConfigFn:       evmFactoryConfigFn,
+		DonTimeStore:             dontime.NewStore(dontime.DefaultRequestTimeout),
 		LimitsFactory:            limits.Factory{Logger: lggr.Named("Limits")},
 	})
 
@@ -490,6 +497,139 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 	}
 
 	return ta
+}
+
+func logPubKeys(t testing.TB, kr keystore.Master) {
+	ctx := t.Context()
+	csas, err := kr.CSA().GetAll()
+	require.NoError(t, err)
+	csaIDs := make([]string, len(csas))
+	for _, CSAKey := range csas {
+		csaIDs = append(csaIDs, CSAKey.ID())
+	}
+	eths, err := kr.Eth().GetAll(ctx)
+	require.NoError(t, err)
+	ethIDs := make([]string, len(eths))
+	for _, ETHKey := range eths {
+		ethIDs = append(ethIDs, ETHKey.ID())
+	}
+	ocrs, err := kr.OCR().GetAll()
+	require.NoError(t, err)
+	ocrIDs := make([]string, len(ocrs))
+	for _, OCRKey := range ocrs {
+		ocrIDs = append(ocrIDs, OCRKey.ID())
+	}
+	ocr2s, err := kr.OCR2().GetAll()
+	require.NoError(t, err)
+	ocr2IDs := make([]string, len(ocr2s))
+	for _, OCR2Key := range ocr2s {
+		ocr2IDs = append(ocr2IDs, OCR2Key.ID())
+	}
+	p2ps, err := kr.P2P().GetAll()
+	require.NoError(t, err)
+	p2pIDs := make([]string, len(p2ps))
+	for _, P2PKey := range p2ps {
+		p2pIDs = append(p2pIDs, P2PKey.ID())
+	}
+	cosmos, err := kr.Cosmos().GetAll()
+	require.NoError(t, err)
+	cosmosIDs := make([]string, len(cosmos))
+	for _, cosmosKey := range cosmos {
+		cosmosIDs = append(cosmosIDs, cosmosKey.ID())
+	}
+	solanas, err := kr.Solana().GetAll()
+	require.NoError(t, err)
+	solanaIDs := make([]string, len(solanas))
+	for _, solanaKey := range solanas {
+		solanaIDs = append(solanaIDs, solanaKey.ID())
+	}
+	starknets, err := kr.StarkNet().GetAll()
+	require.NoError(t, err)
+	starknetIDs := make([]string, len(starknets))
+	for _, starkkey := range starknets {
+		starknetIDs = append(starknetIDs, starkkey.ID())
+	}
+	aptoses, err := kr.Aptos().GetAll()
+	require.NoError(t, err)
+	aptosIDs := make([]string, len(aptoses))
+	for _, aptosKey := range aptoses {
+		aptosIDs = append(aptosIDs, aptosKey.ID())
+	}
+	trons, err := kr.Tron().GetAll()
+	require.NoError(t, err)
+	tronIDs := make([]string, len(trons))
+	for _, tronKey := range trons {
+		tronIDs = append(tronIDs, tronKey.ID())
+	}
+	tons, err := kr.TON().GetAll()
+	require.NoError(t, err)
+	tonIDs := make([]string, len(tons))
+	for _, tonKey := range tons {
+		tonIDs = append(tonIDs, tonKey.ID())
+	}
+	suies, err := kr.Sui().GetAll()
+	require.NoError(t, err)
+	suiIDs := make([]string, len(suies))
+	for _, suiKey := range suies {
+		suiIDs = append(suiIDs, suiKey.ID())
+	}
+	vrfs, err := kr.VRF().GetAll()
+	require.NoError(t, err)
+	vrfIDs := make([]string, len(vrfs))
+	for _, VRFKey := range vrfs {
+		vrfIDs = append(vrfIDs, VRFKey.ID())
+	}
+	wfs, err := kr.Workflow().GetAll()
+	require.NoError(t, err)
+	workflowIDs := make([]string, len(wfs))
+	i := 0
+	for _, workflowKey := range wfs {
+		workflowIDs[i] = workflowKey.ID()
+		i++
+	}
+	lggr := logger.TestLogger(t)
+	if len(csaIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d CSA keys", len(csaIDs)), "keys", csaIDs)
+	}
+	if len(ethIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d ETH keys", len(ethIDs)), "keys", ethIDs)
+	}
+	if len(ocrIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d OCR keys", len(ocrIDs)), "keys", ocrIDs)
+	}
+	if len(ocr2IDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d OCR2 keys", len(ocr2IDs)), "keys", ocr2IDs)
+	}
+	if len(p2pIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d P2P keys", len(p2pIDs)), "keys", p2pIDs)
+	}
+	if len(cosmosIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Cosmos keys", len(cosmosIDs)), "keys", cosmosIDs)
+	}
+	if len(solanaIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Solana keys", len(solanaIDs)), "keys", solanaIDs)
+	}
+	if len(starknetIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d StarkNet keys", len(starknetIDs)), "keys", starknetIDs)
+	}
+	if len(aptosIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Aptos keys", len(aptosIDs)), "keys", aptosIDs)
+	}
+	if len(tronIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Tron keys", len(tronIDs)), "keys", tronIDs)
+	}
+	if len(tonIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d TON keys", len(tonIDs)), "keys", tonIDs)
+	}
+	if len(suiIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Sui keys", len(suiIDs)), "keys", suiIDs)
+	}
+	if len(vrfIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d VRF keys", len(vrfIDs)), "keys", vrfIDs)
+	}
+	if len(workflowIDs) > 0 {
+		lggr.Infow(fmt.Sprintf("Unlocked %d Workflow keys", len(workflowIDs)), "keys", workflowIDs)
+	}
 }
 
 func NewEthMocksWithDefaultChain(t testing.TB) (c *clienttest.Client) {
@@ -704,8 +844,9 @@ func (ta *TestApplication) NewAuthenticatingShell(prompter cmd.Prompter) *cmd.Sh
 // NewKeyStore returns a new, unlocked keystore
 func NewKeyStore(t testing.TB, ds sqlutil.DataSource) keystore.Master {
 	ctx := testutils.Context(t)
-	keystore := keystore.NewInMemory(ds, utils.FastScryptParams, logger.TestLogger(t))
+	keystore := keystore.NewInMemory(ds, utils.FastScryptParams, logger.TestLogger(t).Infof)
 	require.NoError(t, keystore.Unlock(ctx, Password))
+	logPubKeys(t, keystore)
 	return keystore
 }
 

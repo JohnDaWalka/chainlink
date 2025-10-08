@@ -11,6 +11,7 @@ import (
 	"time"
 
 	cldf_chain_utils "github.com/smartcontractkit/chainlink-deployments-framework/chain/utils"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/data-feeds/changeset/types"
@@ -21,9 +22,6 @@ import (
 const (
 	timeoutV2 = 240 * time.Second
 )
-
-type NOPWorkflowMetadata struct {
-}
 
 // ProposeWFJobsToJDV2Changeset is a Durable Pipeline compatible changeset that reads a feed state file,
 // creates a workflow job spec from it and proposes it to JD.
@@ -36,7 +34,8 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 	chainInfo, _ := cldf_chain_utils.ChainInfo(c.ChainSelector)
 
 	domain := getDomain(c.Domain)
-	feedStatePath := filepath.Join("domains", domain, env.Name, "inputs", "feeds", chainInfo.ChainName+".json")
+
+	feedStatePath := filepath.Join("domains", domain, env.Name, "inputs", "feeds", c.NodeFilter.Zone, chainInfo.ChainName+".json")
 	feedState, _ := readFeedStateFile(feedStatePath)
 
 	// Only get feeds that are part of the workflow
@@ -71,6 +70,7 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 		consensusRef,
 		workflowSpecConfig.ConsensusReportID,
 		workflowSpecConfig.ConsensusAggregationMethod,
+		workflowSpecConfig.TriggerCapability,
 		consensusConfigKeyID,
 		workflowSpecConfig.ConsensusAllowedPartialStaleness,
 		consensusEncoderAbi,
@@ -85,7 +85,7 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create workflow spec: %w", err)
 	}
 
-	// log the workflow spec for debugging purposes. We don't yet store it anywhere
+	// log the workflow spec for debugging purposes.
 	fmt.Println(workflowSpec)
 
 	// create workflow job spec TOML
@@ -101,6 +101,16 @@ func proposeWFJobsToJDV2Logic(env cldf.Environment, c types.ProposeWFJobsV2Confi
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to propose workflow job spec: %w", err)
 	}
 
+	// Save workflow spec in the datastore
+	ds := datastore.NewMemoryDataStore()
+
+	err = UpdateWorkflowMetadataDS(env, ds, workflowSpecConfig.WorkflowName, workflowSpec)
+	if err != nil {
+		env.Logger.Errorf("failed to set workflow spec in datastore: %s", err)
+	}
+
+	out.DataStore = ds
+
 	return out, nil
 }
 
@@ -115,12 +125,16 @@ func proposeWFJobsToJDV2Precondition(env cldf.Environment, c types.ProposeWFJobs
 
 	validTargetEncoder := c.WorkflowSpecConfig.TargetContractEncoderType
 	if validTargetEncoder != "data-feeds_decimal" && validTargetEncoder != "aptos" && validTargetEncoder != "ccip" {
-		return fmt.Errorf("invalid consensus target encoder: %s", c.WorkflowSpecConfig.ConsensusAggregationMethod)
+		return fmt.Errorf("invalid consensus target encoder: %s", c.WorkflowSpecConfig.TargetContractEncoderType)
 	}
 
 	validMethod := c.WorkflowSpecConfig.ConsensusAggregationMethod
 	if validMethod != "data_feeds" && validMethod != "llo_streams" {
 		return fmt.Errorf("invalid consensus aggregation method: %s", c.WorkflowSpecConfig.ConsensusAggregationMethod)
+	}
+
+	if c.WorkflowSpecConfig.TriggerCapability == "" {
+		return errors.New("trigger capability is required")
 	}
 
 	if c.WorkflowSpecConfig.ConsensusReportID == "" {
@@ -134,12 +148,29 @@ func proposeWFJobsToJDV2Precondition(env cldf.Environment, c types.ProposeWFJobs
 		return fmt.Errorf("failed to get consensus encoder abi: %w", err)
 	}
 
+	if c.NodeFilter == nil {
+		return errors.New("missing node filter")
+	}
+
+	if c.NodeFilter.DONID == 0 {
+		return errors.New("missing DON ID in node filter")
+	}
+
+	if c.NodeFilter.EnvLabel == "" {
+		return errors.New("missing environment label in node filter")
+	}
+
+	if c.NodeFilter.Zone != "zone-a" && c.NodeFilter.Zone != "zone-b" {
+		return errors.New("missing or invalid zone in node filter")
+	}
+
 	domain := getDomain(c.Domain)
 	chainInfo, err := cldf_chain_utils.ChainInfo(c.ChainSelector)
 	if err != nil {
 		return fmt.Errorf("failed to get chain info for chain %d: %w", c.ChainSelector, err)
 	}
-	feedStatePath := filepath.Join("domains", domain, env.Name, "inputs", "feeds", chainInfo.ChainName+".json")
+
+	feedStatePath := filepath.Join("domains", domain, env.Name, "inputs", "feeds", c.NodeFilter.Zone, chainInfo.ChainName+".json")
 
 	feedState, err := readFeedStateFile(feedStatePath)
 	if err != nil {
@@ -163,18 +194,6 @@ func proposeWFJobsToJDV2Precondition(env cldf.Environment, c types.ProposeWFJobs
 	cacheAddress := GetDataFeedsCacheAddress(env.ExistingAddresses, env.DataStore.Addresses(), c.ChainSelector, &c.CacheLabel)
 	if cacheAddress == "" {
 		return errors.New("failed to get data feeds cache address")
-	}
-
-	if c.NodeFilter == nil {
-		return errors.New("missing node filter")
-	}
-
-	if c.NodeFilter.DONID == 0 {
-		return errors.New("missing DON ID in node filter")
-	}
-
-	if c.NodeFilter.EnvLabel == "" {
-		return errors.New("missing environment label in node filter")
 	}
 
 	return nil

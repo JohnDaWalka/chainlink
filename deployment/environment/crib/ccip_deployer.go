@@ -65,6 +65,7 @@ const (
 // DeployHomeChainContracts deploys the home chain contracts so that the chainlink nodes can use the CR address in Capabilities.ExternalRegistry
 // Afterward, we call DeployHomeChainChangeset changeset with nodeinfo ( the peer id and all)
 func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig devenv.EnvironmentConfig, homeChainSel uint64, feedChainSel uint64) (deployment.CapabilityRegistryConfig, cldf.AddressBook, error) {
+	lggr.Info("Deploying home chain contracts...")
 	e, _, err := devenv.NewEnvironment(func() context.Context { return ctx }, lggr, envConfig)
 	if err != nil {
 		return deployment.CapabilityRegistryConfig{}, nil, err
@@ -91,7 +92,7 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 		}
 	}
 
-	p2pIds := nodes.NonBootstraps().PeerIDs()
+	p2pIDs := nodes.NonBootstraps().PeerIDs()
 	cfg := make(map[uint64]commontypes.MCMSWithTimelockConfigV2)
 	for _, chain := range e.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chainselectors.FamilyEVM)) {
 		mcmsConfig, err := mcmstypes.NewConfig(1, []common.Address{evmChains[chain].DeployerKey.From}, []mcmstypes.Config{})
@@ -115,7 +116,7 @@ func DeployHomeChainContracts(ctx context.Context, lggr logger.Logger, envConfig
 			RMNStaticConfig:          testhelpers.NewTestRMNStaticConfig(),
 			RMNDynamicConfig:         testhelpers.NewTestRMNDynamicConfig(),
 			NodeOperators:            testhelpers.NewTestNodeOperator(evmChains[homeChainSel].DeployerKey.From),
-			NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{"NodeOperator": p2pIds},
+			NodeP2PIDsPerNodeOpAdmin: map[string][][32]byte{"NodeOperator": p2pIDs},
 		},
 	))
 	if err != nil {
@@ -500,7 +501,6 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 	}
 	for _, solChainSel := range sels {
 		solTokenAddress := state.SolChains[solChainSel].LinkToken
-		bnm := solTestTokenPool.BurnAndMint_PoolType
 
 		*e, err = commonchangeset.Apply(nil, *e,
 			commonchangeset.Configure(
@@ -533,7 +533,7 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 							TokenPoolConfigs: []ccipChangesetSolana.TokenPoolConfig{
 								{
 									TokenPubKey: solTokenAddress,
-									PoolType:    &bnm,
+									PoolType:    shared.BurnMintTokenPool,
 									Metadata:    shared.CLLMetadata,
 								},
 							},
@@ -568,7 +568,7 @@ func setupSolLinkPools(e *cldf.Environment) (cldf.Environment, error) {
 							SetPoolTokenConfigs: []ccipChangesetSolana.SetPoolTokenConfig{
 								{
 									TokenPubKey: solTokenAddress,
-									PoolType:    &bnm,
+									PoolType:    shared.BurnMintTokenPool,
 									Metadata:    shared.CLLMetadata,
 								},
 							},
@@ -758,7 +758,6 @@ func setupSolEvmLanes(lggr logger.Logger, e *cldf.Environment, state stateview.C
 					laneChangesets = append(laneChangesets, cs...)
 				}
 
-				bnm := solTestTokenPool.BurnAndMint_PoolType
 				laneChangesets = append(laneChangesets,
 					commonchangeset.Configure(
 						cldf.CreateLegacyChangeSet(ccipChangesetSolana.SetupTokenPoolForRemoteChain),
@@ -767,7 +766,7 @@ func setupSolEvmLanes(lggr logger.Logger, e *cldf.Environment, state stateview.C
 							RemoteTokenPoolConfigs: []ccipChangesetSolana.RemoteChainTokenPoolConfig{
 								{
 									SolTokenPubKey: solChainState.LinkToken,
-									SolPoolType:    &bnm,
+									SolPoolType:    shared.BurnMintTokenPool,
 									EVMRemoteConfigs: map[uint64]ccipChangesetSolana.EVMRemoteConfig{
 										evmSelector.Selector: {
 											TokenSymbol: shared.LinkSymbol,
@@ -1007,7 +1006,7 @@ func mustOCR(e *cldf.Environment, homeChainSel uint64, feedChainSel uint64, newD
 				params.CommitOffChainConfig.MultipleReportsEnabled = true
 				params.CommitOffChainConfig.MaxMerkleRootsPerReport = 1
 				params.CommitOffChainConfig.MaxPricesPerReport = 3
-				params.CommitOffChainConfig.MaxMerkleTreeSize = 1
+				params.CommitOffChainConfig.MaxMerkleTreeSize = 10
 				params.CommitOffChainConfig.MerkleRootAsyncObserverDisabled = true
 				return params
 			})

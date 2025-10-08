@@ -41,7 +41,7 @@ func ValidatePreReqContractsInState(e cldf.Environment, cfg TranslateEVM2EVMOnRa
 	if err := cfg.Validate(e); err != nil {
 		return fmt.Errorf("invalid config: %w", err)
 	}
-	state, err := stateview.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e, stateview.WithLoadLegacyContracts(true))
 	if err != nil {
 		return fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -68,7 +68,6 @@ func ValidatePreReqContractsInState(e cldf.Environment, cfg TranslateEVM2EVMOnRa
 				return fmt.Errorf("tokenAdminRegistry not found for source chain %d, cannot process 1.5.0 OnRamps", sourceChainSel)
 			}
 		}
-
 	}
 
 	return nil
@@ -76,7 +75,7 @@ func ValidatePreReqContractsInState(e cldf.Environment, cfg TranslateEVM2EVMOnRa
 
 func TranslateEVM2EVMOnRampsToFeeQuoterChangeset(e cldf.Environment, cfg TranslateEVM2EVMOnRampsToFeeQuoterConfig) (cldf.ChangesetOutput, error) {
 	csOutput := cldf.ChangesetOutput{}
-	state, err := stateview.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e, stateview.WithLoadLegacyContracts(true))
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}
@@ -218,7 +217,7 @@ func (cfg TranslateEVM2EVMOnRampsToFeeQuoterConfig) toPremiumMultiplierCfgSeqInp
 
 func TranslateEVM2EVMOnRampsToFeeQTokenTransferFeeConfigChangeset(e cldf.Environment, cfg TranslateEVM2EVMOnRampsToFeeQuoterConfig) (cldf.ChangesetOutput, error) {
 	csOutput := cldf.ChangesetOutput{}
-	state, err := stateview.LoadOnchainState(e)
+	state, err := stateview.LoadOnchainState(e, stateview.WithLoadLegacyContracts(true))
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load onchain state: %w", err)
 	}

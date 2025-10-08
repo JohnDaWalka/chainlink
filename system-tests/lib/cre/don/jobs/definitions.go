@@ -16,6 +16,13 @@ var (
 	DefaultAllowedPorts = []int{80, 443}
 )
 
+type HandlerType string
+
+const (
+	WebAPIHandlerType HandlerType = "web-api-capabilities"
+	HTTPHandlerType   HandlerType = "http-capabilities"
+)
+
 func BootstrapOCR3(nodeID string, name string, ocr3CapabilityAddress string, chainID uint64) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
 
@@ -35,16 +42,21 @@ func BootstrapOCR3(nodeID string, name string, ocr3CapabilityAddress string, cha
 	providerType = "ocr3-capability"
 `,
 			uuid,
-			"ocr3-bootstrap-"+name,
+			"ocr3-bootstrap-"+name+fmt.Sprintf("-%d", chainID),
 			ocr3CapabilityAddress,
 			chainID),
 	}
 }
 
-func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllowedPorts []int, extraAllowedIps, extrAallowedIPsCIDR []string, gatewayConnectorData cre.GatewayConnectorOutput) *jobv1.ProposeJobRequest {
+type GatewayHandler struct {
+	Name   string
+	Config string
+}
+
+func AnyGateway(bootstrapNodeID string, chainID uint64, extraAllowedPorts []int, extraAllowedIps, extrAallowedIPsCIDR []string, gatewayConfiguration *cre.DonGatewayConfiguration) *jobv1.ProposeJobRequest {
 	var gatewayDons string
 
-	for _, don := range gatewayConnectorData.Dons {
+	for _, don := range gatewayConfiguration.Dons {
 		var gatewayMembers string
 
 		for i := 0; i < len(don.MembersEthAddresses); i++ {
@@ -57,20 +69,22 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 			)
 		}
 
+		var handlersConfig string
+		for name, config := range don.Handlers {
+			handlersConfig += fmt.Sprintf(`
+	[[gatewayConfig.Dons.Handlers]]
+	Name = "%s"
+	%s
+		`, name, config)
+		}
+
 		gatewayDons += fmt.Sprintf(`
-		[[gatewayConfig.Dons]]
-		DonId = "%d"
-		F = 1
-		HandlerName = "web-api-capabilities"
-			[gatewayConfig.Dons.HandlerConfig]
-			MaxAllowedMessageAgeSec = 1_000
-				[gatewayConfig.Dons.HandlerConfig.NodeRateLimiter]
-				GlobalBurst = 10
-				GlobalRPS = 50
-				PerSenderBurst = 10
-				PerSenderRPS = 10
-			%s
-		`, don.ID, gatewayMembers)
+	[[gatewayConfig.Dons]]
+	DonId = "%s"
+	F = 1
+	%s
+	%s
+		`, don.ID, gatewayMembers, handlersConfig)
 	}
 
 	uuid := uuid.NewString()
@@ -83,7 +97,7 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 	forwardingAllowed = false
 	[gatewayConfig.ConnectionManagerConfig]
 	AuthChallengeLen = 10
-	AuthGatewayId = "por_gateway"
+	AuthGatewayId = "%s"
 	AuthTimestampToleranceSec = 5
 	HeartbeatIntervalSec = 20
 	%s
@@ -102,21 +116,22 @@ func AnyGateway(bootstrapNodeID string, chainID uint64, donID uint32, extraAllow
 	MaxRequestBytes = 100_000
 	Path = "%s"
 	Port = %d
-	ReadTimeoutMillis = 1_000
-	RequestTimeoutMillis = 10_000
-	WriteTimeoutMillis = 1_000
+	ReadTimeoutMillis = 80_000
+	RequestTimeoutMillis = 80_000
+	WriteTimeoutMillis = 80_000
 	CORSEnabled = false
 	CORSAllowedOrigins = []
 	[gatewayConfig.HTTPClientConfig]
 	MaxResponseBytes = 100_000_000
 `,
 		uuid,
-		cre.GatewayJobName,
+		"cre-gateway",
+		gatewayConfiguration.AuthGatewayID,
 		gatewayDons,
-		gatewayConnectorData.Outgoing.Path,
-		gatewayConnectorData.Outgoing.Port,
-		gatewayConnectorData.Incoming.Path,
-		gatewayConnectorData.Incoming.InternalPort,
+		gatewayConfiguration.Outgoing.Path,
+		gatewayConfiguration.Outgoing.Port,
+		gatewayConfiguration.Incoming.Path,
+		gatewayConfiguration.Incoming.InternalPort,
 	)
 
 	if len(extraAllowedPorts) != 0 {
@@ -166,9 +181,7 @@ const (
 	EmptyStdCapConfig = "\"\""
 )
 
-func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.ProposeJobRequest {
-	uuid := uuid.NewString()
-
+func WorkerStandardCapability(nodeID, name, command, config, oracleFactoryConfig string) *jobv1.ProposeJobRequest {
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
@@ -179,20 +192,66 @@ func WorkerStandardCapability(nodeID, name, command, config string) *jobv1.Propo
 	forwardingAllowed = false
 	command = "%s"
 	config = %s
+	%s
 `,
-			uuid,
+			uuid.NewString(),
 			name,
 			command,
-			config),
+			config,
+			oracleFactoryConfig),
 	}
 }
 
-func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+func DonTimeJob(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
-
 	return &jobv1.ProposeJobRequest{
 		NodeId: nodeID,
 		Spec: fmt.Sprintf(`
+	type = "offchainreporting2"
+	schemaVersion = 1
+	externalJobID = "%s"
+	name = "dontime"
+	forwardingAllowed = false
+	maxTaskDuration = "0s"
+	contractID = "%s"
+	relay = "evm"
+	pluginType = "dontime"
+	ocrKeyBundleID = "%s"
+	p2pv2Bootstrappers = [
+		"%s@%s",
+	]
+	transmitterID = "%s"
+
+	[relayConfig]
+	chainID = "%d"
+	providerType = "dontime"
+
+	[pluginConfig]
+	pluginName = "dontime"
+	ocrVersion = 3
+	telemetryType = "plugin"
+
+	[onchainSigningStrategy]
+	strategyName = 'multi-chain'
+	[onchainSigningStrategy.config]
+	evm = "%s"
+`,
+			uuid,
+			ocr3CapabilityAddress, // re-use OCR3Capability contract
+			ocr2KeyBundleID,
+			ocrPeeringData.OCRBootstraperPeerID,
+			fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
+			nodeEthAddress, // transmitterID (although this shouldn't be used for this plugin?)
+			chainID,
+			ocr2KeyBundleID,
+		),
+	}
+}
+
+func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, offchainBundleID string, ocr2KeyBundles map[string]string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+	uuid := uuid.NewString()
+
+	spec := fmt.Sprintf(`
 	type = "offchainreporting2"
 	schemaVersion = 1
 	externalJobID = "%s"
@@ -214,24 +273,31 @@ func WorkerOCR3(nodeID string, ocr3CapabilityAddress, nodeEthAddress, ocr2KeyBun
 	providerType = "ocr3-capability"
 	telemetryType = "plugin"
 	[onchainSigningStrategy]
-	strategyName = 'multi-chain'
+	strategyName = "multi-chain"
 	[onchainSigningStrategy.config]
-	evm = "%s"
 `,
-			uuid,
-			cre.OCR3Capability,
-			ocr3CapabilityAddress,
-			ocr2KeyBundleID,
-			ocrPeeringData.OCRBootstraperPeerID,
-			fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
-			nodeEthAddress,
-			chainID,
-			ocr2KeyBundleID,
-		),
+		uuid,
+		cre.ConsensusCapability,
+		ocr3CapabilityAddress,
+		offchainBundleID,
+		ocrPeeringData.OCRBootstraperPeerID,
+		fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
+		nodeEthAddress,
+		chainID,
+	)
+	for family, key := range ocr2KeyBundles {
+		spec += fmt.Sprintf(`
+        %s = "%s"`, family, key)
+		spec += "\n"
+	}
+
+	return &jobv1.ProposeJobRequest{
+		NodeId: nodeID,
+		Spec:   spec,
 	}
 }
 
-func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
+func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, dkgAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
 	uuid := uuid.NewString()
 
 	return &jobv1.ProposeJobRequest{
@@ -253,6 +319,8 @@ func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2
 	chainID = "%d"
 	[pluginConfig]
 	requestExpiryDuration = "60s"
+	[pluginConfig.dkg]
+	dkgContractID = "%s"
 `,
 			uuid,
 			"Vault OCR3 Capability",
@@ -263,6 +331,7 @@ func WorkerVaultOCR3(nodeID string, vaultCapabilityAddress, nodeEthAddress, ocr2
 			types.VaultPlugin,
 			nodeEthAddress,
 			chainID,
+			dkgAddress,
 		),
 	}
 }

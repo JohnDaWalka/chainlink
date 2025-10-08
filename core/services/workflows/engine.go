@@ -22,10 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/settings"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/limits"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/exec"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
+	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
 	"github.com/smartcontractkit/chainlink/v2/core/platform"
@@ -695,7 +695,7 @@ func (e *Engine) finishExecution(ctx context.Context, cma custmsg.MessageEmitter
 
 	logCustMsg(ctx, cma, fmt.Sprintf("execution duration: %d (seconds)", executionDuration), l)
 	l.Infof("execution duration: %d (seconds)", executionDuration)
-	err = events.EmitExecutionFinishedEvent(ctx, cma.Labels(), status, executionID)
+	err = events.EmitExecutionFinishedEvent(ctx, cma.Labels(), status, executionID, l)
 	if err != nil {
 		e.logger.Errorf("failed to emit execution finished event: %+v", err)
 	}
@@ -736,7 +736,7 @@ func (e *Engine) worker(ctx context.Context) {
 				continue
 			}
 
-			executionID, err := types.GenerateExecutionID(e.workflow.id, te.ID)
+			executionID, err := events.GenerateExecutionID(e.workflow.id, te.ID)
 			if err != nil {
 				e.logger.With(platform.KeyTriggerID, te.ID).Errorf("could not generate execution ID: %v", err)
 				continue
@@ -1063,7 +1063,7 @@ func (e *Engine) executeStep(
 	}
 
 	defer func() {
-		if err := events.EmitCapabilityFinishedEvent(ctx, e.cma.Labels(), msg.state.ExecutionID, curStep.ID, msg.stepRef, status); err != nil {
+		if err := events.EmitCapabilityFinishedEvent(ctx, e.cma.Labels(), msg.state.ExecutionID, curStep.ID, msg.stepRef, status, capErr); err != nil {
 			e.logger.Errorf("failed to emit capability event: %v", err)
 		}
 	}()
@@ -1324,8 +1324,8 @@ type Config struct {
 
 	// WorkflowRegistryAddress is the address of the workflow registry contract
 	WorkflowRegistryAddress string
-	// WorkflowRegistryChainID is the chain ID for the workflow registry
-	WorkflowRegistryChainID string
+	// WorkflowRegistryChainSelector is the chain selector for the workflow registry
+	WorkflowRegistryChainSelector string
 
 	// RateLimiter limits the workflow execution steps globally and per
 	// second that a workflow owner can make
@@ -1448,6 +1448,27 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get local node state: %w", err)
 	}
+
+	if cfg.WorkflowRegistryChainSelector == "" {
+		// current integration tests (and things like the local-cre) sometimes
+		// need to avoid setting TOML config for the cap and workflow registry
+		// syncers as they spin up relayers. Setting default values like this
+		// prevents current and future tests from needing to setup custom
+		// wiring so that engine instances can be created with the proper registry values.
+		// Default to Ethereum mainnet chain selector
+		cfg.WorkflowRegistryChainSelector = "5009297550715157269" // Ethereum mainnet
+	}
+
+	chainSelector, err := strconv.ParseUint(cfg.WorkflowRegistryChainSelector, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse chain selector: %w", err)
+	}
+
+	if cfg.WorkflowRegistryAddress == "" {
+		// refer to comment above on setting default value.
+		cfg.WorkflowRegistryAddress = "0xv1EngineDefault"
+	}
+
 	cma := custmsg.NewLabeler().With(platform.KeyWorkflowID, cfg.WorkflowID,
 		platform.KeyWorkflowOwner, cfg.WorkflowOwner,
 		platform.KeyWorkflowName, cfg.WorkflowName.String(),
@@ -1460,6 +1481,11 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 			int(nodeState.WorkflowDON.F),
 		)),
 		platform.KeyP2PID, nodeState.PeerID.String(),
+		platform.WorkflowRegistryAddress, cfg.WorkflowRegistryAddress,
+		platform.WorkflowRegistryChainSelector, strconv.FormatUint(chainSelector, 10),
+		platform.EngineVersion, platform.ValueWorkflowVersionV2,
+		platform.DonVersion, strconv.Itoa(int(nodeState.WorkflowDON.ConfigVersion)),
+		// TODO platform.KeyOrganizationID, wire through org ID from linking service
 	)
 	workflow, err := Parse(cfg.Workflow)
 	if err != nil {
@@ -1471,7 +1497,7 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 	workflow.owner = cfg.WorkflowOwner
 	workflow.name = cfg.WorkflowName
 
-	lggr := logger.With(cfg.Lggr, "workflowID", cfg.WorkflowID)
+	lggr := logger.With(cfg.Lggr, "workflowID", cfg.WorkflowID, "workflowOwner", cfg.WorkflowOwner, "workflowRegistryAddress", cfg.WorkflowRegistryAddress, "workflowRegistryChainSelector", cfg.WorkflowRegistryChainSelector)
 
 	metrics := monitoring.NewWorkflowsMetricLabeler(metrics.NewLabeler(), em).With(platform.KeyWorkflowID, cfg.WorkflowID, platform.KeyWorkflowOwner, cfg.WorkflowOwner, platform.KeyWorkflowName, cfg.WorkflowName.String())
 
@@ -1504,7 +1530,7 @@ func NewEngine(ctx context.Context, cfg Config) (engine *Engine, err error) {
 		clock:                cfg.clock,
 		ratelimiter:          cfg.RateLimiter,
 		workflowLimits:       cfg.WorkflowLimits,
-		meterReports:         metering.NewReports(cfg.BillingClient, workflow.owner, workflow.id, lggr, cma.Labels(), metrics, cfg.WorkflowRegistryAddress, cfg.WorkflowRegistryChainID),
+		meterReports:         metering.NewReports(cfg.BillingClient, workflow.owner, workflow.id, lggr, cma.Labels(), metrics, cfg.WorkflowRegistryAddress, cfg.WorkflowRegistryChainSelector, metering.EngineVersionV1),
 	}
 
 	return engine, nil

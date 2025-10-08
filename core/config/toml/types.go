@@ -139,8 +139,103 @@ type Secrets struct {
 	Mercury    MercurySecrets           `toml:",omitempty"`
 	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
 	EVM        EthKeys                  `toml:",omitempty"` // choose EVM as the TOML field name to align with relayer config convention
-	P2PKey     P2PKey                   `toml:",omitempty"`
-	CRE        CreSecrets               `toml:",omitempty"`
+	Solana     SolKeys                  `toml:",omitempty"` // choose Solana as the TOML field name to align with relayer config convention
+
+	P2PKey          P2PKey          `toml:",omitempty"`
+	DKGRecipientKey DKGRecipientKey `toml:",omitempty"`
+
+	CRE CreSecrets `toml:",omitempty"`
+}
+
+type SolKeys struct {
+	Keys []*SolKey
+}
+
+type SolKey struct {
+	JSON     *models.Secret
+	ID       *string
+	Password *models.Secret
+}
+
+func (s *SolKeys) SetFrom(f *SolKeys) error {
+	err := s.validateMerge(f)
+	if err != nil {
+		return err
+	}
+	if f == nil || len(f.Keys) == 0 {
+		return nil
+	}
+	s.Keys = make([]*SolKey, len(f.Keys))
+	copy(s.Keys, f.Keys)
+	return nil
+}
+
+func (s *SolKeys) validateMerge(f *SolKeys) (err error) {
+	have := make(map[string]struct{})
+	if s != nil && f != nil {
+		for _, solKey := range s.Keys {
+			have[*solKey.ID] = struct{}{}
+		}
+		for _, solKey := range f.Keys {
+			if _, ok := have[*solKey.ID]; ok {
+				err = errors.Join(err, configutils.ErrOverride{Name: "SolKeys: " + *solKey.ID})
+			}
+		}
+	}
+	return err
+}
+
+func (s *SolKeys) ValidateConfig() (err error) {
+	for i, solKey := range s.Keys {
+		if err2 := solKey.ValidateConfig(); err2 != nil {
+			err = errors.Join(err, configutils.ErrInvalid{Name: fmt.Sprintf("SolKeys[%d]", i), Value: solKey, Msg: "invalid SolKey"})
+		}
+	}
+	return err
+}
+
+func (e *SolKey) SetFrom(f *SolKey) (err error) {
+	err = e.validateMerge(f)
+	if err != nil {
+		return err
+	}
+	if v := f.JSON; v != nil {
+		e.JSON = v
+	}
+	if v := f.Password; v != nil {
+		e.Password = v
+	}
+	if v := f.ID; v != nil {
+		e.ID = v
+	}
+	return nil
+}
+
+func (e *SolKey) validateMerge(f *SolKey) (err error) {
+	if e.JSON != nil && f.JSON != nil {
+		err = errors.Join(err, configutils.ErrOverride{Name: "PrivateKey"})
+	}
+	if e.ID != nil && f.ID != nil {
+		err = errors.Join(err, configutils.ErrOverride{Name: "Selector"})
+	}
+	if e.Password != nil && f.Password != nil {
+		err = errors.Join(err, configutils.ErrOverride{Name: "Password"})
+	}
+	return err
+}
+
+func (e *SolKey) ValidateConfig() (err error) {
+	if (e.JSON != nil) != (e.Password != nil) && (e.Password != nil) != (e.ID != nil) {
+		err = errors.Join(err, configutils.ErrInvalid{Name: "SolKey", Value: e.JSON, Msg: "all fields must be nil or non-nil"})
+	}
+	// require valid id
+	if e.ID != nil {
+		_, err2 := chain_selectors.SolanaNameFromChainId(*e.ID)
+		if err2 != nil {
+			err = errors.Join(err, configutils.ErrInvalid{Name: "ChainID", Value: e.ID, Msg: "invalid chain id"})
+		}
+	}
+	return err
 }
 
 type EthKeys struct {
@@ -356,6 +451,42 @@ func (p *P2PKey) validateMerge(f *P2PKey) (err error) {
 func (p *P2PKey) ValidateConfig() (err error) {
 	if (p.JSON != nil) != (p.Password != nil) {
 		err = errors.Join(err, configutils.ErrInvalid{Name: "P2PKey", Value: p.JSON, Msg: "all fields must be nil or non-nil"})
+	}
+	return err
+}
+
+type DKGRecipientKey struct {
+	JSON     *models.Secret
+	Password *models.Secret
+}
+
+func (p *DKGRecipientKey) SetFrom(f *DKGRecipientKey) (err error) {
+	err = p.validateMerge(f)
+	if err != nil {
+		return err
+	}
+	if v := f.JSON; v != nil {
+		p.JSON = v
+	}
+	if v := f.Password; v != nil {
+		p.Password = v
+	}
+	return nil
+}
+
+func (p *DKGRecipientKey) validateMerge(f *DKGRecipientKey) (err error) {
+	if p.JSON != nil && f.JSON != nil {
+		err = errors.Join(err, configutils.ErrOverride{Name: "JSON"})
+	}
+	if p.Password != nil && f.Password != nil {
+		err = errors.Join(err, configutils.ErrOverride{Name: "Password"})
+	}
+	return err
+}
+
+func (p *DKGRecipientKey) ValidateConfig() (err error) {
+	if (p.JSON != nil) != (p.Password != nil) {
+		err = errors.Join(err, configutils.ErrInvalid{Name: "DKGRecipientKey", Value: p.JSON, Msg: "all fields must be nil or non-nil"})
 	}
 	return err
 }
@@ -1730,13 +1861,22 @@ type StreamsConfig struct {
 }
 
 type CreConfig struct {
-	Streams         *StreamsConfig         `toml:",omitempty"`
-	WorkflowFetcher *WorkflowFetcherConfig `toml:",omitempty"`
+	Streams              *StreamsConfig         `toml:",omitempty"`
+	WorkflowFetcher      *WorkflowFetcherConfig `toml:",omitempty"`
+	UseLocalTimeProvider *bool                  `toml:",omitempty"`
+	EnableDKGRecipient   *bool                  `toml:",omitempty"`
+	Linking              *LinkingConfig         `toml:",omitempty"`
 }
 
 // WorkflowFetcherConfig holds the configuration for fetching workflow files
 type WorkflowFetcherConfig struct {
 	URL *string `toml:",omitempty"`
+}
+
+// LinkingConfig holds the configuration for connecting to the CRE linking service
+type LinkingConfig struct {
+	URL        *string `toml:",omitempty"`
+	TLSEnabled *bool   `toml:",omitempty"`
 }
 
 func (c *CreConfig) setFrom(f *CreConfig) {
@@ -1760,6 +1900,28 @@ func (c *CreConfig) setFrom(f *CreConfig) {
 			c.WorkflowFetcher.URL = v
 		}
 	}
+
+	if f.UseLocalTimeProvider != nil {
+		if c.UseLocalTimeProvider == nil {
+			c.UseLocalTimeProvider = f.UseLocalTimeProvider
+		}
+	}
+
+	if f.EnableDKGRecipient != nil {
+		c.EnableDKGRecipient = f.EnableDKGRecipient
+	}
+
+	if f.Linking != nil {
+		if c.Linking == nil {
+			c.Linking = &LinkingConfig{}
+		}
+		if v := f.Linking.URL; v != nil {
+			c.Linking.URL = v
+		}
+		if v := f.Linking.TLSEnabled; v != nil {
+			c.Linking.TLSEnabled = v
+		}
+	}
 }
 
 func (w *WorkflowFetcherConfig) ValidateConfig() error {
@@ -1776,6 +1938,18 @@ func (w *WorkflowFetcherConfig) ValidateConfig() error {
 		return configutils.ErrInvalid{Name: "URL", Value: *w.URL, Msg: "scheme must be one of: file, http, https"}
 	}
 
+	return nil
+}
+
+func (l *LinkingConfig) ValidateConfig() error {
+	if l.URL == nil {
+		val := ""
+		l.URL = &val
+	}
+	if l.TLSEnabled == nil {
+		val := true
+		l.TLSEnabled = &val
+	}
 	return nil
 }
 
@@ -1897,14 +2071,49 @@ func (r *Limits) setFrom(f *Limits) {
 	}
 }
 
+type WorkflowStorage struct {
+	ArtifactStorageHost *string
+	URL                 *string
+	TLSEnabled          *bool
+}
+
+func (s *WorkflowStorage) setFrom(f *WorkflowStorage) {
+	if f.ArtifactStorageHost != nil {
+		s.ArtifactStorageHost = f.ArtifactStorageHost
+	}
+	if f.URL != nil {
+		s.URL = f.URL
+	}
+	if f.TLSEnabled != nil {
+		s.TLSEnabled = f.TLSEnabled
+	}
+}
+
+func (s *WorkflowStorage) ValidateConfig() error {
+	URLIsSet := s.URL != nil && *s.URL != ""
+	ArtifactStorageHostIsSet := s.ArtifactStorageHost != nil && *s.ArtifactStorageHost != ""
+	if URLIsSet && !ArtifactStorageHostIsSet {
+		return configutils.ErrInvalid{Name: "ArtifactStorageHost", Value: "", Msg: "workflow storage service artifact storage host must be set"}
+	}
+
+	if s.TLSEnabled == nil {
+		val := true
+		s.TLSEnabled = &val
+	}
+
+	return nil
+}
+
 type WorkflowRegistry struct {
 	Address                 *string
 	NetworkID               *string
 	ChainID                 *string
+	ContractVersion         *string
 	MaxBinarySize           *utils.FileSize
 	MaxEncryptedSecretsSize *utils.FileSize
 	MaxConfigSize           *utils.FileSize
 	SyncStrategy            *string
+	WorkflowStorage         WorkflowStorage
 }
 
 func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
@@ -1918,6 +2127,10 @@ func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
 
 	if f.ChainID != nil {
 		r.ChainID = f.ChainID
+	}
+
+	if f.ContractVersion != nil {
+		r.ContractVersion = f.ContractVersion
 	}
 
 	if f.MaxBinarySize != nil {
@@ -1935,12 +2148,15 @@ func (r *WorkflowRegistry) setFrom(f *WorkflowRegistry) {
 	if f.SyncStrategy != nil {
 		r.SyncStrategy = f.SyncStrategy
 	}
+
+	r.WorkflowStorage.setFrom(&f.WorkflowStorage)
 }
 
 type Dispatcher struct {
 	SupportedVersion   *int
 	ReceiverBufferSize *int
 	RateLimit          DispatcherRateLimit
+	SendToSharedPeer   *bool
 }
 
 func (d *Dispatcher) setFrom(f *Dispatcher) {
@@ -1952,6 +2168,10 @@ func (d *Dispatcher) setFrom(f *Dispatcher) {
 
 	if f.SupportedVersion != nil {
 		d.SupportedVersion = f.SupportedVersion
+	}
+
+	if f.SendToSharedPeer != nil {
+		d.SendToSharedPeer = f.SendToSharedPeer
 	}
 }
 
@@ -2022,9 +2242,60 @@ type ConnectorGateway struct {
 	URL *string
 }
 
+type SharedPeering struct {
+	Enabled       *bool
+	Bootstrappers *[]ocrcommontypes.BootstrapperLocator
+	StreamConfig  StreamConfig
+}
+
+func (c *SharedPeering) setFrom(f *SharedPeering) {
+	if f.Enabled != nil {
+		c.Enabled = f.Enabled
+	}
+	if f.Bootstrappers != nil {
+		c.Bootstrappers = f.Bootstrappers
+	}
+	c.StreamConfig.setFrom(&f.StreamConfig)
+}
+
+type StreamConfig struct {
+	IncomingMessageBufferSize  *int
+	OutgoingMessageBufferSize  *int
+	MaxMessageLenBytes         *int
+	MessageRateLimiterRate     *float64
+	MessageRateLimiterCapacity *uint32
+	BytesRateLimiterRate       *float64
+	BytesRateLimiterCapacity   *uint32
+}
+
+func (c *StreamConfig) setFrom(f *StreamConfig) {
+	if v := f.IncomingMessageBufferSize; v != nil {
+		c.IncomingMessageBufferSize = v
+	}
+	if v := f.OutgoingMessageBufferSize; v != nil {
+		c.OutgoingMessageBufferSize = v
+	}
+	if v := f.MaxMessageLenBytes; v != nil {
+		c.MaxMessageLenBytes = v
+	}
+	if v := f.MessageRateLimiterRate; v != nil {
+		c.MessageRateLimiterRate = v
+	}
+	if v := f.MessageRateLimiterCapacity; v != nil {
+		c.MessageRateLimiterCapacity = v
+	}
+	if v := f.BytesRateLimiterRate; v != nil {
+		c.BytesRateLimiterRate = v
+	}
+	if v := f.BytesRateLimiterCapacity; v != nil {
+		c.BytesRateLimiterCapacity = v
+	}
+}
+
 type Capabilities struct {
 	RateLimit        EngineExecutionRateLimit `toml:",omitempty"`
 	Peering          P2P                      `toml:",omitempty"`
+	SharedPeering    SharedPeering            `toml:",omitempty"`
 	Dispatcher       Dispatcher               `toml:",omitempty"`
 	ExternalRegistry ExternalRegistry         `toml:",omitempty"`
 	WorkflowRegistry WorkflowRegistry         `toml:",omitempty"`
@@ -2034,6 +2305,7 @@ type Capabilities struct {
 func (c *Capabilities) setFrom(f *Capabilities) {
 	c.RateLimit.setFrom(&f.RateLimit)
 	c.Peering.setFrom(&f.Peering)
+	c.SharedPeering.setFrom(&f.SharedPeering)
 	c.ExternalRegistry.setFrom(&f.ExternalRegistry)
 	c.WorkflowRegistry.setFrom(&f.WorkflowRegistry)
 	c.Dispatcher.setFrom(&f.Dispatcher)
@@ -2150,16 +2422,18 @@ func (t *Tracing) ValidateConfig() (err error) {
 }
 
 type Telemetry struct {
-	Enabled               *bool
-	CACertFile            *string
-	Endpoint              *string
-	InsecureConnection    *bool
-	ResourceAttributes    map[string]string `toml:",omitempty"`
-	TraceSampleRatio      *float64
-	EmitterBatchProcessor *bool
-	EmitterExportTimeout  *commonconfig.Duration
-	ChipIngressEndpoint   *string
-	HeartbeatInterval     *commonconfig.Duration
+	Enabled                       *bool
+	CACertFile                    *string
+	Endpoint                      *string
+	InsecureConnection            *bool
+	ResourceAttributes            map[string]string `toml:",omitempty"`
+	TraceSampleRatio              *float64
+	EmitterBatchProcessor         *bool
+	EmitterExportTimeout          *commonconfig.Duration
+	ChipIngressEndpoint           *string
+	ChipIngressInsecureConnection *bool
+	HeartbeatInterval             *commonconfig.Duration
+	LogStreamingEnabled           *bool
 }
 
 func (b *Telemetry) setFrom(f *Telemetry) {
@@ -2190,8 +2464,14 @@ func (b *Telemetry) setFrom(f *Telemetry) {
 	if v := f.ChipIngressEndpoint; v != nil {
 		b.ChipIngressEndpoint = v
 	}
+	if v := f.ChipIngressInsecureConnection; v != nil {
+		b.ChipIngressInsecureConnection = v
+	}
 	if v := f.HeartbeatInterval; v != nil {
 		b.HeartbeatInterval = v
+	}
+	if v := f.LogStreamingEnabled; v != nil {
+		b.LogStreamingEnabled = v
 	}
 }
 
@@ -2264,6 +2544,9 @@ type Billing struct {
 func (b *Billing) setFrom(f *Billing) {
 	if f.URL != nil {
 		b.URL = f.URL
+	}
+
+	if f.TLSEnabled != nil {
 		b.TLSEnabled = f.TLSEnabled
 	}
 }
@@ -2274,7 +2557,8 @@ func (b *Billing) ValidateConfig() error {
 	}
 
 	if b.TLSEnabled == nil {
-		return configutils.ErrInvalid{Name: "TLSEnabled", Value: "", Msg: "billing service TLS option must be set"}
+		val := true
+		b.TLSEnabled = &val
 	}
 
 	return nil

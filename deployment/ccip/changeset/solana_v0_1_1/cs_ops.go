@@ -242,7 +242,7 @@ func SetUpgradeAuthorityChangeset(
 	e.Logger.Infow("Setting upgrade authority", "newUpgradeAuthority", config.NewUpgradeAuthority.String())
 	mcmsTxns := make([]mcmsTypes.Transaction, 0)
 	for _, programID := range programs {
-		ixn := setUpgradeAuthority(&e, &chain, programID, currentAuthority, config.NewUpgradeAuthority, false)
+		ixn := SetUpgradeAuthority(&e, &chain, programID, currentAuthority, config.NewUpgradeAuthority, false)
 		if config.MCMS == nil {
 			if err := chain.Confirm([]solana.Instruction{ixn}); err != nil {
 				return cldf.ChangesetOutput{}, fmt.Errorf("failed to confirm instructions: %w", err)
@@ -271,8 +271,8 @@ func SetUpgradeAuthorityChangeset(
 	return cldf.ChangesetOutput{}, nil
 }
 
-// setUpgradeAuthority creates a transaction to set the upgrade authority for a program
-func setUpgradeAuthority(
+// SetUpgradeAuthority creates a transaction to set the upgrade authority for a program
+func SetUpgradeAuthority(
 	e *cldf.Environment,
 	chain *cldf_solana.Chain,
 	programID solana.PublicKey,
@@ -432,7 +432,7 @@ func DeployReceiverForTest(e cldf.Environment, cfg DeployForTestConfig) (cldf.Ch
 	}
 
 	if cfg.BuildConfig != nil {
-		e.Logger.Debugw("Building solana artifacts", "gitCommitSha", cfg.BuildConfig.GitCommitSha)
+		e.Logger.Debugw("Building solana artifacts", "BuildConfig", cfg.BuildConfig)
 		err := BuildSolana(e, *cfg.BuildConfig)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to build solana: %w", err)
@@ -483,7 +483,6 @@ func DeployReceiverForTest(e cldf.Environment, cfg DeployForTestConfig) (cldf.Ch
 		// only support deployer key as upgrade authority. never transfer to timelock
 		_, err := generateUpgradeTxns(e, chain, ab, DeployChainContractsConfig{
 			UpgradeConfig: UpgradeConfig{
-				SpillAddress:     chain.DeployerKey.PublicKey(),
 				UpgradeAuthority: chain.DeployerKey.PublicKey(),
 			},
 		}, cfg.ReceiverVersion, chainState.Receiver, shared.Receiver)

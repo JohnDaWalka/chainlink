@@ -11,6 +11,7 @@ import (
 	burnmint "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/burnmint_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/cctp_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/fee_quoter"
 	lockrelease "github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/lockrelease_token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/v0_1_1/rmn_remote"
@@ -32,13 +33,13 @@ type AcceptOwnershipFn func(
 	authority solana.PublicKey,
 ) (solana.Instruction, error)
 
-// transferAndWrapAcceptOwnership abstracts logic of:
+// TransferAndWrapAcceptOwnership abstracts logic of:
 //   - building a “transfer ownership” instruction
 //   - confirming on-chain
 //   - building an “accept ownership” instruction
 //   - wrapping it in an MCMS transaction
 //   - returning the mcms transaction for the accept ownership
-func transferAndWrapAcceptOwnership(
+func TransferAndWrapAcceptOwnership(
 	buildTransfer TransferOwnershipFn,
 	buildAccept AcceptOwnershipFn,
 	programID solana.PublicKey, // e.g. token_pool program or router program
@@ -150,7 +151,7 @@ func transferOwnershipRouter(
 		return acceptOwnershipIx, nil
 	}
 
-	tx, err := transferAndWrapAcceptOwnership(
+	tx, err := TransferAndWrapAcceptOwnership(
 		buildTransfer,
 		buildAccept,
 		routerProgramID,
@@ -228,7 +229,7 @@ func transferOwnershipFeeQuoter(
 		return acceptOwnershipIx, nil
 	}
 
-	tx, err := transferAndWrapAcceptOwnership(
+	tx, err := TransferAndWrapAcceptOwnership(
 		buildTransfer,
 		buildAccept,
 		feeQuoterProgramID,
@@ -306,7 +307,7 @@ func transferOwnershipOffRamp(
 		return acceptOwnershipIx, nil
 	}
 
-	tx, err := transferAndWrapAcceptOwnership(
+	tx, err := TransferAndWrapAcceptOwnership(
 		buildTransfer,
 		buildAccept,
 		offRampProgramID,
@@ -375,7 +376,7 @@ func transferOwnershipBurnMintTokenPools(
 		return ix, nil
 	}
 
-	tx, err := transferAndWrapAcceptOwnership(
+	tx, err := TransferAndWrapAcceptOwnership(
 		buildTransfer,
 		buildAccept,
 		state.BurnMintTokenPools[tokenPoolMetadata],
@@ -444,7 +445,7 @@ func transferOwnershipLockReleaseTokenPools(
 		return ix, nil
 	}
 
-	tx, err := transferAndWrapAcceptOwnership(
+	tx, err := TransferAndWrapAcceptOwnership(
 		buildTransfer,
 		buildAccept,
 		state.LockReleaseTokenPools[tokenPoolMetadata],
@@ -458,6 +459,74 @@ func transferOwnershipLockReleaseTokenPools(
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to transfer lock-release token pool ownership: %w", err)
+	}
+
+	result = append(result, tx)
+	return result, nil
+}
+
+// transferOwnershipCCTPTokenPools transfers ownership of the CCTP token pool.
+func transferOwnershipCCTPTokenPools(
+	ccipState stateview.CCIPOnChainState,
+	tokenPoolConfigPDA solana.PublicKey,
+	tokenMint solana.PublicKey,
+	chainSelector uint64,
+	solChain cldf_solana.Chain,
+	currentOwner solana.PublicKey,
+	proposedOwner solana.PublicKey,
+	timelockSigner solana.PublicKey,
+) ([]mcmsTypes.Transaction, error) {
+	var result []mcmsTypes.Transaction
+
+	state := ccipState.SolChains[chainSelector]
+
+	// Build specialized closures
+	buildTransfer := func(proposedOwner, config, authority solana.PublicKey) (solana.Instruction, error) {
+		cctp_token_pool.SetProgramID(state.CCTPTokenPool)
+		ix, err := cctp_token_pool.NewTransferOwnershipInstruction(
+			proposedOwner, config, tokenMint, authority,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, err
+		}
+		for _, acc := range ix.Accounts() {
+			if acc.PublicKey == timelockSigner {
+				acc.IsSigner = false
+			}
+		}
+		return ix, nil
+	}
+	buildAccept := func(config, newOwnerAuthority solana.PublicKey) (solana.Instruction, error) {
+		cctp_token_pool.SetProgramID(state.CCTPTokenPool)
+		// If the router has its own accept function, use that
+		ix, err := cctp_token_pool.NewAcceptOwnershipInstruction(
+			config, tokenMint, newOwnerAuthority,
+		).ValidateAndBuild()
+		if err != nil {
+			return nil, err
+		}
+		for _, acc := range ix.Accounts() {
+			if acc.PublicKey == timelockSigner {
+				acc.IsSigner = false
+			}
+		}
+		return ix, nil
+	}
+
+	tx, err := TransferAndWrapAcceptOwnership(
+		buildTransfer,
+		buildAccept,
+		state.CCTPTokenPool,
+		proposedOwner,      // timelock PDA
+		tokenPoolConfigPDA, // config PDA
+		currentOwner,
+		solChain,
+		shared.CCTPTokenPool,
+		timelockSigner, // the timelock signer PDA
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to transfer CCTP token pool ownership: %w", err)
 	}
 
 	result = append(result, tx)

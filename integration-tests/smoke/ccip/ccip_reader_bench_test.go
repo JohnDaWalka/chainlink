@@ -14,11 +14,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/ccip_reader_tester"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/onramp"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	ccipocr3common "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-evm/pkg/config"
 
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -33,7 +37,6 @@ import (
 	evmconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
-	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
 )
 
@@ -727,16 +730,27 @@ func benchSetup(
 
 	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{params.ReaderChain: extendedCr}
 	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
+	mockAddrCodec := newMockAddressCodec(t)
+	mockContractWriter := writer_mocks.NewMockContractWriter(t)
+	readerChainAccessor, err := chainaccessor.NewDefaultAccessor(
+		lggr,
+		params.ReaderChain,
+		extendedCr,
+		mockContractWriter,
+		mockAddrCodec,
+	)
+	require.NoError(t, err)
+	chainAccessors := map[ccipocr3common.ChainSelector]ccipocr3common.ChainAccessor{params.ReaderChain: readerChainAccessor}
 
-	mokAddrCodec := newMockAddressCodec(t)
 	reader := ccipreaderpkg.NewCCIPReaderWithExtendedContractReaders(
 		ctx,
 		lggr,
+		chainAccessors,
 		contractReaders,
 		contractWriters,
 		params.DestChain,
 		nil,
-		mokAddrCodec,
+		mockAddrCodec,
 	)
 
 	t.Cleanup(func() {
@@ -756,7 +770,7 @@ func benchSetup(
 type benchSetupParams struct {
 	ReaderChain        cciptypes.ChainSelector
 	DestChain          cciptypes.ChainSelector
-	Cfg                evmtypes.ChainReaderConfig
+	Cfg                config.ChainReaderConfig
 	ContractNameToBind string
 	FinalityDepth      int64
 }

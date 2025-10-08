@@ -2,7 +2,10 @@ package crib
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"slices"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,7 +18,6 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
@@ -106,57 +108,115 @@ func distributeTransmitterFunds(lggr logger.Logger, nodeInfo []devenv.Node, env 
 }
 
 func SendFundsToAccounts(ctx context.Context, lggr logger.Logger, chain cldf_evm.Chain, accounts []common.Address, fundingAmount *big.Int, sel uint64) error {
-	latesthdr, err := chain.Client.HeaderByNumber(ctx, nil)
+	nonce, err := chain.Client.NonceAt(ctx, chain.DeployerKey.From, nil)
 	if err != nil {
-		lggr.Errorw("could not get header, skipping chain", "chain", sel, "err", err)
-		return err
+		return fmt.Errorf("could not get latest nonce for deployer key: %w", err)
 	}
-	block := latesthdr.Number
+	lggr.Infow("Starting funding process", "chain", sel, "fromAddress", chain.DeployerKey.From, "startNonce", nonce)
 
-	nonce, err := chain.Client.NonceAt(context.Background(), chain.DeployerKey.From, block)
+	tipCap, err := chain.Client.SuggestGasTipCap(ctx)
 	if err != nil {
-		lggr.Warnw("could not get latest nonce for deployer key", "err", err)
-		return err
+		return fmt.Errorf("could not suggest gas tip cap: %w", err)
 	}
-	for _, address := range accounts {
-		gasPrice, err := chain.Client.SuggestGasPrice(ctx)
-		if err != nil {
-			lggr.Warnw("could not suggest gas price, using default", "err", err)
-			gasPrice = big.NewInt(100000000) // 1 Gwei as default
-		}
 
-		gasLimit, err := chain.Client.EstimateGas(ctx, ethereum.CallMsg{
-			From:     chain.DeployerKey.From,
-			To:       &address,
-			Value:    fundingAmount,
-			GasPrice: gasPrice,
-		})
-		if err != nil {
-			lggr.Warnw("could not estimate gas, using default", "err", err)
-			gasLimit = uint64(1000000)
-		}
+	latestBlock, err := chain.Client.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("could not get latest block: %w", err)
+	}
+	baseFee := latestBlock.BaseFee
 
-		tx := gethtypes.NewTransaction(nonce, address, fundingAmount, gasLimit, gasPrice, nil)
+	feeCap := new(big.Int).Add(
+		new(big.Int).Mul(baseFee, big.NewInt(2)),
+		tipCap,
+	)
+
+	gasLimit, err := chain.Client.EstimateGas(ctx, ethereum.CallMsg{
+		From:  chain.DeployerKey.From,
+		To:    &accounts[0],
+		Value: fundingAmount,
+	})
+	if err != nil {
+		return fmt.Errorf("could not estimate gas for chain %d: %w", sel, err)
+	}
+	lggr.Infow("Using EIP-1559 fees", "chain", sel, "baseFee", baseFee, "tipCap", tipCap, "feeCap", feeCap, "gasLimit", gasLimit)
+
+	var signedTxs []*gethtypes.Transaction
+
+	chainID, err := chainsel.GetChainIDFromSelector(chain.Selector)
+	if err != nil {
+		return fmt.Errorf("could not get chainID from selector: %w", err)
+	}
+	chainIDBig := new(big.Int)
+	if _, ok := chainIDBig.SetString(chainID, 10); !ok {
+		return fmt.Errorf("could not parse chainID: %s", chainID)
+	}
+
+	for i, address := range accounts {
+		currentNonce := nonce + uint64(i) //nolint:gosec // G115: i is always positive and within reasonable bounds
+		baseTx := &gethtypes.DynamicFeeTx{
+			ChainID:   chainIDBig,
+			Nonce:     currentNonce,
+			GasTipCap: tipCap,
+			GasFeeCap: feeCap,
+			Gas:       gasLimit,
+			To:        &address,
+			Value:     fundingAmount,
+			Data:      nil,
+		}
+		tx := gethtypes.NewTx(baseTx)
 
 		signedTx, err := chain.DeployerKey.Signer(chain.DeployerKey.From, tx)
 		if err != nil {
-			lggr.Errorw("could not sign transaction for sending funds to ", "chain", sel, "account", address, "err", err)
-			return err
+			return fmt.Errorf("could not sign transaction for account %s: %w", address.Hex(), err)
 		}
-
-		lggr.Infow("sending transaction for ", "account", address.String(), "chain", sel)
-		err = chain.Client.SendTransaction(context.Background(), signedTx)
-		if err != nil {
-			lggr.Errorw("could not send transaction to address on ", "chain", sel, "address", address, "err", err)
-			return err
-		}
-
-		_, err = bind.WaitMined(context.Background(), chain.Client, signedTx)
-		if err != nil {
-			lggr.Errorw("could not mine transaction to address on ", "chain", sel)
-			return err
-		}
-		nonce++
+		signedTxs = append(signedTxs, signedTx)
 	}
-	return nil
+
+	for _, signedTx := range signedTxs {
+		lggr.Infow("Sending funding tx", "chain", sel, "hash", signedTx.Hash().Hex(), "nonce", signedTx.Nonce())
+		err = chain.Client.SendTransaction(ctx, signedTx)
+		if err != nil {
+			return fmt.Errorf("could not send transaction %s: %w", signedTx.Hash().Hex(), err)
+		}
+	}
+
+	g, waitCtx := errgroup.WithContext(ctx)
+	for _, tx := range signedTxs {
+		tx := tx
+		g.Go(func() error {
+			receipt, err := bind.WaitMined(waitCtx, chain.Client, tx)
+			if err != nil {
+				return fmt.Errorf("failed to mine transaction %s: %w", tx.Hash().Hex(), err)
+			}
+			if receipt.Status == gethtypes.ReceiptStatusFailed {
+				return fmt.Errorf("transaction %s reverted", tx.Hash().Hex())
+			}
+			lggr.Infow("Transaction successfully mined", "chain", sel, "hash", tx.Hash().Hex())
+			return nil
+		})
+	}
+
+	return g.Wait()
+}
+
+// getTierChainSelectors organizes the provided chain selectors into deterministic tiers based on the supplied number of high and low tier chains.
+func getTierChainSelectors(allSelectors []uint64, highTierCount int, lowTierCount int) (highTierSelectors []uint64, lowTierSelectors []uint64) {
+	// we prioritize home selector, simulated solana, and evm feed selectors
+	prioritySelectors := []uint64{3379446385462418246, 12463857294658392847, 12922642891491394802}
+	orderedSelectors := make([]uint64, 0, len(allSelectors))
+	for _, sel := range prioritySelectors {
+		if slices.Contains(allSelectors, sel) {
+			orderedSelectors = append(orderedSelectors, sel)
+		}
+	}
+
+	// the remaining chains are evm and count up
+	evmChainID := 90000001
+	for len(orderedSelectors) < len(allSelectors) {
+		details, _ := chainsel.GetChainDetailsByChainIDAndFamily(strconv.Itoa(evmChainID), chainsel.FamilyEVM)
+		orderedSelectors = append(orderedSelectors, details.ChainSelector)
+		evmChainID++
+	}
+
+	return orderedSelectors[0:highTierCount], orderedSelectors[highTierCount : highTierCount+lowTierCount]
 }

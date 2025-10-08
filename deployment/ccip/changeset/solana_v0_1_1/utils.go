@@ -1,6 +1,7 @@
 package solana
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -30,7 +31,7 @@ const (
 
 var ContractVersionShortSha = map[CCIPSolanaContractVersion]string{
 	SolanaContractV0_1_0: "0ee732e80586",
-	SolanaContractV0_1_1: "ee587a6c0562",
+	SolanaContractV0_1_1: "7f8a0f403c3a",
 }
 
 func ValidateMCMSConfigSolana(
@@ -71,11 +72,20 @@ func ValidateMCMSConfigSolana(
 		if tokenPoolMetadata != "" {
 			metadata = tokenPoolMetadata
 		}
-		if err := solanastateview.ValidateOwnershipSolana(&e, chain, mcms != nil, chainState.BurnMintTokenPools[metadata], shared.BurnMintTokenPool, tokenAddress); contractsToValidate[shared.BurnMintTokenPool] && err != nil {
-			return fmt.Errorf("failed to validate ownership for burnmint: %w", err)
+		if contractsToValidate[shared.BurnMintTokenPool] {
+			if err := solanastateview.ValidateOwnershipSolana(&e, chain, mcms != nil, chainState.BurnMintTokenPools[metadata], shared.BurnMintTokenPool, tokenAddress); err != nil {
+				return fmt.Errorf("failed to validate ownership for burnmint: %w", err)
+			}
 		}
-		if err := solanastateview.ValidateOwnershipSolana(&e, chain, mcms != nil, chainState.LockReleaseTokenPools[metadata], shared.LockReleaseTokenPool, tokenAddress); contractsToValidate[shared.LockReleaseTokenPool] && err != nil {
-			return fmt.Errorf("failed to validate ownership for lockrelease: %w", err)
+		if contractsToValidate[shared.LockReleaseTokenPool] {
+			if err := solanastateview.ValidateOwnershipSolana(&e, chain, mcms != nil, chainState.LockReleaseTokenPools[metadata], shared.LockReleaseTokenPool, tokenAddress); err != nil {
+				return fmt.Errorf("failed to validate ownership for lockrelease: %w", err)
+			}
+		}
+		if contractsToValidate[shared.CCTPTokenPool] {
+			if err := solanastateview.ValidateOwnershipSolana(&e, chain, mcms != nil, chainState.CCTPTokenPool, shared.CCTPTokenPool, tokenAddress); err != nil {
+				return fmt.Errorf("failed to validate ownership for cctp token pool: %w", err)
+			}
 		}
 	}
 
@@ -209,4 +219,23 @@ func GetTokenProgramID(programName cldf.ContractType) (solana.PublicKey, error) 
 		return solana.PublicKey{}, fmt.Errorf("invalid token program: %s. Must be one of: %s, %s", programName, shared.SPLTokens, shared.SPL2022Tokens)
 	}
 	return programID, nil
+}
+
+func generateProposalIfMCMS(e cldf.Environment, chainSelector uint64, mcmsCfg *proposalutils.TimelockConfig, mcmsTxs []mcmsTypes.Transaction) (cldf.ChangesetOutput, error) {
+	if len(mcmsTxs) > 0 {
+		if mcmsCfg == nil {
+			return cldf.ChangesetOutput{}, errors.New("MCMS txn detected but no MCMS config provided. Please re-run with mcms specified")
+		}
+		proposal, err := BuildProposalsForTxns(
+			e, chainSelector, "proposal to upgrade CCIP contracts", mcmsCfg.MinDelay, mcmsTxs)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to build proposal: %w", err)
+		}
+
+		return cldf.ChangesetOutput{
+			MCMSTimelockProposals: []mcms.TimelockProposal{*proposal},
+		}, nil
+	}
+
+	return cldf.ChangesetOutput{}, nil
 }

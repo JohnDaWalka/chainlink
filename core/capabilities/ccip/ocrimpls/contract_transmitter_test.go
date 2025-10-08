@@ -25,8 +25,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_0/multi_ocr3_helper"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink-evm/pkg/assets"
 	"github.com/smartcontractkit/chainlink-evm/pkg/client"
@@ -45,7 +45,6 @@ import (
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"    // Register EVM plugin config factories
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipsolana" // Register Solana plugin config factories
 	_ "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipton"    // Register Ton plugin config factories
-	ccipcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
@@ -54,7 +53,6 @@ import (
 	kschaintype "github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
-	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
 func Test_ContractTransmitter_TransmitWithoutSignatures(t *testing.T) {
@@ -192,7 +190,7 @@ func abiEncodeUint32(data uint32) ([]byte, error) {
 
 // Test EVM -> SVM extra data decoding in contract transmitter
 func TestSVMExecCallDataFuncExtraDataDecoding(t *testing.T) {
-	extraDataCodec := ccipcommon.ExtraDataCodec(map[string]ccipcommon.SourceChainExtraDataCodec{
+	extraDataCodec := ccipocr3.ExtraDataCodecMap(map[string]ccipocr3.SourceChainExtraDataCodec{
 		chainsel.FamilyEVM:    ccipevm.ExtraDataDecoder{},
 		chainsel.FamilySolana: ccipsolana.ExtraDataDecoder{},
 	})
@@ -475,7 +473,8 @@ func newTestUniverse(t *testing.T, ks *keyringsAndSigners[[]byte]) *testUniverse
 		simClient,
 		txm,
 		gasEstimator,
-		chainWriterConfigRaw(transmitters[0], assets.GWei(1)))
+		chainWriterConfigRaw(transmitters[0], assets.GWei(1)),
+		nil)
 	require.NoError(t, err, "failed to create chain writer")
 	require.NoError(t, chainWriter.Start(testutils.Context(t)), "failed to start chain writer")
 	t.Cleanup(func() { require.NoError(t, chainWriter.Close()) })
@@ -557,12 +556,12 @@ const (
 	methodTransmitWithoutSignatures = "TransmitWithoutSignatures"
 )
 
-func chainWriterConfigRaw(fromAddress common.Address, maxGasPrice *assets.Wei) evmrelaytypes.ChainWriterConfig {
-	return evmrelaytypes.ChainWriterConfig{
-		Contracts: map[string]*evmrelaytypes.ContractConfig{
+func chainWriterConfigRaw(fromAddress common.Address, maxGasPrice *assets.Wei) evmconfig.ChainWriterConfig {
+	return evmconfig.ChainWriterConfig{
+		Contracts: map[string]*evmconfig.ContractConfig{
 			contractName: {
 				ContractABI: multi_ocr3_helper.MultiOCR3HelperABI,
-				Configs: map[string]*evmrelaytypes.ChainWriterDefinition{
+				Configs: map[string]*evmconfig.ChainWriterDefinition{
 					methodTransmitWithSignatures: {
 						ChainSpecificName: "transmitWithSignatures",
 						GasLimit:          1e6,

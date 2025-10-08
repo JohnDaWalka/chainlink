@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/services/servicetest"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-common/pkg/values"
+	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/executable"
 	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/transmission"
@@ -293,8 +293,13 @@ func testRemoteExecutableCapability(ctx context.Context, t *testing.T, underlyin
 	for i := 0; i < numCapabilityPeers; i++ {
 		capabilityPeer := capabilityPeers[i]
 		capabilityDispatcher := broker.NewDispatcherForNode(capabilityPeer)
-		capabilityNode := executable.NewServer(&commoncap.RemoteExecutableConfig{RequestHashExcludedAttributes: []string{}}, capabilityPeer, underlying, capInfo, capDonInfo, workflowDONs, capabilityDispatcher,
-			capabilityNodeResponseTimeout, 10, nil, lggr)
+		capabilityNode := executable.NewServer(capInfo.ID, "", capabilityPeer, capabilityDispatcher, lggr)
+		cfg := &commoncap.RemoteExecutableConfig{
+			RequestHashExcludedAttributes: []string{},
+			RequestTimeout:                capabilityNodeResponseTimeout,
+			ServerMaxParallelRequests:     10,
+		}
+		require.NoError(t, capabilityNode.SetConfig(cfg, underlying, capInfo, capDonInfo, workflowDONs, nil))
 		servicetest.Run(t, capabilityNode)
 		broker.RegisterReceiverNode(capabilityPeer, capabilityNode)
 		capabilityNodes[i] = capabilityNode
@@ -303,7 +308,9 @@ func testRemoteExecutableCapability(ctx context.Context, t *testing.T, underlyin
 	workflowNodes := make([]commoncap.ExecutableCapability, numWorkflowPeers)
 	for i := 0; i < numWorkflowPeers; i++ {
 		workflowPeerDispatcher := broker.NewDispatcherForNode(workflowPeers[i])
-		workflowNode := executable.NewClient(capInfo, workflowDonInfo, workflowPeerDispatcher, workflowNodeTimeout, lggr)
+		workflowNode := executable.NewClient(capInfo.ID, "", workflowPeerDispatcher, lggr)
+		err := workflowNode.SetConfig(capInfo, workflowDonInfo, workflowNodeTimeout, nil)
+		require.NoError(t, err)
 		servicetest.Run(t, workflowNode)
 		broker.RegisterReceiverNode(workflowPeers[i], workflowNode)
 		workflowNodes[i] = workflowNode
@@ -434,6 +441,12 @@ func (t *nodeDispatcher) SetReceiver(capabilityID string, donID uint32, receiver
 	return nil
 }
 func (t *nodeDispatcher) RemoveReceiver(capabilityID string, donID uint32) {}
+
+func (t *nodeDispatcher) SetReceiverForMethod(capabilityID string, donID uint32, methodName string, receiver remotetypes.Receiver) error {
+	return nil
+}
+func (t *nodeDispatcher) RemoveReceiverForMethod(capabilityID string, donID uint32, methodName string) {
+}
 
 type abstractTestCapability struct {
 }

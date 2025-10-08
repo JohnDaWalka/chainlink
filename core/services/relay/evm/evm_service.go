@@ -37,7 +37,14 @@ type evmService struct {
 
 // Direct RPC
 func (e *evmService) CallContract(ctx context.Context, request evmtypes.CallContractRequest) (*evmtypes.CallContractReply, error) {
-	result, err := e.chain.Client().CallContractWithOpts(ctx, toEthMsg(request.Msg), request.BlockNumber, types.CallContractOpts{ConfidenceLevel: request.ConfidenceLevel})
+	opts := types.CallContractOpts{
+		ConfidenceLevel:   request.ConfidenceLevel,
+		IsExternalRequest: request.IsExternal,
+	}
+	if request.Msg == nil {
+		return nil, errors.New("request.Msg can not be nil")
+	}
+	result, err := e.chain.Client().CallContractWithOpts(ctx, toEthMsg(*request.Msg), request.BlockNumber, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +53,11 @@ func (e *evmService) CallContract(ctx context.Context, request evmtypes.CallCont
 }
 
 func (e *evmService) FilterLogs(ctx context.Context, request evmtypes.FilterLogsRequest) (*evmtypes.FilterLogsReply, error) {
-	rawLogs, err := e.chain.Client().FilterLogsWithOpts(ctx, convertEthFilter(request.FilterQuery), types.FilterLogsOpts{ConfidenceLevel: request.ConfidenceLevel})
+	opts := types.FilterLogsOpts{
+		ConfidenceLevel:   request.ConfidenceLevel,
+		IsExternalRequest: request.IsExternal,
+	}
+	rawLogs, err := e.chain.Client().FilterLogsWithOpts(ctx, convertEthFilter(request.FilterQuery), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +80,14 @@ func (e *evmService) BalanceAt(ctx context.Context, request evmtypes.BalanceAtRe
 }
 
 func (e *evmService) EstimateGas(ctx context.Context, call *evmtypes.CallMsg) (uint64, error) {
-	return e.chain.Client().EstimateGas(ctx, toEthMsg(call))
+	if call == nil {
+		return 0, errors.New("call can not be nil")
+	}
+	return e.chain.Client().EstimateGas(ctx, toEthMsg(*call))
 }
 
-func (e *evmService) GetTransactionByHash(ctx context.Context, hash evmtypes.Hash) (*evmtypes.Transaction, error) {
-	tx, err := e.chain.Client().TransactionByHash(ctx, hash)
+func (e *evmService) GetTransactionByHash(ctx context.Context, request evmtypes.GetTransactionByHashRequest) (*evmtypes.Transaction, error) {
+	tx, err := e.chain.Client().TransactionByHashWithOpts(ctx, request.Hash, types.TransactionByHashOpts{IsExternalRequest: request.IsExternal})
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +95,8 @@ func (e *evmService) GetTransactionByHash(ctx context.Context, hash evmtypes.Has
 	return convertTransaction(tx), nil
 }
 
-func (e *evmService) GetTransactionReceipt(ctx context.Context, txHash evmtypes.Hash) (*evmtypes.Receipt, error) {
-	receipt, err := e.chain.Client().TransactionReceipt(ctx, txHash)
+func (e *evmService) GetTransactionReceipt(ctx context.Context, request evmtypes.GeTransactionReceiptRequest) (*evmtypes.Receipt, error) {
+	receipt, err := e.chain.Client().TransactionReceiptWithOpts(ctx, request.Hash, types.TransactionReceiptOpts{IsExternalRequest: request.IsExternal})
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +113,14 @@ func (e *evmService) HeaderByNumber(ctx context.Context, request evmtypes.Header
 	var err error
 	var h *types.Head
 	switch {
+	case request.Number != nil && !request.Number.IsInt64():
+		// chain-evm.RpcClient does not support block numbers larger than int64
+		return nil, fmt.Errorf("block number %s is larger than int64: %w", request.Number.String(), ethereum.NotFound)
 	// latest block
 	case request.Number == nil || request.Number.Int64() == rpc.LatestBlockNumber.Int64():
 		h, _, err = e.chain.HeadTracker().LatestAndFinalizedBlock(ctx)
 		// non-special block or larger that int64
-	case request.Number.Sign() >= 0 || request.Number.IsInt64():
+	case request.Number.Sign() >= 0:
 		var header *types.Header
 		header, err = e.chain.Client().HeaderByNumberWithOpts(ctx, request.Number, types.HeaderByNumberOpts{ConfidenceLevel: request.ConfidenceLevel})
 		h = (*types.Head)(header)
@@ -245,7 +262,7 @@ func (e *evmService) SubmitTransaction(ctx context.Context, txRequest evmtypes.S
 	}
 
 	if txStatus == evm.TxFatal {
-		return &evmtypes.TransactionResult{TxStatus: txStatus}, nil
+		return &evmtypes.TransactionResult{TxStatus: txStatus, TxIdempotencyKey: txID}, nil
 	}
 
 	receipt, err := retry.Do(retryContext, e.logger, func(ctx context.Context) (*evmtxmgr.ChainReceipt, error) {
@@ -264,8 +281,9 @@ func (e *evmService) SubmitTransaction(ctx context.Context, txRequest evmtypes.S
 	}
 
 	return &evmtypes.TransactionResult{
-		TxStatus: evm.TxSuccess,
-		TxHash:   (*receipt).GetTxHash(),
+		TxStatus:         evm.TxSuccess,
+		TxHash:           (*receipt).GetTxHash(),
+		TxIdempotencyKey: txID,
 	}, nil
 }
 
@@ -409,7 +427,7 @@ func hashesToArrays(input []common.Hash) [][32]byte {
 
 var empty common.Address
 
-func toEthMsg(msg *evmtypes.CallMsg) ethereum.CallMsg {
+func toEthMsg(msg evmtypes.CallMsg) ethereum.CallMsg {
 	var to *common.Address
 
 	if empty.Cmp(msg.To) != 0 {
