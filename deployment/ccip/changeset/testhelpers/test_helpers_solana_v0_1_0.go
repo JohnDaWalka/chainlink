@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -24,11 +23,13 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	mcmstypes "github.com/smartcontractkit/mcms/types"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	tonOps "github.com/smartcontractkit/chainlink-ton/deployment/ccip"
 	tonCfg "github.com/smartcontractkit/chainlink-ton/deployment/ccip/config"
@@ -363,9 +364,7 @@ func allocateCCIPChainSelectors(chains map[uint64]cldf_evm.Chain) (homeChainSel 
 	for chainSel := range chains {
 		chainSels = append(chainSels, chainSel)
 	}
-	sort.Slice(chainSels, func(i, j int) bool {
-		return chainSels[i] < chainSels[j]
-	})
+	slices.Sort(chainSels)
 	// Take lowest for determinism.
 	return chainSels[HomeChainIndex], chainSels[FeedChainIndex]
 }
@@ -1911,7 +1910,6 @@ func MintAndAllow(
 	allowance := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
 
 	for chain, mintTokenInfos := range tokenMap {
-		mintTokenInfos := mintTokenInfos
 
 		configurePoolGrp.Go(func() error {
 			for _, mintTokenInfo := range mintTokenInfos {

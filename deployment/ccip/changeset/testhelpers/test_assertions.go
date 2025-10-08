@@ -116,7 +116,6 @@ func ConfirmTokenPriceUpdatedForAll(
 ) {
 	var wg errgroup.Group
 	for _, chain := range e.BlockChains.EVMChains() {
-		chain := chain
 		wg.Go(func() error {
 			var startBlock *uint64
 			if startBlocks != nil {
@@ -347,7 +346,6 @@ func ConfirmMultipleCommits(
 	errGrp := &errgroup.Group{}
 
 	for sourceDest, seqRange := range expectedSeqNums {
-		seqRange := seqRange
 		srcChain := sourceDest.SourceChainSelector
 		destChain := sourceDest.DestChainSelector
 
@@ -1236,7 +1234,7 @@ func getExecutionState(t *testing.T, sourceSelector uint64, offRamp offramp.OffR
 	return scc, executionState
 }
 
-func RequireConsistently(t *testing.T, condition func() bool, duration time.Duration, tick time.Duration, msgAndArgs ...interface{}) {
+func RequireConsistently(t *testing.T, condition func() bool, duration time.Duration, tick time.Duration, msgAndArgs ...any) {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 	tickTimer := time.NewTicker(tick)
