@@ -120,7 +120,7 @@ func (h *MessageHasherV1) Hash(ctx context.Context, msg ccipocr3common.Message) 
 		return [32]byte{}, err
 	}
 
-	gasLimit, err := parseExtraDataMap(decodedExtraArgsMap)
+	gasLimit, tokenReceiver, err := parseExtraDataMap(decodedExtraArgsMap)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("decode extra args to get gas limit: %w", err)
 	}
@@ -132,7 +132,7 @@ func (h *MessageHasherV1) Hash(ctx context.Context, msg ccipocr3common.Message) 
 		return [32]byte{}, err
 	}
 
-	msgHash, err := computeMessageDataHash(metaDataHashInput, msg.Header.MessageID, receiverAddress, uint64(msg.Header.SequenceNumber), gasLimit, msg.Header.Nonce, msg.Sender, msg.Data, rampTokenAmounts)
+	msgHash, err := computeMessageDataHash(metaDataHashInput, msg.Header.MessageID, receiverAddress, uint64(msg.Header.SequenceNumber), gasLimit, tokenReceiver, msg.Header.Nonce, msg.Sender, msg.Data, rampTokenAmounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -152,7 +152,7 @@ func computeMessageDataHash(
 	receiver [32]byte,
 	sequenceNumber uint64,
 	gasLimit *big.Int,
-	// tokenReceiver [32]byte,
+	tokenReceiver [32]byte,
 	nonce uint64,
 	sender []byte,
 	data []byte,
@@ -178,15 +178,15 @@ func computeMessageDataHash(
 		{Type: bytes32Type}, // receiver as bytes32
 		{Type: uint64Type},  // sequenceNumber
 		{Type: uint256Type}, // gasLimit
-		// {Type: bytes32Type}, // tokenReceiver
-		{Type: uint64Type}, // nonce
+		{Type: bytes32Type}, // tokenReceiver
+		{Type: uint64Type},  // nonce
 	}
 	headerEncoded, err := headerArgs.Pack(
 		messageID,
 		receiver,
 		sequenceNumber,
 		gasLimit,
-		// tokenReceiver,
+		tokenReceiver,
 		nonce,
 	)
 	if err != nil {
@@ -292,46 +292,26 @@ func encodeBytes(b []byte) []byte {
 	return result
 }
 
-func parseExtraDataMap(input map[string]any) (*big.Int, error) {
-	var outputGas *big.Int
-	for fieldName, fieldValue := range input {
-		lowercase := strings.ToLower(fieldName)
-		switch lowercase {
-		case "gaslimit":
-			// Expect [][32]byte
-			if val, ok := fieldValue.(*big.Int); ok {
-				outputGas = val
-				return outputGas, nil
-			}
-			return nil, fmt.Errorf("unexpected type for gas limit: %T", fieldValue)
-		default:
-			// no error here, as we only need the keys to gasLimit, other keys can be skipped without like AllowOutOfOrderExecution	etc.
-		}
+func parseExtraDataMap(input map[string]any) (*big.Int, [32]byte, error) {
+	outputGas, ok := input["gasLimit"]
+	if !ok {
+		return nil, [32]byte{}, errors.New("gas limit not found in extra data map")
 	}
-	return outputGas, errors.New("gas limit not found in extra data map")
+	outputGasInt, ok := outputGas.(*big.Int)
+	if !ok {
+		return nil, [32]byte{}, errors.New("gas limit not a *big.Int")
+	}
+
+	tokenReceiver, ok := input["tokenReceiver"]
+	if !ok {
+		return nil, [32]byte{}, errors.New("token receiver not found in extra data map")
+	}
+	tokenReceiverBytes, ok := tokenReceiver.([32]byte)
+	if !ok {
+		return nil, [32]byte{}, errors.New("token receiver not a [32]byte")
+	}
+	return outputGasInt, tokenReceiverBytes, nil
 }
-
-// TODO use this after testing
-// func parseExtraDataMap(input map[string]any) (*big.Int, [32]byte, error) {
-// 	outputGas, ok := input["gasLimit"]
-// 	if !ok {
-// 		return nil, [32]byte{}, errors.New("gas limit not found in extra data map")
-// 	}
-// 	outputGasInt, ok := outputGas.(*big.Int)
-// 	if !ok {
-// 		return nil, [32]byte{}, errors.New("gas limit not a *big.Int")
-// 	}
-
-// 	tokenReceiver, ok := input["tokenReceiver"]
-// 	if !ok {
-// 		return nil, [32]byte{}, errors.New("token receiver not found in extra data map")
-// 	}
-// 	tokenReceiverBytes, ok := tokenReceiver.([32]byte)
-// 	if !ok {
-// 		return nil, [32]byte{}, errors.New("token receiver not a [32]byte")
-// 	}
-// 	return outputGasInt, tokenReceiverBytes, nil
-// }
 
 func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
 	// Iterate through the expected fields in the struct
