@@ -100,7 +100,6 @@ func TestDeployCache(t *testing.T) {
 }
 
 func TestConfigureCache(t *testing.T) {
-	skipInCI(t)
 	t.Parallel()
 
 	lggr := logger.Test(t)
