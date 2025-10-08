@@ -110,6 +110,7 @@ func DeployKeystoneContracts(
 		},
 		ks_contracts_op.DeployRegistryContractsSequenceInput{
 			RegistryChainSelector: homeChainSelector,
+			Qualifier:             "test-registry",
 		},
 	)
 	if seqErr != nil {

@@ -169,9 +169,9 @@ func SetupEnvV2(t *testing.T, useMCMS bool) *EnvWrapperV2 {
 		changeset.Configure(
 			cldf.CreateChangeSet(configCapRegChangeset.Apply, configCapRegChangeset.VerifyPreconditions),
 			changeset2.ConfigureCapabilitiesRegistryInput{
-				ChainSelector:               registryChainSel,
-				CapabilitiesRegistryAddress: registryAddrs[0].Address,
-				MCMSConfig:                  mcmsConfig,
+				ChainSelector: registryChainSel,
+				Qualifier:     registryAddrs[0].Qualifier,
+				MCMSConfig:    mcmsConfig,
 				Nops: []changeset2.CapabilitiesRegistryNodeOperator{
 					{
 						Name:  "Operator 1",
