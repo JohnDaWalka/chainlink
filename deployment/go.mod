@@ -5,6 +5,10 @@ go 1.24.5
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
+replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+
+replace github.com/smartcontractkit/chainlink-sui/deployment => ../../chainlink-sui/deployment
+
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require github.com/smartcontractkit/chainlink/v2 v2.27.3-0.20250908153844-03478edcd69f
@@ -42,7 +46,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251007140624-a242e4bbd3dc
-	github.com/smartcontractkit/chainlink-deployments-framework v0.54.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.55.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251007172225-ba2f4b5ef962
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003185510-17234095940f
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20250729142306-508e798f6a5d
@@ -58,7 +62,7 @@ require (
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20250930221620-ce57bba04eab
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e
 	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d
-	github.com/smartcontractkit/mcms v0.26.0
+	github.com/smartcontractkit/mcms v0.25.1
 	github.com/smartcontractkit/quarantine v0.0.0-20250909213106-ece491bef618
 	github.com/smartcontractkit/smdkg v0.0.0-20250916143931-2876ea233fd8
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945
@@ -146,7 +150,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
-	github.com/btcsuite/btcutil v1.0.2 // indirect
+	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytecodealliance/wasmtime-go/v28 v28.0.0 // indirect

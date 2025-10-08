@@ -9,6 +9,10 @@ replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
 replace github.com/smartcontractkit/chainlink/integration-tests => ../
 
+replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+
+replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
+
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require (
@@ -33,7 +37,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251007140624-a242e4bbd3dc
-	github.com/smartcontractkit/chainlink-deployments-framework v0.54.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.55.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251007172225-ba2f4b5ef962
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003185510-17234095940f
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.34
@@ -500,7 +504,7 @@ require (
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d // indirect
-	github.com/smartcontractkit/mcms v0.26.0 // indirect
+	github.com/smartcontractkit/mcms v0.25.1 // indirect
 	github.com/smartcontractkit/smdkg v0.0.0-20250916143931-2876ea233fd8 // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de // indirect
 	github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 // indirect

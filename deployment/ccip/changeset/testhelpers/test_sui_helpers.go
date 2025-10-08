@@ -608,3 +608,87 @@ func WaitForTokenBalanceSui(
 		return balance.Cmp(expected) == 0
 	}, tests.WaitTimeout(t), 500*time.Millisecond)
 }
+
+func UpgradeContractDirect(
+	ctx context.Context,
+	callOpts *suiBind.CallOpts, // must include Signer, GasBudget, WaitForExecution
+	client sui.ISuiAPI,
+	upgradeCapID string,
+	modules [][]byte,
+	dependencies []models.SuiAddressBytes,
+	policy byte,
+	digest []byte,
+) (*models.SuiTransactionBlockResponse, error) {
+
+	ptb := suitx.NewTransaction()
+	ptb.SetSuiClient(client.(*sui.Client))
+
+	packageContract, err := suiBind.NewBoundContract(
+		"0x2",     // Framework package
+		"sui",     // Package name
+		"package", // Module name
+		client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to suibind package module: %w", err)
+	}
+
+	fmt.Println("BOUNDED PKG")
+
+	// Encode authorize_upgrade call
+	typeArgsList := []string{}
+	typeParamsList := []string{}
+	paramTypes := []string{
+		"&UpgradeCap",
+		"u8",
+		"vector<u8>",
+	}
+	paramValues := []any{
+		suiBind.Object{Id: upgradeCapID},
+		uint8(policy),
+		digest,
+	}
+
+	authCall, err := packageContract.EncodeCallArgsWithGenerics(
+		"authorize_upgrade",
+		typeArgsList,
+		typeParamsList,
+		paramTypes,
+		paramValues,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode authorize_upgrade call: %w", err)
+	}
+
+	fmt.Println("ENCODE ARGS COMPLETE")
+	authResult, err := packageContract.AppendPTB(ctx, callOpts, ptb, authCall)
+	if err != nil {
+		return nil, fmt.Errorf("failed to append authorize_upgrade to PTB: %w", err)
+	}
+
+	fmt.Println("APPEND PTB COMPLETE")
+	// Append the Upgrade command (consumes UpgradeTicket)
+	upgradeCmd := suitx.Command{
+		Upgrade: &suitx.Upgrade{
+			Modules:      modules,
+			Dependencies: dependencies,
+			Package:      models.SuiAddressBytes{}, // Derived by runtime from ticket
+			Ticket:       &suitx.Argument{Result: authResult.Result},
+		},
+	}
+	ptb.Data.V1.Kind.ProgrammableTransaction.Commands =
+		append(ptb.Data.V1.Kind.ProgrammableTransaction.Commands, &upgradeCmd)
+
+	fmt.Println("ABOUT TO CALL EXECUTE")
+
+	// ️ Execute PTB
+	resp, err := suiBind.ExecutePTB(ctx, callOpts, client, ptb)
+	if err != nil {
+		return nil, fmt.Errorf("failed executing upgrade PTB: %w", err)
+	}
+
+	fmt.Println("Package upgraded successfully!")
+	fmt.Println("Transaction digest:", resp.Digest)
+	return resp, nil
+}

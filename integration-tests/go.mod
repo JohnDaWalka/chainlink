@@ -7,6 +7,10 @@ replace github.com/smartcontractkit/chainlink/v2 => ../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../deployment
 
+replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+
+replace github.com/smartcontractkit/chainlink-sui/deployment => ../../chainlink-sui/deployment
+
 // Using a separate `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
 require (
@@ -22,6 +26,7 @@ require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
+	github.com/block-vision/sui-go-sdk v1.1.2
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20240821051457-da69c6d9617a
 	github.com/cli/go-gh/v2 v2.11.2
 	github.com/deckarep/golang-set/v2 v2.6.0
@@ -51,7 +56,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251007140624-a242e4bbd3dc
-	github.com/smartcontractkit/chainlink-deployments-framework v0.54.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.55.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251007172225-ba2f4b5ef962
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003185510-17234095940f
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
@@ -66,7 +71,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.0
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250930221620-ce57bba04eab
 	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d
-	github.com/smartcontractkit/mcms v0.26.0
+	github.com/smartcontractkit/mcms v0.25.1
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1
 	github.com/subosito/gotenv v1.6.0
@@ -153,7 +158,6 @@ require (
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/blendle/zapdriver v1.3.1 // indirect
-	github.com/block-vision/sui-go-sdk v1.1.2 // indirect
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
