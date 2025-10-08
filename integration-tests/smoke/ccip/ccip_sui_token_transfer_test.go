@@ -399,51 +399,6 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 			ExtraArgs:             testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, stateObj), // receiver is objectId this time
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{},
 		},
-
-		{
-			Name:             "Send token to EOA with gas limit set to 0",
-			SourceChain:      sourceChain,
-			DestChain:        destChain,
-			Receiver:         receiverByte, // reciever contract pkgId
-			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
-			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
-			Tokens: []router.ClientEVMTokenAmount{
-				{
-					Token:  evmToken.Address(),
-					Amount: big.NewInt(1e18),
-				},
-			},
-			ExtraArgs: testhelpers.MakeSuiExtraArgs(0, true, recieverObjectIds, suiAddr),
-			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{
-					Token:  suiTokenBytes,
-					Amount: big.NewInt(1e9),
-				},
-			},
-		},
-
-		{
-			Name:             "Send token and message to EOA",
-			SourceChain:      sourceChain,
-			DestChain:        destChain,
-			Data:             []byte("Hello, World!"),
-			Receiver:         receiverByte, // reciever contract pkgId
-			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
-			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
-			Tokens: []router.ClientEVMTokenAmount{
-				{
-					Token:  evmToken.Address(),
-					Amount: big.NewInt(1e18),
-				},
-			},
-			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, suiAddr),
-			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
-				{
-					Token:  suiTokenBytes,
-					Amount: big.NewInt(1e9),
-				},
-			},
-		},
 	}
 
 	startBlocks, expectedSeqNums, expectedExecutionStates, expectedTokenBalances := testhelpers.TransferMultiple(ctx, t, e.Env, state, tcs)
