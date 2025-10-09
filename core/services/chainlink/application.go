@@ -1260,6 +1260,7 @@ func newCREServices(
 					}
 
 					srvcs = append(srvcs, wfSyncer)
+					workflowRegistrySyncer = wfSyncer
 					globalLogger.Debugw("Created WorkflowRegistrySyncer V2")
 
 				default:
@@ -1351,6 +1352,7 @@ func (app *ChainlinkApplication) StopIfStarted() error {
 func (app *ChainlinkApplication) GetLoopRegistry() *plugins.LoopRegistry {
 	return app.loopRegistry
 }
+
 func (app *ChainlinkApplication) GetLoopRegistrarConfig() plugins.RegistrarConfig {
 	return app.loopRegistrarConfig
 }
@@ -1522,7 +1524,8 @@ func (app *ChainlinkApplication) RunJobV2(
 					common.BigToHash(big.NewInt(42)).Bytes(), // seed
 					evmutils.NewHash().Bytes(),               // sender
 					evmutils.NewHash().Bytes(),               // fee
-					evmutils.NewHash().Bytes()},              // requestID
+					evmutils.NewHash().Bytes(),
+				}, // requestID
 					[]byte{}),
 				Topics:      []common.Hash{{}, jb.ExternalIDEncodeBytesToTopic()}, // jobID BYTES
 				TxHash:      evmutils.NewHash(),
