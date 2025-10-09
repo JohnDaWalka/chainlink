@@ -245,11 +245,11 @@ jobs:
         with:
           CLI_VERSION: 7.8.1
 
-      - name: Setup Sui CLI v1.50.1
+      - name: Setup Sui CLI v1.57.2
         if: ${{ matrix.type.should-run == 'true' && matrix.type.setup-sui == 'true' }}
         uses: ./.github/actions/setup-sui
         with:
-          version: mainnet-v1.50.1
+          version: mainnet-v1.57.2
 
       - name: Setup wasmd
         if: ${{ matrix.type.should-run == 'true' }}
