@@ -150,7 +150,8 @@ func testAuthForRequests(t *testing.T, allowlistedRequest, notAllowlistedRequest
 	owner := common.Address{1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 	mockSyncer := syncerv2mocks.NewWorkflowRegistrySyncer(t)
-	auth := NewRequestAuthorizer(lggr, mockSyncer)
+	auth, err := NewRequestAuthorizer(lggr, mockSyncer)
+	require.NoError(t, err)
 
 	// Invalid method
 	invalidReq := jsonrpc.Request[json.RawMessage]{

@@ -673,7 +673,11 @@ func (d *Delegate) newServicesVaultPlugin(
 	expiryDuration := cfg.RequestExpiryDuration.Duration()
 	requestStoreHandler := requests.NewHandler(lggr, requestStore, clock, expiryDuration)
 	lpk := vaultcap.NewLazyPublicKey()
-	vaultCapability := vaultcap.NewCapability(lggr, clock, expiryDuration, requestStoreHandler, vaultcap.NewRequestAuthorizer(lggr, syncer), capabilitiesRegistry, lpk)
+	auth, err := vaultcap.NewRequestAuthorizer(lggr, syncer)
+	if err != nil {
+		return nil, err
+	}
+	vaultCapability := vaultcap.NewCapability(lggr, clock, expiryDuration, requestStoreHandler, auth, capabilitiesRegistry, lpk)
 	srvs = append(srvs, vaultCapability)
 
 	handler, err := vaultcap.NewGatewayHandler(capabilitiesRegistry, vaultCapability, gwconnector, d.lggr)
@@ -722,7 +726,7 @@ func (d *Delegate) newServicesVaultPlugin(
 	srvs = append(srvs, ocrLogger)
 
 	fullPath := filepath.Join(d.cfg.OCR2().KeyValueStoreRootDir(), jb.ExternalJobID.String())
-	err = utils.EnsureDirAndMaxPerms(fullPath, os.FileMode(0700))
+	err = utils.EnsureDirAndMaxPerms(fullPath, os.FileMode(0o700))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key value store directory: %w", err)
 	}
@@ -798,7 +802,7 @@ func (d *Delegate) newServicesVaultPlugin(
 	srvs = append(srvs, dkgProvider)
 
 	fullPathDKG := filepath.Join(d.cfg.OCR2().KeyValueStoreRootDir(), jb.ExternalJobID.String(), "_dkg")
-	err = utils.EnsureDirAndMaxPerms(fullPathDKG, os.FileMode(0700))
+	err = utils.EnsureDirAndMaxPerms(fullPathDKG, os.FileMode(0o700))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key value store directory: %w", err)
 	}
@@ -2171,7 +2175,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		return nil, fmt.Errorf("chain not supported for CCIP execution: %s", spec.Relay)
 	}
 	dstRid, err := spec.RelayID()
-
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
@@ -2232,7 +2235,6 @@ func (d *Delegate) ccipExecGetDstProvider(ctx context.Context, jb job.Job, plugi
 		return nil, fmt.Errorf("chain not supported for CCIP execution: %s", spec.Relay)
 	}
 	dstRid, err := spec.RelayID()
-
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}

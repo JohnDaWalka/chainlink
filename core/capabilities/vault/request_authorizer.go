@@ -152,10 +152,13 @@ func CalculateRequestDigest(req any) [32]byte {
 	return hash
 }
 
-func NewRequestAuthorizer(lggr logger.Logger, workflowRegistrySyncer workflowsyncerv2.WorkflowRegistrySyncer) *requestAuthorizer {
+func NewRequestAuthorizer(lggr logger.Logger, workflowRegistrySyncer workflowsyncerv2.WorkflowRegistrySyncer) (*requestAuthorizer, error) {
+	if workflowRegistrySyncer == nil {
+		return nil, errors.New("cannot create request authorizer: workflow registry syncer is nil")
+	}
 	return &requestAuthorizer{
 		workflowRegistrySyncer:    workflowRegistrySyncer,
 		lggr:                      logger.Named(lggr, "VaultRequestAuthorizer"),
 		alreadyAuthorizedRequests: make(map[string]bool),
-	}
+	}, nil
 }
