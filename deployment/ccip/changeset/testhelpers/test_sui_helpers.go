@@ -540,7 +540,7 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 				// apply dest chain updates
 				RemoteChainSelectorsToRemove: []uint64{},
 				RemoteChainSelectorsToAdd:    []uint64{evmChainSel},
-				RemotePoolAddressesToAdd:     [][]string{{evmPool.Address().String()}}, // this gets convert to 32byte bytes internally
+				RemotePoolAddressesToAdd:     [][]string{{evmPool.Address().String()}}, // this gets converted to bytes internally
 				RemoteTokenAddressesToAdd: []string{
 					evmToken.Address().String(), // this gets convert to 32byte bytes internally
 				},
