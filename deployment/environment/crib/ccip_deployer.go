@@ -679,7 +679,6 @@ func setupSolEvmLanes(lggr logger.Logger, e *cldf.Environment, state stateview.C
 	}
 
 	for _, solSelector := range solSelectors {
-		// capture range variable
 		solChainSel := solSelector.ChainSelector()
 		relevantLanes := lanesBySolChain[solChainSel]
 
