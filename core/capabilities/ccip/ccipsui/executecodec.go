@@ -351,7 +351,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		}
 	}
 
-	receiver, err := ccipocr3.NewUnknownAddressFromHex(message.Receiver)
+	receiver, err := ccipocr3.NewUnknownAddressFromHex(message.TokenReceiver)
 	if err != nil {
 		return report, fmt.Errorf("failed to parse receiver: %w", err)
 	}
@@ -360,7 +360,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	ccipTypesMsg := []cciptypes.Message{
 		{
 			Header: cciptypes.RampMessageHeader{
-				MessageID:           ccipocr3.Bytes32(message.Header.MessageId),
+				MessageID:           ccipocr3.Bytes32(messageIDBytes),
 				SourceChainSelector: cciptypes.ChainSelector(message.Header.SourceChainSelector),
 				DestChainSelector:   cciptypes.ChainSelector(message.Header.DestChainSelector),
 				SequenceNumber:      cciptypes.SeqNum(message.Header.SequenceNumber),
