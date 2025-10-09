@@ -96,7 +96,11 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 		return nil, fmt.Errorf("failed to extract values from decoded ExtraArgs map: %w", err)
 	}
 	s.U256(*gasLimit)
-	s.FixedBytes(tokenReceiver[:])
+
+	// 11. token_receiver
+	var tokenReceiverAddr aptos.AccountAddress
+	copy(tokenReceiverAddr[:], tokenReceiver[:])
+	s.Struct(&tokenReceiverAddr)
 
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
 	bcs.SerializeSequenceWithFunction(message.TokenAmounts, s, func(s *bcs.Serializer, item ccipocr3common.RampTokenAmount) {

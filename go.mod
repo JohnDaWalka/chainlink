@@ -100,7 +100,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20251006153136-770c21cddddc
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20251007010318-c9a7b2d44524
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20251009192516-984c6ca52807
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20251009213225-643e19ad20e0
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20250930221620-ce57bba04eab
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250815105909-75499abc4335
 	github.com/smartcontractkit/cre-sdk-go v0.7.0
