@@ -8,15 +8,20 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_2_0/router"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
+
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -45,7 +50,8 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
-	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	require.NoError(t, err)
 
 	_, err = e.Env.BlockChains.SuiChains()[sourceChain].Signer.GetAddress()
 	require.NoError(t, err)
@@ -245,7 +251,6 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	testhelpers.WaitForTokenBalances(ctx, t, updatedEnv, expectedTokenBalances)
 
 	// TODO: Add failure cases for Sui2EVM Token transfers
-
 }
 
 func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
@@ -280,7 +285,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.Equal(t, 32, len(suiTokenBytes), "expected 32-byte sui token address")
+	require.Len(t, suiTokenBytes, 32, "expected 32-byte sui token address")
 	copy(suiTokenAddr[:], suiTokenBytes)
 
 	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
@@ -295,7 +300,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 	addrBytes, err := hex.DecodeString(suiAddrStr)
 	require.NoError(t, err)
 
-	require.Equal(t, 32, len(addrBytes), "expected 32-byte sui address")
+	require.Len(t, addrBytes, 32, "expected 32-byte sui token address")
 	copy(suiAddr[:], addrBytes)
 
 	// Token Pool setup on both SUI and EVM
@@ -319,7 +324,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 		},
 	)
 
-	// Deploy SUI Reciever
+	// Deploy SUI Receiver
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.DeployDummyReciever{}, sui_cs.DeployDummyRecieverConfig{
 			SuiChainSelector: destChain,
@@ -337,7 +342,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 	receiverByteDecoded, err := hex.DecodeString(id)
 	require.NoError(t, err)
 
-	// register the reciever
+	// register the receiver
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.RegisterDummyReciever{}, sui_cs.RegisterDummyReceiverConfig{
 			SuiChainSelector:       destChain,
@@ -359,14 +364,14 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 		outputMap.Objects.CCIPReceiverStateObjectId,
 	))
 
-	recieverObjectIds := [][32]byte{clockObj, stateObj}
+	recieverObjectIDs := [][32]byte{clockObj, stateObj}
 
 	tcs := []testhelpers.TestTransferRequest{
 		{
 			Name:             "Send token to EOA",
 			SourceChain:      sourceChain,
 			DestChain:        destChain,
-			Receiver:         receiverByte, // reciever contract pkgId
+			Receiver:         receiverByte, // receiver contract pkgId
 			TokenReceiverATA: suiAddr[:],   // tokenReciever extracted from extraArgs (the address that actually gets the token)
 			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
 			Tokens: []router.ClientEVMTokenAmount{
@@ -375,7 +380,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 					Amount: big.NewInt(1e18),
 				},
 			},
-			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, suiAddr),
+			ExtraArgs: testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIDs, suiAddr),
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{
 				{
 					Token:  suiTokenBytes,
@@ -387,7 +392,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 			Name:             "Send token to an Object",
 			SourceChain:      sourceChain,
 			DestChain:        destChain,
-			Receiver:         receiverByte, // reciever contract pkgId
+			Receiver:         receiverByte, // receiver contract pkgId
 			TokenReceiverATA: stateObj[:],  // tokenReciever extracted from extraArgs (the object that actually gets the token)
 			ExpectedStatus:   testhelpers.EXECUTION_STATE_SUCCESS,
 			Tokens: []router.ClientEVMTokenAmount{
@@ -396,7 +401,7 @@ func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
 					Amount: big.NewInt(1e18),
 				},
 			},
-			ExtraArgs:             testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, stateObj), // receiver is objectId this time
+			ExtraArgs:             testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIDs, stateObj), // receiver is objectId this time
 			ExpectedTokenBalances: []testhelpers.ExpectedBalance{},
 		},
 	}

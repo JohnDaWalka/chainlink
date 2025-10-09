@@ -11,12 +11,15 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
 	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
@@ -25,6 +28,7 @@ import (
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
+
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	mlt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagelimitationstest"
@@ -59,7 +63,8 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
-	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	require.NoError(t, err)
 
 	suiSenderAddr, err := e.Env.BlockChains.SuiChains()[sourceChain].Signer.GetAddress()
 	require.NoError(t, err)
@@ -174,7 +179,8 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 
 	lggr.Debug("Source chain (EVM): ", sourceChain, "Dest chain (Sui): ", destChain)
 
-	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	require.NoError(t, err)
 
 	var (
 		nonce  uint64
@@ -195,7 +201,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		wethToken    = state.Chains[sourceChain].Weth9
 	)
 
-	// Deploy SUI Reciever
+	// Deploy SUI Receiver
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.DeployDummyReciever{}, sui_cs.DeployDummyRecieverConfig{
 			SuiChainSelector: destChain,
@@ -213,7 +219,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 	receiverByteDecoded, err := hex.DecodeString(id)
 	require.NoError(t, err)
 
-	// register the reciever
+	// register the receiver
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.RegisterDummyReciever{}, sui_cs.RegisterDummyReceiverConfig{
 			SuiChainSelector:       destChain,
@@ -235,7 +241,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		outputMap.Objects.CCIPReceiverStateObjectId,
 	))
 
-	recieverObjectIds := [][32]byte{clockObj, stateObj}
+	recieverObjectIDs := [][32]byte{clockObj, stateObj}
 
 	t.Run("Message to Sui - Should Succeed", func(t *testing.T) {
 		// ccipChainState := state.SuiChains[destChain]
@@ -247,7 +253,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 				ValidationType:         messagingtest.ValidationTypeExec,
 				Receiver:               receiverByte,
 				MsgData:                message,
-				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, [32]byte{}),
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIDs, [32]byte{}),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 			},
 		)
@@ -316,11 +322,10 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 				Receiver:       receiverByte,
 				MsgData:        message,
 				// true for out of order execution, which is necessary and enforced for Sui
-				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, [32]byte{}),
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIDs, [32]byte{}),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
 				FeeToken:               state.Chains[sourceChain].LinkToken.Address().String(),
 			},
 		)
 	})
-
 }

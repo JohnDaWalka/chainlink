@@ -34,6 +34,7 @@ import (
 	solcommon "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	ccipocr3common "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -724,7 +725,7 @@ func AptosEventEmitter[T any](
 func SuiEventEmitter[T any](
 	t *testing.T,
 	client sui.ISuiAPI,
-	packageId, moduleName, event string,
+	packageID, moduleName, event string,
 	done chan any,
 ) (<-chan struct {
 	Event   T
@@ -738,7 +739,6 @@ func SuiEventEmitter[T any](
 	limit := uint64(50)
 	var lastSeenTxDigest string
 
-	fmt.Println("SUI EVENTS EMITTER")
 	go func() {
 		ticker := time.NewTicker(time.Second * 2)
 		defer ticker.Stop()
@@ -752,7 +752,7 @@ func SuiEventEmitter[T any](
 				default:
 				}
 				eventFilter := models.EventFilterByMoveEventType{
-					MoveEventType: fmt.Sprintf("%s::%s::%s", packageId, moduleName, event),
+					MoveEventType: fmt.Sprintf("%s::%s::%s", packageID, moduleName, event),
 				}
 
 				events, err := client.SuiXQueryEvents(t.Context(), models.SuiXQueryEventsRequest{
@@ -790,7 +790,6 @@ func SuiEventEmitter[T any](
 						Version: ev.Id.EventSeq, // use the actual version
 					}
 				}
-
 			}
 			select {
 			case <-done:
@@ -809,7 +808,7 @@ func ConfirmCommitWithExpectedSeqNumRangeSui(
 	dest cldf_sui.Chain,
 	offRampAddress string,
 	startVersion *uint64,
-	expectedSeqNumRange ccipocr3.SeqNumRange,
+	expectedSeqNumRange ccipocr3common.SeqNumRange,
 	enforceSingleCommit bool,
 ) (any, error) {
 	// Bound the offRamp
@@ -1308,7 +1307,7 @@ func ConfirmExecWithExpectedSeqNrsSui(
 			}
 
 			if seqNrsToWatch[event.Event.SequenceNumber] && event.Event.SourceChainSelector == srcSelector {
-				t.Logf("(Sui) received ExecutionStateChanged (state %s) on chain %d (offramp %s) with expected sequence number %d (tx %d)",
+				t.Logf("(Sui) received ExecutionStateChanged (state %s) on chain %d (offramp %s) with expected sequence number %d (tx %s)",
 					executionStateToString(event.Event.State), dest.Selector, offRampAddress, event.Event.SequenceNumber, event.Version,
 				)
 				if event.Event.State == EXECUTION_STATE_INPROGRESS {
