@@ -988,7 +988,7 @@ func newCREServices(
 		globalLogger.Warn("OrgResolver not created - no linking service URL configured")
 	}
 
-	var workflowRegistrySyncer syncerV2.WorkflowRegistrySyncer
+	var workflowRegistrySyncerV2 syncerV2.WorkflowRegistrySyncer
 	var externalPeerWrapper p2ptypes.PeerWrapper
 	var don2donSharedPeer p2ptypes.SharedPeer
 	var streamConfig config.StreamConfig
@@ -1263,7 +1263,7 @@ func newCREServices(
 						return nil, fmt.Errorf("unable to create workflow registry event handler: %w", err)
 					}
 
-					wfSyncer, err := syncerV2.NewWorkflowRegistry(
+					workflowRegistrySyncerV2, err = syncerV2.NewWorkflowRegistry(
 						lggr,
 						crFactory,
 						capCfg.WorkflowRegistry().Address(),
@@ -1279,7 +1279,7 @@ func newCREServices(
 						return nil, fmt.Errorf("unable to create workflow registry syncer: %w", err)
 					}
 
-					srvcs = append(srvcs, wfSyncer)
+					srvcs = append(srvcs, workflowRegistrySyncerV2)
 					globalLogger.Debugw("Created WorkflowRegistrySyncer V2")
 
 				default:
@@ -1297,8 +1297,7 @@ func newCREServices(
 		gatewayConnectorWrapper: gatewayConnectorWrapper,
 		getPeerID:               getPeerID,
 		srvs:                    srvcs,
-		workflowRegistrySyncer:  workflowRegistrySyncer,
-		orgResolver:             orgResolver,
+		workflowRegistrySyncer:  workflowRegistrySyncerV2,
 	}, nil
 }
 
