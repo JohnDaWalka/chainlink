@@ -42,6 +42,7 @@ import (
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_evm "github.com/smartcontractkit/chainlink-deployments-framework/chain/evm"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset"
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
@@ -1122,15 +1123,17 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 		state, err := stateview.LoadOnchainState(e.Env)
 		require.NoError(t, err)
 
+		suiState, err := sui_deployment.LoadOnchainStatesui(e.Env)
+		require.NoError(t, err)
+
 		e.Env, _, err = commonchangeset.ApplyChangesets(t, e.Env, []commonchangeset.ConfiguredChangeSet{
 			commonchangeset.Configure(sui_cs.DeploySuiChain{}, sui_cs.DeploySuiChainConfig{
 				SuiChainSelector:              suiChains[0],
 				DestChainSelector:             evmChains[0],
 				DestChainOnRampAddressBytes:   state.MustGetEVMChainState(e.HomeChainSel).OnRamp.Address().Bytes(),
-				LinkTokenCoinMetadataObjectId: state.SuiChains[suiChains[0]].LinkTokenCoinMetadataId,
+				LinkTokenCoinMetadataObjectId: suiState[suiChains[0]].LinkTokenCoinMetadataId,
 			}),
 		})
-		require.NoError(t, err)
 	}
 
 	if len(tonChains) != 0 {
@@ -1471,6 +1474,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				MCMS: mcmsConfig,
 			},
 		))
+
 		if len(suiChains) > 0 {
 			apps = append(apps, commonchangeset.Configure(
 				// Enable the OCR config on the remote chains.
@@ -1482,6 +1486,7 @@ func AddCCIPContractsToEnvironment(t *testing.T, allChains []uint64, tEnv TestEn
 				},
 			))
 		}
+
 		apps = append(apps, commonchangeset.Configure(
 			// Enable the OCR config on the remote chains.
 			cldf.CreateLegacyChangeSet(v1_6.SetOCR3OffRampChangeset),

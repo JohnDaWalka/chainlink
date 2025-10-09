@@ -1381,6 +1381,11 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 		gasPrices[from] = big.NewInt(1e17)
 		gasPrices[to] = big.NewInt(1e17)
 		tokenPrices[tonState.LinkTokenAddress.String()] = deployment.EDecMult(20, 28)
+	case chainsel.FamilySui:
+		suiState := state.SuiChains[from]
+		gasPrices[from] = big.NewInt(1e17)
+		gasPrices[to] = big.NewInt(1e17)
+		tokenPrices[suiState.LinkTokenCoinMetadataId] = deployment.EDecMult(20, 28)
 	}
 	fqCfg := v1_6.DefaultFeeQuoterDestChainConfig(true, to)
 

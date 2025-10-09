@@ -738,6 +738,7 @@ func SuiEventEmitter[T any](
 	limit := uint64(50)
 	var lastSeenTxDigest string
 
+	fmt.Println("SUI EVENTS EMITTER")
 	go func() {
 		ticker := time.NewTicker(time.Second * 2)
 		defer ticker.Stop()

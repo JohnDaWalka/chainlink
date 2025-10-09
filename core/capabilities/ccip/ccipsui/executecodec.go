@@ -2,18 +2,15 @@ package ccipsui
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	sui_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
 )
 
 // ExecutePluginCodecV1 is a codec for encoding and decoding execute plugin reports.
@@ -182,7 +179,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	des := bcs.NewDeserializer(encodedReport)
 	report := cciptypes.ExecutePluginReport{}
 	var chainReport cciptypes.ExecutePluginReportSingleChain
-	var message sui_offramp.Any2SuiRampMessage
+	var message cciptypes.Message
 
 	// 1. source_chain_selector: u64
 	chainReport.SourceChainSelector = cciptypes.ChainSelector(des.U64())
@@ -196,22 +193,22 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize message_id: %w", des.Error())
 	}
-	copy(message.Header.MessageId[:], messageIDBytes)
+	copy(message.Header.MessageID[:], messageIDBytes)
 
 	// 3. header_source_chain_selector: u64
-	message.Header.SourceChainSelector = des.U64()
+	message.Header.SourceChainSelector = cciptypes.ChainSelector(des.U64())
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize header_source_chain_selector: %w", des.Error())
 	}
 
 	// 4. dest_chain_selector: u64
-	message.Header.DestChainSelector = des.U64()
+	message.Header.DestChainSelector = cciptypes.ChainSelector(des.U64())
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize dest_chain_selector: %w", des.Error())
 	}
 
 	// 5. sequence_number: u64
-	message.Header.SequenceNumber = des.U64()
+	message.Header.SequenceNumber = cciptypes.SeqNum(des.U64())
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize sequence_number: %w", des.Error())
 	}
@@ -243,8 +240,6 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		return report, fmt.Errorf("failed to deserialize receiver: %w", des.Error())
 	}
 
-	message.Receiver = fmt.Sprintf("0x%s", hex.EncodeToString(receiverAddr[:]))
-
 	// 10. gas_limit: u256
 	_ = des.U256()
 	if des.Error() != nil {
@@ -257,11 +252,12 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		return report, fmt.Errorf("failed to deserialize token_receiver: %w", des.Error())
 	}
 
-	// Convert to hex-encoded string (Aptos-style address)
-	message.TokenReceiver = fmt.Sprintf("0x%s", hex.EncodeToString(tokenReceiverBytes))
+	// Sui OffRamp uses token_receiver as the actual message target.
+	// Hence, we set message.Receiver = tokenReceiverBytes.
+	message.Receiver = tokenReceiverBytes[:]
 
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
-	message.TokenAmounts = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *sui_offramp.Any2SuiTokenTransfer) {
+	message.TokenAmounts = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *cciptypes.RampTokenAmount) {
 		// 11a. source_pool_address: vector<u8>
 		item.SourcePoolAddress = des.ReadBytes()
 		if des.Error() != nil {
@@ -274,8 +270,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		if des.Error() != nil {
 			return // Error handled by caller
 		}
-
-		item.DestTokenAddress = fmt.Sprintf("0x%s", hex.EncodeToString(destTokenAddr[:]))
+		item.DestTokenAddress = destTokenAddr[:]
 
 		// 11c. dest_gas_amount: u32
 		destGasAmount := des.U32()
@@ -288,7 +283,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 			des.SetError(fmt.Errorf("abi encode dest gas amount: %w", err))
 			return
 		}
-		item.ExtraData = destData
+		item.DestExecData = destData
 
 		// 11d. extra_data: vector<u8>
 		item.ExtraData = des.ReadBytes()
@@ -301,7 +296,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		if des.Error() != nil {
 			return // Error handled by caller
 		}
-		item.Amount = &amountU256
+		item.Amount = cciptypes.NewBigInt(&amountU256)
 	})
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize token_amounts: %w", des.Error())
@@ -339,48 +334,16 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		return report, fmt.Errorf("unexpected remaining bytes after decoding: %d", des.Remaining())
 	}
 
-	// prepare decoded bytes to be converted to
-	tokenAmounts := make([]cciptypes.RampTokenAmount, len(message.TokenAmounts))
-	for i, t := range message.TokenAmounts {
-		tokenAmounts[i] = cciptypes.RampTokenAmount{
-			SourcePoolAddress: t.SourcePoolAddress,
-			DestTokenAddress:  common.FromHex(t.DestTokenAddress),
-			DestExecData:      t.ExtraData,
-			ExtraData:         t.ExtraData,
-			Amount:            cciptypes.NewBigInt(t.Amount),
-		}
-	}
-
-	receiver, err := ccipocr3.NewUnknownAddressFromHex(message.TokenReceiver)
-	if err != nil {
-		return report, fmt.Errorf("failed to parse receiver: %w", err)
-	}
-
-	// Convert decoded Any2SuiRampMessage into canonical cciptypes.Message
-	ccipTypesMsg := []cciptypes.Message{
-		{
-			Header: cciptypes.RampMessageHeader{
-				MessageID:           ccipocr3.Bytes32(messageIDBytes),
-				SourceChainSelector: cciptypes.ChainSelector(message.Header.SourceChainSelector),
-				DestChainSelector:   cciptypes.ChainSelector(message.Header.DestChainSelector),
-				SequenceNumber:      cciptypes.SeqNum(message.Header.SequenceNumber),
-				Nonce:               message.Header.Nonce,
-				MsgHash:             cciptypes.Bytes32{},
-				OnRamp:              cciptypes.UnknownAddress{},
-			},
-			Sender:         message.Sender,
-			Data:           message.Data,
-			Receiver:       receiver,
-			ExtraArgs:      cciptypes.Bytes{},
-			FeeToken:       cciptypes.UnknownAddress{},
-			FeeTokenAmount: cciptypes.BigInt{},
-			TokenAmounts:   tokenAmounts,
-		},
-	}
+	// Set empty fields
+	message.Header.MsgHash = cciptypes.Bytes32{}
+	message.Header.OnRamp = cciptypes.UnknownAddress{}
+	message.FeeToken = cciptypes.UnknownAddress{}
+	message.ExtraArgs = cciptypes.Bytes{}
+	message.FeeTokenAmount = cciptypes.BigInt{}
 
 	// Assemble the final report
-	chainReport.Messages = ccipTypesMsg
-	// ProofFlagBits is not part of the Sui report, initialize it empty/zero.
+	chainReport.Messages = []cciptypes.Message{message}
+	// ProofFlagBits is not part of the Aptos report, initialize it empty/zero.
 	chainReport.ProofFlagBits = cciptypes.NewBigInt(big.NewInt(0))
 	report.ChainReports = []cciptypes.ExecutePluginReportSingleChain{chainReport}
 

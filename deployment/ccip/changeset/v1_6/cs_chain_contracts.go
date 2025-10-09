@@ -1421,6 +1421,11 @@ func (c SetOCR3OffRampConfig) validateRemoteChain(e *cldf.Environment, state *st
 			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
 		}
 		// TODO add chain state validation for ramp addr later, https://smartcontract-it.atlassian.net/browse/NONEVM-1938
+	case chain_selectors.FamilySui:
+		_, ok := state.SuiChains[chainSelector]
+		if !ok {
+			return fmt.Errorf("remote chain %d not found in onchain state", chainSelector)
+		}
 		return nil
 	default:
 		return fmt.Errorf("unsupported chain family %s", family)

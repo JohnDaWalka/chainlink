@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/crypto/blake2b"
-
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	offrampops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip_offramp"
-
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/globals"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/internal"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/v1_6"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"golang.org/x/crypto/blake2b"
 )
 
 var _ cldf.ChangeSetV2[v1_6.SetOCR3OffRampConfig] = SetOCR3Offramp{}
@@ -32,6 +30,11 @@ const Ed25519Scheme byte = 0x00
 // Apply implements deployment.ChangeSetV2.
 func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConfig) (cldf.ChangesetOutput, error) {
 	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
+	}
+
+	suiState, err := sui_deployment.LoadOnchainStatesui(e)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to load Sui onchain state: %w", err)
 	}
@@ -110,10 +113,10 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 		}
 
 		setOCR3ConfigCommitInput := offrampops.SetOCR3ConfigInput{
-			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
-			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
-			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
-			CCIPObjectRefId:  state.SuiChains[remoteSelector].CCIPObjectRef,
+			OffRampPackageId: suiState[remoteSelector].OffRampAddress,
+			OffRampStateId:   suiState[remoteSelector].OffRampStateObjectId,
+			OwnerCapObjectId: suiState[remoteSelector].OffRampOwnerCapId,
+			CCIPObjectRefId:  suiState[remoteSelector].CCIPObjectRef,
 			// commit plugin config
 			ConfigDigest:                   commitArgs.ConfigDigest[:],
 			OCRPluginType:                  commitArgs.OcrPluginType,
@@ -123,16 +126,35 @@ func (s SetOCR3Offramp) Apply(e cldf.Environment, config v1_6.SetOCR3OffRampConf
 			Transmitters:                   commitTransmitters,
 		}
 
+		// convert exec transmitters to account address
+		var execTransmitters []string
+
+		for _, transmitter := range execArgs.Transmitters {
+			// 1) Strip any “0x” prefix
+			clean := strings.TrimPrefix(transmitter, "0x")
+
+			// 2) Decode the clean hex into bytes
+			pubKeyBytes, err := hex.DecodeString(clean)
+			if err != nil {
+				return cldf.ChangesetOutput{}, fmt.Errorf("failed to decode transmitter %q: %w", transmitter, err)
+			}
+
+			flagged := append([]byte{Ed25519Scheme}, pubKeyBytes...)
+
+			hash := blake2b.Sum256(flagged)
+			addr := "0x" + hex.EncodeToString(hash[:])
+			execTransmitters = append(execTransmitters, addr)
+		}
 		_, err = operations.ExecuteOperation(e.OperationsBundle, offrampops.SetOCR3ConfigOp, deps.SuiChain, setOCR3ConfigCommitInput)
 		if err != nil {
 			return cldf.ChangesetOutput{}, err
 		}
 
 		setOCR3ConfigExecInput := offrampops.SetOCR3ConfigInput{
-			OffRampPackageId: state.SuiChains[remoteSelector].OffRampAddress,
-			OffRampStateId:   state.SuiChains[remoteSelector].OffRampStateObjectId,
-			OwnerCapObjectId: state.SuiChains[remoteSelector].OffRampOwnerCapId,
-			CCIPObjectRefId:  state.SuiChains[remoteSelector].CCIPObjectRef,
+			OffRampPackageId: suiState[remoteSelector].OffRampAddress,
+			OffRampStateId:   suiState[remoteSelector].OffRampStateObjectId,
+			OwnerCapObjectId: suiState[remoteSelector].OffRampOwnerCapId,
+			CCIPObjectRefId:  suiState[remoteSelector].CCIPObjectRef,
 			// exec plugin config
 			ConfigDigest:                   execArgs.ConfigDigest[:],
 			OCRPluginType:                  execArgs.OcrPluginType,
