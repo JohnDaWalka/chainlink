@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -40,6 +42,7 @@ var logScannerSettings = test_env.GetDefaultChainlinkNodeLogScannerSettingsWithE
 // consistency test with no network disruptions with approximate emission of 1500-1600 logs per second for ~110-120 seconds
 // 6 filters are registered
 func TestLogPollerFewFiltersFixedDepth(t *testing.T) {
+	quarantine.Flaky(t, "DX-2085")
 	executeBasicLogPollerTest(t, test_env.DefaultChainlinkNodeLogScannerSettings)
 }
 
