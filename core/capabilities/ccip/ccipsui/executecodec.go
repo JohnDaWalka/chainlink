@@ -2,6 +2,7 @@ package ccipsui
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	ccipocr3common "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -26,6 +28,7 @@ func NewExecutePluginCodecV1(extraDataCodec ccipocr3.ExtraDataCodecBundle) *Exec
 }
 
 func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.ExecutePluginReport) ([]byte, error) {
+	lgr, _ := logger.NewLogger()
 	if len(report.ChainReports) == 0 {
 		return nil, nil
 	}
@@ -72,11 +75,18 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 	s.U64(message.Header.Nonce)
 	// --- End Message Header ---
 
+	lgr.Infof("[Encode] SourceChainSelector=%d", chainReport.SourceChainSelector)
+	lgr.Infof("[Encode] MsgID=%x", message.Header.MessageID)
+	lgr.Infof("[Encode] DestChainSelector=%d Seq=%d Nonce=%d", message.Header.DestChainSelector, message.Header.SequenceNumber, message.Header.Nonce)
+	lgr.Infof("[Encode] offset after header=%d", len(s.ToBytes()))
+
 	// 7. sender: vector<u8>
 	s.WriteBytes(message.Sender)
 
 	// 8. data: vector<u8>
 	s.WriteBytes(message.Data)
+
+	lgr.Infof("[Encode] senderLen=%d dataLen=%d total=%d", len(message.Sender), len(message.Data), len(s.ToBytes()))
 
 	// 9. receiver: address (Aptos address, 32 bytes)
 	var receiverAddr aptos.AccountAddress
@@ -99,6 +109,8 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 	var tokenReceiverAddr aptos.AccountAddress
 	copy(tokenReceiverAddr[:], tokenReceiver[:]) // tokenReceiver is [32]byte
 	s.Struct(&tokenReceiverAddr)
+
+	lgr.Infof("[Encode] GasLimit=%s TokenReceiver=%x total=%d", gasLimit.String(), tokenReceiverAddr[:], len(s.ToBytes()))
 
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
 	bcs.SerializeSequenceWithFunction(message.TokenAmounts, s, func(s *bcs.Serializer, item ccipocr3common.RampTokenAmount) {
@@ -143,6 +155,8 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 		return nil, fmt.Errorf("failed to serialize token_amounts: %w", s.Error())
 	}
 
+	lgr.Infof("[Encode] tokenAmounts count=%d total=%d", len(message.TokenAmounts), len(s.ToBytes()))
+
 	// 12. offchain_token_data: vector<vector<u8>>
 	bcs.SerializeSequenceWithFunction(offchainTokenData, s, func(s *bcs.Serializer, item []byte) {
 		s.WriteBytes(item)
@@ -174,11 +188,23 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 		return nil, fmt.Errorf("BCS serialization failed: %w", s.Error())
 	}
 
-	fmt.Println("ENCODED BYTES", s.ToBytes())
-	return s.ToBytes(), nil
+	encoded := s.ToBytes()
+
+	lgr.Info("ENCODED BYTES", encoded)
+
+	lgr.Infof("[Encode] FINAL length=%d", len(encoded))
+	if len(encoded) >= 64 {
+		lgr.Infof("[Encode] First 64 bytes: %s", hex.EncodeToString(encoded[:64]))
+	}
+	if len(encoded) >= 128 {
+		lgr.Infof("[Encode] Last 128 bytes: %s", hex.EncodeToString(encoded[len(encoded)-128:]))
+	}
+
+	return encoded, nil
 }
 
 func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte) (ccipocr3common.ExecutePluginReport, error) {
+	lgr, _ := logger.NewLogger()
 	des := bcs.NewDeserializer(encodedReport)
 	report := ccipocr3common.ExecutePluginReport{}
 	var chainReport ccipocr3common.ExecutePluginReportSingleChain
@@ -243,6 +269,8 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		return report, fmt.Errorf("failed to deserialize receiver: %w", des.Error())
 	}
 
+	lgr.Infof("[Decode] Receiver=%x offset=%d", receiverAddr[:], len(encodedReport)-des.Remaining())
+
 	// 10. gas_limit: u256
 	_ = des.U256()
 	if des.Error() != nil {
@@ -255,6 +283,8 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	if des.Error() != nil {
 		return report, fmt.Errorf("failed to deserialize tokenReceiverAddr: %w", des.Error())
 	}
+
+	lgr.Infof("[Decode] TokenReceiver=%x offset=%d", tokenReceiverAddr[:], len(encodedReport)-des.Remaining())
 
 	// Sui OffRamp uses token_receiver as the actual message target.
 	// Hence, we set message.Receiver = tokenReceiverBytes.
@@ -345,7 +375,17 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	message.ExtraArgs = ccipocr3common.Bytes{}
 	message.FeeTokenAmount = ccipocr3common.BigInt{}
 
-	fmt.Println("MESSAGE DECODED: ", message)
+	lgr.Infof("[Decode] MESSAGE SUMMARY: SrcSel=%d Seq=%d Receiver=%x TokenReceiver=%x SenderLen=%d DataLen=%d",
+		chainReport.SourceChainSelector,
+		message.Header.SequenceNumber,
+		message.Receiver,
+		tokenReceiverAddr[:],
+		len(message.Sender),
+		len(message.Data),
+	)
+
+	lgr.Info("MESSAGE DECODED: ", message)
+
 	// Assemble the final report
 	chainReport.Messages = []ccipocr3common.Message{message}
 	// ProofFlagBits is not part of the Sui report, initialize it empty/zero.
