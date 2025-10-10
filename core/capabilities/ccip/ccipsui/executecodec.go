@@ -251,14 +251,14 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	}
 
 	// 10b. token_receiver: fixed_vector_u8(32)
-	tokenReceiverBytes := des.ReadFixedBytes(32)
+	var tokenReceiverAddr aptos.AccountAddress
+	des.Struct(&receiverAddr)
 	if des.Error() != nil {
-		return report, fmt.Errorf("failed to deserialize token_receiver: %w", des.Error())
+		return report, fmt.Errorf("failed to deserialize receiver: %w", des.Error())
 	}
-
 	// Sui OffRamp uses token_receiver as the actual message target.
 	// Hence, we set message.Receiver = tokenReceiverBytes.
-	message.Receiver = tokenReceiverBytes
+	message.Receiver = tokenReceiverAddr[:]
 
 	// 11. token_amounts: vector<Any2AptosTokenTransfer>
 	message.TokenAmounts = bcs.DeserializeSequenceWithFunction(des, func(des *bcs.Deserializer, item *ccipocr3common.RampTokenAmount) {
