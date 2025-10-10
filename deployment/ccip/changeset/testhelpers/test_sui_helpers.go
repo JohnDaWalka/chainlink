@@ -13,8 +13,8 @@ import (
 	"github.com/block-vision/sui-go-sdk/models"
 	"github.com/block-vision/sui-go-sdk/sui"
 	suitx "github.com/block-vision/sui-go-sdk/transaction"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/latest/message_hasher"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_6_3/message_hasher"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
@@ -24,8 +24,6 @@ import (
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	"github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/config"
 	suiofframp_helper "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/ptb/offramp"
-	suicodec "github.com/smartcontractkit/chainlink-sui/relayer/codec"
-	"github.com/smartcontractkit/chainlink-sui/relayer/testutils"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -79,121 +77,6 @@ type CCIPMessageSent struct {
 	Message           Sui2AnyRampMessage `json:"message"`
 }
 
-func baseCCIPConfig(
-	ccipPkg string,
-	pubKey []byte,
-	extra []config.ChainWriterPTBCommand,
-) config.ChainWriterConfig {
-	// common PTB command 0: create_token_params
-	cmds := []config.ChainWriterPTBCommand{{
-		Type:      suicodec.SuiPTBCommandMoveCall,
-		PackageId: strPtr(ccipPkg),
-		ModuleId:  strPtr("onramp_state_helper"),
-		Function:  strPtr("create_token_transfer_params"),
-		Params: []suicodec.SuiFunctionParam{
-			{
-				Name:     "token_receiver",
-				Type:     "address",
-				Required: true,
-			},
-		},
-	}}
-	// append the variant commands
-	cmds = append(cmds, extra...)
-
-	return config.ChainWriterConfig{
-		Modules: map[string]*config.ChainWriterModule{
-			config.PTBChainWriterModuleName: {
-				Name:     config.PTBChainWriterModuleName,
-				ModuleID: "0x123",
-				Functions: map[string]*config.ChainWriterFunction{
-					"ccip_send": {
-						Name:        "ccip_send",
-						PublicKey:   pubKey,
-						Params:      []suicodec.SuiFunctionParam{},
-						PTBCommands: cmds,
-					},
-				},
-			},
-		},
-	}
-}
-
-// 2a) Simple Message → EVM
-func configureChainWriterForMsg(
-	ccipPkg, onRampPkg string,
-	pubKey []byte,
-	feeTokenPkgId string,
-) config.ChainWriterConfig {
-	feeTokenType := fmt.Sprintf("%s::link::LINK", feeTokenPkgId)
-	extra := []config.ChainWriterPTBCommand{{
-		Type:      suicodec.SuiPTBCommandMoveCall,
-		PackageId: strPtr(onRampPkg),
-		ModuleId:  strPtr("onramp"),
-		Function:  strPtr("ccip_send"),
-		Params: []suicodec.SuiFunctionParam{
-			{Name: "ref", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(true)},
-			{Name: "state", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(true)},
-			{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
-			{Name: "dest_chain_selector", Type: "u64", Required: true},
-			{Name: "receiver", Type: "vector<u8>", Required: true},
-			{Name: "data", Type: "vector<u8>", Required: true},
-			{Name: "token_params", Type: "ptb_dependency", Required: true,
-				PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 0}},
-			{Name: "fee_token_metadata", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false), GenericType: strPtr(feeTokenType)},
-			{Name: "fee_token", Type: "object_id", Required: true},
-			{Name: "extra_args", Type: "vector<u8>", Required: true},
-		},
-	}}
-	return baseCCIPConfig(ccipPkg, pubKey, extra)
-}
-
-// 2b) Message + BurnMintTP → EVM
-func configureChainWriterForMultipleTokens(
-	ccipPkg, onRampPkg string,
-	pubKey []byte,
-	tokenPool string,
-) config.ChainWriterConfig {
-	extra := []config.ChainWriterPTBCommand{
-		// lock-or-burn command
-		{
-			Type:      suicodec.SuiPTBCommandMoveCall,
-			PackageId: strPtr(tokenPool),
-			ModuleId:  strPtr("burn_mint_token_pool"),
-			Function:  strPtr("lock_or_burn"),
-			Params: []suicodec.SuiFunctionParam{
-				{Name: "ref", Type: "object_id", Required: true},
-				{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
-				{Name: "state", Type: "object_id", Required: true},
-				{Name: "c", Type: "object_id", Required: true},
-				{Name: "token_params", Type: "ptb_dependency", Required: true,
-					PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 0}},
-			},
-		},
-		// the same onramp send
-		{
-			Type:      suicodec.SuiPTBCommandMoveCall,
-			PackageId: strPtr(onRampPkg),
-			ModuleId:  strPtr("onramp"),
-			Function:  strPtr("ccip_send"),
-			Params: []suicodec.SuiFunctionParam{
-				{Name: "ref", Type: "object_id", Required: true},
-				{Name: "state", Type: "object_id", Required: true},
-				{Name: "clock", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
-				{Name: "dest_chain_selector", Type: "u64", Required: true},
-				{Name: "receiver", Type: "vector<u8>", Required: true},
-				{Name: "data", Type: "vector<u8>", Required: true},
-				{Name: "token_params", Type: "ptb_dependency", Required: true,
-					PTBDependency: &suicodec.PTBCommandDependency{CommandIndex: 1}},
-				{Name: "fee_token_metadata", Type: "object_id", Required: true, IsMutable: testutils.BoolPointer(false)},
-				{Name: "fee_token", Type: "object_id", Required: true},
-				{Name: "extra_args", Type: "vector<u8>", Required: true},
-			},
-		},
-	}
-	return baseCCIPConfig(ccipPkg, pubKey, extra)
-}
-
 func BuildPTBArgs(baseArgs map[string]any, coinType string, extraArgs map[string]any) config.Arguments {
 	args := make(map[string]any, len(baseArgs)+len(extraArgs))
 	for k, v := range baseArgs {
@@ -230,7 +113,7 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 	suiChains := e.BlockChains.SuiChains()
 	suiChain := suiChains[cfg.SourceChain]
 
-	deps := suideps.SuiDeps{
+	deps := suideps.Deps{
 		SuiChain: sui_ops.OpTxDeps{
 			Client: suiChain.Client,
 			Signer: suiChain.Signer,
