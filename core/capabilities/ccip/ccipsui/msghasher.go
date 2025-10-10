@@ -291,26 +291,29 @@ func encodeBytes(b []byte) []byte {
 	copy(result[32:], b)
 	return result
 }
+func parseExtraDataMap(extraData map[string]interface{}) (*big.Int, [32]byte, error) {
+	gasLimit := big.NewInt(0)
+	var tokenReceiver [32]byte
 
-func parseExtraDataMap(input map[string]any) (*big.Int, [32]byte, error) {
-	outputGas, ok := input["gasLimit"]
-	if !ok {
-		return nil, [32]byte{}, errors.New("gas limit not found in extra data map")
-	}
-	outputGasInt, ok := outputGas.(*big.Int)
-	if !ok {
-		return nil, [32]byte{}, errors.New("gas limit not a *big.Int")
+	// Decode gasLimit normally...
+	if val, ok := extraData["gasLimit"].(int64); ok {
+		gasLimit.SetInt64(val)
 	}
 
-	tokenReceiver, ok := input["tokenReceiver"]
-	if !ok {
-		return nil, [32]byte{}, errors.New("token receiver not found in extra data map")
+	// Handle tokenReceiver
+	receivers, ok := extraData["tokenReceiver"].([][]byte)
+	if !ok || len(receivers) == 0 {
+		// No token receiver specified — leave tokenReceiver as all zeros
+		return gasLimit, tokenReceiver, nil
 	}
-	tokenReceiverBytes, ok := tokenReceiver.([32]byte)
-	if !ok {
-		return nil, [32]byte{}, errors.New("token receiver not a [32]byte")
+
+	// Otherwise, pick the first one (or correct one)
+	first := receivers[0]
+	if len(first) != 32 {
+		return gasLimit, tokenReceiver, fmt.Errorf("invalid tokenReceiver length: got %d, want 32", len(first))
 	}
-	return outputGasInt, tokenReceiverBytes, nil
+	copy(tokenReceiver[:], first)
+	return gasLimit, tokenReceiver, nil
 }
 
 func extractDestGasAmountFromMap(input map[string]any) (uint32, error) {
