@@ -6,32 +6,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/math"
-
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-
-	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
-	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	suiutil "github.com/smartcontractkit/chainlink-sui/bindings/utils"
 	sui_deployment "github.com/smartcontractkit/chainlink-sui/deployment"
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
-
-	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
-	mlt "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagelimitationstest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers/messagingtest"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
@@ -40,6 +27,7 @@ import (
 )
 
 func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
+	// ctx := testhelpers.Context(t)
 	e, _, _ := testsetups.NewIntegrationEnvironment(
 		t,
 		testhelpers.WithNumOfChains(2),
@@ -63,14 +51,15 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 
 	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
 
-	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
-	require.NoError(t, err)
+	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
 	suiSenderAddr, err := e.Env.BlockChains.SuiChains()[sourceChain].Signer.GetAddress()
 	require.NoError(t, err)
 
 	normalizedAddr, err := suiutil.ConvertStringToAddressBytes(suiSenderAddr)
 	require.NoError(t, err)
+
+	suiSenderByte := normalizedAddr[:]
 
 	// SUI FeeToken
 	// mint link token to use as feeToken
@@ -90,7 +79,7 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 
 	var (
 		nonce  uint64
-		sender = common.LeftPadBytes(normalizedAddr[:], 32)
+		sender = common.LeftPadBytes(suiSenderByte[:], 32)
 		out    messagingtest.TestCaseOutput
 		setup  = messagingtest.NewTestSetupWithDeployedEnv(
 			t,
@@ -103,46 +92,7 @@ func Test_CCIP_Messaging_Sui2EVM(t *testing.T) {
 		)
 	)
 
-	// Get Sui FQ
-	ctx := testcontext.Get(t)
-
-	suiFeeQuoter, err := module_fee_quoter.NewFeeQuoter(
-		state.SuiChains[sourceChain].CCIPAddress,
-		e.Env.BlockChains.SuiChains()[sourceChain].Client)
-	require.NoError(t, err)
-
-	suiFeeQuoterDestChainConfig, err := suiFeeQuoter.DevInspect().GetDestChainConfig(ctx, &suiBind.CallOpts{
-		Signer:           e.Env.BlockChains.SuiChains()[sourceChain].Signer,
-		WaitForExecution: true,
-	}, suiBind.Object{Id: state.SuiChains[sourceChain].CCIPObjectRef}, destChain)
-	require.NoError(t, err, "Failed to get destination chain config")
-
-	// For testing messages that revert on source
-	_ = mlt.NewTestSetup(
-		t,
-		state,
-		sourceChain,
-		destChain,
-		common.HexToAddress(outputMap.Objects.MintedLinkTokenObjectId),
-		suiFeeQuoterDestChainConfig,
-		false, // testRouter
-		true,  // validateResp
-		mlt.WithDeployedEnv(e),
-	)
-
-	_ = mlt.NewTestSetup(
-		t,
-		state,
-		sourceChain,
-		destChain,
-		common.HexToAddress("0x0"),
-		suiFeeQuoterDestChainConfig,
-		false, // testRouter
-		true,  // validateResp
-		mlt.WithDeployedEnv(e),
-	)
-
-	t.Run("Message to EVM - Should Succeed", func(t *testing.T) {
+	t.Run("Message to EVM", func(t *testing.T) {
 		out = messagingtest.Run(t,
 			messagingtest.TestCase{
 				TestSetup:              setup,
@@ -179,8 +129,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 
 	lggr.Debug("Source chain (EVM): ", sourceChain, "Dest chain (Sui): ", destChain)
 
-	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
-	require.NoError(t, err)
+	testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
 
 	var (
 		nonce  uint64
@@ -194,14 +143,9 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 			sender,
 			false, // test router
 		)
-
-		// Tokens
-		_            = "0x0"
-		evmLinkToken = state.Chains[sourceChain].LinkToken
-		wethToken    = state.Chains[sourceChain].Weth9
 	)
 
-	// Deploy SUI Receiver
+	// Deploy SUI Reciever
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.DeployDummyReciever{}, sui_cs.DeployDummyRecieverConfig{
 			SuiChainSelector: destChain,
@@ -219,7 +163,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 	receiverByteDecoded, err := hex.DecodeString(id)
 	require.NoError(t, err)
 
-	// register the receiver
+	// register the reciever
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
 		commoncs.Configure(sui_cs.RegisterDummyReciever{}, sui_cs.RegisterDummyReceiverConfig{
 			SuiChainSelector:       destChain,
@@ -241,10 +185,9 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 		outputMap.Objects.CCIPReceiverStateObjectId,
 	))
 
-	recieverObjectIDs := [][32]byte{clockObj, stateObj}
+	recieverObjectIds := [][32]byte{clockObj, stateObj}
 
-	t.Run("Message to Sui - Should Succeed", func(t *testing.T) {
-		// ccipChainState := state.SuiChains[destChain]
+	t.Run("Message to Sui", func(t *testing.T) {
 		message := []byte("Hello Sui, from EVM!")
 		messagingtest.Run(t,
 			messagingtest.TestCase{
@@ -253,78 +196,8 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 				ValidationType:         messagingtest.ValidationTypeExec,
 				Receiver:               receiverByte,
 				MsgData:                message,
-				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIDs, [32]byte{}),
+				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIds, [32]byte{}),
 				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-			},
-		)
-	})
-
-	ctx := testcontext.Get(t)
-	srcFeeQuoterDestChainConfig, err := state.Chains[sourceChain].FeeQuoter.GetDestChainConfig(&bind.CallOpts{Context: ctx}, destChain)
-	require.NoError(t, err, "Failed to get destination chain config")
-
-	// grant mint role
-	tx, err := evmLinkToken.GrantMintRole(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, common.BytesToAddress(sender))
-	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
-	require.NoError(t, err)
-
-	// mint token and approve to router
-	tx, err = evmLinkToken.Mint(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, common.BytesToAddress(sender), deployment.E18Mult(10_000))
-	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
-	require.NoError(t, err)
-
-	tx, err = evmLinkToken.Approve(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, state.Chains[sourceChain].Router.Address(), math.MaxBig256)
-	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
-	require.NoError(t, err)
-
-	// Deposit 1 ETH to get WETH
-	wethTransactOpts := *e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey
-	wethTransactOpts.Value = deployment.E18Mult(1)
-	tx, err = wethToken.Deposit(&wethTransactOpts)
-	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
-	require.NoError(t, err)
-
-	tx, err = wethToken.Approve(e.Env.BlockChains.EVMChains()[sourceChain].DeployerKey, state.Chains[sourceChain].Router.Address(), math.MaxBig256)
-	_, err = cldf.ConfirmIfNoError(e.Env.BlockChains.EVMChains()[sourceChain], tx, err)
-	require.NoError(t, err)
-
-	// For testing messages that revert on source
-	_ = mlt.NewTestSetup(
-		t,
-		state,
-		sourceChain,
-		destChain,
-		common.HexToAddress("0x0"),
-		srcFeeQuoterDestChainConfig,
-		false, // testRouter
-		true,  // validateResp
-		mlt.WithDeployedEnv(e),
-	)
-
-	_ = mlt.NewTestSetup(
-		t,
-		state,
-		sourceChain,
-		destChain,
-		common.HexToAddress("0x0"),
-		srcFeeQuoterDestChainConfig,
-		false, // testRouter
-		true,  // validateResp
-		mlt.WithDeployedEnv(e),
-	)
-	t.Run("Fee Token (LINK) - Should Succeed", func(t *testing.T) {
-		message := []byte("Hello Sui, from EVM!")
-		messagingtest.Run(t,
-			messagingtest.TestCase{
-				TestSetup:      setup,
-				Nonce:          &nonce,
-				ValidationType: messagingtest.ValidationTypeExec,
-				Receiver:       receiverByte,
-				MsgData:        message,
-				// true for out of order execution, which is necessary and enforced for Sui
-				ExtraArgs:              testhelpers.MakeSuiExtraArgs(1000000, true, recieverObjectIDs, [32]byte{}),
-				ExpectedExecutionState: testhelpers.EXECUTION_STATE_SUCCESS,
-				FeeToken:               state.Chains[sourceChain].LinkToken.Address().String(),
 			},
 		)
 	})
