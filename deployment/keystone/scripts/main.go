@@ -50,18 +50,18 @@ type JobDistributorConfig struct {
 type NodeInfo struct {
 	Name           string                 `json:"name"`
 	URL            string                 `json:"url"`
-	CSAPublicKey   string                 `json:"csa_public_key,omitempty"`
-	P2PPeerID      string                 `json:"p2p_peer_id,omitempty"`
-	OCR2KeyBundles []client.OCR2KeyBundle `json:"ocr2_key_bundles,omitempty"`
+	CSAPublicKey   string                 `json:"csaPublicKey,omitempty"`
+	P2PPeerID      string                 `json:"p2pPeerID,omitempty"`
+	OCR2KeyBundles []client.OCR2KeyBundle `json:"ocr2KeyBundles,omitempty"`
 }
 
 type BootstrapNodeInfo struct {
 	Name         string `json:"name"`
 	URL          string `json:"url"`
-	CSAPublicKey string `json:"csa_public_key,omitempty"`
-	P2PPeerID    string `json:"p2p_peer_id,omitempty"`
-	OCRUrl       string `json:"ocr_url,omitempty"`
-	Don2DonURL   string `json:"don2_don_url,omitempty"`
+	CSAPublicKey string `json:"csaPublicKey,omitempty"`
+	P2PPeerID    string `json:"p2pPeerID,omitempty"`
+	OCRUrl       string `json:"ocrURL,omitempty"`
+	Don2DonURL   string `json:"don2DonURL,omitempty"`
 }
 
 var (
@@ -118,11 +118,11 @@ func main() {
 	jdCreateCmd.Flags().StringVarP(&jdConfigPath, "jd-config", "j", "jd.toml", "Path to Job Distributor TOML config file")
 
 	// Aptos chain enablement command
-	jdAptosCmd := newJDAptosCmd()
+	//jdAptosCmd := newJDAptosCmd()
 
 	// Build JD command hierarchy
 	jdCmd.AddCommand(jdCreateCmd)
-	jdCmd.AddCommand(jdAptosCmd)
+	//jdCmd.AddCommand(jdAptosCmd)
 	jdCmd.AddCommand(newJDAcceptCmd())
 
 	jdCmd.Flags().StringVarP(&jdConfigPath, "jd-config", "j", "jd.toml", "Path to Job Distributor TOML config file")
@@ -300,46 +300,24 @@ func nodeInfo(ctx context.Context, nodeConfig NodeConfig) (NodeInfo, error) {
 		return NodeInfo{}, fmt.Errorf("failed to connect to node %s: %w", nodeConfig.Name, err)
 	}
 
-	// Fetch CSA Public Key
 	csaKey, err := cl.FetchCSAPublicKey(ctx)
-	if err == nil && csaKey != nil {
-		nodeInfo.CSAPublicKey = *csaKey
+	if err != nil {
+		log.Printf("Failed to fetch CSA public key for node %s: %v", nodeConfig.Name, err)
 	}
+	nodeInfo.CSAPublicKey = *csaKey
 
-	// Fetch P2P Peer ID
 	peerID, err := cl.FetchP2PPeerID(ctx)
-	if err == nil && peerID != nil {
-		nodeInfo.P2PPeerID = *peerID
+	if err != nil {
+		log.Printf("Failed to fetch P2P peer ID for node %s: %v", nodeConfig.Name, err)
 	}
+	nodeInfo.P2PPeerID = *peerID
 
-	if !nodeConfig.Bootstrap {
-		ocrKeyBundleIDs, err := cl.ListOCR2KeyBundles(ctx)
-		if err == nil {
-			nodeInfo.OCR2KeyBundles = ocrKeyBundleIDs
-		}
-		// if no aptos ocr2 key bundles are found, create one and retry fetching
-		foundAptosKeyBundle := false
-		for _, keyBundle := range nodeInfo.OCR2KeyBundles {
-			if keyBundle.ChainType == client.OCR2ChainTypeAptos {
-				foundAptosKeyBundle = true
-				break
-			}
-		}
-		if !foundAptosKeyBundle {
-			// Create a new OCR2 key bundle for Aptos
-			aptosKeyBundleID, err := cl.CreateOCR2KeyBundle(ctx, client.OCR2ChainTypeAptos)
-			if err != nil {
-				return nodeInfo, fmt.Errorf("failed to create OCR2 key bundle for Aptos on node %s: %w", nodeConfig.Name, err)
-			}
-			log.Printf("Created OCR2 key bundle for Aptos on node %s with ID: %s", nodeConfig.Name, aptosKeyBundleID)
-			// Retry fetching OCR2 key bundles
-			ocrKeyBundleIDs, err = cl.ListOCR2KeyBundles(ctx)
-			if err != nil {
-				return nodeInfo, fmt.Errorf("failed to fetch OCR2 key bundles after creating new one on node %s: %w", nodeConfig.Name, err)
-			}
-			nodeInfo.OCR2KeyBundles = ocrKeyBundleIDs
-		}
+	ocrKeyBundleIDs, err := cl.ListOCR2KeyBundles(ctx)
+	if err != nil {
+		log.Printf("Failed to fetch OCR2 key bundle IDs for node %s: %v", nodeConfig.Name, err)
 	}
+	nodeInfo.OCR2KeyBundles = ocrKeyBundleIDs
+
 	return nodeInfo, nil
 }
 
