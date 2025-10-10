@@ -15,7 +15,7 @@ plugins:
 
   sui:
     - moduleURI: "github.com/smartcontractkit/chainlink-sui"
-      gitRef: "v0.0.0-20251009192516-984c6ca52807"
+      gitRef: "v0.0.0-20251009194901-6a02b1bddd8e"
       installPath: "./relayer/cmd/chainlink-sui"
 
   cosmos:
