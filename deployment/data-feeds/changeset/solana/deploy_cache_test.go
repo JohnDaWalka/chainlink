@@ -112,7 +112,6 @@ func TestConfigureCache(t *testing.T) {
 	solSel := env.BlockChains.ListChainSelectors(cldfchain.WithFamily(chain_selectors.FamilySolana))[0]
 
 	chain := env.BlockChains.SolanaChains()[solSel]
-	chain.ProgramsPath = getProgramsPath()
 	env.BlockChains = cldfchain.NewBlockChains(map[uint64]cldfchain.BlockChain{solSel: chain})
 	// Example array of DataIDs as [][16]uint8
 	DataIDs := []string{
