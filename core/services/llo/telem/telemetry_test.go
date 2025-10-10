@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/quarantine"
 
 	"github.com/smartcontractkit/chainlink-data-streams/llo"
 	datastreamsllo "github.com/smartcontractkit/chainlink-data-streams/llo"
@@ -516,6 +517,7 @@ func Test_Telemeter_outcomeTelemetry(t *testing.T) {
 }
 
 func Test_Telemeter_reportTelemetry(t *testing.T) {
+	quarantine.Flaky(t, "DX-2084")
 	t.Parallel()
 
 	lggr := logger.TestLogger(t)
