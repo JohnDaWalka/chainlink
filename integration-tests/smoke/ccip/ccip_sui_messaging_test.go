@@ -162,7 +162,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 
 	// Deploy SUI Reciever
 	_, output, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.DeployDummyReciever{}, sui_cs.DeployDummyRecieverConfig{
+		commoncs.Configure(sui_cs.DeployDummyReceiver{}, sui_cs.DeployDummyReceiverConfig{
 			SuiChainSelector: destChain,
 			McmsOwner:        "0x1",
 		}),
@@ -180,7 +180,7 @@ func Test_CCIP_Messaging_EVM2Sui(t *testing.T) {
 
 	// register the reciever
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.RegisterDummyReciever{}, sui_cs.RegisterDummyReceiverConfig{
+		commoncs.Configure(sui_cs.RegisterDummyReceiver{}, sui_cs.RegisterDummyReceiverConfig{
 			SuiChainSelector:       destChain,
 			CCIPObjectRefObjectId:  state.SuiChains[destChain].CCIPObjectRef,
 			DummyReceiverPackageId: outputMap.PackageId,

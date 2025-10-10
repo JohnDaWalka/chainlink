@@ -363,14 +363,16 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 		typeArgsList := []string{}
 		typeParamsList := []string{}
 		paramTypes := []string{
-			"address",
-		}
-		paramValues := []any{
-			// For SUI -> EVM BurnMint Pool token Transfer, we can use msg.Reciever as tokenReciever, this field is only used in usdc token pool
-			// bc we need to check the recipient with Circle's packages from the onramp side before sending USDC. and it's not used anyway else.
-			"0x0000000000000000000000000000000000000000000000000000000000000000",
+			"vector<u8>",
 		}
 
+		decodedTokenReceiver, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000000")
+		var tokenReceiver [32]byte
+		copy(tokenReceiver[:], decodedTokenReceiver)
+
+		paramValues := []any{
+			decodedTokenReceiver,
+		}
 		onRampCreateTokenTransferParamsCall, err := ccipStateHelperContract.EncodeCallArgsWithGenerics(
 			"create_token_transfer_params",
 			typeArgsList,
@@ -518,10 +520,14 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 	typeArgsList := []string{}
 	typeParamsList := []string{}
 	paramTypes := []string{
-		"address",
+		"vector<u8>",
 	}
+	decodedTokenReceiver, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000000")
+	var tokenReceiver [32]byte
+	copy(tokenReceiver[:], decodedTokenReceiver)
+
 	paramValues := []any{
-		"0x0000000000000000000000000000000000000000000000000000000000000000", // zero address as it's msg transfer
+		decodedTokenReceiver,
 	}
 
 	onRampCreateTokenTransferParamsCall, err := ccipStateHelperContract.EncodeCallArgsWithGenerics(
