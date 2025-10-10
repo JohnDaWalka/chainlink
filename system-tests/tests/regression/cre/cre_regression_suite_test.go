@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
 
@@ -125,6 +127,7 @@ func Test_CRE_V2_EVM_HeaderByNumber_Invalid_Block_Regression(t *testing.T) {
 }
 
 func Test_CRE_V2_EVM_WriteReport_Invalid_Receiver_Regression(t *testing.T) {
+	quarantine.Flaky(t, "DX-2087")
 	runEVMNegativeTestSuite(t, evmNegativeTestsWriteReportInvalidReceiver)
 }
 
