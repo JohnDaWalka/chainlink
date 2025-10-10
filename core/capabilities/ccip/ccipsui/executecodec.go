@@ -347,7 +347,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 
 	// Assemble the final report
 	chainReport.Messages = []ccipocr3common.Message{message}
-	// ProofFlagBits is not part of the Aptos report, initialize it empty/zero.
+	// ProofFlagBits is not part of the Sui report, initialize it empty/zero.
 	chainReport.ProofFlagBits = ccipocr3common.NewBigInt(big.NewInt(0))
 	report.ChainReports = []ccipocr3common.ExecutePluginReportSingleChain{chainReport}
 
