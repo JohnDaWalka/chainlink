@@ -172,6 +172,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report ccipocr3.Execu
 		return nil, fmt.Errorf("BCS serialization failed: %w", s.Error())
 	}
 
+	fmt.Println("ENCODED BYTES", s.ToBytes())
 	return s.ToBytes(), nil
 }
 
@@ -341,6 +342,7 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 	message.ExtraArgs = ccipocr3common.Bytes{}
 	message.FeeTokenAmount = ccipocr3common.BigInt{}
 
+	fmt.Println("MESSAGE DECODED: ", message)
 	// Assemble the final report
 	chainReport.Messages = []ccipocr3common.Message{message}
 	// ProofFlagBits is not part of the Sui report, initialize it empty/zero.
