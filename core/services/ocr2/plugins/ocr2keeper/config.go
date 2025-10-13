@@ -8,6 +8,8 @@ import (
 
 type Duration time.Duration
 
+// run CI
+
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var raw string
 	if err := json.Unmarshal(b, &raw); err != nil {
