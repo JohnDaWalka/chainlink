@@ -826,7 +826,7 @@ runner-test-matrix:
     sui_cli_version: mainnet-1.57.2
     install_plugins_public: true
 
-  - id: smoke/ccip/ccip_sui_token_transfer_test.go:Test_CCIPUpgrade_Sui2EVM
+  - id: smoke/ccip/ccip_sui_upgrade_test.go:Test_CCIPUpgrade_Sui2EVM
     path: integration-tests/smoke/ccip/ccip_sui_upgrade_test.go
     test_env_type: in-memory
     runs_on: ubuntu-latest
