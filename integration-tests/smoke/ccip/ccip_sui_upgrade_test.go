@@ -212,17 +212,17 @@ func Test_CCIP_Upgrade_EVM2Sui(t *testing.T) {
 
 	fmt.Println("Upgrading SUI onRamp...")
 	// Upgrade sui onRamp contract
-	upgradeSuiOnRamp(ctx, t, e, sourceChain)
+	upgradeSuiOnRamp(ctx, t, e, destChain)
 	fmt.Println("Upgraded SUI onRamp")
 
 	fmt.Println("Upgrading SUI offRamp...")
 	// Upgrade sui offramp contract
-	upgradeSuiOffRamp(ctx, t, e, sourceChain)
+	upgradeSuiOffRamp(ctx, t, e, destChain)
 	fmt.Println("Upgraded SUI offRamp")
 
 	fmt.Println("Upgrading SUI CCIP...")
 	// Upgrade sui offramp contract
-	upgradeCCIP(ctx, t, e, sourceChain)
+	upgradeCCIP(ctx, t, e, destChain)
 
 	fmt.Println("Upgraded SUI CCIP")
 
