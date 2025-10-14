@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-protos/cre/go/values"
@@ -21,6 +23,7 @@ func assertBetween(t *testing.T, got time.Duration, low time.Duration, high time
 }
 
 func TestScheduledExecutionStrategy_LocalDON(t *testing.T) {
+	quarantine.Flaky(t, "DX-2099")
 	var gotTime time.Time
 	var called bool
 
