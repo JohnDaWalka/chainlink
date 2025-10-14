@@ -47,6 +47,7 @@ var RegisterNodes = operations.NewOperation[RegisterNodesInput, RegisterNodesOut
 			return RegisterNodesOutput{}, errors.New("address is not set")
 		}
 		if len(input.Nodes) == 0 {
+			b.Logger.Info("No nodes to register, skipping")
 			// The contract allows to pass an empty array of nodes.
 			return RegisterNodesOutput{
 				Nodes: []*capabilities_registry_v2.CapabilitiesRegistryNodeAdded{},

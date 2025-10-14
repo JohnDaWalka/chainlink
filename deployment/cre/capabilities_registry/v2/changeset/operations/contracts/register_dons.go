@@ -42,6 +42,14 @@ var RegisterDons = operations.NewOperation[RegisterDonsInput, RegisterDonsOutput
 	semver.MustParse("1.0.0"),
 	"Register DONs in Capabilities Registry",
 	func(b operations.Bundle, deps RegisterDonsDeps, input RegisterDonsInput) (RegisterDonsOutput, error) {
+		if len(input.DONs) == 0 {
+			b.Logger.Info("No DONs to register, skipping")
+			// The contract allows to pass an empty array of nodes.
+			return RegisterDonsOutput{
+				DONs: []capabilities_registry_v2.CapabilitiesRegistryDONInfo{},
+			}, nil
+		}
+
 		// Get the target chain
 		chain, ok := deps.Env.BlockChains.EVMChains()[input.ChainSelector]
 		if !ok {
