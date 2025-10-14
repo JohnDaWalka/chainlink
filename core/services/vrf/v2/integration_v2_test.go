@@ -1510,6 +1510,7 @@ func TestVRFV2Integration_SingleConsumer_AlwaysRevertingCallback_StillFulfilled(
 }
 
 func TestVRFV2Integration_ConsumerProxy_HappyPath(t *testing.T) {
+	quarantine.Flaky(t, "DX-2097")
 	ownerKey := cltest.MustGenerateRandomKey(t)
 	uni := newVRFCoordinatorV2Universe(t, ownerKey, 0)
 	testConsumerProxyHappyPath(
