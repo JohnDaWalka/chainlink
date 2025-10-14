@@ -78,7 +78,7 @@ The CLI manages CRE test environments. It is located in `core/scripts/cre/enviro
 # e.g. AWS_ECR=<PROD_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
 AWS_ECR=<PROD_AWS_URL> go run . env start --auto-setup
 ```
-> You can find `PROD_ACCOUNT_ID` and `REGION` in the `[profile prod]` section of the [AWS CLI configuration guide](https://smartcontract-it.atlassian.net/wiki/spaces/INFRA/pages/1045495923/Configure+the+AWS+CLI#Configure).
+> You can find `PROD_ACCOUNT_ID` and `REGION` in the `[profile prod]` section of the [AWS CLI configuration guide](https://smartcontract-it.atlassian.net/wiki/spaces/INFRA/pages/1045495923/Configure+the+AWS+CLI#Configure). If for some reason you want to limit the AWS config to bare minimum, include only `staging-default` profile and `cl-secure-sso` session entries.
 
 If you are missing requirements, you may need to fix the errors and re-run.
 
@@ -86,7 +86,7 @@ Refer to [this document](https://docs.google.com/document/d/1HtVLv2ipx2jvU15WYOi
 
 ## Setup
 
-Environment can be setup by running `go run . env setup` inside `fdf` folder. Its configuration is defined in [configs/setup.toml](configs/setup.toml) file. It will make sure that:
+Environment can be setup by running `go run . env setup` inside `core/scripts/cre/evnrionment` folder. Its configuration is defined in [configs/setup.toml](configs/setup.toml) file. It will make sure that:
 - you have AWS CLI installed and configured
 - you have GH CLI installed and authenticated
 - you have required Job Distributor and Chip Ingress (Beholder) images
@@ -183,7 +183,7 @@ ctf bs r
 ```
 ---
 
-## Debugging core nodes 
+## Debugging core nodes
 Before start the environment set the `CTF_CLNODE_DLV` environment variable to `true`
 ```bash
 export CTF_CLNODE_DLV="true"
@@ -1444,7 +1444,7 @@ TRON blockchain support is integrated into the CRE environment by configuring TR
 [[nodesets]]
 ...
   [nodesets.chain_capabilities]
-    # Tron is configured as an EVM chain so we can use all the EVM capabilities. 
+    # Tron is configured as an EVM chain so we can use all the EVM capabilities.
     read-contract = ["1337", "3360022319"]
     write-evm = ["1337", "3360022319"]
 ```
