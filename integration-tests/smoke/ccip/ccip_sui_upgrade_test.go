@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	module_state_object "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/state_object"
 	module_offramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_offramp/offramp"
 	module_onramp "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip_onramp/onramp"
 	"github.com/smartcontractkit/chainlink-sui/contracts"
@@ -94,14 +95,18 @@ func Test_CCIP_Upgrade_Sui2EVM(t *testing.T) {
 	fmt.Println("Upgrading SUI onRamp...")
 	// Upgrade sui onRamp contract
 	upgradeSuiOnRamp(ctx, t, e, sourceChain)
-
 	fmt.Println("Upgraded SUI onRamp")
 
 	fmt.Println("Upgrading SUI offRamp...")
 	// Upgrade sui offramp contract
 	upgradeSuiOffRamp(ctx, t, e, sourceChain)
-
 	fmt.Println("Upgraded SUI offRamp")
+
+	fmt.Println("Upgrading SUI CCIP...")
+	// Upgrade sui offramp contract
+	upgradeCCIP(ctx, t, e, sourceChain)
+
+	fmt.Println("Upgraded SUI CCIP")
 
 	t.Run("Message to EVM - Should Succeed", func(t *testing.T) {
 		out = messagingtest.Run(t,
@@ -244,5 +249,67 @@ func upgradeSuiOffRamp(ctx context.Context, t *testing.T, e testhelpers.Deployed
 		WaitForExecution: true,
 		GasBudget:        &b,
 	}, suiBind.Object{Id: state.SuiChains[sourceChain].OffRampStateObjectId}, suiBind.Object{Id: state.SuiChains[sourceChain].OffRampOwnerCapId}, newOffRampPkgId)
+	require.NoError(t, err)
+}
+
+func upgradeCCIP(ctx context.Context, t *testing.T, e testhelpers.DeployedEnv, sourceChain uint64) {
+	state, err := stateview.LoadOnchainState(e.Env)
+	require.NoError(t, err)
+
+	// compile packages
+	compiledPackage, err := suiBind.CompilePackage(contracts.CCIP, map[string]string{
+		"ccip":       "0x0",
+		"mcms":       state.SuiChains[sourceChain].MCMsAddress,
+		"mcms_owner": "0x1",
+	})
+	require.NoError(t, err)
+
+	// decode modules from base64 -> [][]byte
+	moduleBytes := make([][]byte, len(compiledPackage.Modules))
+	for i, moduleBase64 := range compiledPackage.Modules {
+		decoded, err := base64.StdEncoding.DecodeString(moduleBase64)
+		require.NoError(t, err)
+
+		moduleBytes[i] = decoded
+	}
+
+	depAddresses := make([]models.SuiAddress, len(compiledPackage.Dependencies))
+	for i, dep := range compiledPackage.Dependencies {
+		depAddresses[i] = models.SuiAddress(dep)
+	}
+
+	policy := byte(0)
+
+	// upgrade the ccipPkg
+	b := uint64(700_000_000)
+	resp, err := testhelpers.UpgradeContractDirect(ctx, &suiBind.CallOpts{
+		Signer:           e.Env.BlockChains.SuiChains()[sourceChain].Signer,
+		WaitForExecution: true,
+		GasBudget:        &b,
+	},
+
+		e.Env.BlockChains.SuiChains()[sourceChain].Client,
+		state.SuiChains[sourceChain].CCIPAddress,
+		state.SuiChains[sourceChain].CCIPUpgradeCapObjectId,
+		moduleBytes,
+		depAddresses,
+		policy,
+		compiledPackage.Digest,
+	)
+	require.NoError(t, err)
+
+	newCCIPPkgId, err := bind.FindPackageIdFromPublishTx(*resp)
+	require.NoError(t, err)
+
+	// Add new PackageID
+	ccipStateObject, err := module_state_object.NewStateObject(state.SuiChains[sourceChain].CCIPAddress, e.Env.BlockChains.SuiChains()[sourceChain].Client)
+	require.NoError(t, err)
+
+	// add new pkgId to state
+	_, err = ccipStateObject.AddPackageId(ctx, &suiBind.CallOpts{
+		Signer:           e.Env.BlockChains.SuiChains()[sourceChain].Signer,
+		WaitForExecution: true,
+		GasBudget:        &b,
+	}, suiBind.Object{Id: state.SuiChains[sourceChain].CCIPObjectRef}, suiBind.Object{Id: state.SuiChains[sourceChain].CCIPOwnerCapObjectId}, newCCIPPkgId)
 	require.NoError(t, err)
 }

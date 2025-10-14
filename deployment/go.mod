@@ -5,9 +5,9 @@ go 1.24.5
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
-replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../chainlink-sui
 
-replace github.com/smartcontractkit/chainlink-sui/deployment => ../../chainlink-sui/deployment
+// replace github.com/smartcontractkit/chainlink-sui/deployment => ../../chainlink-sui/deployment
 
 // Using a separate inline `require` here to avoid surrounding line changes
 // creating potential merge conflicts.
@@ -54,8 +54,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
 	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0
 	github.com/smartcontractkit/chainlink-solana v1.1.2-0.20251007010318-c9a7b2d44524
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20251013155034-5f85c5f450ab
-	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251012014843-5d44e7731854
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20251014052500-262b8fc9464f
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251014052500-262b8fc9464f
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.10.34
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.5
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20251009173109-af31806bede5

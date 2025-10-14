@@ -11,9 +11,9 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 replace github.com/smartcontractkit/chainlink/deployment => ../../deployment
 
-replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
-replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
+// replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
 
 require (
 	dario.cat/mergo v1.0.2
@@ -468,8 +468,8 @@ require (
 	github.com/smartcontractkit/chainlink-protos/storage-service v0.3.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/svr v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/workflows/go v0.0.0-20251008185222-47a7460f5207 // indirect
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20251013155034-5f85c5f450ab // indirect
-	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251012014843-5d44e7731854 // indirect
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20251014052500-262b8fc9464f // indirect
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251014052500-262b8fc9464f // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/parrot v0.6.2 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20251009173109-af31806bede5 // indirect
 	github.com/smartcontractkit/chainlink-ton/deployment v0.0.0-20251009173109-af31806bede5 // indirect
