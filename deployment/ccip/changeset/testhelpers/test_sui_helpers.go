@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	burnminttokenpoolops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip_burn_mint_token_pool"
 	suiofframp_helper "github.com/smartcontractkit/chainlink-sui/relayer/chainwriter/ptb/offramp"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	suideps "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/sui"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
@@ -649,4 +651,130 @@ func WaitForTokenBalanceSui(
 
 		return balance.Cmp(expected) == 0
 	}, tests.WaitTimeout(t), 500*time.Millisecond)
+}
+
+func UpgradeContractDirect(
+	ctx context.Context,
+	callOpts *suiBind.CallOpts, // must include Signer, GasBudget, WaitForExecution
+	client sui.ISuiAPI,
+	packageToUpgrade string,
+	upgradeCapID string,
+	modules [][]byte,
+	dependencies []models.SuiAddress,
+	policy byte,
+	digest []byte,
+) (*models.SuiTransactionBlockResponse, error) {
+	lggr, _ := logger.New()
+
+	ptb := suitx.NewTransaction()
+	ptb.SetSuiClient(client.(*sui.Client))
+
+	packageContract, err := suiBind.NewBoundContract(
+		"0x2",     // Framework package
+		"sui",     // Package name
+		"package", // Module name
+		client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to suibind package module: %w", err)
+	}
+
+	// Encode authorize_upgrade call
+	typeArgsList := []string{}
+	typeParamsList := []string{}
+
+	normalizedModulePackage, err := client.SuiGetNormalizedMoveModule(ctx, models.GetNormalizedMoveModuleRequest{
+		Package:    "0x2",
+		ModuleName: "package",
+	})
+	if err != nil {
+		return nil, errors.New("failed to get normalized module: " + err.Error())
+	}
+
+	functionSignatureAuthorizeUpgrade, isValidaAU := normalizedModulePackage.ExposedFunctions["authorize_upgrade"]
+	if !isValidaAU {
+		return nil, errors.New("missing function signature for receiver function not found in module authorize_upgrade")
+	}
+
+	// Figure out the parameter types from the normalized module of the token pool
+	paramTypesAuthorizeUpgrade, err := suiofframp_helper.DecodeParameters(lggr, functionSignatureAuthorizeUpgrade.(map[string]any), "parameters")
+	if err != nil {
+		return nil, errors.New("failed to decode parameters for commit upgrade function: " + err.Error())
+	}
+
+	paramValues := []any{
+		suiBind.Object{Id: upgradeCapID},
+		uint8(policy),
+		digest,
+	}
+
+	authCall, err := packageContract.EncodeCallArgsWithGenerics(
+		"authorize_upgrade",
+		typeArgsList,
+		typeParamsList,
+		paramTypesAuthorizeUpgrade,
+		paramValues,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode authorize_upgrade call: %w", err)
+	}
+
+	authResult, err := packageContract.AppendPTB(ctx, callOpts, ptb, authCall)
+	if err != nil {
+		return nil, fmt.Errorf("failed to append authorize_upgrade to PTB: %w", err)
+	}
+
+	// Append the Upgrade command (consumes UpgradeTicket)
+	upgradeReceiptArg := ptb.Upgrade(
+		modules,                             // Raw bytes (from Call)
+		dependencies,                        // Dependencies as addresses (from Call)
+		models.SuiAddress(packageToUpgrade), // Package being upgraded (from Call)
+		*authResult,                         // UpgradeTicket from authorize step
+	)
+
+	// commit the ticket
+	typeArgsListCommit := []string{}
+	typeParamsListCommit := []string{}
+
+	functionSignatureCommitUpgrade, isValidaCU := normalizedModulePackage.ExposedFunctions["commit_upgrade"]
+	if !isValidaCU {
+		return nil, errors.New("missing function signature for receiver function not found in module commit_upgrade")
+	}
+
+	// Figure out the parameter types from the normalized module of the token pool
+	paramTypesCommitUpgrade, err := suiofframp_helper.DecodeParameters(lggr, functionSignatureCommitUpgrade.(map[string]any), "parameters")
+	if err != nil {
+		return nil, errors.New("failed to decode parameters for commit upgrade function: " + err.Error())
+	}
+
+	paramValuesCommit := []any{
+		suiBind.Object{Id: upgradeCapID},
+		upgradeReceiptArg,
+	}
+
+	commitEncoded, err := packageContract.EncodeCallArgsWithGenerics(
+		"commit_upgrade",
+		typeArgsListCommit,
+		typeParamsListCommit,
+		paramTypesCommitUpgrade,
+		paramValuesCommit,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode commit_upgrade call: %w", err)
+	}
+
+	_, err = packageContract.AppendPTB(ctx, callOpts, ptb, commitEncoded)
+	if err != nil {
+		return nil, fmt.Errorf("failed to append commit_upgrade to PTB: %w", err)
+	}
+
+	// ️ Execute PTB
+	resp, err := suiBind.ExecutePTB(ctx, callOpts, client, ptb)
+	if err != nil {
+		return nil, fmt.Errorf("failed executing upgrade PTB: %w", err)
+	}
+
+	return resp, nil
 }
