@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"sort"
 	"testing"
 	"time"
@@ -57,15 +58,13 @@ type donConfig struct {
 	RegistryChainSel uint64
 }
 
+// TODO CRE-999; aptos can be made optional
 func initEnv(t *testing.T, lggr logger.Logger) (registryChainSel, aptosChainSel uint64, env *cldf.Environment) {
 	evmChains := memory.NewMemoryChainsEVM(t, 1, 1)
-	aptosChains := memory.NewMemoryChainsAptos(t, 1)
 	chains := cldf_chain.NewBlockChainsFromSlice([]cldf_chain.BlockChain{
 		evmChains[0],
-		aptosChains[0],
 	})
 	registryChainSel = evmChains[0].ChainSelector()
-	aptosChainSel = aptosChains[0].ChainSelector()
 
 	ds := datastore.NewMemoryDataStore()
 	localEnv := cldf.Environment{
@@ -93,9 +92,9 @@ func initEnv(t *testing.T, lggr logger.Logger) (registryChainSel, aptosChainSel 
 	env = &localEnv
 	require.NotNil(t, env)
 	require.Len(t, env.BlockChains.EVMChains(), 1)
-	require.Len(t, env.BlockChains.AptosChains(), 1)
 
-	return registryChainSel, aptosChainSel, env
+	// by inspection, the only chain that is needed is evm, but some callers expect aptos keys and therefore an aptos selector to use for generating the keys
+	return registryChainSel, chain_selectors.APTOS_LOCALNET.Selector, env
 }
 
 // SetupEnvV2 starts an environment with a single DON, 4 nodes and a capabilities registry v2 deployed and configured.
@@ -184,7 +183,7 @@ func SetupEnvV2(t *testing.T, useMCMS bool) *EnvWrapperV2 {
 				Capabilities: []changeset2.CapabilitiesRegistryCapability{
 					{
 						CapabilityID: "test-capability@1.0.0",
-						Metadata:     map[string]interface{}{"capabilityType": 2},
+						Metadata:     map[string]any{"capabilityType": 2},
 					},
 				},
 				DONs: []changeset2.CapabilitiesRegistryNewDONParams{
@@ -193,7 +192,7 @@ func SetupEnvV2(t *testing.T, useMCMS bool) *EnvWrapperV2 {
 						F:           uint8(donCfg.F), //nolint:gosec // disable G115
 						Nodes:       nodesP2PIDs,
 						DonFamilies: []string{"test-family"},
-						Config:      map[string]interface{}{"consensus": "basic", "timeout": "30s"},
+						Config:      map[string]any{"consensus": "basic", "timeout": "30s"},
 						CapabilityConfigurations: []changeset2.CapabilitiesRegistryCapabilityConfiguration{
 							{
 								CapabilityID: "test-capability@1.0.0",
@@ -264,9 +263,7 @@ func setupViewOnlyNodeTest(t *testing.T, registryChainSel, aptosChainSel uint64,
 			"type":               "plugin",
 		}
 		if donCfg.Labels != nil {
-			for k, v := range donCfg.Labels {
-				labels[k] = v
-			}
+			maps.Copy(labels, donCfg.Labels)
 		}
 
 		nCfg := envtest.NodeConfig{
@@ -284,9 +281,7 @@ func setupViewOnlyNodeTest(t *testing.T, registryChainSel, aptosChainSel uint64,
 		"type":               "bootstrap",
 	}
 	if donCfg.Labels != nil {
-		for k, v := range donCfg.Labels {
-			btLabels[k] = v
-		}
+		maps.Copy(btLabels, donCfg.Labels)
 	}
 	nodesCfg = append(nodesCfg, envtest.NodeConfig{
 		ChainSelectors: []uint64{registryChainSel, aptosChainSel},

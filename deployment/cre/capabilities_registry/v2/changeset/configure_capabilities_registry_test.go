@@ -7,14 +7,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 	"gopkg.in/yaml.v3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	capabilities_registry_v2 "github.com/smartcontractkit/chainlink-evm/gethwrappers/workflow/generated/capabilities_registry_wrapper_v2"
 	commonchangeset "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 	"github.com/smartcontractkit/chainlink/deployment/common/proposalutils"
@@ -30,6 +33,7 @@ import (
 type testFixture struct {
 	env                         cldf.Environment
 	chainSelector               uint64
+	qualifier                   string
 	capabilitiesRegistryAddress string
 	nops                        []CapabilitiesRegistryNodeOperator
 	capabilities                []CapabilitiesRegistryCapability
@@ -50,7 +54,18 @@ const (
 
 func TestConfigureCapabilitiesRegistry(t *testing.T) {
 	fixture := setupCapabilitiesRegistryTest(t)
+	t.Run("select by address", func(t *testing.T) {
+		suite(t, fixture)
+	})
 
+	t.Run("select by qualifier", func(t *testing.T) {
+		fixture.configureInput.CapabilitiesRegistryAddress = ""
+		fixture.configureInput.Qualifier = fixture.qualifier
+		suite(t, fixture)
+	})
+}
+
+func suite(t *testing.T, fixture *testFixture) {
 	t.Run("single configuration", func(t *testing.T) {
 		t.Log("Starting capabilities registry configuration...")
 		configureOutput, err := ConfigureCapabilitiesRegistry{}.Apply(fixture.env, fixture.configureInput)
@@ -101,7 +116,7 @@ func TestConfigureCapabilitiesRegistry(t *testing.T) {
 		nopsInput := contracts.RegisterNopsInput{
 			Address:       mcmsFixture.capabilitiesRegistryAddress,
 			ChainSelector: mcmsFixture.chainSelector,
-			Nops: []capabilities_registry_v2.CapabilitiesRegistryNodeOperator{
+			Nops: []capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams{
 				{
 					Admin: common.HexToAddress("0x0000000000000000000000000000000000000001"),
 					Name:  "test nop1",
@@ -169,7 +184,7 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 			{
 				CapabilityID:          "write-chain@1.0.0",
 				ConfigurationContract: common.HexToAddress("0x3333333333333333333333333333333333333333"),
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"capabilityType": 3,
 					"responseType":   0,
 				},
@@ -177,7 +192,7 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 			{
 				CapabilityID:          "trigger@1.0.0",
 				ConfigurationContract: common.Address{}, // Zero address
-				Metadata: map[string]interface{}{
+				Metadata: map[string]any{
 					"capabilityType": 0,
 					"responseType":   0,
 				},
@@ -197,20 +212,20 @@ func TestConfigureCapabilitiesRegistryInput_YAMLSerialization(t *testing.T) {
 			{
 				Name:        "workflow-don-1",
 				DonFamilies: []string{"workflow", "test"},
-				Config: map[string]interface{}{
+				Config: map[string]any{
 					"consensus": "basic",
 					"timeout":   "30s",
 				},
 				CapabilityConfigurations: []CapabilitiesRegistryCapabilityConfiguration{
 					{
 						CapabilityID: "write-chain@1.0.0",
-						Config: map[string]interface{}{
+						Config: map[string]any{
 							"targetChain": "ethereum",
 						},
 					},
 					{
 						CapabilityID: "trigger@1.0.0",
-						Config: map[string]interface{}{
+						Config: map[string]any{
 							"schedule": "0 0 * * *",
 						},
 					},
@@ -360,11 +375,11 @@ dons:
 	assert.Equal(t, "trigger@1.0.0", input.Capabilities[1].CapabilityID)
 
 	// Verify metadata is decoded properly
-	expectedMetadata1 := map[string]interface{}{
+	expectedMetadata1 := map[string]any{
 		"capabilityType": 3,
 		"responseType":   0,
 	}
-	expectedMetadata2 := map[string]interface{}{
+	expectedMetadata2 := map[string]any{
 		"capabilityType": 0,
 		"responseType":   1,
 	}
@@ -384,7 +399,7 @@ dons:
 	assert.Equal(t, uint8(1), input.DONs[0].F)
 
 	// Verify config is decoded properly
-	expectedConfig := map[string]interface{}{
+	expectedConfig := map[string]any{
 		"consensus": "basic",
 	}
 	assert.Equal(t, expectedConfig, input.DONs[0].Config)
@@ -392,7 +407,7 @@ dons:
 	// Verify capability configuration is decoded properly
 	require.Len(t, input.DONs[0].CapabilityConfigurations, 1)
 	assert.Equal(t, "write-chain@1.0.0", input.DONs[0].CapabilityConfigurations[0].CapabilityID)
-	expectedCapConfig := map[string]interface{}{
+	expectedCapConfig := map[string]any{
 		"targetChain": "ethereum",
 	}
 	assert.Equal(t, expectedCapConfig, input.DONs[0].CapabilityConfigurations[0].Config)
@@ -452,7 +467,7 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 		ConfigurationContract: common.Address{},
 		Metadata:              []byte(`{"capabilityType": 3, "responseType": 1}`),
 	}
-	var writeChainCapabilityMetadata map[string]interface{}
+	var writeChainCapabilityMetadata map[string]any
 	err = json.Unmarshal(writeChainCapability.Metadata, &writeChainCapabilityMetadata)
 	require.NoError(t, err)
 
@@ -461,7 +476,7 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 		ConfigurationContract: common.Address{},
 		Metadata:              []byte(`{"capabilityType": 1, "responseType": 1}`),
 	}
-	var triggerCapabilityMetadata map[string]interface{}
+	var triggerCapabilityMetadata map[string]any
 	err = json.Unmarshal(triggerCapability.Metadata, &triggerCapabilityMetadata)
 	require.NoError(t, err)
 
@@ -502,9 +517,9 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 	}
 
 	// Create capability configurations
-	configMap := map[string]interface{}{
-		"defaultConfig": map[string]interface{}{},
-		"remoteTriggerConfig": map[string]interface{}{
+	configMap := map[string]any{
+		"defaultConfig": map[string]any{},
+		"remoteTriggerConfig": map[string]any{
 			"registrationRefresh":     "20s",
 			"registrationExpiry":      "60s",
 			"minResponsesToAggregate": 2,
@@ -516,7 +531,7 @@ func setupCapabilitiesRegistryWithMCMS(t *testing.T) *testFixture {
 		{
 			Name:        "test-don-mcms-1",
 			DonFamilies: []string{"don-family-mcms-1"},
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"name": "test-don-mcms-config",
 				"type": "workflow",
 			},
@@ -565,15 +580,19 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 
 	// Apply the changeset to deploy the V2 capabilities registry
 	t.Log("Running deployment changeset...")
+	qualifier := "test-capabilities-registry-v2"
 	deployOutput, err := DeployCapabilitiesRegistry{}.Apply(env, DeployCapabilitiesRegistryInput{
 		ChainSelector: chainSelector,
-		Qualifier:     "test-capabilities-registry-v2",
+		Qualifier:     qualifier,
 	})
 	require.NoError(t, err, "failed to apply deployment changeset")
 	require.NotNil(t, deployOutput, "deployment output should not be nil")
 	t.Logf("Deployment result: err=%v, output=%v", err, deployOutput)
 
-	capabilitiesRegistryAddress := deployOutput.DataStore.Addresses().Filter(datastore.AddressRefByQualifier("test-capabilities-registry-v2"))[0].Address
+	capabilitiesRegistryAddress := deployOutput.DataStore.Addresses().Filter(datastore.AddressRefByQualifier(qualifier))[0].Address
+
+	// Replace the env datastore with the one with deployed contracts
+	env.DataStore = deployOutput.DataStore.Seal()
 
 	// Setup test data
 	nops := []CapabilitiesRegistryNodeOperator{
@@ -592,7 +611,7 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 		ConfigurationContract: common.Address{},
 		Metadata:              []byte(`{"capabilityType": 3, "responseType": 1}`),
 	}
-	var writeChainCapabilityMetadata map[string]interface{}
+	var writeChainCapabilityMetadata map[string]any
 	err = json.Unmarshal(writeChainCapability.Metadata, &writeChainCapabilityMetadata)
 	require.NoError(t, err)
 
@@ -601,7 +620,7 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 		ConfigurationContract: common.Address{},
 		Metadata:              []byte(`{"capabilityType": 1, "responseType": 1}`),
 	}
-	var triggerCapabilityMetadata map[string]interface{}
+	var triggerCapabilityMetadata map[string]any
 	err = json.Unmarshal(triggerCapability.Metadata, &triggerCapabilityMetadata)
 	require.NoError(t, err)
 
@@ -641,9 +660,9 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 	}
 
 	// Create capability configurations with readable config
-	configMap := map[string]interface{}{
-		"defaultConfig": map[string]interface{}{},
-		"remoteTriggerConfig": map[string]interface{}{
+	configMap := map[string]any{
+		"defaultConfig": map[string]any{},
+		"remoteTriggerConfig": map[string]any{
 			"registrationRefresh":     "20s",
 			"registrationExpiry":      "60s",
 			"minResponsesToAggregate": 2,
@@ -655,7 +674,7 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 		{
 			Name:        "test-don-1",
 			DonFamilies: []string{"don-family-1"},
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"name": "test-don-v2-config",
 				"type": "workflow",
 			},
@@ -673,7 +692,7 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 		{
 			Name:        "test-don-2",
 			DonFamilies: []string{"don-family-2"},
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"name": "test-don-v2-config",
 				"type": "trigger",
 			},
@@ -703,6 +722,7 @@ func setupCapabilitiesRegistryTest(t *testing.T) *testFixture {
 	return &testFixture{
 		env:                         env,
 		chainSelector:               chainSelector,
+		qualifier:                   qualifier,
 		capabilitiesRegistryAddress: capabilitiesRegistryAddress,
 		nops:                        nops,
 		capabilities:                capabilities,
@@ -721,15 +741,16 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 	t.Logf("CapabilitiesRegistry instance created at address: %s", fixture.capabilitiesRegistryAddress)
 
 	// Verify node operators
-	registeredNops, err := capabilitiesRegistry.GetNodeOperators(nil)
+	registeredNops, err := pkg.GetNodeOperators(nil, capabilitiesRegistry)
 	require.NoError(t, err, "failed to get registered node operators")
 	require.Len(t, registeredNops, len(fixture.nops), "should have registered the correct number of node operators")
-	for _, nop := range fixture.nops {
-		assert.Contains(t, registeredNops, nop.ToWrapper(), "node operator should be registered")
+	for i, nop := range fixture.nops {
+		assert.Equal(t, registeredNops[i].Admin, nop.Admin, "should have registered the correct admin")
+		assert.Equal(t, registeredNops[i].Name, nop.Name, "should have registered the correct name")
 	}
 
 	// Verify capabilities
-	registeredCapabilities, err := capabilitiesRegistry.GetCapabilities(nil)
+	registeredCapabilities, err := pkg.GetCapabilities(nil, capabilitiesRegistry)
 	require.NoError(t, err, "failed to get registered capabilities")
 	require.Len(t, registeredCapabilities, len(fixture.capabilities), "should have registered the correct number of capabilities")
 	for _, capability := range fixture.capabilities {
@@ -745,7 +766,7 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 	}
 
 	// Verify nodes
-	registeredNodes, err := capabilitiesRegistry.GetNodes(nil)
+	registeredNodes, err := pkg.GetNodes(nil, capabilitiesRegistry)
 	require.NoError(t, err, "failed to get registered nodes")
 	require.Len(t, registeredNodes, len(fixture.nodes), "should have registered the correct number of nodes")
 
@@ -773,7 +794,7 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 	}
 
 	// Verify DONs
-	registeredDONs, err := capabilitiesRegistry.GetDONs(nil)
+	registeredDONs, err := pkg.GetDONs(nil, capabilitiesRegistry)
 	require.NoError(t, err, "failed to get registered DONs")
 	require.Len(t, registeredDONs, len(fixture.DONs), "should have registered the correct number of DONs")
 
@@ -792,16 +813,24 @@ func verifyCapabilitiesRegistryConfiguration(t *testing.T, fixture *testFixture)
 		assert.Equal(t, don.DonFamilies, foundDON.DonFamilies, "DON families should match")
 
 		// Convert our config map to JSON bytes for comparison
-		expectedConfigBytes, err := json.Marshal(don.Config)
+		got := new(pkg.CapabilityConfig)
+		require.NoError(t, got.UnmarshalProto(foundDON.Config), "failed to unmarshal DON config from on chain value")
+
+		capCfg := pkg.CapabilityConfig(don.Config)
+		wantB, err := capCfg.MarshalProto()
 		require.NoError(t, err, "failed to marshal expected DON config")
-		assert.Equal(t, expectedConfigBytes, foundDON.Config, "DON config should match")
+		want := new(pkg.CapabilityConfig)
+		require.NoError(t, want.UnmarshalProto(wantB), "failed to unmarshal expected DON config")
+		if diff := cmp.Diff(want, got, protocmp.Transform()); diff != "" {
+			t.Errorf("DON config mismatch (-want +got):\n%s", diff)
+		}
 
 		assert.Equal(t, don.F, foundDON.F, "DON F value should match")
 		assert.Equal(t, don.IsPublic, foundDON.IsPublic, "DON isPublic flag should match")
 		assert.Equal(t, don.AcceptsWorkflows, foundDON.AcceptsWorkflows, "DON accepts workflows flag should match")
 	}
 
-	donsFamilyTwo, err := capabilitiesRegistry.GetDONsInFamily(nil, "don-family-2")
+	donsFamilyTwo, err := pkg.GetDONsInFamily(nil, capabilitiesRegistry, "don-family-2")
 	require.NoError(t, err, "failed to get DONs in family 'don-family-2'")
 	require.Len(t, donsFamilyTwo, 1, "should have one DON in family 'don-family-2'")
 	assert.Equal(t, big.NewInt(2), donsFamilyTwo[0], "DON ID should match")
