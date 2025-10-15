@@ -1,7 +1,6 @@
 package cre
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -77,8 +76,8 @@ func ExecuteHTTPActionCRUDSuccessTest(t *testing.T, testEnv *ttypes.TestEnvironm
 
 	for _, testCase := range httpActionSuccessTests {
 		// Set dynamic URL with free port and host.docker.internal
-		testCase.url = strings.Replace(testCase.url, "<port>", strconv.Itoa(freePort), -1)
-		testCase.url = strings.Replace(testCase.url, "<host>", "host.docker.internal", -1) // Use
+		testCase.url = strings.ReplaceAll(testCase.url, "<port>", strconv.Itoa(freePort))
+		testCase.url = strings.ReplaceAll(testCase.url, "<host>", "host.docker.internal") // Use
 
 		testName := "[v2] HTTP Action " + testCase.name
 		t.Run(testName, func(t *testing.T) {
@@ -113,7 +112,7 @@ func HTTPActionSuccessTest(t *testing.T, testEnv *ttypes.TestEnvironment, httpAc
 	timeout := 60 * time.Second
 
 	// Expect exact success message for this test case
-	expectedMessage := fmt.Sprintf("HTTP Action CRUD success test completed: %s", httpActionTest.testCase)
+	expectedMessage := "HTTP Action CRUD success test completed: " + httpActionTest.testCase
 	err := thelpers.AssertBeholderMessage(listenerCtx, t, expectedMessage, testLogger, messageChan, kafkaErrChan, timeout)
 	require.NoError(t, err, "HTTP Action CRUD success test failed")
 
