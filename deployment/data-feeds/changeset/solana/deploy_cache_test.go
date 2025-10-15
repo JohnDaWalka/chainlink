@@ -165,25 +165,7 @@ func TestConfigureCache(t *testing.T) {
 			},
 		)
 
-		// Apply deploy changeset first to get the cache state and program ID
-		_, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset})
-		require.NoError(t, err)
-
-		configuredChangeset := commonchangeset.Configure(InitCacheDecimalReport{},
-			&InitCacheDecimalReportRequest{
-				ChainSel:  solSel,
-				Qualifier: testQualifier,
-				Version:   "1.0.0",
-				DataIDs:   DataIDs,
-				FeedAdmin: chain.DeployerKey.PublicKey(),
-			},
-		)
-
-		// Apply the init changeset
-		out, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
-		require.NoError(t, err)
-
-		configuredChangeset = commonchangeset.Configure(ConfigureCacheDecimalReport{},
+		configuredChangeset := commonchangeset.Configure(ConfigureCacheDecimalReport{},
 			&ConfigureCacheDecimalReportRequest{
 				ChainSel:             solSel,
 				Qualifier:            testQualifier,
@@ -197,8 +179,8 @@ func TestConfigureCache(t *testing.T) {
 			},
 		)
 
-		// Apply the configure changeset
-		_, _, err = commonchangeset.ApplyChangesets(t, out, []commonchangeset.ConfiguredChangeSet{configuredChangeset})
+		// Apply the init changeset
+		_, _, err := commonchangeset.ApplyChangesets(t, env, []commonchangeset.ConfiguredChangeSet{deployChangeset, configuredChangeset})
 		require.NoError(t, err)
 	})
 
