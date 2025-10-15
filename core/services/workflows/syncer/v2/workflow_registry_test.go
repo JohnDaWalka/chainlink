@@ -876,3 +876,104 @@ func (m *mockContractReader) Start(
 ) error {
 	return m.startErr
 }
+
+func Test_getWorkflowMetadata_filtersInvalidMetadata(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	ctx := testutils.Context(t)
+	workflowDonNotifier := capabilities.NewDonNotifier()
+	er := NewEngineRegistry()
+
+	validWorkflowID := [32]byte{1}
+	invalidWorkflowID := [32]byte{}
+	owner := common.Address{1, 2, 3}
+
+	mockWorkflows := []workflow_registry_wrapper_v2.WorkflowRegistryWorkflowMetadataView{
+		{
+			WorkflowId:   validWorkflowID,
+			Owner:        owner,
+			CreatedAt:    123456,
+			Status:       0,
+			WorkflowName: "valid workflow",
+			BinaryUrl:    "http://example.com/binary",
+			ConfigUrl:    "http://example.com/config",
+			Tag:          "v1.0",
+			Attributes:   []byte{},
+			DonFamily:    "test-don",
+		},
+		{ // this one should get filtered out
+			WorkflowId:   invalidWorkflowID,
+			Owner:        common.Address{},
+			CreatedAt:    123456,
+			Status:       0,
+			WorkflowName: "invalid workflow",
+			BinaryUrl:    "",
+			ConfigUrl:    "",
+			Tag:          "v1.0",
+			Attributes:   []byte{},
+			DonFamily:    "test-don",
+		},
+	}
+
+	mockReader := &mockWorkflowMetadataReader{
+		workflows: mockWorkflows,
+	}
+
+	wr, err := NewWorkflowRegistry(
+		lggr,
+		func(ctx context.Context, bytes []byte) (types.ContractReader, error) {
+			return mockReader, nil
+		},
+		"test-address",
+		Config{
+			QueryCount:   20,
+			SyncStrategy: SyncStrategyReconciliation,
+		},
+		&eventHandler{},
+		workflowDonNotifier,
+		er,
+	)
+	require.NoError(t, err)
+
+	don := commonCap.DON{
+		Families: []string{"test-don"},
+	}
+
+	metadata, head, err := wr.getWorkflowMetadata(ctx, don, mockReader)
+	require.NoError(t, err)
+	require.NotNil(t, head)
+
+	require.Len(t, metadata, 1)
+	require.Equal(t, validWorkflowID[:], metadata[0].WorkflowID[:])
+	require.Equal(t, "valid workflow", metadata[0].WorkflowName)
+	require.Equal(t, "http://example.com/binary", metadata[0].BinaryURL)
+	require.Equal(t, "http://example.com/config", metadata[0].ConfigURL)
+}
+
+type mockWorkflowMetadataReader struct {
+	types.ContractReader
+	workflows []workflow_registry_wrapper_v2.WorkflowRegistryWorkflowMetadataView
+}
+
+func (m *mockWorkflowMetadataReader) GetLatestValueWithHeadData(
+	_ context.Context,
+	_ string,
+	_ primitives.ConfidenceLevel,
+	_ any,
+	result any,
+) (*types.Head, error) {
+	if res, ok := result.(*struct {
+		List []workflow_registry_wrapper_v2.WorkflowRegistryWorkflowMetadataView
+	}); ok {
+		res.List = m.workflows
+		return &types.Head{Height: "123"}, nil
+	}
+	return &types.Head{Height: "0"}, nil
+}
+
+func (m *mockWorkflowMetadataReader) Bind(_ context.Context, _ []types.BoundContract) error {
+	return nil
+}
+
+func (m *mockWorkflowMetadataReader) Start(_ context.Context) error {
+	return nil
+}
