@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"gopkg.in/yaml.v3"
 )
 
@@ -55,7 +56,9 @@ func runCRUDFailureTest(wfCfg config.Config, runtime cre.Runtime) (string, error
 				Url:     cfg.URL,
 				Method:  cfg.Method,
 				Headers: cfg.Headers,
-				Timeout: int32(cfg.TimeoutMs),
+				Timeout: &durationpb.Duration{
+					Seconds: int64(cfg.TimeoutMs),
+				},
 			}
 
 			// Set default method if not specified
@@ -64,8 +67,8 @@ func runCRUDFailureTest(wfCfg config.Config, runtime cre.Runtime) (string, error
 			}
 
 			// Set default timeout if not specified
-			if req.TimeoutMs == 0 {
-				req.TimeoutMs = 5000
+			if req.Timeout.Seconds == 0 {
+				req.Timeout.Seconds = 5000
 			}
 
 			// Add body if specified
@@ -76,7 +79,7 @@ func runCRUDFailureTest(wfCfg config.Config, runtime cre.Runtime) (string, error
 			logger.Info("Testing HTTP Action with configuration",
 				"url", req.Url,
 				"method", req.Method,
-				"timeout", req.TimeoutMs,
+				"timeout", req.Timeout,
 				"hasBody", len(cfg.Body) > 0)
 
 			resp, err := client.SendRequest(nodeRuntime, req).Await()
