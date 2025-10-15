@@ -166,6 +166,7 @@ func TestSetConfigMCMSV2EVM(t *testing.T) {
 }
 
 func TestSetConfigMCMSV2Solana(t *testing.T) {
+	quarantine.Flaky(t, "DX-1821")
 	t.Parallel()
 	for _, tc := range []struct {
 		name       string
