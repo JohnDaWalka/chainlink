@@ -839,7 +839,6 @@ func Test_StratReconciliation_RetriesWithBackoff(t *testing.T) {
 			return errors.New("error handling event")
 		}
 		return nil
-
 	})
 
 	// Create the worker
