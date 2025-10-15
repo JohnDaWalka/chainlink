@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 
@@ -308,6 +310,7 @@ func TestKeeperBlockCountPerTurn(t *testing.T) {
 }
 
 func TestKeeperSimulation(t *testing.T) {
+	quarantine.Flaky(t, "DX-2108")
 	t.Parallel()
 	registryVersions := []ethereum.KeeperRegistryVersion{
 		ethereum.RegistryVersion_1_2,
