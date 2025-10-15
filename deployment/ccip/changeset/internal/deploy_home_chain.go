@@ -682,7 +682,9 @@ func DONIdExists(cr *capabilities_registry.CapabilitiesRegistry, donIDs []uint32
 func replaceAptosPublicKeys(transmitterKey ocrtypes.Account) ocrtypes.Account {
 	// Due to missing support in Operator UI, nodes will currently submit their account address to JD, when we actually need their pubkeys
 	// As a temporary fix, hardcoding a mapping of address->pubkey, until we've got this fixed with https://github.com/smartcontractkit/operator-ui/pull/105
-	// at which point we can remove this mapping and use the AccountAddressPublicKey returned by JD directly
+	// at which point we can remove this mapping and use the AccountAddressPublicKey returned by JD directly.
+	// Note: The operator-ui PR got merged, but JD is currently missing support for the field, to fix: https://github.com/smartcontractkit/job-distributor/pull/658
+	// Also, we'll need to ensure that all NOPs have re-submitted the chain config to JD first, before removing this mapping.
 	if pubkey, ok := map[ocrtypes.Account]ocrtypes.Account{
 		// address -> pubkey
 		"abf583b6a78104352571ac4c26c0c21cc300ac4721f20e7ccafe8fef0165994c": "df0abd3db66ac53143414283d80a989ab7952977a1829eb411a1866ec59b2e63",
