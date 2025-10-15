@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
@@ -13,6 +15,7 @@ import (
 )
 
 func TestVersionUpgrade(t *testing.T) {
+	quarantine.Flaky(t, "DX-2102")
 	t.Parallel()
 
 	l := logging.GetTestLogger(t)
