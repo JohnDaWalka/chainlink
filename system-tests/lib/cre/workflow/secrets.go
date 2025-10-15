@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 )
 
-func PrepareSecrets(sethClient *seth.Client, donID uint32, capabilitiesRegistryAddress, workflowOwnerAddress common.Address, capRegTV deployment.TypeAndVersion, secretsFilePath string) (string, error) {
+func PrepareSecrets(sethClient *seth.Client, donID uint32, capabilitiesRegistryAddress, workflowOwnerAddress common.Address, capRegTV deployment.TypeAndVersion, secretsFilePath, secretsOutFilePath string) (string, error) {
 	secretsConfig, secretsConfigErr := newSecretsConfig(secretsFilePath)
 	if secretsConfigErr != nil {
 		return "", errors.Wrap(secretsConfigErr, "failed to parse secrets config")
@@ -39,6 +39,9 @@ func PrepareSecrets(sethClient *seth.Client, donID uint32, capabilitiesRegistryA
 	}
 
 	encryptedSecretsFilePath := "./encrypted.secrets.json"
+	if secretsOutFilePath != "" {
+		encryptedSecretsFilePath = secretsOutFilePath
+	}
 	encryptedSecretsFile, encryptedSecretsFileErr := os.Create(encryptedSecretsFilePath)
 	if encryptedSecretsFileErr != nil {
 		return "", errors.Wrap(encryptedSecretsFileErr, "failed to create secrets file")
