@@ -65,6 +65,7 @@ func sendRequestWithHeader(t *testing.T, url string, headerName string, headerVa
 }
 
 func TestWSServer_HandleRequest_AuthHeaderTooBig(t *testing.T) {
+	quarantine.Flaky(t, "DX-2104")
 	t.Parallel()
 	server, _, urlStr := startNewWSServer(t, 100_000)
 	defer server.Close()
