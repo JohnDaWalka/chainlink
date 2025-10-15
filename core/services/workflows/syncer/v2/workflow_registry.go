@@ -564,32 +564,16 @@ func isEmptyWorkflowID(wfID [32]byte) bool {
 	return wfID == emptyID
 }
 
-// validateWorkflowMetadata logs warnings for incomplete workflow metadata from contract
-func validateWorkflowMetadata(wfMeta workflow_registry_wrapper_v2.WorkflowRegistryWorkflowMetadataView, lggr logger.Logger) {
-	if isEmptyWorkflowID(wfMeta.WorkflowId) {
-		lggr.Warnw("Workflow has empty WorkflowID from contract",
-			"workflowName", wfMeta.WorkflowName,
-			"owner", hex.EncodeToString(wfMeta.Owner.Bytes()),
-			"binaryURL", wfMeta.BinaryUrl,
-			"configURL", wfMeta.ConfigUrl)
-	}
-
-	if len(wfMeta.Owner.Bytes()) == 0 {
-		lggr.Warnw("Workflow has empty Owner from contract",
-			"workflowID", hex.EncodeToString(wfMeta.WorkflowId[:]),
-			"workflowName", wfMeta.WorkflowName,
-			"binaryURL", wfMeta.BinaryUrl,
-			"configURL", wfMeta.ConfigUrl)
-	}
-
-	if wfMeta.BinaryUrl == "" || wfMeta.ConfigUrl == "" {
-		lggr.Warnw("Workflow has empty BinaryURL or ConfigURL from contract",
-			"workflowID", hex.EncodeToString(wfMeta.WorkflowId[:]),
-			"workflowName", wfMeta.WorkflowName,
-			"owner", hex.EncodeToString(wfMeta.Owner.Bytes()),
-			"binaryURL", wfMeta.BinaryUrl,
-			"configURL", wfMeta.ConfigUrl)
-	}
+// isValidWorkflowMetadata checks if workflowID, workflowOwner, binaryURL, and configURL exist
+// in the the metadata pulled from the contract. There is contract side validation to ensure these
+// fields are provided, but in the case of contract deletion bugs, or relaxing of contract validation,
+// this func can help filter out noisy deploys/workflow events.
+func isValidWorkflowMetadata(wfMeta workflow_registry_wrapper_v2.WorkflowRegistryWorkflowMetadataView, lggr logger.Logger) bool {
+	invalid := isEmptyWorkflowID(wfMeta.WorkflowId) ||
+		len(wfMeta.Owner.Bytes()) == 0 ||
+		wfMeta.BinaryUrl == "" ||
+		wfMeta.ConfigUrl == ""
+	return !invalid
 }
 
 func (w *workflowRegistry) newWorkflowRegistryContractReader(
@@ -678,7 +662,17 @@ func (w *workflowRegistry) getWorkflowMetadata(ctx context.Context, don capabili
 
 			for _, wfMeta := range workflows.List {
 				// Log warnings for incomplete metadata but don't skip processing
-				validateWorkflowMetadata(wfMeta, w.lggr)
+				validMetadata := isValidWorkflowMetadata(wfMeta, w.lggr)
+				if !validMetadata {
+					w.lggr.Warnw("Workflow has incomplete metadata from contract, skipping",
+						"workflowName", wfMeta.WorkflowName,
+						"workflowID", hex.EncodeToString(wfMeta.WorkflowId[:]),
+						"owner", hex.EncodeToString(wfMeta.Owner.Bytes()),
+						"binaryURL", wfMeta.BinaryUrl,
+						"configURL", wfMeta.ConfigUrl,
+						"status", wfMeta.Status)
+					continue
+				}
 
 				// TODO: https://smartcontract-it.atlassian.net/browse/CAPPL-1021 load balance across workflow nodes in DON Family
 				allWorkflows = append(allWorkflows, WorkflowMetadataView{
