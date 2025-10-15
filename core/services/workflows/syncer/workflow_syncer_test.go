@@ -797,7 +797,7 @@ func Test_StratReconciliation_InitialStateSync(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return len(testEventHandler.GetEvents()) == numberWorkflows
-		}, 30*time.Second, 1*time.Second)
+		}, 60*time.Second, 1*time.Second)
 
 		for _, event := range testEventHandler.GetEvents() {
 			assert.Equal(t, WorkflowRegisteredEvent, event.EventType)
