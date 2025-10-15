@@ -161,7 +161,7 @@ func deployWorkflowCmd() *cobra.Command {
 					metaData["result"] = "success"
 				}
 
-				trackingErr := dxTracker.Track("cre.local.workflow.deploy", metaData)
+				trackingErr := dxTracker.Track(MetricWorkflowDeploy, metaData)
 				if trackingErr != nil {
 					fmt.Fprintf(os.Stderr, "failed to track workflow deploy: %s\n", trackingErr)
 				}
@@ -257,7 +257,7 @@ func compileDeployWorkflowCmd() *cobra.Command {
 					metaData["result"] = "success"
 				}
 
-				trackingErr := dxTracker.Track("cre.local.workflow.deploy", metaData)
+				trackingErr := dxTracker.Track(MetricWorkflowDeploy, metaData)
 				if trackingErr != nil {
 					fmt.Fprintf(os.Stderr, "failed to track workflow deploy: %s\n", trackingErr)
 				}
