@@ -1,4 +1,4 @@
-package ocrcommon
+package ocr
 
 import (
 	"context"
@@ -169,10 +169,8 @@ func (t *transmitter) FromAddress(context.Context) common.Address {
 }
 
 func (t *transmitter) forwarderAddress() common.Address {
-	for _, a := range t.fromAddresses {
-		if a == t.effectiveTransmitterAddress {
-			return common.Address{}
-		}
+	if slices.Contains(t.fromAddresses, t.effectiveTransmitterAddress) {
+		return common.Address{}
 	}
 	return t.effectiveTransmitterAddress
 }
