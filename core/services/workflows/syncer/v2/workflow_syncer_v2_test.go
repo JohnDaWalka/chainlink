@@ -104,6 +104,7 @@ func Test_InitialStateSyncV2(t *testing.T) {
 			Status:    WorkflowStatusActive,
 			DonFamily: donFamily,
 			BinaryURL: "someurl",
+			ConfigURL: "https://config-url.com",
 			KeepAlive: false,
 		}
 		workflow.ID = workflowID
@@ -157,6 +158,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDONV2(t *testing.T) {
 		backendTH = testutils.NewEVMBackendTH(t)
 
 		giveBinaryURL   = "https://original-url.com"
+		configURL       = "https://config-url.com"
 		donID           = uint32(1)
 		donFamily1      = "A"
 		donFamily2      = "B"
@@ -164,6 +166,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDONV2(t *testing.T) {
 			Name:      "test-wf2",
 			Status:    WorkflowStatusActive,
 			BinaryURL: giveBinaryURL,
+			ConfigURL: configURL,
 			Tag:       "sometag",
 			DonFamily: donFamily2,
 			KeepAlive: false,
@@ -172,6 +175,7 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDONV2(t *testing.T) {
 			Name:      "test-wf",
 			Status:    WorkflowStatusActive,
 			BinaryURL: "someurl",
+			ConfigURL: configURL,
 			Tag:       "sometag",
 			DonFamily: donFamily1,
 			KeepAlive: false,
@@ -245,12 +249,14 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyPausedV2(t *testing.T) {
 		orm       = artifacts.NewWorkflowRegistryDS(db, lggr)
 
 		giveBinaryURL = "https://original-url.com"
+		configURL     = "https://config-url.com"
 		donID         = uint32(1)
 		donFamily     = "A"
 		giveWorkflow  = RegisterWorkflowCMDV2{
 			Name:      "test-wf",
 			Status:    WorkflowStatusPaused,
 			BinaryURL: giveBinaryURL,
+			ConfigURL: configURL,
 			Tag:       "sometag",
 			DonFamily: donFamily,
 			KeepAlive: false,
@@ -349,6 +355,7 @@ func Test_RegistrySyncer_WorkflowRegistered_InitiallyActivatedV2(t *testing.T) {
 			Name:      "test-wf",
 			Status:    WorkflowStatusActive,
 			BinaryURL: giveBinaryURL,
+			ConfigURL: "https://config-url.com",
 			Tag:       "sometag",
 			DonFamily: donFamily,
 			KeepAlive: false,
@@ -462,6 +469,7 @@ func Test_StratReconciliation_InitialStateSyncV2(t *testing.T) {
 				Name:      fmt.Sprintf("test-wf-%d", i),
 				Status:    WorkflowStatusActive,
 				BinaryURL: "someurl",
+				ConfigURL: "https://config-url.com",
 				Tag:       "sometag",
 				DonFamily: donFamily,
 				KeepAlive: false,
@@ -500,7 +508,7 @@ func Test_StratReconciliation_InitialStateSyncV2(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return len(testEventHandler.GetEvents()) == numberWorkflows
-		}, 30*time.Second, 1*time.Second)
+		}, tests.WaitTimeout(t), 1*time.Second)
 
 		for _, event := range testEventHandler.GetEvents() {
 			assert.Equal(t, WorkflowActivated, event.Name)
@@ -530,6 +538,7 @@ func Test_StratReconciliation_RetriesWithBackoffV2(t *testing.T) {
 		Name:      "test-wf",
 		Status:    WorkflowStatusActive,
 		BinaryURL: "someurl",
+		ConfigURL: "https://config-url.com",
 		Tag:       "sometag",
 		DonFamily: donFamily,
 		KeepAlive: false,
@@ -574,7 +583,7 @@ func Test_StratReconciliation_RetriesWithBackoffV2(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return len(testEventHandler.GetEvents()) == 1
-	}, 30*time.Second, 1*time.Second)
+	}, tests.WaitTimeout(t), 1*time.Second)
 
 	event := testEventHandler.GetEvents()[0]
 	assert.Equal(t, WorkflowActivated, event.Name)
