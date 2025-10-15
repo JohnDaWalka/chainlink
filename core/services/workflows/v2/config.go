@@ -18,8 +18,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services/orgresolver"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/workflowkey"
-	"github.com/smartcontractkit/chainlink/v2/core/services/orgresolver"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/metering"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/workflows/types"
@@ -79,6 +79,10 @@ type EngineLimiters struct {
 	CapabilityCallTime    limits.TimeLimiter
 	LogEvent              limits.BoundLimiter[int]
 	LogLine               limits.BoundLimiter[config.Size]
+
+	ChainWriteTargets limits.BoundLimiter[int]
+	ChainReadCalls    limits.BoundLimiter[int]
+	HTTPActionCalls   limits.BoundLimiter[int]
 }
 
 // NewLimiters returns a new set of EngineLimiters based on the default configuration, and optionally modified by cfgFn.
@@ -89,7 +93,7 @@ func NewLimiters(lf limits.Factory, cfgFn func(*cresettings.Workflows)) (*Engine
 }
 
 func (l *EngineLimiters) init(lf limits.Factory, cfgFn func(*cresettings.Workflows)) (err error) {
-	cfg := cresettings.Default.PerWorkflow
+	cfg := cresettings.Default.PerWorkflow // make copy
 	if cfgFn != nil {
 		cfgFn(&cfg)
 	}
@@ -146,6 +150,15 @@ func (l *EngineLimiters) init(lf limits.Factory, cfgFn func(*cresettings.Workflo
 	if err != nil {
 		return
 	}
+	l.ChainWriteTargets, err = limits.MakeBoundLimiter(lf, cfg.ChainWrite.TargetsLimit)
+	if err != nil {
+		return
+	}
+	l.ChainReadCalls, err = limits.MakeBoundLimiter(lf, cfg.ChainRead.CallLimit)
+	if err != nil {
+		return
+	}
+	l.HTTPActionCalls, err = limits.MakeBoundLimiter(lf, cfg.HTTPAction.CallLimit)
 	return
 }
 
@@ -164,6 +177,9 @@ func (l *EngineLimiters) Close() error {
 		l.CapabilityCallTime,
 		l.LogEvent,
 		l.LogLine,
+		l.ChainWriteTargets,
+		l.ChainReadCalls,
+		l.HTTPActionCalls,
 	)
 }
 

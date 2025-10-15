@@ -7,18 +7,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 )
 
 func Test_DB_LatestRoundRequested(t *testing.T) {
-	sqlDB := pgtest.NewSqlxDB(t)
+	sqlDB := testutils.NewSqlxDB(t)
 
 	_, err := sqlDB.Exec(`SET CONSTRAINTS offchainreporting2_latest_round_oracle_spec_fkey DEFERRED`)
 	require.NoError(t, err)
@@ -31,7 +30,7 @@ func Test_DB_LatestRoundRequested(t *testing.T) {
 
 	rr := ocr2aggregator.OCR2AggregatorRoundRequested{
 		Requester:    testutils.NewAddress(),
-		ConfigDigest: testhelpers.MakeConfigDigest(t),
+		ConfigDigest: types.ConfigDigest{},
 		Epoch:        42,
 		Round:        9,
 		Raw:          rawLog,
@@ -47,7 +46,7 @@ func Test_DB_LatestRoundRequested(t *testing.T) {
 		// Now overwrite to prove that updating works
 		rr = ocr2aggregator.OCR2AggregatorRoundRequested{
 			Requester:    testutils.NewAddress(),
-			ConfigDigest: testhelpers.MakeConfigDigest(t),
+			ConfigDigest: types.ConfigDigest{},
 			Epoch:        43,
 			Round:        8,
 			Raw:          rawLog,
