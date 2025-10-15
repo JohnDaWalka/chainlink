@@ -96,7 +96,6 @@ To execute tests with v2 contracts start the local CRE first:
  2. Execute the tests in `system-tests/tests/smoke/cre`: `go test -timeout 15m -run "^Test_CRE_V2"`.
 */
 func Test_CRE_V2_Suite(t *testing.T) {
-	quarantine.Flaky(t, "DX-2093")
 	topology := os.Getenv("TOPOLOGY_NAME")
 
 	t.Run("[v2] Proof Of Reserve - "+topology, func(t *testing.T) {
@@ -112,6 +111,8 @@ func Test_CRE_V2_Suite(t *testing.T) {
 	})
 
 	t.Run("[v2] Vault DON - "+topology, func(t *testing.T) {
+		quarantine.Flaky(t, "DX-2002")
+		t.Skip("Flaky - CAPPL-1078")
 		testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 
 		ExecuteVaultTest(t, testEnv)
@@ -130,6 +131,7 @@ func Test_CRE_V2_Suite(t *testing.T) {
 	})
 
 	t.Run("[v2] DON Time - "+topology, func(t *testing.T) {
+		quarantine.Flaky(t, "DX-2093")
 		testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 
 		ExecuteDonTimeTest(t, testEnv)
