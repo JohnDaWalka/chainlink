@@ -94,6 +94,7 @@ To execute tests with v2 contracts start the local CRE first:
  2. Execute the tests in `system-tests/tests/smoke/cre`: `go test -timeout 15m -run "^Test_CRE_V2"`.
 */
 func Test_CRE_V2_Suite(t *testing.T) {
+	quarantine.Flaky(t, "DX-2093")
 	quarantine.Flaky(t, "DX-2002")
 	topology := os.Getenv("TOPOLOGY_NAME")
 
