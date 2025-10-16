@@ -68,7 +68,7 @@ func runCRUDFailureTest(wfCfg config.Config, runtime cre.Runtime) (string, error
 
 			// Set default timeout if not specified
 			if req.Timeout.Seconds == 0 {
-				req.Timeout.Seconds = 5000
+				req.Timeout.Seconds = 10 // Default to 10 seconds
 			}
 
 			// Add body if specified

@@ -141,6 +141,7 @@ func Test_CRE_V2_EVM_WriteReport_Invalid_Gas_Regression(t *testing.T) {
 func Test_CRE_V2_HTTP_Action_CRUD_Regression(t *testing.T) {
 	for _, tCase := range httpActionFailureTests {
 		testName := "[v2] HTTP Action fails with " + tCase.name
+		tCase := tCase // capture range variable for closure
 		t.Run(testName, func(t *testing.T) {
 			testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
 

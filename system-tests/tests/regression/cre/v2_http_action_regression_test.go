@@ -114,10 +114,12 @@ func HTTPActionFailureTest(t *testing.T, testEnv *ttypes.TestEnvironment, httpAc
 	}
 
 	workflowName := "http-action-fail-workflow-" + httpActionTest.method + "-" + uuid.New().String()[0:8]
-	t_helpers.CompileAndDeployWorkflow(t, testEnv, testLogger, workflowName, &workflowConfig, workflowFileLocation)
 
-	// Start Beholder listener to capture error messages
+	// Start Beholder listener BEFORE registering workflow to avoid missing messages
 	listenerCtx, messageChan, kafkaErrChan := t_helpers.StartBeholder(t, testLogger, testEnv)
+
+	// Now register and deploy the workflow
+	t_helpers.CompileAndDeployWorkflow(t, testEnv, testLogger, workflowName, &workflowConfig, workflowFileLocation)
 
 	// Wait for specific error message in Beholder based on test case
 	testLogger.Info().Msgf("Waiting for expected HTTP Action failure: '%s' in Beholder...", httpActionTest.expectedError)
@@ -127,4 +129,9 @@ func HTTPActionFailureTest(t *testing.T, testEnv *ttypes.TestEnvironment, httpAc
 	err := t_helpers.AssertBeholderMessage(listenerCtx, t, httpActionTest.expectedError, testLogger, messageChan, kafkaErrChan, timeout)
 	require.NoError(t, err, "Expected HTTP Action failure message '%s' not found in Beholder logs", httpActionTest.expectedError)
 	testLogger.Info().Msg("HTTP Action failure test completed successfully")
+
+	// Note: Workflow cleanup happens via t.Cleanup() after this function returns
+	// The delay below ensures cleanup completes before the next test starts
+	testLogger.Info().Msg("Waiting for workflow cleanup before next test...")
+	time.Sleep(5 * time.Second)
 }
