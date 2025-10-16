@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils/big"
+
 	ccip "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
@@ -1518,11 +1519,12 @@ func (s *service) newChainConfigMsg(cfg ChainConfig) (*pb.ChainConfig, error) {
 			Id:   cfg.ChainID,
 			Type: protoChainType,
 		},
-		AccountAddress:    cfg.AccountAddress,
-		AdminAddress:      cfg.AdminAddress,
-		FluxMonitorConfig: s.newFluxMonitorConfigMsg(cfg.FluxMonitorConfig),
-		Ocr1Config:        ocr1Cfg,
-		Ocr2Config:        ocr2Cfg,
+		AccountAddress:          cfg.AccountAddress,
+		AdminAddress:            cfg.AdminAddress,
+		AccountAddressPublicKey: cfg.AccountAddressPublicKey.Ptr(),
+		FluxMonitorConfig:       s.newFluxMonitorConfigMsg(cfg.FluxMonitorConfig),
+		Ocr1Config:              ocr1Cfg,
+		Ocr2Config:              ocr2Cfg,
 	}
 
 	if cfg.AccountAddressPublicKey.Valid {
