@@ -3,7 +3,9 @@ package solana
 import (
 	"errors"
 	"fmt"
+	"slices"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/gagliardetto/solana-go"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -212,15 +214,31 @@ func isOCR3ConfigSetOnOffRampSolana(
 			return false, nil
 		}
 		if newState.OCRPluginType == OcrCommitPlugin {
-			e.Logger.Debugw("existingState.Signers", "signers", existingState.Signers)
-			e.Logger.Debugw("newState.Signers", "signers", newState.Signers)
+			var existingStateSigners []string
+			for _, signer := range existingState.Signers {
+				if signer != [20]uint8{} {
+					addr := common.BytesToAddress(signer[:])
+					existingStateSigners = append(existingStateSigners, addr.Hex())
+				}
+			}
+			var newSigners []string
+			for _, signer := range newState.Signers {
+				if signer != [20]byte{} {
+					addr := common.BytesToAddress(signer[:])
+					newSigners = append(newSigners, addr.Hex())
+				}
+			}
+			slices.Sort(existingStateSigners)
+			slices.Sort(newSigners)
+			e.Logger.Debugw("existingState.Signers", "signers", existingStateSigners)
+			e.Logger.Debugw("newState.Signers", "signers", newSigners)
 			// only commit will set signers, exec doesn't need them.
-			if len(existingState.Signers) != len(newState.Signers) {
+			if len(existingStateSigners) != len(newSigners) {
 				e.Logger.Infof("OCR3 config signers length mismatch")
 				return false, nil
 			}
-			for i := range len(existingState.Signers) {
-				if existingState.Signers[i] != newState.Signers[i] {
+			for i := range len(existingStateSigners) {
+				if existingStateSigners[i] != newSigners[i] {
 					e.Logger.Infof("OCR3 config signers mismatch")
 					return false, nil
 				}
