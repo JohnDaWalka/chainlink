@@ -134,6 +134,12 @@ func getGoModVersion(module string) (string, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		// Skip all indirect dependencies
+		if strings.Contains(line, "// indirect") {
+			continue
+		}
+
 		// Check if this line contains the module we're looking for
 		if strings.Contains(line, module+" ") {
 			foundModule = true
