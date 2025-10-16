@@ -244,12 +244,29 @@ func isOCR3ConfigSetOnOffRampSolana(
 				}
 			}
 		}
-		if len(existingState.Transmitters) != len(newState.Transmitters) {
+		var existingStateTransmitters []string
+			for _, signer := range existingState.Transmitters {
+				if signer != [32]uint8{} {
+					addr := solana.PublicKeyFromBytes(signer[:])
+					existingStateTransmitters = append(existingStateTransmitters, addr.String())
+				}
+			}
+			var newTransmitters []string
+			for _, signer := range newState.Transmitters {
+				if !signer.IsZero() {
+					newTransmitters = append(newTransmitters, signer.String())
+				}
+			}
+			slices.Sort(existingStateTransmitters)
+			slices.Sort(newTransmitters)
+			e.Logger.Debugw("existingState.Transmitters", "Transmitters", existingStateTransmitters)
+			e.Logger.Debugw("newState.Transmitters", "Transmitters", newTransmitters)
+		if len(existingStateTransmitters) != len(newTransmitters) {
 			e.Logger.Infof("OCR3 config transmitters length mismatch")
 			return false, nil
 		}
-		for i := range len(existingState.Transmitters) {
-			if existingState.Transmitters[i] != newState.Transmitters[i] {
+		for i := range len(existingStateTransmitters) {
+			if existingStateTransmitters[i] != newTransmitters[i] {
 				e.Logger.Infof("OCR3 config transmitters mismatch")
 				return false, nil
 			}
