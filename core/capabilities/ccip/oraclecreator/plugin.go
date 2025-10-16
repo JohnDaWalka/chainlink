@@ -705,6 +705,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			continue
 		}
 
+		// TODO: IMPLEMENT AS A FOLLOW-UP AFTER CCIPPROVIDERWRAPPERS HAVE BEEN CREATED
 		if chainID == destChainID && destChainFamily == relayChainFamily {
 			offrampAddress := destAddrStr
 			err2 := cr.Bind(ctx, []types.BoundContract{
@@ -718,6 +719,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			}
 		}
 
+		// TODO: IMPLEMENT AS A FOLLOW-UP AFTER CCIPPROVIDERWRAPPERS HAVE BEEN CREATED
 		if err2 := cr.Start(ctx); err2 != nil {
 			return nil, nil, nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chainID, err2)
 		}
@@ -741,6 +743,7 @@ func (i *pluginOracleCreator) createReadersAndWriters(
 			continue
 		}
 
+		// TODO: IMPLEMENT AS A FOLLOW-UP AFTER CCIPPROVIDERWRAPPERS HAVE BEEN CREATED
 		if err4 := cw.Start(ctx); err4 != nil {
 			return nil, nil, nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chainID, err4)
 		}
