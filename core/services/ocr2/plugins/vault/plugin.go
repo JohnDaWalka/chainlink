@@ -19,9 +19,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/smartcontractkit/libocr/quorumhelper"
-	"github.com/smartcontractkit/smdkg/dkgocr"
 	"github.com/smartcontractkit/smdkg/dkgocr/dkgocrtypes"
-	"github.com/smartcontractkit/smdkg/dkgocr/tdh2shim"
 	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -169,35 +167,6 @@ func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config 
 	// TODO: deprecate config-based private keys entirely, and only use the database.
 	publicKey := r.cfg.PublicKey
 	privateKeyShare := r.cfg.PrivateKeyShare
-	if configProto.DKGInstanceID != nil {
-		pack, err := r.db.ReadResultPackage(ctx, dkgocrtypes.InstanceID(*configProto.DKGInstanceID))
-		if err != nil {
-			return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not read result package from db: %w", err)
-		}
-		rP := dkgocr.NewResultPackage()
-		err = rP.UnmarshalBinary(pack.ReportWithResultPackage)
-		if err != nil {
-			return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not unmarshal result package: %w", err)
-		}
-
-		tdh2PubKey, err := tdh2shim.TDH2PublicKeyFromDKGResult(rP)
-		if err != nil {
-			return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not get tdh2 public key from DKG result: %w", err)
-		}
-		publicKey, err = tdh2ToTDH2EasyPK(tdh2PubKey)
-		if err != nil {
-			return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not convert to tdh2easy public key: %w", err)
-		}
-
-		tdh2PrivateKeyShare, err := tdh2shim.TDH2PrivateShareFromDKGResult(rP, r.recipientKey)
-		if err != nil {
-			return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not get tdh2 private key share from DKG result: %w", err)
-		}
-		privateKeyShare, err = tdh2ToTDH2EasyKS(tdh2PrivateKeyShare)
-		if err != nil {
-			return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not convert to tdh2easy private key share: %w", err)
-		}
-	}
 
 	cfg := &ReportingPluginConfig{
 		PublicKey:                         publicKey,
