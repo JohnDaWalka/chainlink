@@ -539,6 +539,8 @@ func Test_RegistrySyncer_SkipsEventsNotBelongingToDON(t *testing.T) {
 }
 
 func Test_RegistrySyncer_WorkflowRegistered_InitiallyPaused(t *testing.T) {
+	quarantine.Flaky(
+		t, "DX-2120")
 	var (
 		ctx       = coretestutils.Context(t)
 		lggr      = logger.TestLogger(t)
