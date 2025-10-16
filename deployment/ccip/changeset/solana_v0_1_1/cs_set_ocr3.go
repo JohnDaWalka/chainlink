@@ -212,6 +212,8 @@ func isOCR3ConfigSetOnOffRampSolana(
 			return false, nil
 		}
 		if newState.OCRPluginType == OcrCommitPlugin {
+			e.Logger.Debugw("existingState.Signers", "signers", existingState.Signers)
+			e.Logger.Debugw("newState.Signers", "signers", newState.Signers)
 			// only commit will set signers, exec doesn't need them.
 			if len(existingState.Signers) != len(newState.Signers) {
 				e.Logger.Infof("OCR3 config signers length mismatch")
