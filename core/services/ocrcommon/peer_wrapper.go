@@ -165,6 +165,7 @@ func (p *SingletonPeerWrapper) peerConfig() (ocrnetworking.PeerConfig, error) {
 		},
 		MetricsRegisterer:            prometheus.DefaultRegisterer,
 		LatencyMetricsServiceConfigs: rageping.DefaultConfigs(),
+		EnableExperimentalRageP2P:    ocrnetworking.DangerDangerEnableExperimentalRageP2P,
 	}
 
 	return peerConfig, nil
