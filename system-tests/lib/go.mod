@@ -47,7 +47,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20251008094352-f74459c46e8c
 	github.com/smartcontractkit/crib-sdk v0.4.0
-	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
+	github.com/smartcontractkit/libocr v0.0.0-20251016100754-eb1a9e0ff5b7
 	github.com/smartcontractkit/smdkg v0.0.0-20250916143931-2876ea233fd8
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20250624150019-e49f7e125e6b
 	github.com/stretchr/testify v1.11.1

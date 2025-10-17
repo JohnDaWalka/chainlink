@@ -107,7 +107,7 @@ require (
 	github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.7.0
 	github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron v0.8.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250716200817-cb5dfd0e369e
-	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
+	github.com/smartcontractkit/libocr v0.0.0-20251016100754-eb1a9e0ff5b7
 	github.com/smartcontractkit/quarantine v0.0.0-20250909213106-ece491bef618
 	github.com/smartcontractkit/smdkg v0.0.0-20250916143931-2876ea233fd8
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20241009055228-33d0c0bf38de
