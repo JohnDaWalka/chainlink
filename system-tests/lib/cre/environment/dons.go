@@ -2,15 +2,23 @@ package environment
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"io"
+	"maps"
 	"os"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 
@@ -19,8 +27,32 @@ import (
 	crecapabilities "github.com/smartcontractkit/chainlink/system-tests/lib/cre/capabilities"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/crib"
 	creflags "github.com/smartcontractkit/chainlink/system-tests/lib/cre/flags"
+	text "github.com/smartcontractkit/chainlink/system-tests/lib/format"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/infra"
 )
+
+type StartedDON struct {
+	NodeOutput *cre.WrappedNodeOutput
+	DON        *cre.DON
+}
+
+type StartedDONs []*StartedDON
+
+func (s *StartedDONs) NodeOutputs() []*cre.WrappedNodeOutput {
+	outputs := make([]*cre.WrappedNodeOutput, len(*s))
+	for idx, don := range *s {
+		outputs[idx] = don.NodeOutput
+	}
+	return outputs
+}
+
+func (s *StartedDONs) DONs() []*cre.DON {
+	dons := make([]*cre.DON, len(*s))
+	for idx, don := range *s {
+		dons[idx] = don.DON
+	}
+	return dons
+}
 
 func StartDONs(
 	ctx context.Context,
@@ -31,7 +63,7 @@ func StartDONs(
 	capabilityConfigs cre.CapabilityConfigs,
 	copyCapabilityBinaries bool,
 	capabilitiesAwareNodeSets []*cre.CapabilitiesAwareNodeSet,
-) ([]*cre.WrappedNodeOutput, error) {
+) (*StartedDONs, error) {
 	if infraInput.Type == infra.CRIB {
 		lggr.Info().Msg("Saving node configs and secret overrides")
 		deployCribDonsInput := &cre.DeployCribDonsInput{
@@ -111,18 +143,26 @@ func StartDONs(
 	var resultMap sync.Map
 
 	for idx, nodeSetInput := range capabilitiesAwareNodeSets {
-		startTime := time.Now()
-		lggr.Info().Msgf("Starting DON named %s", nodeSetInput.Name)
 		errGroup.Go(func() error {
+			startTime := time.Now()
+			lggr.Info().Msgf("Starting DON named %s", nodeSetInput.Name)
 			nodeset, nodesetErr := ns.NewSharedDBNodeSet(nodeSetInput.Input, registryChainBlockchainOutput)
 			if nodesetErr != nil {
-				return pkgerrors.Wrapf(nodesetErr, "failed to create node set named %s", nodeSetInput.Name)
+				return pkgerrors.Wrapf(nodesetErr, "failed to start nodeSet named %s", nodeSetInput.Name)
 			}
 
-			resultMap.Store(idx, &cre.WrappedNodeOutput{
-				Output:       nodeset,
-				NodeSetName:  nodeSetInput.Name,
-				Capabilities: nodeSetInput.ComputedCapabilities,
+			don, donErr := cre.NewDON(ctx, topology.DonsMetadata.List()[idx], nodeset.CLNodes)
+			if donErr != nil {
+				return pkgerrors.Wrapf(donErr, "failed to create DON from node set named %s", nodeSetInput.Name)
+			}
+
+			resultMap.Store(idx, &StartedDON{
+				NodeOutput: &cre.WrappedNodeOutput{
+					Output:       nodeset,
+					NodeSetName:  nodeSetInput.Name,
+					Capabilities: nodeSetInput.ComputedCapabilities,
+				},
+				DON: don,
 			})
 
 			lggr.Info().Msgf("DON %s started in %.2f seconds", nodeSetInput.Name, time.Since(startTime).Seconds())
@@ -132,15 +172,64 @@ func StartDONs(
 	}
 
 	if err := errGroup.Wait(); err != nil {
+		printFailedContainerLogs(lggr, 30)
 		return nil, err
 	}
 
-	nodeSetOutput := make([]*cre.WrappedNodeOutput, len(capabilitiesAwareNodeSets))
+	startedDONs := make(StartedDONs, len(capabilitiesAwareNodeSets))
 	resultMap.Range(func(key, value any) bool {
-		// key is index, value is *cre.WrappedNodeOutput
-		nodeSetOutput[key.(int)] = value.(*cre.WrappedNodeOutput)
+		// key is index in the original slice
+		startedDONs[key.(int)] = value.(*StartedDON)
 		return true
 	})
 
-	return nodeSetOutput, nil
+	return &startedDONs, nil
+}
+
+func printFailedContainerLogs(logger zerolog.Logger, logLinesCount uint64) {
+	logStream, lErr := framework.StreamContainerLogs(framework.ExitedCtfContainersListOpts, container.LogsOptions{
+		ShowStderr: true,
+		Tail:       strconv.FormatUint(logLinesCount, 10),
+	})
+
+	if lErr != nil {
+		logger.Error().Err(lErr).Msg("failed to stream Docker container logs")
+		return
+	}
+
+	logger.Error().Msgf("Containers that failed to start: %s", strings.Join(slices.Collect(maps.Keys(logStream)), ", "))
+	for cName, ioReader := range logStream {
+		content := ""
+		header := make([]byte, 8) // Docker stream header is 8 bytes
+		for {
+			_, err := io.ReadFull(ioReader, header)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				logger.Error().Err(err).Str("Container", cName).Msg("failed to read log stream header")
+				break
+			}
+
+			// Extract log message size
+			msgSize := binary.BigEndian.Uint32(header[4:8])
+
+			// Read the log message
+			msg := make([]byte, msgSize)
+			_, err = io.ReadFull(ioReader, msg)
+			if err != nil {
+				logger.Error().Err(err).Str("Container", cName).Msg("failed to read log message")
+				break
+			}
+
+			content += string(msg)
+		}
+
+		content = strings.TrimSpace(content)
+		if len(content) > 0 {
+			logger.Info().Str("Container", cName).Msgf("Last 100 lines of logs")
+			fmt.Println(text.RedText("%s\n", content))
+		}
+		_ = ioReader.Close() // can't do much about the error here
+	}
 }

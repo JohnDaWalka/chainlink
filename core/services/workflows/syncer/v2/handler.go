@@ -194,6 +194,7 @@ func (h *eventHandler) Handle(ctx context.Context, event Event) error {
 			platform.KeyWorkflowOwner, wfOwner,
 			platform.KeyWorkflowTag, payload.WorkflowTag,
 			platform.KeyOrganizationID, orgID,
+			platform.WorkflowRegistryAddress, h.workflowRegistryAddress,
 			platform.WorkflowRegistryChainSelector, h.workflowRegistryChainSelector,
 		)
 
@@ -232,6 +233,7 @@ func (h *eventHandler) Handle(ctx context.Context, event Event) error {
 			platform.KeyWorkflowOwner, hex.EncodeToString(payload.WorkflowOwner),
 			platform.KeyWorkflowTag, payload.Tag,
 			platform.KeyOrganizationID, orgID,
+			platform.WorkflowRegistryAddress, h.workflowRegistryAddress,
 			platform.WorkflowRegistryChainSelector, h.workflowRegistryChainSelector,
 		)
 
@@ -281,6 +283,7 @@ func (h *eventHandler) Handle(ctx context.Context, event Event) error {
 			platform.KeyWorkflowName, wfName,
 			platform.KeyWorkflowOwner, wfOwner,
 			platform.KeyOrganizationID, orgID,
+			platform.WorkflowRegistryAddress, h.workflowRegistryAddress,
 			platform.WorkflowRegistryChainSelector, h.workflowRegistryChainSelector,
 		)
 
@@ -447,7 +450,8 @@ func (h *eventHandler) fetchOrganizationID(ctx context.Context, workflowOwner st
 }
 
 func (h *eventHandler) engineFactoryFn(ctx context.Context, workflowID string, owner string, name types.WorkflowName, tag string, config []byte, binary []byte) (services.Service, error) {
-	moduleConfig := &host.ModuleConfig{Logger: h.lggr, Labeler: h.emitter}
+	lggr := h.lggr.Named("WorkflowEngine.Module").With("workflowID", workflowID, "workflowName", name, "workflowOwner", owner)
+	moduleConfig := &host.ModuleConfig{Logger: lggr, Labeler: h.emitter}
 
 	h.lggr.Debugf("Creating module for workflowID %s", workflowID)
 	module, err := host.NewModule(moduleConfig, binary, host.WithDeterminism())
