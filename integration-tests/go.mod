@@ -55,13 +55,13 @@ require (
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20251009203201-900123a5c46a
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5
-	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251010135052-c1f318b35ed1
+	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251016213956-9a6afcd1532a
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.1-0.20251014055036-43cd59e81e5c
-	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251007172225-ba2f4b5ef962
-	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003185510-17234095940f
+	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251017190323-e749d4a05491
+	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251015115541-729ba0b2b1c1
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20251014052500-262b8fc9464f
-	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251014052500-262b8fc9464f
+	github.com/smartcontractkit/chainlink-sui v0.0.0-20251020204759-ff4a93a23ddc
+	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251020204759-ff4a93a23ddc
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.6
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.51.0
@@ -69,9 +69,9 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/sentinel v0.1.2
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.51.0
-	github.com/smartcontractkit/chainlink-ton v0.0.0-20251009173109-af31806bede5
-	github.com/smartcontractkit/libocr v0.0.0-20250905115425-2785a5cee79d
-	github.com/smartcontractkit/mcms v0.26.1-0.20251013181329-bb6a47c7284c
+	github.com/smartcontractkit/chainlink-ton v0.0.0-20251015181357-b635fc06e2ea
+	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
+	github.com/smartcontractkit/mcms v0.27.1-0.20251016194901-e46e00ac4f51
 	github.com/smartcontractkit/quarantine v0.0.0-20250909213106-ece491bef618
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1

@@ -114,7 +114,11 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 
 	ccipObjectRefID := state.SuiChains[cfg.SourceChain].CCIPObjectRef
 	ccipPackageID := state.SuiChains[cfg.SourceChain].CCIPAddress
-	onRampPackageID := state.SuiChains[cfg.SourceChain].OnRampAddress
+	onRampPackageID := state.SuiChains[cfg.SourceChain].OnRampMockV2PackageId
+	if onRampPackageID == "" {
+		fmt.Println("onRamp v2 not set, using onramp v1")
+		onRampPackageID = state.SuiChains[cfg.SourceChain].OnRampAddress
+	}
 	onRampStateObjectID := state.SuiChains[cfg.SourceChain].OnRampStateObjectId
 	linkTokenPkgID := state.SuiChains[cfg.SourceChain].LinkTokenAddress
 	linkTokenObjectMetadataID := state.SuiChains[cfg.SourceChain].LinkTokenCoinMetadataId
