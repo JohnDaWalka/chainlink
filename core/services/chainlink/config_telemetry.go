@@ -108,3 +108,10 @@ func (b *telemetryConfig) LogStreamingEnabled() bool {
 	}
 	return *b.s.LogStreamingEnabled
 }
+
+func (b *telemetryConfig) AuthHeadersTTL() time.Duration {
+	if b.s.AuthHeadersTTL == nil {
+		return 0
+	}
+	return b.s.AuthHeadersTTL.Duration()
+}

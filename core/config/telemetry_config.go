@@ -3,6 +3,7 @@ package config
 import "time"
 
 type Telemetry interface {
+	AuthHeadersTTL() time.Duration
 	Enabled() bool
 	InsecureConnection() bool
 	CACertFile() string
