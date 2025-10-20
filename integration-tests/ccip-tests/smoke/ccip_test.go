@@ -39,6 +39,7 @@ type testDefinition struct {
 }
 
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
+	quarantine.Flaky(t, "DX-2068")
 	quarantine.Flaky(t, "DX-2067")
 	t.Parallel()
 	log := logging.GetTestLogger(t)
