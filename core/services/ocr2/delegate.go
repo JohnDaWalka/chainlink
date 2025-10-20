@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"log"
 	"os"
 	"path/filepath"
@@ -83,6 +82,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
+	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	functionsRelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/functions"
@@ -866,19 +866,23 @@ func (d *Delegate) newDonTimePlugin(
 
 	var capRegConfigTracker *relay.CapRegConfigProvider
 	if true { // TODO: Check if {job spec?} specifies that config is stored in Cap Reg
-		// TODO: Will this work to get the DonID for tracking config in Cap Reg?
 		localNode, err := d.capabilitiesRegistry.LocalNode(ctx)
 		if err != nil {
 			return nil, errors.New("Failed to get local node from cap reg")
 		}
+		// TODO: Will this work to get the DonID for tracking config in Cap Reg?
 		donID := localNode.WorkflowDON.ID
 
-		capName := string(jb.OCR2OracleSpec.PluginType) // TODO: Can we get Cap Name from spec?
+		capName := string(jb.OCR2OracleSpec.PluginType) // TODO: Can we get Cap Name from spec or where?
 		capRegConfigTracker, err := relay.NewCapRegConfigProvider(ctx, lggr, donID, capName)
 		if err != nil {
 			return nil, err
 		}
 		d.registrySyncer.AddListener(capRegConfigTracker) // Subscribe to Cap Reg changes
+		err = d.registrySyncer.Sync(ctx, false)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	provider, err := relayer.NewPluginProvider(ctx, types.RelayArgs{

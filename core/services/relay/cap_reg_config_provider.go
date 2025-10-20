@@ -24,6 +24,7 @@ type CapRegConfigProvider struct {
 	localConfig           ocrtypes.ContractConfig
 	donID                 registrysyncer.DonID
 	capability            string
+	initialSync           bool
 }
 
 func NewCapRegConfigProvider(ctx context.Context, lggr logger.Logger, donID uint32, capability string) (*CapRegConfigProvider, error) {
@@ -31,25 +32,14 @@ func NewCapRegConfigProvider(ctx context.Context, lggr logger.Logger, donID uint
 }
 
 func newCapRegConfigProvider(ctx context.Context, lggr logger.Logger, donID uint32, capability string) (*CapRegConfigProvider, error) {
-	cp := &CapRegConfigProvider{
+	return &CapRegConfigProvider{
 		lggr:       logger.Named(lggr, "ConfigPoller"),
 		donID:      registrysyncer.DonID(donID),
 		capability: capability,
-		localConfig: ocrtypes.ContractConfig{
-			// TODO: Set initial config?
-			// TODO: Do we get all this from the cap-reg? What about offChainConfig?
-			ConfigDigest:          ocrtypes.ConfigDigest{},
-			ConfigCount:           0,
-			Signers:               nil,
-			Transmitters:          nil,
-			F:                     0,
-			OnchainConfig:         nil,
-			OffchainConfigVersion: 0,
-			OffchainConfig:        nil,
-		},
-	}
-
-	return cp, nil
+		// localConfig will be updated once sync is called on registry syncer
+		localConfig: ocrtypes.ContractConfig{},
+		initialSync: false,
+	}, nil
 }
 
 // Subscribes to registry syncer for config changes
@@ -59,6 +49,7 @@ func (cp *CapRegConfigProvider) OnNewRegistry(ctx context.Context, registry *reg
 	if registry == nil {
 		return errors.New("registry is nil")
 	}
+	cp.initialSync = true
 
 	don, ok := registry.IDsToDONs[cp.donID]
 	if !ok {
@@ -72,16 +63,22 @@ func (cp *CapRegConfigProvider) OnNewRegistry(ctx context.Context, registry *reg
 		return nil
 	}
 
-	cp.lastSyncedBlockHeight = registry.LastSyncedBlockHeight
-
 	// This config is on-chain in the Capability Registry
 	newOnChainConfig := capConfig.Config
+	cp.lastSyncedBlockHeight = registry.LastSyncedBlockHeight
 
-	/* TODO: We also want to handle changes to these configs:
-	don.ID
-	don.F
-	...
-	*/
+	// TODO: Do we unmarshal newOnChainConfig into ocrtypes.ContractConfig or is that just the OnchainConfig?
+	// TODO: If so, how do we obtain the rest of the information?
+	cp.localConfig = ocrtypes.ContractConfig{
+		ConfigDigest:          ocrtypes.ConfigDigest{},
+		ConfigCount:           0,
+		Signers:               nil,
+		Transmitters:          nil,
+		F:                     don.F,
+		OnchainConfig:         nil, // TODO: Is newOnChainConfig just this part?
+		OffchainConfigVersion: 0,
+		OffchainConfig:        nil,
+	}
 
 	if !bytes.Equal(newOnChainConfig, cp.localConfig.OnchainConfig) {
 		cp.lggr.Infow("capability config updated", "donID", cp.donID, "capability", cp.capability)
@@ -92,6 +89,9 @@ func (cp *CapRegConfigProvider) OnNewRegistry(ctx context.Context, registry *reg
 
 // LatestConfigDetails returns the latest config details from the logs
 func (cp *CapRegConfigProvider) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest ocrtypes.ConfigDigest, err error) {
+	if !cp.initialSync {
+		return 0, ocrtypes.ConfigDigest{}, errors.New("Config Provider has not been synced yet")
+	}
 	blockHeight, err := cp.LatestBlockHeight(ctx)
 	if err != nil {
 		return 0, ocrtypes.ConfigDigest{}, err
@@ -102,6 +102,9 @@ func (cp *CapRegConfigProvider) LatestConfigDetails(ctx context.Context) (change
 
 // LatestConfig returns the latest config from the logs on a certain block
 func (cp *CapRegConfigProvider) LatestConfig(ctx context.Context, changedInBlock uint64) (ocrtypes.ContractConfig, error) {
+	if !cp.initialSync {
+		return ocrtypes.ContractConfig{}, errors.New("Config Provider has not been synced yet")
+	}
 	latestConfigSet := ocrtypes.ContractConfig{
 		ConfigDigest:          cp.localConfig.ConfigDigest,
 		ConfigCount:           cp.localConfig.ConfigCount,
