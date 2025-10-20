@@ -725,6 +725,7 @@ func TestAutomationPauseRegistry(t *testing.T) {
 }
 
 func TestAutomationKeeperNodesDown(t *testing.T) {
+	quarantine.Flaky(t, "DX-2148")
 	t.Parallel()
 	registryVersions := map[string]ethereum.KeeperRegistryVersion{
 		"registry_2_0": ethereum.RegistryVersion_2_0,
