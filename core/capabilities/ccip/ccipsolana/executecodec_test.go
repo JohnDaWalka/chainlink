@@ -31,9 +31,9 @@ var randomExecuteReport = func(t *testing.T, sourceChainSelector uint64) ccipocr
 	const numTokensPerMsg = 1
 
 	chainReports := make([]ccipocr3.ExecutePluginReportSingleChain, numChainReports)
-	for i := 0; i < numChainReports; i++ {
+	for i := range numChainReports {
 		reportMessages := make([]ccipocr3.Message, msgsPerReport)
-		for j := 0; j < msgsPerReport; j++ {
+		for j := range msgsPerReport {
 			key, err := solanago.NewRandomPrivateKey()
 			if err != nil {
 				panic(err)
@@ -46,7 +46,7 @@ var randomExecuteReport = func(t *testing.T, sourceChainSelector uint64) ccipocr
 			binary.LittleEndian.PutUint32(destExecData, destGasAmount)
 
 			tokenAmounts := make([]ccipocr3.RampTokenAmount, numTokensPerMsg)
-			for z := 0; z < numTokensPerMsg; z++ {
+			for z := range numTokensPerMsg {
 				tokenAmounts[z] = ccipocr3.RampTokenAmount{
 					SourcePoolAddress: ccipocr3.UnknownAddress(key.PublicKey().String()),
 					DestTokenAddress:  key.PublicKey().Bytes(),
@@ -87,7 +87,7 @@ var randomExecuteReport = func(t *testing.T, sourceChainSelector uint64) ccipocr
 		}
 
 		tokenData := make([][][]byte, numTokensPerMsg)
-		for j := 0; j < numTokensPerMsg; j++ {
+		for j := range numTokensPerMsg {
 			tokenData[j] = [][]byte{{0x1}, {0x2, 0x3}}
 		}
 
@@ -183,12 +183,11 @@ func TestExecutePluginCodecV1(t *testing.T) {
 		chainsel.FamilySolana: mockExtraDataCodec,
 	}
 
-	edc := ccipocr3.ExtraDataCodec(registeredMockExtraDataCodecMap)
+	edc := ccipocr3.ExtraDataCodecMap(registeredMockExtraDataCodecMap)
 	cd := NewExecutePluginCodecV1(edc)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			report := tc.report(randomExecuteReport(t, tc.chainSelector))
 			bytes, err := cd.Encode(ctx, report)
 			if tc.expErr {
@@ -267,7 +266,7 @@ func Test_DecodingExecuteReport(t *testing.T) {
 		err = onChainReport.MarshalWithEncoder(encoder)
 		require.NoError(t, err)
 
-		edc := ccipocr3.ExtraDataCodec(registeredMockExtraDataCodecMap)
+		edc := ccipocr3.ExtraDataCodecMap(registeredMockExtraDataCodecMap)
 		executeCodec := NewExecutePluginCodecV1(edc)
 		decode, err := executeCodec.Decode(testutils.Context(t), buf.Bytes())
 		require.NoError(t, err)
@@ -284,7 +283,7 @@ func Test_DecodingExecuteReport(t *testing.T) {
 
 	t.Run("decode Borsh encoded execute report", func(t *testing.T) {
 		ocrReport := randomExecuteReport(t, 124615329519749607)
-		edc := ccipocr3.ExtraDataCodec(registeredMockExtraDataCodecMap)
+		edc := ccipocr3.ExtraDataCodecMap(registeredMockExtraDataCodecMap)
 		cd := NewExecutePluginCodecV1(edc)
 		encodedReport, err := cd.Encode(testutils.Context(t), ocrReport)
 		require.NoError(t, err)

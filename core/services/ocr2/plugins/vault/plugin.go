@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/requests"
 	vaultcap "github.com/smartcontractkit/chainlink/v2/core/capabilities/vault"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/vault/vaulttypes"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/vault/vaultutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/dkgrecipientkey"
 )
@@ -42,12 +43,18 @@ const (
 	defaultMaxIdentifierOwnerLengthBytes     = 64
 	defaultMaxIdentifierNamespaceLengthBytes = 64
 
-	defaultLimitsMaxQueryLength                          = 1024   // 1KB
-	defaultLimitsMaxObservationLength                    = 102400 // 100KB
-	defaultLimitsMaxReportsPlusPrecursorLength           = 1024   // 1KB
-	defaultLimitsMaxReportLength                         = 409600 // 400KB
-	defaultLimitsMaxReportCount                          = 10
-	defaultLimitsMaxKeyValueModifiedKeysPlusValuesLength = 1024        // 1KB
+	// The query is empty in this plugin.
+	defaultLimitsMaxQueryLength = 100
+
+	// Back of the envelope calculation:
+	// - A request can contain 2KB of ciphertext, 192 bytes of metadata (key, owner, namespace),
+	// a UUID (16 bytes) plus some overhead = ~2.5KB per request
+	// There can be 10 such items in a request, and 20 per batch, so 2.5KB * 10 * 20 = 500KB
+	defaultLimitsMaxObservationLength                    = 500 * 1024 // 500KB
+	defaultLimitsMaxReportsPlusPrecursorLength           = 500 * 1024 // 500KB
+	defaultLimitsMaxReportLength                         = 500 * 1024 // 500KB
+	defaultLimitsMaxReportCount                          = 20
+	defaultLimitsMaxKeyValueModifiedKeysPlusValuesLength = 1024 * 1024 // 1MB
 	defaultLimitsMaxBlobPayloadLength                    = 1024 * 1024 // 1MB
 )
 
@@ -855,7 +862,7 @@ func validateObservation(o *vaultcommon.Observation) error {
 			return errors.New("UpdateSecrets request and response must have the same number of items")
 		}
 
-		// We disallow duplicate create requests within a single batch request.
+		// We disallow duplicate update requests within a single batch request.
 		// This prevents users from clobbering their own writes.
 		idSet := map[string]bool{}
 		for _, r := range o.GetUpdateSecretsRequest().EncryptedSecrets {
@@ -875,7 +882,7 @@ func validateObservation(o *vaultcommon.Observation) error {
 			return errors.New("DeleteSecrets request and response must have the same number of items")
 		}
 
-		// We disallow duplicate create requests within a single batch request.
+		// We disallow duplicate delete requests within a single batch request.
 		// This prevents users from clobbering their own writes.
 		idSet := map[string]bool{}
 		for _, r := range o.GetDeleteSecretsRequest().Ids {
@@ -915,8 +922,6 @@ func (r *ReportingPlugin) StateTransition(ctx context.Context, seqNr uint64, aq 
 			}
 			obsMap[o.Id] = append(obsMap[o.Id], o)
 		}
-
-		// TODO -- we need to validate that a single oracle doesn't submit multiple observations for the same request.
 	}
 
 	os := &vaultcommon.Outcomes{
@@ -1114,7 +1119,18 @@ func (r *ReportingPlugin) stateTransitionCreateSecrets(ctx context.Context, stor
 	sortedResps := []*vaultcommon.CreateSecretResponse{}
 	for _, id := range slices.Sorted(maps.Keys(idToResps)) {
 		resp := idToResps[id]
-		req := idToReqs[id]
+		req, found := idToReqs[id]
+		if !found {
+			// This shouldn't happen, as we've validated that the request and response
+			// have the same number of items.
+			r.lggr.Errorw("could not find request for response", "id", id, "requestID", reqID)
+			sortedResps = append(sortedResps, &vaultcommon.CreateSecretResponse{
+				Id:      resp.Id,
+				Success: false,
+				Error:   "internal error: could not find request for response",
+			})
+			continue
+		}
 		resp, err := r.stateTransitionCreateSecretsRequest(ctx, store, req, resp)
 		if err != nil {
 			r.lggr.Errorw("failed to handle create secret request", "id", req.Id, "requestID", reqID, "error", err)
@@ -1220,7 +1236,16 @@ func (r *ReportingPlugin) stateTransitionUpdateSecrets(ctx context.Context, stor
 	sortedResps := []*vaultcommon.UpdateSecretResponse{}
 	for _, id := range slices.Sorted(maps.Keys(idToResps)) {
 		resp := idToResps[id]
-		req := idToReqs[id]
+		req, found := idToReqs[id]
+		if !found {
+			r.lggr.Errorw("could not find request for response", "id", id, "requestID", reqID)
+			sortedResps = append(sortedResps, &vaultcommon.UpdateSecretResponse{
+				Id:      resp.Id,
+				Success: false,
+				Error:   "internal error: could not find request for response",
+			})
+			continue
+		}
 		resp, err := r.stateTransitionUpdateSecretsRequest(ctx, store, req, resp)
 		if err != nil {
 			r.lggr.Errorw("failed to handle update secret request", "id", req.Id, "requestID", reqID, "error", err)
@@ -1316,7 +1341,16 @@ func (r *ReportingPlugin) stateTransitionDeleteSecrets(ctx context.Context, stor
 	sortedResps := []*vaultcommon.DeleteSecretResponse{}
 	for _, id := range slices.Sorted(maps.Keys(idToResps)) {
 		resp := idToResps[id]
-		req := idToReqs[id]
+		req, found := idToReqs[id]
+		if !found {
+			r.lggr.Errorw("could not find request for response", "id", id)
+			sortedResps = append(sortedResps, &vaultcommon.DeleteSecretResponse{
+				Id:      resp.Id,
+				Success: false,
+				Error:   "internal error: could not find request for response",
+			})
+			continue
+		}
 		resp, err := r.stateTransitionDeleteSecretsRequest(ctx, store, req, resp)
 		if err != nil {
 			r.lggr.Errorw("failed to handle delete secret request", "id", id, "requestId", reqID, "error", err)
@@ -1374,8 +1408,8 @@ func (r *ReportingPlugin) stateTransitionListSecretIdentifiers(ctx context.Conte
 }
 
 func (r *ReportingPlugin) Committed(ctx context.Context, seqNr uint64, keyValueReader ocr3_1types.KeyValueReader) error {
-	// Not currently used by the protocol, so we noop here.
-	return nil
+	// Not currently used by the protocol, so we don't implement it.
+	return errors.New("not implemented")
 }
 
 func (r *ReportingPlugin) Reports(ctx context.Context, seqNr uint64, reportsPlusPrecursor ocr3_1types.ReportsPlusPrecursor) ([]ocr3types.ReportPlus[[]byte], error) {
@@ -1475,7 +1509,7 @@ func (r *ReportingPlugin) generateJSONReport(id string, requestType vaultcommon.
 		return ocr3types.ReportWithInfo[[]byte]{}, errors.New("invalid report: response cannot be nil")
 	}
 
-	jsonb, err := ToCanonicalJSON(msg)
+	jsonb, err := vaultutils.ToCanonicalJSON(msg)
 	if err != nil {
 		return ocr3types.ReportWithInfo[[]byte]{}, fmt.Errorf("failed to convert proto to canonical JSON: %w", err)
 	}

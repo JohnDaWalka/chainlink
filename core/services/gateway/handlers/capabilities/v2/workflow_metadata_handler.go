@@ -28,6 +28,13 @@ type workflowReference struct {
 	workflowTag   string
 }
 
+// jwtReplayCache manages used JWT IDs to prevent replay attacks
+type jwtReplayCache struct {
+	mu            sync.RWMutex
+	cleanupPeriod time.Duration
+	cache         map[string]time.Time // jti -> timestamp
+}
+
 type WorkflowMetadataHandler struct {
 	services.StateMachine
 	lggr            logger.Logger
@@ -41,6 +48,8 @@ type WorkflowMetadataHandler struct {
 	donConfig       *config.DONConfig
 	stopCh          services.StopChan
 	metrics         *metrics.Metrics
+	jwtCache        *jwtReplayCache // JWT replay protection cache
+	wg              sync.WaitGroup
 }
 
 // NewWorkflowMetadataHandler creates a new WorkflowMetadataHandler.
@@ -58,19 +67,26 @@ func NewWorkflowMetadataHandler(lggr logger.Logger, cfg ServiceConfig, don handl
 		config:          cfg,
 		stopCh:          make(services.StopChan),
 		metrics:         metrics,
+		jwtCache:        newJWTReplayCache(time.Duration(cfg.CleanUpPeriodMs) * time.Millisecond),
 	}
 }
 
 func (h *WorkflowMetadataHandler) Authorize(workflowID string, token string, req *jsonrpc.Request[json.RawMessage]) (*gateway.AuthorizedKey, error) {
-	_, signer, err := utils.VerifyRequestJWT(token, *req)
+	claims, signer, err := utils.VerifyRequestJWT(token, *req)
 	if err != nil {
 		h.lggr.Errorw("Failed to verify JWT", "error", err)
 		return nil, err
 	}
+
+	if h.jwtCache.isReplay(claims.ID) {
+		h.lggr.Warnw("JWT token has already been used", "workflowID", workflowID, "signer", signer.Hex(), "jti", claims.ID)
+		return nil, errors.New("JWT token has already been used. Please generate a new one with new id (jti)")
+	}
+
 	keys, exists := h.authorizedKeys[workflowID]
 	if !exists {
 		h.lggr.Errorw("Workflow ID not found in authorized keys", "workflowID", workflowID)
-		return nil, errors.New("workflow ID not found in authorized keys")
+		return nil, fmt.Errorf("workflow ID %s not found", workflowID)
 	}
 	key := gateway.AuthorizedKey{
 		KeyType:   gateway.KeyTypeECDSAEVM,
@@ -78,8 +94,10 @@ func (h *WorkflowMetadataHandler) Authorize(workflowID string, token string, req
 	}
 	if _, exists = keys[key]; !exists {
 		h.lggr.Errorw("Signer not found in authorized keys", "signer", signer.Hex())
-		return nil, errors.New("signer not found in authorized keys")
+		return nil, fmt.Errorf("signer '%s' is not authorized for workflow '%s'. Ensure that the signer is registered in the workflow definition", signer.Hex(), workflowID)
 	}
+	h.jwtCache.recordUsage(claims.ID)
+
 	return &key, nil
 }
 
@@ -205,12 +223,22 @@ func (h *WorkflowMetadataHandler) Start(ctx context.Context) error {
 			}
 		})
 		h.runTicker(time.Duration(h.config.MetadataAggregationIntervalMs)*time.Millisecond, h.syncMetadata)
+
+		h.runTicker(h.jwtCache.cleanupPeriod, func() {
+			now := time.Now()
+			expiredCount := h.jwtCache.cleanupOldEntries(now.Add(-h.jwtCache.cleanupPeriod))
+			h.metrics.Trigger.IncrementJwtCacheCleanUpCount(context.Background(), int64(expiredCount), h.lggr)
+			h.metrics.Trigger.RecordJwtCacheSize(context.Background(), int64(len(h.jwtCache.cache)), h.lggr)
+			h.lggr.Debugw("Workflow execution cache cleanup completed", "expired_entries", expiredCount, "remaining_entries", len(h.jwtCache.cache))
+		})
 		return nil
 	})
 }
 
 func (h *WorkflowMetadataHandler) runTicker(period time.Duration, fn func()) {
+	h.wg.Add(1)
 	go func() {
+		defer h.wg.Done()
 		ticker := time.NewTicker(period)
 		defer ticker.Stop()
 		for {
@@ -225,8 +253,17 @@ func (h *WorkflowMetadataHandler) runTicker(period time.Duration, fn func()) {
 }
 
 func (h *WorkflowMetadataHandler) validateAuthMetadata(metadata gateway.WorkflowMetadata) error {
-	if metadata.WorkflowSelector.WorkflowID == "" || metadata.WorkflowSelector.WorkflowOwner == "" || metadata.WorkflowSelector.WorkflowName == "" || metadata.WorkflowSelector.WorkflowTag == "" {
-		return errors.New("invalid workflow metadata")
+	if len(metadata.WorkflowSelector.WorkflowID) != workflowIDLength {
+		return fmt.Errorf("invalid workflow ID: expected %d characters, got %d", workflowIDLength, len(metadata.WorkflowSelector.WorkflowID))
+	}
+	if len(metadata.WorkflowSelector.WorkflowOwner) != workflowOwnerLength {
+		return fmt.Errorf("invalid workflow owner: expected %d characters, got %d", workflowOwnerLength, len(metadata.WorkflowSelector.WorkflowOwner))
+	}
+	if len(metadata.WorkflowSelector.WorkflowName) != WorkflowNameHashLength {
+		return fmt.Errorf("invalid workflow name: expected %d characters, got %d", WorkflowNameHashLength, len(metadata.WorkflowSelector.WorkflowName))
+	}
+	if len(metadata.WorkflowSelector.WorkflowTag) == 0 || len(metadata.WorkflowSelector.WorkflowTag) > maxWorkflowTagLength {
+		return fmt.Errorf("invalid workflow tag: expected non-empty and at most %d characters, got %d", maxWorkflowTagLength, len(metadata.WorkflowSelector.WorkflowTag))
 	}
 	if len(metadata.AuthorizedKeys) == 0 {
 		return errors.New("no authorized keys")
@@ -274,6 +311,43 @@ func (h *WorkflowMetadataHandler) Close() error {
 			h.lggr.Errorw("Failed to close WorkflowMetadataAggregator", "error", err)
 		}
 		close(h.stopCh)
+		h.wg.Wait()
 		return nil
 	})
+}
+
+func newJWTReplayCache(cleanupPeriod time.Duration) *jwtReplayCache {
+	return &jwtReplayCache{
+		cache:         make(map[string]time.Time),
+		cleanupPeriod: cleanupPeriod,
+	}
+}
+
+func (cache *jwtReplayCache) isReplay(jti string) bool {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	_, exists := cache.cache[jti]
+	return exists
+}
+
+func (cache *jwtReplayCache) recordUsage(jti string) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	cache.cache[jti] = time.Now()
+}
+
+// cleanupOldEntries removes expired entries from the cache
+func (cache *jwtReplayCache) cleanupOldEntries(cutoff time.Time) int {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	var expiredCount int
+	for jti, createdAt := range cache.cache {
+		if createdAt.Before(cutoff) {
+			delete(cache.cache, jti)
+			expiredCount++
+		}
+	}
+	return expiredCount
 }

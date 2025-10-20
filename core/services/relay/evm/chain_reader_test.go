@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/testutils"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/smartcontractkit/chainlink-evm/pkg/config"
 	"github.com/smartcontractkit/chainlink-evm/pkg/heads/headstest"
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink-evm/pkg/types"
@@ -28,7 +29,6 @@ import (
 
 	lpmocks "github.com/smartcontractkit/chainlink/v2/common/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
 func TestChainReaderSizedBigIntTypes(t *testing.T) {
@@ -55,7 +55,7 @@ func TestChainReaderSizedBigIntTypes(t *testing.T) {
 			wrapped.Setup(t)
 
 			svc := wrapped.GetContractReader(t)
-			binding := commontypes.BoundContract{Address: "0x21", Name: "Contract"}
+			binding := commontypes.BoundContract{Address: contractAddress.String(), Name: "Contract"}
 
 			require.NoError(t, svc.Bind(t.Context(), []commontypes.BoundContract{binding}))
 
@@ -73,16 +73,16 @@ func TestChainReaderSizedBigIntTypes(t *testing.T) {
 func TestChainReader_Bind(t *testing.T) {
 	lp := lpmocks.NewLogPoller(t)
 	ht := headstest.NewTracker[*evmtypes.Head](t)
-	cr, err := evm.NewChainReaderService(t.Context(), logger.Nop(), lp, ht, nil, types.ChainReaderConfig{Contracts: map[string]types.ChainContractReader{
+	cr, err := evm.NewChainReaderService(t.Context(), logger.Nop(), lp, ht, nil, config.ChainReaderConfig{Contracts: map[string]config.ChainContractReader{
 		"test-contract": {
 			ContractABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"someDW\",\"type\":\"string\"}],\"name\":\"EventName\",\"type\":\"event\"}]",
-			ContractPollingFilter: types.ContractPollingFilter{
+			ContractPollingFilter: config.ContractPollingFilter{
 				GenericEventNames: []string{"EventName"},
-				PollingFilter:     types.PollingFilter{Retention: 1},
+				PollingFilter:     config.PollingFilter{Retention: 1},
 			},
-			Configs: map[string]*types.ChainReaderDefinition{
+			Configs: map[string]*config.ChainReaderDefinition{
 				"EventName": {
-					ReadType:          types.Event,
+					ReadType:          config.Event,
 					ChainSpecificName: "EventName",
 				},
 			},
@@ -169,7 +169,7 @@ func TestChainReaderPrimitiveTypes(t *testing.T) {
 			wrapped.Setup(t)
 
 			svc := wrapped.GetContractReader(t)
-			binding := commontypes.BoundContract{Address: "0x21", Name: "Contract"}
+			binding := commontypes.BoundContract{Address: contractAddress.Hex(), Name: "Contract"}
 
 			require.NoError(t, svc.Bind(t.Context(), []commontypes.BoundContract{binding}))
 
@@ -187,6 +187,7 @@ func TestChainReaderPrimitiveTypes(t *testing.T) {
 type mockedClient struct {
 	value        any
 	internalType abi.Type
+	t            *testing.T
 }
 
 func newMockedClient(t *testing.T, value any, internalType string) *mockedClient {
@@ -199,20 +200,29 @@ func newMockedClient(t *testing.T, value any, internalType string) *mockedClient
 	return &mockedClient{
 		value:        value,
 		internalType: internal,
+		t:            t,
 	}
 }
 
 func (_m *mockedClient) BatchCallContext(_ context.Context, _ []rpc.BatchElem) error { return nil }
 
 func (_m *mockedClient) CallContract(_ context.Context, msg ethereum.CallMsg, _ *big.Int) ([]byte, error) {
+	// ensure we never put msg.From to contractAddress to comply with EIP-3607
+	require.NotEqual(_m.t, contractAddress, msg.From)
 	return abi.Arguments{abi.Argument{Type: _m.internalType}}.Pack(_m.value)
 }
 
-func (_m *mockedClient) CodeAt(_ context.Context, _ common.Address, _ *big.Int) ([]byte, error) {
-	return []byte{0, 1, 2}, nil
+func (_m *mockedClient) CodeAt(_ context.Context, addr common.Address, _ *big.Int) ([]byte, error) {
+	if addr.Cmp(contractAddress) == 0 {
+		return []byte{0, 1, 2}, nil
+	}
+
+	return nil, nil
 }
 
 const contractABI = `[{"inputs":[],"name":"GetValue","outputs":[{"internalType":"%s","name":"","type":"%s"}],"stateMutability":"pure","type":"function"}]`
+
+var contractAddress = common.Address{1, 2, 3}
 
 type simpleTester struct {
 	returnVal    any
@@ -234,11 +244,11 @@ func (s *simpleTester) DisableTests(testIDs []string) {}
 func (s *simpleTester) GetContractReader(t *testing.T) commontypes.ContractReader {
 	t.Helper()
 
-	config := types.ChainReaderConfig{
-		Contracts: map[string]types.ChainContractReader{
+	config := config.ChainReaderConfig{
+		Contracts: map[string]config.ChainContractReader{
 			"Contract": {
 				ContractABI: fmt.Sprintf(contractABI, s.internalType, s.internalType),
-				Configs: map[string]*types.ChainReaderDefinition{
+				Configs: map[string]*config.ChainReaderDefinition{
 					"GetValue": {
 						ChainSpecificName:   "GetValue",
 						OutputModifications: codec.ModifiersConfig{},

@@ -9,12 +9,11 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-evm/pkg/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
+	"github.com/smartcontractkit/chainlink-evm/pkg/config"
 )
 
-func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *types.RelayOpts, capRegConfigTracker ocrtypes.ContractConfigTracker) (*configWatcher, error) {
+func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *config.RelayOpts, capRegConfigTracker ocrtypes.ContractConfigTracker) (*configWatcher, error) {
 	if !common.IsHexAddress(opts.ContractID) {
 		return nil, errors.New("invalid contractID, expected hex address")
 	}
@@ -33,8 +32,8 @@ func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain le
 	return newContractConfigProvider(ctx, lggr, chain, opts, aggregatorAddress, OCR2AggregatorLogDecoder, offchainConfigDigester)
 }
 
-func newContractConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *types.RelayOpts, aggregatorAddress common.Address, ld LogDecoder, digester ocrtypes.OffchainConfigDigester) (*configWatcher, error) {
-	var cp types.ConfigPoller
+func newContractConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *config.RelayOpts, aggregatorAddress common.Address, ld LogDecoder, digester ocrtypes.OffchainConfigDigester) (*configWatcher, error) {
+	var cp config.ConfigPoller
 
 	relayConfig, err := opts.RelayConfig()
 	if err != nil {

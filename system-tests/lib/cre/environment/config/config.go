@@ -27,7 +27,7 @@ import (
 )
 
 type Config struct {
-	Blockchains       []blockchain.Input              `toml:"blockchains" validate:"required"`
+	Blockchains       []*blockchain.Input             `toml:"blockchains" validate:"required"`
 	NodeSets          []*cre.CapabilitiesAwareNodeSet `toml:"nodesets" validate:"required"`
 	JD                *jd.Input                       `toml:"jd" validate:"required"`
 	Infra             *infra.Provider                 `toml:"infra" validate:"required"`
@@ -96,7 +96,7 @@ func validateContractVersions(envDependencies cre.CLIEnvironmentDependencies) er
 }
 
 const (
-	WorkflowRegistryV2Semver   = "2.0.0-dev"
+	WorkflowRegistryV2Semver   = "2.0.0"
 	CapabilityRegistryV2Semver = "2.0.0"
 	DefaultDONFamily           = "test-don-family"
 )

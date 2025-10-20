@@ -7,9 +7,11 @@ import (
 	"io"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/chainaccessor"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -128,6 +130,27 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		return nil, fmt.Errorf("failed to get chain family from selector %d: %w", config.Config.ChainSelector, err)
 	}
 
+	pluginServices, err := ccipcommon.GetPluginServices(i.lggr, destChainFamily)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize plugin config: %w", err)
+	}
+
+	// Create CCIP providers - this is the preferred way for plugins to access CCIP data
+	ccipProviders, err := i.createCCIPProviders(
+		ctx,
+		pluginServices,
+		config,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CCIPProviders: %w", err)
+	}
+
+	// Populate extraDataCodecRegistry with codecs from CCIPProviders
+	err = i.populateCodecRegistriesWithProviderCodecs(ccipProviders)
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate extraDataCodecRegistry with codecs from CCIPProviders: %w", err)
+	}
+
 	destChainID, err := chainsel.GetChainIDFromSelector(chainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain ID from selector %d: %w", chainSelector, err)
@@ -141,11 +164,6 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	publicConfig, err := configTracker.PublicConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public config from OCR config: %w", err)
-	}
-
-	pluginServices, err := ccipcommon.GetPluginServices(i.lggr, destChainFamily)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize plugin config: %w", err)
 	}
 
 	i.lggr.Infow("Creating plugin using OCR3 settings",
@@ -189,7 +207,12 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 	}
 
 	// Create chain accessors and contract transmitters for relayers that supported them
-	chainAccessors, contractTransmitters, err := i.createChainAccessorsAndContractTransmitters(ctx, extendedReaders, chainWriters, pluginServices, offrampAddrStr, pluginType)
+	chainAccessors, contractTransmitters, err := i.getChainAccessorsAndContractTransmittersFromProviders(
+		ccipProviders,
+		extendedReaders,
+		chainWriters,
+		pluginServices,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain accessors: %w", err)
 	}
@@ -229,7 +252,7 @@ func (i *pluginOracleCreator) Create(ctx context.Context, donID uint32, config c
 		publicConfig,
 		destChainFamily,
 		destChainID,
-		pluginServices.PluginConfig,
+		pluginServices,
 		offrampAddrStr,
 		contractTransmitters,
 	)
@@ -297,12 +320,13 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	publicConfig ocr3confighelper.PublicConfig,
 	destChainFamily string,
 	destChainID string,
-	pluginConfig ccipcommon.PluginConfig,
+	pluginServices ccipcommon.PluginServices,
 	offrampAddrStr string,
 	existingContractTransmitterMap map[cciptypes.ChainSelector]ocr3types.ContractTransmitter[[]byte],
 ) (ocr3types.ReportingPluginFactory[[]byte], ocr3types.ContractTransmitter[[]byte], error) {
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
+	pluginConfig := pluginServices.PluginConfig
 	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
 		if !i.peerWrapper.IsStarted() {
 			return nil, nil, errors.New("peer wrapper is not started")
@@ -326,18 +350,19 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 					Named(destRelayID.String()).
 					Named(fmt.Sprintf("%d", config.Config.ChainSelector)).
 					Named(offrampAddrStr),
-				DonID:             donID,
-				OcrConfig:         ccipreaderpkg.OCR3ConfigWithMeta(config),
-				CommitCodec:       pluginConfig.CommitPluginCodec,
-				MsgHasher:         pluginConfig.MessageHasher,
-				AddrCodec:         i.addressCodec,
-				HomeChainReader:   i.homeChainReader,
-				HomeChainSelector: i.homeChainSelector,
-				ChainAccessors:    chainAccessors,
-				ExtendedReaders:   extendedReaders,
-				ContractWriters:   chainWriters,
-				RmnPeerClient:     rmnPeerClient,
-				RmnCrypto:         pluginConfig.RMNCrypto})
+				DonID:                      donID,
+				OcrConfig:                  ccipreaderpkg.OCR3ConfigWithMeta(config),
+				CommitCodec:                pluginConfig.CommitPluginCodec,
+				MsgHasher:                  pluginConfig.MessageHasher,
+				AddrCodec:                  i.addressCodec,
+				HomeChainReader:            i.homeChainReader,
+				HomeChainSelector:          i.homeChainSelector,
+				ChainAccessors:             chainAccessors,
+				LOOPPCCIPProviderSupported: pluginServices.CCIPProviderSupported,
+				ExtendedReaders:            extendedReaders,
+				ContractWriters:            chainWriters,
+				RmnPeerClient:              rmnPeerClient,
+				RmnCrypto:                  pluginConfig.RMNCrypto})
 		factory = promwrapper.NewReportingPluginFactory(
 			factory,
 			i.lggr,
@@ -401,17 +426,18 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 					Named(destRelayID.String()).
 					Named(fmt.Sprintf("%d", config.Config.ChainSelector)).
 					Named(offrampAddrStr),
-				DonID:            donID,
-				OcrConfig:        ccipreaderpkg.OCR3ConfigWithMeta(config),
-				ExecCodec:        pluginConfig.ExecutePluginCodec,
-				MsgHasher:        pluginConfig.MessageHasher,
-				AddrCodec:        i.addressCodec,
-				HomeChainReader:  i.homeChainReader,
-				TokenDataEncoder: pluginConfig.TokenDataEncoder,
-				EstimateProvider: pluginConfig.GasEstimateProvider,
-				ChainAccessors:   chainAccessors,
-				ExtendedReaders:  extendedReaders,
-				ContractWriters:  chainWriters,
+				DonID:                      donID,
+				OcrConfig:                  ccipreaderpkg.OCR3ConfigWithMeta(config),
+				ExecCodec:                  pluginConfig.ExecutePluginCodec,
+				MsgHasher:                  pluginConfig.MessageHasher,
+				AddrCodec:                  i.addressCodec,
+				HomeChainReader:            i.homeChainReader,
+				TokenDataEncoder:           pluginConfig.TokenDataEncoder,
+				EstimateProvider:           pluginConfig.GasEstimateProvider,
+				LOOPPCCIPProviderSupported: pluginServices.CCIPProviderSupported,
+				ChainAccessors:             chainAccessors,
+				ExtendedReaders:            extendedReaders,
+				ContractWriters:            chainWriters,
 			})
 		factory = promwrapper.NewReportingPluginFactory(
 			factory,
@@ -469,39 +495,85 @@ func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	return factory, transmitter, nil
 }
 
-func (i *pluginOracleCreator) createChainAccessorsAndContractTransmitters(
+func (i *pluginOracleCreator) createCCIPProviders(
 	ctx context.Context,
+	pluginServices ccipcommon.PluginServices,
+	config cctypes.OCR3ConfigWithMeta,
+) (map[cciptypes.ChainSelector]types.CCIPProvider, error) {
+	ccipProviders := make(map[cciptypes.ChainSelector]types.CCIPProvider)
+	for relayID, relayer := range i.relayers {
+		chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(relayID.ChainID, relayID.Network)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain selector from relay ID %s and family %s: %w", relayID.ChainID, relayID.Network, err)
+		}
+		chainSelector := cciptypes.ChainSelector(chainDetails.ChainSelector)
+
+		ccipProviderSupported, ok := pluginServices.CCIPProviderSupported[relayID.Network]
+		if ccipProviderSupported && ok {
+			i.lggr.Debugw("creating CCIPProvider for chain family",
+				"chainSelector", chainSelector, "chainFamily", relayID.Network)
+			transmitter := i.transmitters[relayID]
+			if len(transmitter) == 0 {
+				return nil, errors.New("transmitter list is empty")
+			}
+
+			// Check if the transmitter string is a valid utf-8 string
+			if !utf8.ValidString(transmitter[0]) {
+				i.lggr.Errorw("transmitter contains invalid UTF-8",
+					"transmitter", transmitter[0],
+					"relayID.Network", relayID.Network,
+					"chainSelector", chainSelector)
+				return nil, fmt.Errorf("transmitter contains invalid UTF-8: %q", transmitter[0])
+			}
+			ccipProvider, err := relayer.NewCCIPProvider(ctx, types.CCIPProviderArgs{
+				PluginType:           cciptypes.PluginType(config.Config.PluginType),
+				OffRampAddress:       config.Config.OfframpAddress,
+				TransmitterAddress:   cciptypes.UnknownEncodedAddress(transmitter[0]),
+				ExtraDataCodecBundle: ccipcommon.GetExtraDataCodecRegistry(),
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create CCIP provider for relay ID %s: %w", relayID, err)
+			}
+			ccipProviders[chainSelector] = ccipProvider
+		}
+	}
+	return ccipProviders, nil
+}
+
+func (i *pluginOracleCreator) getChainAccessorsAndContractTransmittersFromProviders(
+	ccipProviders map[cciptypes.ChainSelector]types.CCIPProvider,
 	extendedReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	pluginServices ccipcommon.PluginServices,
-	offrampAddrStr string,
-	pluginType cctypes.PluginType,
 ) (map[cciptypes.ChainSelector]cciptypes.ChainAccessor, map[cciptypes.ChainSelector]ocr3types.ContractTransmitter[[]byte], error) {
 	chainAccessors := make(map[cciptypes.ChainSelector]cciptypes.ChainAccessor)
 	contractTransmitters := make(map[cciptypes.ChainSelector]ocr3types.ContractTransmitter[[]byte])
-	for relayID, relayer := range i.relayers {
+	for relayID := range i.relayers {
 		chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(relayID.ChainID, relayID.Network)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get chain selector from relay ID %s and family %s: %w", relayID.ChainID, relayID.Network, err)
 		}
+
 		chainSelector := cciptypes.ChainSelector(chainDetails.ChainSelector)
-		// check if CCIP provider is supported, otherwise create default chain accessor
 		var ca cciptypes.ChainAccessor
 		var ct ocr3types.ContractTransmitter[[]byte]
-		var provider types.CCIPProvider
-		ccipProviderSupported, ok := pluginServices.CCIPProviderSupported[relayID.Network]
-		if ccipProviderSupported && ok {
-			provider, err = relayer.NewCCIPProvider(ctx, types.CCIPProviderArgs{
-				OffRampAddress: offrampAddrStr,
-				PluginType:     uint32(pluginType),
-			})
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create CCIP provider for relay ID %s: %w", relayID, err)
+
+		// Check if a CCIPProvider exists for this chain selector, if so use its chain accessor and contract transmitter
+		ccipProvider := ccipProviders[chainSelector]
+		if ccipProvider != nil {
+			ca = ccipProvider.ChainAccessor()
+			if ca == nil {
+				return nil, nil, fmt.Errorf("CCIPProvider for relay ID %s does not support chain accessor", relayID)
 			}
-			ca = provider.ChainAccessor()
-			ct = provider.ContractTransmitter()
+			ct = ccipProvider.ContractTransmitter()
+			if ct == nil {
+				i.lggr.Warnw("contracts transmitter provided from CCIP provider is nil, will use default transmitter if possible",
+					"relayID", relayID,
+					"chainSelector", chainSelector,
+				)
+			}
 		} else {
-			// use default chain accessor if cr and cw exist
+			// Use DefaultAccessor if CR and CW exist
 			if extendedReaders[chainSelector] == nil || chainWriters[chainSelector] == nil {
 				return nil, nil, fmt.Errorf("cannot create default chain accessor for relay ID %s, contract reader and chain writer need to be present", relayID)
 			}
@@ -522,6 +594,27 @@ func (i *pluginOracleCreator) createChainAccessorsAndContractTransmitters(
 		contractTransmitters[chainSelector] = ct
 	}
 	return chainAccessors, contractTransmitters, nil
+}
+
+func (i *pluginOracleCreator) populateCodecRegistriesWithProviderCodecs(
+	ccipProviders map[cciptypes.ChainSelector]types.CCIPProvider,
+) error {
+	edcr := ccipcommon.GetExtraDataCodecRegistry()
+	for chainSelector, provider := range ccipProviders {
+		codec := provider.Codec()
+		chainFamily, err := chainsel.GetSelectorFamily(uint64(chainSelector))
+		if err != nil {
+			return fmt.Errorf("failed to get chain family from chain selector %d: %w", chainSelector, err)
+		}
+
+		sourceChainExtraDataCodec := codec.SourceChainExtraDataCodec
+		if sourceChainExtraDataCodec != nil {
+			edcr.RegisterCodec(chainFamily, sourceChainExtraDataCodec)
+		} else {
+			i.lggr.Warnw("CCIPProvider codec has no SourceChainExtraDataCodec", "chainSelector", chainSelector)
+		}
+	}
+	return nil
 }
 
 func (i *pluginOracleCreator) getTransmitterFromPublicConfig(publicConfig ocr3confighelper.PublicConfig) (ocrtypes.Account, error) {

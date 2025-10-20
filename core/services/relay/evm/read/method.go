@@ -15,10 +15,9 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-
+	"github.com/smartcontractkit/chainlink-evm/pkg/codec"
 	"github.com/smartcontractkit/chainlink-evm/pkg/logpoller"
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 )
 
 var ErrEmptyContractReturnValue = errors.New("the contract return value was empty")
@@ -160,7 +159,6 @@ func (b *MethodBinding) GetLatestValueWithHeadData(ctx context.Context, addr com
 
 	callMsg := ethereum.CallMsg{
 		To:   &addr,
-		From: addr,
 		Data: data,
 	}
 

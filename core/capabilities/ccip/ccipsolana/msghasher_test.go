@@ -33,7 +33,7 @@ func TestMessageHasher_EVM2SVM(t *testing.T) {
 		chainsel.FamilySolana: ExtraDataDecoder{},
 		chainsel.FamilySui:    ccipaptos.ExtraDataDecoder{},
 	}
-	var extraDataCodec = ccipocr3.ExtraDataCodec(registeredExtraDataCodecMap)
+	var extraDataCodec = ccipocr3.ExtraDataCodecMap(registeredExtraDataCodecMap)
 	any2AnyMsg, any2SolanaMsg, msgAccounts := createEVM2SolanaMessages(t)
 	msgHasher := NewMessageHasherV1(logger.Test(t), extraDataCodec)
 	actualHash, err := msgHasher.Hash(testutils.Context(t), any2AnyMsg)
@@ -67,7 +67,7 @@ func TestMessageHasher_InvalidReceiver(t *testing.T) {
 		chainsel.FamilySolana: mockExtraDataCodec,
 	}
 
-	edc := ccipocr3.ExtraDataCodec(registeredMockExtraDataCodecMap)
+	edc := ccipocr3.ExtraDataCodecMap(registeredMockExtraDataCodecMap)
 	msgHasher := NewMessageHasherV1(logger.Test(t), edc)
 	_, err := msgHasher.Hash(testutils.Context(t), any2AnyMsg)
 	require.Error(t, err)
@@ -96,7 +96,7 @@ func TestMessageHasher_InvalidDestinationTokenAddress(t *testing.T) {
 		chainsel.FamilyEVM:    mockExtraDataCodec,
 		chainsel.FamilySolana: mockExtraDataCodec,
 	}
-	edc := ccipocr3.ExtraDataCodec(registeredMockExtraDataCodecMap)
+	edc := ccipocr3.ExtraDataCodecMap(registeredMockExtraDataCodecMap)
 	msgHasher := NewMessageHasherV1(logger.Test(t), edc)
 	_, err := msgHasher.Hash(testutils.Context(t), any2AnyMsg)
 	require.Error(t, err)
@@ -126,7 +126,7 @@ func createEVM2SolanaMessages(t *testing.T) (cciptypes.Message, ccip_offramp.Any
 	require.NoError(t, err)
 
 	ccipTokenAmounts := make([]cciptypes.RampTokenAmount, 5)
-	for z := 0; z < 5; z++ {
+	for z := range 5 {
 		ccipTokenAmounts[z] = cciptypes.RampTokenAmount{
 			SourcePoolAddress: cciptypes.UnknownAddress("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			DestTokenAddress:  receiver.Bytes(),
@@ -136,7 +136,7 @@ func createEVM2SolanaMessages(t *testing.T) (cciptypes.Message, ccip_offramp.Any
 	}
 
 	solTokenAmounts := make([]ccip_offramp.Any2SVMTokenTransfer, 5)
-	for z := 0; z < 5; z++ {
+	for z := range 5 {
 		solTokenAmounts[z] = ccip_offramp.Any2SVMTokenTransfer{
 			SourcePoolAddress: cciptypes.UnknownAddress("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			DestTokenAddress:  receiver,

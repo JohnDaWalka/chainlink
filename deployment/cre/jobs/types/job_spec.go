@@ -21,9 +21,10 @@ func (j JobSpecInput) UnmarshalTo(target any) error {
 	return yaml.Unmarshal(bytes, target)
 }
 
-func (j JobSpecInput) ToStandardCapabilityJob(jobName string) (pkg.StandardCapabilityJob, error) {
+func (j JobSpecInput) ToStandardCapabilityJob(jobName string, generateOracleFactory bool) (pkg.StandardCapabilityJob, error) {
 	out := pkg.StandardCapabilityJob{
-		JobName: jobName,
+		JobName:               jobName,
+		GenerateOracleFactory: generateOracleFactory,
 	}
 	err := j.UnmarshalTo(&out)
 	if err != nil {
@@ -32,10 +33,6 @@ func (j JobSpecInput) ToStandardCapabilityJob(jobName string) (pkg.StandardCapab
 
 	if out.Command == "" {
 		return pkg.StandardCapabilityJob{}, errors.New("command is required and must be a string")
-	}
-
-	if out.ExternalJobID == "" {
-		return pkg.StandardCapabilityJob{}, errors.New("externalJobID cannot be an empty string")
 	}
 
 	return out, nil
@@ -49,15 +46,15 @@ func (j JobSpecInput) ToOCR3JobConfigInput() (pkg.OCR3JobConfigInput, error) {
 	}
 
 	if out.TemplateName == "" || strings.TrimSpace(out.TemplateName) == "" {
-		return pkg.OCR3JobConfigInput{}, errors.New("template_name is required and must be a non-empty string")
+		return pkg.OCR3JobConfigInput{}, errors.New("templateName is required and must be a non-empty string")
 	}
 
 	if out.ContractQualifier == "" || strings.TrimSpace(out.ContractQualifier) == "" {
-		return pkg.OCR3JobConfigInput{}, errors.New("contract_qualifier is required and must be a non-empty string")
+		return pkg.OCR3JobConfigInput{}, errors.New("contractQualifier is required and must be a non-empty string")
 	}
 
 	if len(out.BootstrapperOCR3Urls) == 0 {
-		return pkg.OCR3JobConfigInput{}, errors.New("bootstrapper_ocr3_urls is required and cannot be empty")
+		return pkg.OCR3JobConfigInput{}, errors.New("bootstrapperOCR3Urls is required and cannot be empty")
 	}
 
 	return out, nil

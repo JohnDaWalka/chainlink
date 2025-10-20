@@ -3,14 +3,22 @@ package cre
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
+
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	crecontracts "github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/blockchains/evm"
 
 	evm_negative_config "github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/evm/evmread-negative/config"
+	evm_write_negative_config "github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/evm/evmwrite-negative/config"
 	t_helpers "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers"
 	ttypes "github.com/smartcontractkit/chainlink/system-tests/tests/test-helpers/configuration"
 
@@ -19,13 +27,14 @@ import (
 
 // regression
 const (
-	// ...Function methods should literally match the name of the switch-case statements in the workflow
+	// ...Function variables should literally match the name of the switch-case statements in the workflow (evm/evmread-negative/main.go)
+	// in each case the corresponding evm capability function is called with the invalid input
 	balanceAtFunction                          = "BalanceAt"
 	expectedBalanceAtError                     = "balanceAt errored"
 	callContractInvalidAddressToReadFunction   = "CallContract - invalid address to read"
 	expectedCallContractInvalidAddressToRead   = "balances=&[+0]" // expecting empty array of balances
 	callContractInvalidBRContractAddress       = "CallContract - invalid balance reader contract address"
-	expectedCallContractInvalidContractAddress = "got expected error for invalid balance reader contract address"
+	expectedCallContractInvalidContractAddress = "got expected empty response for invalid balance reader contract address"
 	estimateGasInvalidToAddress                = "EstimateGas - invalid 'to' address"
 	filterLogsInvalidAddresses                 = "FilterLogs - invalid addresses"
 	expectedFilterLogsInvalidAddresses         = "got expected error or empty logs"
@@ -34,7 +43,16 @@ const (
 	filterLogsInvalidToBlock                   = "FilterLogs - invalid ToBlock"
 	expectedFilterLogsInvalidToBlock           = "got expected error for FilterLogs with invalid toBlock"
 	getTransactionByHashInvalidHash            = "GetTransactionByHash - invalid hash"
+	getTransactionReceiptInvalidHash           = "GetTransactionReceipt - invalid hash"
 	expectedGetTransactionByHashInvalidHash    = "not found"
+	headerByNumberInvalidBlock                 = "HeaderByNumber - invalid block number"
+	writeReportInvalidReceiver                 = "WriteReport - invalid receiver"
+	expectedWriteReportInvalidReceiver         = "RECEIVER_CONTRACT_EXECUTION_STATUS_REVERTED"
+	writeReportCorruptReceiverAddress          = "WriteReport - corrupt receiver address"
+	expectedWriteReportCorruptReceiverAddress  = "failed to execute capability: received address is not 20 bytes long"
+	writeReportInvalidGas                      = "WriteReport - invalid gas"
+	expectedWriteReportInvalidGas              = "failed to execute capability"
+	writeReportRandomTimestamps                = "WriteReport - random timestamps"
 )
 
 type evmNegativeTest struct {
@@ -47,7 +65,6 @@ type evmNegativeTest struct {
 var evmNegativeTestsBalanceAtInvalidAddress = []evmNegativeTest{
 	// BalanceAt
 	// TODO: Move BalanceAt to the top after fixing https://smartcontract-it.atlassian.net/browse/CRE-934
-	{"empty", "", balanceAtFunction, expectedBalanceAtError},
 	{"a letter", "a", balanceAtFunction, expectedBalanceAtError},
 	{"a symbol", "/", balanceAtFunction, expectedBalanceAtError},
 	{"a number", "1", balanceAtFunction, expectedBalanceAtError},
@@ -70,14 +87,10 @@ var evmNegativeTestsCallContractInvalidAddressToRead = []evmNegativeTest{
 
 var evmNegativeTestsCallContractInvalidBalanceReaderContract = []evmNegativeTest{
 	// CallContract - invalid balance reader contract address
-	// TODO: Uncomment tests after https://smartcontract-it.atlassian.net/browse/CRE-943
-	// "empty" will default to the 0-address which is valid but has no contract deployed, so we expect an error.
-	// {"empty", "", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
-	// {"a letter", "a", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
-	// {"a symbol", "/", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
+	{"empty", "", callContractInvalidBRContractAddress, "EVM error OpcodeNotFound"}, // equivalent to "0x", "0x0", we do not care if anything but contract may be at this address
+	{"a letter", "a", callContractInvalidBRContractAddress, "EVM error PrecompileError"},
+	{"a symbol", "/", callContractInvalidBRContractAddress, "EVM error OpcodeNotFound"},
 	{"a number", "1", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
-	// {"empty hex", "0x", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress}, // we do not care if anything but contract may be at this address
-	// {"cut hex", "0x0", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},  // we do not care if anything but contract may be at this address
 	{"short address", "0x123456789012345678901234567890123456789", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
 	{"long address", "0x12345678901234567890123456789012345678901", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
 	{"invalid address", "0x1234567890abcdefg1234567890abcdef123456", callContractInvalidBRContractAddress, expectedCallContractInvalidContractAddress},
@@ -108,8 +121,7 @@ var evmNegativeTestsFilterLogsWithInvalidAddress = []evmNegativeTest{
 }
 
 var evmNegativeTestsFilterLogsWithInvalidFromBlock = []evmNegativeTest{
-	// FilterLogs - invalid TromBlock/ToBlock values
-	// Border values and equivalent partitioning for positive integers only
+	// FilterLogs - invalid FromBlock/ToBlock values
 	// Distance between blocks should not be more than 100
 	{"negative number", "-1", filterLogsInvalidFromBlock, "block number -1 is not supported"},
 	{"zero", "0", filterLogsInvalidFromBlock, "block number 0 is not supported"},
@@ -117,21 +129,20 @@ var evmNegativeTestsFilterLogsWithInvalidFromBlock = []evmNegativeTest{
 	{"non-numeric string", "abc", filterLogsInvalidFromBlock, "toBlock 150 is less than fromBlock"},
 	{"empty string", "", filterLogsInvalidFromBlock, "toBlock 150 is less than fromBlock"},
 	{"decimal", "100.5", filterLogsInvalidFromBlock, "toBlock 150 is less than fromBlock"},
-	{"fromBlock greater than toBlock by more than 100", "49", filterLogsInvalidFromBlock, "exceeds maximum allowed range of 100"}, // toBlock is 150, so distance is 100+
+	{"fromBlock greater than toBlock by more than 100", "49", filterLogsInvalidFromBlock, "PerWorkflow.ChainRead.LogQueryBlockLimit limited for workflow"}, // toBlock is 150, so distance is 100+
 }
 
 var evmNegativeTestsFilterLogsWithInvalidToBlock = []evmNegativeTest{
 	// FilterLogs - invalid toBlock values
-	// Border values and equivalent partitioning for positive integers only
 	// Distance between blocks should not be more than 100
 	{"negative number", "-1", filterLogsInvalidToBlock, "block number -1 is not supported"},
 	{"zero", "0", filterLogsInvalidToBlock, "block number 0 is not supported"},
 	{"less then FromBlock", "1", filterLogsInvalidToBlock, "toBlock 1 is less than fromBlock"},
 	{"very large number", "9223372036854775808", filterLogsInvalidToBlock, "is not an int64"}, // int64 max + 1
-	{"non-numeric string", "abc", filterLogsInvalidToBlock, "exceeds maximum allowed range of 100"},
-	{"empty string", "", filterLogsInvalidToBlock, "exceeds maximum allowed range of 100"}, // equivalent to "current block"
-	{"decimal", "100.5", filterLogsInvalidToBlock, "exceeds maximum allowed range of 100"},
-	{"toBlock greater than fromBlock by more than 100", "103", filterLogsInvalidToBlock, "exceeds maximum allowed range of 100"}, // fromBlock is 2
+	{"non-numeric string", "abc", filterLogsInvalidToBlock, "PerWorkflow.ChainRead.LogQueryBlockLimit limited for workflow"},
+	{"empty string", "", filterLogsInvalidToBlock, "PerWorkflow.ChainRead.LogQueryBlockLimit limited for workflow"}, // equivalent to "current block"
+	{"decimal", "100.5", filterLogsInvalidToBlock, "PerWorkflow.ChainRead.LogQueryBlockLimit limited for workflow"},
+	{"toBlock greater than fromBlock by more than 100", "103", filterLogsInvalidToBlock, "PerWorkflow.ChainRead.LogQueryBlockLimit limited for workflow"}, // fromBlock is 2
 }
 
 var evmNegativeTestsGetTransactionByHashInvalidHash = []evmNegativeTest{
@@ -147,14 +158,37 @@ var evmNegativeTestsGetTransactionByHashInvalidHash = []evmNegativeTest{
 	{"non-existent hash", "0x1234567890123456789012345678901234567890123456789012345678901234", getTransactionByHashInvalidHash, "RPC call failed: not found"},
 }
 
+var evmNegativeTestsGetTransactionReceiptInvalidHash = []evmNegativeTest{
+	// GetTransactionReceipt - invalid hash (requires 32 bytes)
+	{"empty", "", getTransactionReceiptInvalidHash, "hash can't be nil"}, // equivalent to whitespace " "
+	{"a symbol", ";", getTransactionReceiptInvalidHash, "hash can't be nil"},
+	{"a char", "0xz", getTransactionReceiptInvalidHash, "hash can't be nil"},         // equivalent to any alfa-numeric string/character
+	{"null-0-like hex", "0x", getTransactionReceiptInvalidHash, "hash can't be nil"}, // equivalent to "0x0", empty
+	{"31 bytes (short) non-0x-prefixed", "12345678901234567890123456789012345678901234567890123456789012", getTransactionReceiptInvalidHash, "got 31 bytes, expected 32"},
+	{"33 bytes (long) non-0x-prefixed", "12345678901234567890123456789012345678901234567890123456789012345", getTransactionReceiptInvalidHash, "got 33 bytes, expected 32"},
+	{"malformed (non-hex) correct length", "0x123gggggggggggggggggggggggggggggggggggggggggggggggggggggggggg", getTransactionReceiptInvalidHash, "got 2 bytes, expected 32"}, // produces x01#
+	{"short hash", "0x647b7f17f9edba01d1f75ce071d0bc10173bc66b5d072f28b644275bf13bb99", getTransactionReceiptInvalidHash, "RPC call failed: not found"},
+	{"non-existent hash", "0x1234567890123456789012345678901234567890123456789012345678901234", getTransactionReceiptInvalidHash, "RPC call failed: not found"},
+}
+
+var evmNegativeTestsHeaderByNumberInvalidBlock = []evmNegativeTest{
+	// HeaderByNumber - invalid block number
+	// empty, non-numeric string, decimal will return nil, when parsed to big.Int,
+	// nil is a valid param for searching the latest block, and won't error.
+	{"negative number", "-1", headerByNumberInvalidBlock, "block number -1 is not supported"},
+	{"zero", "0", headerByNumberInvalidBlock, "block number 0 is not supported"},
+	{"int overflownumber", "9223372036854775808", headerByNumberInvalidBlock, "is not an int64"},             // int64 max + 1
+	{"not existing block)", "9223372036854775807", headerByNumberInvalidBlock, "RPC call failed: not found"}, // int64 max
+}
+
 func EVMReadFailsTest(t *testing.T, testEnv *ttypes.TestEnvironment, evmNegativeTest evmNegativeTest) {
 	testLogger := framework.L
 	const workflowFileLocation = "./evm/evmread-negative/main.go"
 	enabledChains := t_helpers.GetEVMEnabledChains(t, testEnv)
 
-	for _, bcOutput := range testEnv.WrappedBlockchainOutputs {
-		chainID := bcOutput.BlockchainOutput.ChainID
-		chainSelector := bcOutput.ChainSelector
+	for _, bcOutput := range testEnv.Blockchains {
+		chainID := bcOutput.CtfOutput().ChainID
+		chainSelector := bcOutput.ChainSelector()
 		creEnvironment := testEnv.CreEnvironment
 		if _, ok := enabledChains[chainID]; !ok {
 			testLogger.Info().Msgf("Skipping chain %s as it is not enabled for EVM Read workflow test", chainID)
@@ -169,7 +203,7 @@ func EVMReadFailsTest(t *testing.T, testEnv *ttypes.TestEnvironment, evmNegative
 		listenerCtx, messageChan, kafkaErrChan := t_helpers.StartBeholder(t, testLogger, testEnv)
 		testLogger.Info().Msg("Creating EVM Read Fail workflow configuration...")
 		workflowConfig := evm_negative_config.Config{
-			ChainSelector:  bcOutput.ChainSelector,
+			ChainSelector:  bcOutput.ChainSelector(),
 			FunctionToTest: evmNegativeTest.functionToTest,
 			InvalidInput:   evmNegativeTest.invalidInput,
 			BalanceReader: evm_negative_config.BalanceReader{
@@ -180,9 +214,106 @@ func EVMReadFailsTest(t *testing.T, testEnv *ttypes.TestEnvironment, evmNegative
 		t_helpers.CompileAndDeployWorkflow(t, testEnv, testLogger, workflowName, &workflowConfig, workflowFileLocation)
 
 		expectedError := evmNegativeTest.expectedError
-		timeout := 90 * time.Second
+		timeout := 2 * time.Minute
 		err := t_helpers.AssertBeholderMessage(listenerCtx, t, expectedError, testLogger, messageChan, kafkaErrChan, timeout)
 		require.NoError(t, err, "EVM Read Fail test failed")
 		testLogger.Info().Msg("EVM Read Fail test successfully completed")
 	}
+}
+
+//////////////////////////////////////////////////////
+// WRITE REPORT NEGATIVE TESTS
+//////////////////////////////////////////////////////
+
+var evmNegativeTestsWriteReportInvalidReceiver = []evmNegativeTest{
+	// WriteReport - invalid receiver
+	// symbols, numbers, 0-addresses are skipped as they are equivalent values for common.Address
+	{"empty", "", writeReportInvalidReceiver, expectedWriteReportInvalidReceiver},
+	{"short address", "0x123456789012345678901234567890123456789", writeReportInvalidReceiver, expectedWriteReportInvalidReceiver},
+	{"invalid address", "0x1234567890abcdefg1234567890abcdef1234567", writeReportInvalidReceiver, expectedWriteReportInvalidReceiver},
+	{"not a contract", "0x9b516F6741Dd1889A3Db4DC276aD349F0DC403C8", writeReportInvalidReceiver, expectedWriteReportInvalidReceiver},
+}
+
+var evmNegativeTestsWriteReportCorruptReceiverAddress = []evmNegativeTest{
+	// WriteReport - corrupt receiver address
+	// malformed values
+	{"empty", "", writeReportCorruptReceiverAddress, expectedWriteReportCorruptReceiverAddress},
+	{"short address", "0x1234", writeReportCorruptReceiverAddress, expectedWriteReportCorruptReceiverAddress},
+	{"invalid address", "0x1234567890abcdefg1234567890abcdef1234567", writeReportCorruptReceiverAddress, expectedWriteReportCorruptReceiverAddress},
+}
+
+var evmNegativeTestsWriteReportInvalidGas = []evmNegativeTest{
+	// WriteReport - corrupt receiver address
+	// malformed values
+	{"zero", "0", writeReportInvalidGas, expectedWriteReportInvalidGas},
+	{"low", "100000", writeReportInvalidGas, expectedWriteReportInvalidGas},
+	{"too high", "100000000000", writeReportInvalidGas, expectedWriteReportInvalidGas},
+}
+
+func EVMWriteFailsTest(t *testing.T, testEnv *ttypes.TestEnvironment, evmNegativeTest evmNegativeTest) {
+	testLogger := framework.L
+	const workflowFileLocation = "./evm/evmwrite-negative/main.go"
+	enabledChains := t_helpers.GetEVMEnabledChains(t, testEnv)
+
+	for _, bcOutput := range testEnv.Blockchains {
+		chainID := bcOutput.ChainID()
+		chainSelector := bcOutput.ChainSelector()
+		creEnvironment := testEnv.CreEnvironment
+		if _, ok := enabledChains[strconv.FormatUint(chainID, 10)]; !ok {
+			testLogger.Info().Msgf("Skipping chain %d as it is not enabled for EVM Read workflow test", chainID)
+			continue
+		}
+
+		forwarderAddress, _, forwarderErr := crecontracts.FindAddressesForChain(creEnvironment.CldfEnvironment.ExistingAddresses, chainSelector, keystone_changeset.KeystoneForwarder.String()) //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
+		require.NoError(t, forwarderErr, "failed to find Forwarder address for chain %d", chainSelector)
+
+		workflowOwner := bcOutput.(*evm.Blockchain).SethClient.MustGetRootKeyAddress()
+		workflowName := fmt.Sprintf("evm-write-fail-workflow-%d-%04d", chainID, rand.Intn(10000))
+		feedID := "018e16c38e000320000000000000000000000000000000000000000000000000" // 32 hex characters (16 bytes)
+		dataFeedsCacheAddress := deployAndConfigureEVMContracts(t, testLogger, chainSelector, chainID, creEnvironment, workflowOwner, workflowName, feedID, forwarderAddress)
+
+		listenerCtx, messageChan, kafkaErrChan := t_helpers.StartBeholder(t, testLogger, testEnv)
+		testLogger.Info().Msg("Creating EVM Write Regression workflow configuration...")
+		workflowConfig := evm_write_negative_config.Config{
+			FeedID:         feedID,
+			ChainSelector:  bcOutput.ChainSelector(),
+			FunctionToTest: evmNegativeTest.functionToTest,
+			InvalidInput:   evmNegativeTest.invalidInput,
+			DataFeedsCache: evm_write_negative_config.DataFeedsCache{
+				DataFeedsCacheAddress: dataFeedsCacheAddress,
+			},
+		}
+		t_helpers.CompileAndDeployWorkflow(t, testEnv, testLogger, workflowName, &workflowConfig, workflowFileLocation)
+
+		expectedError := evmNegativeTest.expectedError
+		timeout := 2 * time.Minute
+		err := t_helpers.AssertBeholderMessage(listenerCtx, t, expectedError, testLogger, messageChan, kafkaErrChan, timeout)
+		require.NoError(t, err, "EVM Write Regression test failed")
+		testLogger.Info().Msg("EVM Write Regression test successfully completed")
+	}
+}
+
+func deployAndConfigureEVMContracts(t *testing.T, testLogger zerolog.Logger, chainSelector uint64, chainID uint64, creEnvironment *cre.Environment, workflowOwner common.Address, uniqueWorkflowName string, feedID string, forwarderAddress common.Address) common.Address {
+	testLogger.Info().Msgf("Deploying additional contracts to chain %d (%d)", chainID, chainSelector)
+	dfAddress, dfOutput, dfErr := crecontracts.DeployDataFeedsCacheContract(testLogger, chainSelector, creEnvironment)
+	require.NoError(t, dfErr, "failed to deploy Data Feeds Cache contract on chain %d", chainSelector)
+	crecontracts.MergeAllDataStores(creEnvironment, dfOutput, dfOutput)
+
+	testLogger.Info().Msgf("Configuring Data Feeds Cache contract for EVM Write Regression test and feed ID %s", feedID)
+	configInput := &cre.ConfigureDataFeedsCacheInput{
+		CldEnv:                creEnvironment.CldfEnvironment,
+		ChainSelector:         chainSelector,
+		FeedIDs:               []string{feedID},
+		Descriptions:          []string{"EVM Write Regression test"},
+		DataFeedsCacheAddress: dfAddress,
+		AdminAddress:          workflowOwner,
+		AllowedSenders:        []common.Address{forwarderAddress},
+		AllowedWorkflowNames:  []string{uniqueWorkflowName},
+		AllowedWorkflowOwners: []common.Address{workflowOwner},
+	}
+	_, dfConfigErr := crecontracts.ConfigureDataFeedsCache(testLogger, configInput)
+	require.NoError(t, dfConfigErr, "failed to configure Data Feeds Cache contract")
+	testLogger.Info().Msg("Data Feeds Cache contract configured successfully.")
+
+	return dfAddress
 }
