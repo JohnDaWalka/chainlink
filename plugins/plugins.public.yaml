@@ -55,5 +55,5 @@ plugins:
 
   tron:
     - moduleURI: "github.com/smartcontractkit/chainlink-tron/relayer"
-      gitRef: "825077b2d5a7603be953fa23f98f18a6f2139cc0"
+      gitRef: "v0.0.11-0.20251014143056-a0c6328c91e9"
       installPath: "./cmd/chainlink-tron"
