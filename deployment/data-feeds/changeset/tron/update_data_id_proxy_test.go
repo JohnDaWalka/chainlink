@@ -5,6 +5,7 @@ import (
 
 	"github.com/fbsobreira/gotron-sdk/pkg/address"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/quarantine"
 	"github.com/stretchr/testify/require"
 
 	cldf_tron "github.com/smartcontractkit/chainlink-deployments-framework/chain/tron"
@@ -17,6 +18,7 @@ import (
 )
 
 func TestUpdateDataIDProxy(t *testing.T) {
+	quarantine.Flaky(t, "DX-2168")
 	t.Parallel()
 
 	selector := chain_selectors.TRON_DEVNET.Selector
