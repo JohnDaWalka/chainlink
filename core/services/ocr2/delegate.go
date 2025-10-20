@@ -858,7 +858,23 @@ func (d *Delegate) newDonTimePlugin(
 		return nil, ErrRelayNotEnabled{Err: err, Relay: spec.Relay, PluginName: "dontime"}
 	}
 
-	// TODO: We need to pass RegistrySyncer to PluginProvider
+	var capRegConfigTracker *relay.CapRegConfigProvider
+	if true { // TODO: Check if {job spec?} specifies that config is stored in Cap Reg
+		// TODO: Will this work to get the DonID for tracking config in Cap Reg?
+		localNode, err := d.capabilitiesRegistry.LocalNode(ctx)
+		if err != nil {
+			return nil, errors.New("Failed to get local node from cap reg")
+		}
+		donID := localNode.WorkflowDON.ID
+
+		capName := string(jb.OCR2OracleSpec.PluginType) // TODO: Can we get Cap Name from spec?
+		capRegConfigTracker, err := relay.NewCapRegConfigProvider(ctx, lggr, donID, capName)
+		if err != nil {
+			return nil, err
+		}
+		d.registrySyncer.AddListener(capRegConfigTracker) // Subscribe to Cap Reg changes
+	}
+
 	provider, err := relayer.NewPluginProvider(ctx, types.RelayArgs{
 		ExternalJobID: jb.ExternalJobID,
 		JobID:         jb.ID,
@@ -868,8 +884,9 @@ func (d *Delegate) newDonTimePlugin(
 		RelayConfig:   spec.RelayConfig.Bytes(),
 		ProviderType:  string(types.DonTimePlugin),
 	}, types.PluginArgs{
-		TransmitterID: spec.TransmitterID.String,
-		PluginConfig:  spec.PluginConfig.Bytes(),
+		TransmitterID:       spec.TransmitterID.String,
+		PluginConfig:        spec.PluginConfig.Bytes(),
+		CapRegConfigTracker: capRegConfigTracker,
 	})
 	if err != nil {
 		return nil, err

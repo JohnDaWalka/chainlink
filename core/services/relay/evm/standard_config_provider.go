@@ -4,10 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
-
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -17,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
-func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *types.RelayOpts, syncer registrysyncer.RegistrySyncer) (*configWatcher, error) {
+func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *types.RelayOpts, capRegConfigTracker ocrtypes.ContractConfigTracker) (*configWatcher, error) {
 	if !common.IsHexAddress(opts.ContractID) {
 		return nil, errors.New("invalid contractID, expected hex address")
 	}
@@ -28,19 +25,9 @@ func newStandardConfigProvider(ctx context.Context, lggr logger.Logger, chain le
 		ContractAddress: aggregatorAddress,
 	}
 
-	// Check if config is stored in the capability registry
-	relayConfig, err := opts.RelayConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get relay config: %w", err)
-	}
-	if relayConfig.CapRegConfig {
-		// TODO: Plumbing for DonID + Capability Name?
-		cp, err := NewCapRegConfigProvider(ctx, lggr, donID, capability)
-		if err != nil {
-			return nil, err
-		}
-		syncer.AddListener(cp)
-		return newConfigWatcher(lggr, aggregatorAddress, offchainConfigDigester, cp, chain, relayConfig.FromBlock, false), nil
+	if capRegConfigTracker != nil {
+		cp := NewCapRegConfigPoller(capRegConfigTracker)
+		return newConfigWatcher(lggr, aggregatorAddress, offchainConfigDigester, cp, chain, 0, false), nil
 	}
 
 	return newContractConfigProvider(ctx, lggr, chain, opts, aggregatorAddress, OCR2AggregatorLogDecoder, offchainConfigDigester)
