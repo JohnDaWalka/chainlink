@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
@@ -86,6 +88,7 @@ func TestLogPollerWithChaosPostgresFinalityTag(t *testing.T) {
 // with approximate emission of 24 logs per second for ~110 seconds
 // 6 filters are registered
 func TestLogPollerReplayFixedDepth(t *testing.T) {
+	quarantine.Flaky(t, "DX-2150")
 	executeLogPollerReplay(t, "5m")
 }
 
