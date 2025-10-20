@@ -23,7 +23,7 @@ type httpActionFailureTest struct {
 	url           string
 	headers       map[string]string
 	body          string
-	timeoutMs     int
+	timeout       int
 	expectedError string
 }
 
@@ -93,7 +93,7 @@ var httpActionFailureTests = []httpActionFailureTest{
 		testCase:      "crud-failure",
 		method:        "GET",
 		url:           "http://host.docker.internal:8080/delay/10", // Endpoint that delays response
-		timeoutMs:     1000,                                        // 1 second timeout
+		timeout:       1,                                           // 1 second timeout
 		expectedError: "HTTP Action failure test completed: request-timeout",
 	},
 }
@@ -110,7 +110,7 @@ func HTTPActionFailureTest(t *testing.T, testEnv *ttypes.TestEnvironment, httpAc
 		Method:    httpActionTest.method,
 		Headers:   httpActionTest.headers,
 		Body:      httpActionTest.body,
-		TimeoutMs: httpActionTest.timeoutMs,
+		TimeoutMs: httpActionTest.timeout,
 	}
 
 	workflowName := "http-action-fail-workflow-" + httpActionTest.method + "-" + uuid.New().String()[0:8]

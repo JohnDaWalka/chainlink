@@ -144,6 +144,8 @@ func Test_CRE_V2_HTTP_Action_CRUD_Regression(t *testing.T) {
 		tCase := tCase // capture range variable for closure
 		t.Run(testName, func(t *testing.T) {
 			testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
+			// TODO remove this when OCR works properly with multiple chains in Local CRE
+			testEnv.WrappedBlockchainOutputs = []*cre.WrappedBlockchainOutput{testEnv.WrappedBlockchainOutputs[0]}
 
 			HTTPActionFailureTest(t, testEnv, tCase)
 		})

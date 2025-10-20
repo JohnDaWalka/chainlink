@@ -12,8 +12,10 @@ github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250918131840-564fe2
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20250918131840-564fe2776a35/go.mod h1:jUC52kZzEnWF9tddHh85zolKybmLpbQ1oNA4FjOHt1Q=
 github.com/smartcontractkit/cre-sdk-go v0.8.0 h1:QHYnz6MgBGFRaTOrP9Nx4HSHUpxYWgRzXGdsAucKAiI=
 github.com/smartcontractkit/cre-sdk-go v0.8.0/go.mod h1:CQY8hCISjctPmt8ViDVgFm4vMGLs5fYI198QhkBS++Y=
+github.com/smartcontractkit/cre-sdk-go v0.9.0/go.mod h1:CQY8hCISjctPmt8ViDVgFm4vMGLs5fYI198QhkBS++Y=
 github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.8.0 h1:UmgRBZR3aWyeJQQJZrys+2XAOQY3fNMz+gwWhYAxQIU=
 github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.8.0/go.mod h1:M83m3FsM1uqVu06OO58mKUSZJjjH8OGJsmvFpFlRDxI=
+github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.9.0/go.mod h1:M83m3FsM1uqVu06OO58mKUSZJjjH8OGJsmvFpFlRDxI=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 google.golang.org/protobuf v1.36.7 h1:IgrO7UwFQGJdRNXH/sQux4R1Dj1WAKcLElzeeRaXV2A=
