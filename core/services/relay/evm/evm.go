@@ -385,7 +385,7 @@ func (r *Relayer) NewPluginProvider(ctx context.Context, rargs commontypes.Relay
 		return nil, fmt.Errorf("failed to get relay config: %w", err)
 	}
 
-	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
+	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts, pargs.CapRegConfigTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +523,7 @@ func (r *Relayer) NewCCIPCommitProvider(ctx context.Context, rargs commontypes.R
 	}
 
 	relayOpts := config.NewRelayOpts(rargs)
-	configWatcher, err := newStandardConfigProvider(ctx, lggr, r.chain, relayOpts)
+	configWatcher, err := newStandardConfigProvider(ctx, lggr, r.chain, relayOpts, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +609,7 @@ func (r *Relayer) NewCCIPExecProvider(ctx context.Context, rargs commontypes.Rel
 	}
 
 	relayOpts := config.NewRelayOpts(rargs)
-	configWatcher, err := newStandardConfigProvider(ctx, lggr, r.chain, relayOpts)
+	configWatcher, err := newStandardConfigProvider(ctx, lggr, r.chain, relayOpts, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -724,7 +724,7 @@ func (r *Relayer) NewConfigProvider(ctx context.Context, args commontypes.RelayA
 
 	switch args.ProviderType {
 	case "median":
-		configProvider, err = newStandardConfigProvider(ctx, lggr, r.chain, relayOpts)
+		configProvider, err = newStandardConfigProvider(ctx, lggr, r.chain, relayOpts, nil)
 	case "mercury":
 		configProvider, err = newMercuryConfigProvider(ctx, lggr, r.chain, relayOpts)
 	case "llo":
@@ -880,7 +880,7 @@ func (r *Relayer) NewMedianProvider(ctx context.Context, rargs commontypes.Relay
 	}
 	contractID := common.HexToAddress(relayOpts.ContractID)
 
-	configWatcher, err := newStandardConfigProvider(ctx, lggr, r.chain, relayOpts)
+	configWatcher, err := newStandardConfigProvider(ctx, lggr, r.chain, relayOpts, nil)
 	if err != nil {
 		return nil, err
 	}

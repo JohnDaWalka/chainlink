@@ -3,11 +3,11 @@ package evm
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
+	"github.com/smartcontractkit/chainlink-evm/pkg/config"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-var _ types.ConfigPoller = &CapRegConfigPoller{}
+var _ config.ConfigPoller = &CapRegConfigPoller{}
 
 func NewCapRegConfigPoller(configTracker ocrtypes.ContractConfigTracker) *CapRegConfigPoller {
 	return &CapRegConfigPoller{
