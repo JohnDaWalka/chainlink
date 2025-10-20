@@ -1116,6 +1116,8 @@ func (s *Shell) beforeNode(c *cli.Context) error {
 		return errors.Wrap(err, "failed initializing globals")
 	}
 
+	beholder.GetClient().SetSigner(&keystore.CSASigner{CSA: keyStore.CSA()})
+
 	// If log streaming is enabled swap core to add Otel
 	if s.Config.Telemetry().LogStreamingEnabled() {
 		if s.SetOtelCore == nil {
