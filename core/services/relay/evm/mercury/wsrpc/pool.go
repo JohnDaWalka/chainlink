@@ -23,7 +23,7 @@ func (cco *clientCheckout) Start(_ context.Context) error {
 }
 
 func (cco *clientCheckout) Close() error {
-	cco.connection.checkin(cco)
+	cco.checkin(cco)
 	return nil
 }
 
@@ -59,7 +59,7 @@ func (conn *connection) checkout(ctx context.Context) (cco *clientCheckout, err 
 func (conn *connection) ensureStartedClient(ctx context.Context) error {
 	if len(conn.checkouts) == 0 {
 		conn.Client = conn.pool.newClient(ClientOpts{logger.Sugared(conn.lggr), conn.clientSigner, conn.serverPubKey, conn.serverURL, conn.pool.cacheSet, nil})
-		return conn.Client.Start(ctx)
+		return conn.Start(ctx)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func (conn *connection) checkin(checkinCco *clientCheckout) {
 		panic("tried to check in client that was never checked out")
 	}
 	if len(conn.checkouts) == 0 {
-		if err := conn.Client.Close(); err != nil {
+		if err := conn.Close(); err != nil {
 			// programming error if we hit this
 			panic(err)
 		}
@@ -92,7 +92,7 @@ func (conn *connection) forceCloseAll() (err error) {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
 	if conn.Client != nil {
-		err = conn.Client.Close()
+		err = conn.Close()
 		if errors.Is(err, services.ErrAlreadyStopped) {
 			// ignore error if it has already been stopped; no problem
 			err = nil

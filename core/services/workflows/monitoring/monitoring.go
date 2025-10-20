@@ -37,16 +37,16 @@ type EngineMetrics struct {
 	engineHeartbeatCounter metric.Int64Counter
 	engineHeartbeatGauge   metric.Int64Gauge
 
-	workflowCompletedDurationSeconds  metric.Int64Histogram
-	workflowEarlyExitDurationSeconds  metric.Int64Histogram
-	workflowErrorDurationSeconds      metric.Int64Histogram
-	workflowTimeoutDurationSeconds    metric.Int64Histogram
-	workflowStepDurationSeconds       metric.Int64Histogram
+	workflowCompletedDurationSeconds   metric.Int64Histogram
+	workflowEarlyExitDurationSeconds   metric.Int64Histogram
+	workflowErrorDurationSeconds       metric.Int64Histogram
+	workflowTimeoutDurationSeconds     metric.Int64Histogram
+	workflowStepDurationSeconds        metric.Int64Histogram
 	capabilityExecutionDurationSeconds metric.Int64Histogram
-	workflowMissingMeteringReport     metric.Int64Counter
-	workflowMeteringMode              metric.Int64Gauge
-	workflowExecutionFailedCounter    metric.Int64Counter
-	workflowExecutionSucceededCounter metric.Int64Counter
+	workflowMissingMeteringReport      metric.Int64Counter
+	workflowMeteringMode               metric.Int64Gauge
+	workflowExecutionFailedCounter     metric.Int64Counter
+	workflowExecutionSucceededCounter  metric.Int64Counter
 
 	getSecretsDuration metric.Int64Histogram
 }
