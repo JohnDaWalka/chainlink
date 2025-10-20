@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/quarantine"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	bridgesMocks "github.com/smartcontractkit/chainlink/v2/core/bridges/mocks"
@@ -54,6 +56,7 @@ func newRunner(t testing.TB, db *sqlx.DB, bridgeORM bridges.ORM, cfg chainlink.G
 }
 
 func Test_PipelineRunner_ExecuteTaskRuns(t *testing.T) {
+	quarantine.Flaky(t, "DX-2160")
 	db := pgtest.NewSqlxDB(t)
 	cfg := configtest.NewTestGeneralConfig(t)
 
