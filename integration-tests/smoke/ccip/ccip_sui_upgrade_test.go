@@ -103,6 +103,7 @@ func Test_CCIP_Upgrade_Sui2EVM(t *testing.T) {
 	// upgrade contracts, upgrade onRamp to v2
 	fmt.Println("Upgrading SUI contracts")
 	upgradeSuiOnRamp(ctx, t, e, sourceChain, contracts.CCIPOnrampMockV2)
+	upgradeCCIP(ctx, t, e, destChain, contracts.CCIPMockV2)
 
 	// Block onRamp v1
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
@@ -117,7 +118,19 @@ func Test_CCIP_Upgrade_Sui2EVM(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	t.Run("Sui OnRamp Upgraded: Message to EVM - Should Succeed", func(t *testing.T) {
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.BlockVersion{}, sui_cs.BlockVersionConfig{
+			SuiChainSelector: sourceChain,
+			CCIPPackageId:    state.SuiChains[sourceChain].CCIPAddress,
+			StateObjectId:    state.SuiChains[sourceChain].CCIPObjectRef,
+			OwnerCapObjectId: state.SuiChains[sourceChain].CCIPOwnerCapObjectId,
+			ModuleName:       "fee_quoter",
+			Version:          1,
+		}),
+	})
+	require.NoError(t, err)
+
+	t.Run("Sui OnRamp, CCIP FQ Upgraded: Message to EVM - Should Succeed", func(t *testing.T) {
 		out = messagingtest.Run(t,
 			messagingtest.TestCase{
 				TestSetup:              setup,
@@ -219,7 +232,33 @@ func Test_CCIP_Upgrade_EVM2Sui(t *testing.T) {
 	upgradeSuiOffRamp(ctx, t, e, destChain, contracts.CCIPOfframpMockV2)
 	upgradeCCIP(ctx, t, e, destChain, contracts.CCIPMockV2)
 
-	t.Run("OnRamp, OffRamp, CCIP upgraded: Message to Sui - Should Succeed", func(t *testing.T) {
+	// Block offramp v1
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.BlockVersion{}, sui_cs.BlockVersionConfig{
+			SuiChainSelector: destChain,
+			CCIPPackageId:    state.SuiChains[destChain].CCIPAddress,
+			StateObjectId:    state.SuiChains[destChain].CCIPObjectRef,
+			OwnerCapObjectId: state.SuiChains[destChain].CCIPOwnerCapObjectId,
+			ModuleName:       "offramp",
+			Version:          1,
+		}),
+	})
+	require.NoError(t, err)
+
+	// Block ccip v1 feequoter
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.BlockVersion{}, sui_cs.BlockVersionConfig{
+			SuiChainSelector: destChain,
+			CCIPPackageId:    state.SuiChains[destChain].CCIPAddress,
+			StateObjectId:    state.SuiChains[destChain].CCIPObjectRef,
+			OwnerCapObjectId: state.SuiChains[destChain].CCIPOwnerCapObjectId,
+			ModuleName:       "fee_quoter",
+			Version:          1,
+		}),
+	})
+	require.NoError(t, err)
+
+	t.Run("OnRamp, OffRamp, CCIP FQ upgraded: Message to Sui - Should Succeed", func(t *testing.T) {
 		// ccipChainState := state.SuiChains[destChain]
 		message := []byte("Hello Sui, from EVM!")
 		messagingtest.Run(t,
@@ -317,6 +356,19 @@ func Test_CCIP_Upgrade_EVM2Sui_Only_Common(t *testing.T) {
 
 	fmt.Println("Upgrading SUI contracts")
 	upgradeCCIP(ctx, t, e, destChain, contracts.CCIPMockV2)
+
+	// Block ccip v1 FQ
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.BlockVersion{}, sui_cs.BlockVersionConfig{
+			SuiChainSelector: destChain,
+			CCIPPackageId:    state.SuiChains[destChain].CCIPAddress,
+			StateObjectId:    state.SuiChains[destChain].CCIPObjectRef,
+			OwnerCapObjectId: state.SuiChains[destChain].CCIPOwnerCapObjectId,
+			ModuleName:       "fee_quoter",
+			Version:          1,
+		}),
+	})
+	require.NoError(t, err)
 
 	t.Run("CCIP FQ upgraded: Message to Sui - Should Succeed", func(t *testing.T) {
 		// ccipChainState := state.SuiChains[destChain]
