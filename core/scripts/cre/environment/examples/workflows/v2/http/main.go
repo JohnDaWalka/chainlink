@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http"
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
@@ -56,21 +59,15 @@ type OrderRequest struct {
 }
 
 // orderPizza posts a pizza order to the orders endpoint
-func orderPizza(sendReqester *http.SendRequester, inputs []byte, customer string) (string, error) {
-	var orderRequest OrderRequest
-	if err := json.Unmarshal(inputs, &orderRequest); err != nil {
-		return "", fmt.Errorf("failed to unmarshal order request: %w", err)
+func orderPizza(sendReqester *http.SendRequester, orderRequest OrderRequest) (string, error) {
+	body, err := json.Marshal(orderRequest)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal order request: %w", err)
 	}
-	// this demonstrates that workflows can have custom logic based on the identity that invoked HTTP trigger
-	// see `onTrigger()` function for how customer can be set based on the authorized key
-	if customer == "Bob" {
-		orderRequest.Toppings = []string{"pineapples"}
-	}
-
 	req := &http.Request{
 		Url:    "http://host.docker.internal:2999/orders",
 		Method: "POST",
-		Body:   inputs,
+		Body:   body,
 		Headers: map[string]string{
 			"Content-Type": "application/json",
 		},
@@ -78,8 +75,8 @@ func orderPizza(sendReqester *http.SendRequester, inputs []byte, customer string
 
 	if orderRequest.Dedup {
 		req.CacheSettings = &http.CacheSettings{
-			ReadFromCache: true,
-			MaxAgeMs:      10000,
+			Store:  true,
+			MaxAge: durationpb.New(10 * time.Second),
 		}
 	}
 
@@ -107,15 +104,18 @@ func onTrigger(config None, runtime cre.Runtime, trigger *http.Payload) (string,
 
 	logger.Info("Processing pizza order with inputs", "inputs", string(trigger.Input))
 
-	customer := "default"
-    // this demonstrates that workflows can have custom logic based on the identity that invoked HTTP trigger
-	if trigger.Key != nil && trigger.Key.PublicKey == "0x4b8d44a7a1302011fbc119407f8ce3baee6ea2ff" {
-		customer = "Bob"
+	var orderRequest OrderRequest
+	if err := json.Unmarshal(trigger.Input, &orderRequest); err != nil {
+		return "", fmt.Errorf("failed to unmarshal order request: %w", err)
+	}
+
+	if trigger.Key != nil && strings.ToLower(trigger.Key.PublicKey) == "0x4b8d44a7a1302011fbc119407f8ce3baee6ea2ff" {
+		orderRequest.Toppings = []string{"pineapples"}
 	}
 
 	client := &http.Client{}
 	pizzaPromise := http.SendRequest(config, runtime, client, func(_ None, logger *slog.Logger, sendRequester *http.SendRequester) (string, error) {
-		return orderPizza(sendRequester, trigger.Input, customer)
+		return orderPizza(sendRequester, orderRequest)
 	}, cre.ConsensusIdenticalAggregation[string]())
 
 	// Await the final, aggregated result.
