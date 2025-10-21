@@ -111,7 +111,11 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 			},
 		},
 	}
+	fmt.Println("OLD CCIP: ", state.SuiChains[cfg.SourceChain].CCIPAddress)
+	fmt.Println("NEW CCIP: ", state.SuiChains[cfg.SourceChain].CCIPMockV2PackageId)
 
+	fmt.Println("OLD ONRAMP: ", state.SuiChains[cfg.SourceChain].OnRampAddress)
+	fmt.Println("NEW ONRAMP: ", state.SuiChains[cfg.SourceChain].OnRampMockV2PackageId)
 	ccipObjectRefID := state.SuiChains[cfg.SourceChain].CCIPObjectRef
 	ccipPackageID := state.SuiChains[cfg.SourceChain].CCIPMockV2PackageId
 	if ccipPackageID == "" {
@@ -384,6 +388,7 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 	ptb := suitx.NewTransaction()
 	ptb.SetSuiClient(client.(*sui.Client))
 
+	// ptb1
 	ccipStateHelperContract, err := suiBind.NewBoundContract(
 		ccipPackageID,
 		"ccip",
@@ -428,6 +433,8 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 		return nil, errors.New("failed to build PTB (get_token_param_data) using bindings: " + err.Error())
 	}
 
+	fmt.Println("ONRAMP PKG ID: ", onRampPackageID)
+	// ptb2
 	onRampContract, err := suiBind.NewBoundContract(
 		onRampPackageID,
 		"ccip_onramp",

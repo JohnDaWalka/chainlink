@@ -102,8 +102,21 @@ func Test_CCIP_Upgrade_Sui2EVM(t *testing.T) {
 
 	// upgrade contracts, upgrade onRamp to v2
 	fmt.Println("Upgrading SUI contracts")
+	upgradeCCIP(ctx, t, e, sourceChain, contracts.CCIPMockV2)
 	upgradeSuiOnRamp(ctx, t, e, sourceChain, contracts.CCIPOnrampMockV2)
-	upgradeCCIP(ctx, t, e, destChain, contracts.CCIPMockV2)
+
+	// block ccip v1 FQ
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.BlockVersion{}, sui_cs.BlockVersionConfig{
+			SuiChainSelector: sourceChain,
+			CCIPPackageId:    state.SuiChains[sourceChain].CCIPAddress,
+			StateObjectId:    state.SuiChains[sourceChain].CCIPObjectRef,
+			OwnerCapObjectId: state.SuiChains[sourceChain].CCIPOwnerCapObjectId,
+			ModuleName:       "fee_quoter",
+			Version:          1,
+		}),
+	})
+	require.NoError(t, err)
 
 	// Block onRamp v1
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
@@ -118,18 +131,7 @@ func Test_CCIP_Upgrade_Sui2EVM(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
-		commoncs.Configure(sui_cs.BlockVersion{}, sui_cs.BlockVersionConfig{
-			SuiChainSelector: sourceChain,
-			CCIPPackageId:    state.SuiChains[sourceChain].CCIPAddress,
-			StateObjectId:    state.SuiChains[sourceChain].CCIPObjectRef,
-			OwnerCapObjectId: state.SuiChains[sourceChain].CCIPOwnerCapObjectId,
-			ModuleName:       "fee_quoter",
-			Version:          1,
-		}),
-	})
-	require.NoError(t, err)
-
+	// ccipSend on newPkgID
 	t.Run("Sui OnRamp, CCIP FQ Upgraded: Message to EVM - Should Succeed", func(t *testing.T) {
 		out = messagingtest.Run(t,
 			messagingtest.TestCase{
@@ -228,9 +230,9 @@ func Test_CCIP_Upgrade_EVM2Sui(t *testing.T) {
 	receiverObjectIDs := [][32]byte{clockObj, stateObj}
 
 	fmt.Println("Upgrading SUI contracts")
+	upgradeCCIP(ctx, t, e, destChain, contracts.CCIPMockV2)
 	upgradeSuiOnRamp(ctx, t, e, destChain, contracts.CCIPOnrampMockV2)
 	upgradeSuiOffRamp(ctx, t, e, destChain, contracts.CCIPOfframpMockV2)
-	upgradeCCIP(ctx, t, e, destChain, contracts.CCIPMockV2)
 
 	// Block offramp v1
 	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
@@ -391,14 +393,23 @@ func upgradeSuiOnRamp(ctx context.Context, t *testing.T, e testhelpers.DeployedE
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
+	ccipPackageID := state.SuiChains[sourceChain].CCIPMockV2PackageId
+	if ccipPackageID == "" {
+		fmt.Println("ccip v2 not set, using ccip v1 during upgrade")
+		ccipPackageID = state.SuiChains[sourceChain].CCIPAddress
+	}
+
 	// compile packages
 	compiledPackage, err := suiBind.CompilePackage(version, map[string]string{
-		"ccip":        state.SuiChains[sourceChain].CCIPAddress,
+		"ccip":        ccipPackageID,
 		"ccip_onramp": "0x0", // old onRamp address
 		"mcms":        state.SuiChains[sourceChain].MCMsAddress,
 		"mcms_owner":  "0x1",
 	})
 	require.NoError(t, err)
+
+	fmt.Println(compiledPackage.Dependencies, compiledPackage.Modules)
+	fmt.Println("ONRAMP COMPILED PKG: ", len(compiledPackage.Dependencies), len(compiledPackage.Modules))
 
 	// decode modules from base64 -> [][]byte
 	moduleBytes := make([][]byte, len(compiledPackage.Modules))
@@ -476,9 +487,15 @@ func upgradeSuiOffRamp(ctx context.Context, t *testing.T, e testhelpers.Deployed
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
+	ccipPackageID := state.SuiChains[sourceChain].CCIPMockV2PackageId
+	if ccipPackageID == "" {
+		fmt.Println("ccip v2 not set, using ccip v1 during upgrade")
+		ccipPackageID = state.SuiChains[sourceChain].CCIPAddress
+	}
+
 	// compile packages
 	compiledPackage, err := suiBind.CompilePackage(version, map[string]string{
-		"ccip":         state.SuiChains[sourceChain].CCIPAddress,
+		"ccip":         ccipPackageID,
 		"ccip_offramp": "0x0",
 		"mcms":         state.SuiChains[sourceChain].MCMsAddress,
 		"mcms_owner":   "0x1",
@@ -557,7 +574,7 @@ func upgradeSuiOffRamp(ctx context.Context, t *testing.T, e testhelpers.Deployed
 	fmt.Println("Upgraded SUI offRamp")
 }
 
-func upgradeCCIP(ctx context.Context, t *testing.T, e testhelpers.DeployedEnv, sourceChain uint64, version contracts.Package) {
+func upgradeCCIP(ctx context.Context, t *testing.T, e testhelpers.DeployedEnv, sourceChain uint64, version contracts.Package) string {
 	state, err := stateview.LoadOnchainState(e.Env)
 	require.NoError(t, err)
 
@@ -607,7 +624,7 @@ func upgradeCCIP(ctx context.Context, t *testing.T, e testhelpers.DeployedEnv, s
 	require.NoError(t, err)
 
 	// Add new PackageID
-	ccipStateObject, err := module_state_object.NewStateObject(state.SuiChains[sourceChain].CCIPAddress, e.Env.BlockChains.SuiChains()[sourceChain].Client)
+	ccipStateObject, err := module_state_object.NewStateObject(newCCIPPkgId, e.Env.BlockChains.SuiChains()[sourceChain].Client)
 	require.NoError(t, err)
 
 	// add new pkgId to state
@@ -618,7 +635,7 @@ func upgradeCCIP(ctx context.Context, t *testing.T, e testhelpers.DeployedEnv, s
 	}, suiBind.Object{Id: state.SuiChains[sourceChain].CCIPObjectRef}, suiBind.Object{Id: state.SuiChains[sourceChain].CCIPOwnerCapObjectId}, newCCIPPkgId)
 	require.NoError(t, err)
 
-	// if the pkg is onramp-v2 do some extra checks
+	// if the pkg is ccip-v2 do some extra checks
 	if version == contracts.CCIPMockV2 {
 		newFQ, err := module_fee_quoter.NewFeeQuoter(newCCIPPkgId, e.Env.BlockChains.SuiChains()[sourceChain].Client)
 		require.NoError(t, err)
@@ -632,11 +649,17 @@ func upgradeCCIP(ctx context.Context, t *testing.T, e testhelpers.DeployedEnv, s
 
 		require.Equal(t, "FeeQuoter 1.6.1", typeAndVersion)
 
+		fmt.Println("NEW CCIPPKGID: ", newCCIPPkgId, "OLD: ", state.SuiChains[sourceChain].CCIPAddress)
 		// save the new pkgId to addressbook
 		typeAndVersionCCIPMockV2 := cldf.NewTypeAndVersion(deployment.SuiCCIPMockV2, deployment.Version1_0_0)
 		err = e.Env.ExistingAddresses.Save(sourceChain, newCCIPPkgId, typeAndVersionCCIPMockV2)
 		require.NoError(t, err)
+
+		newPkgId := newFQ.Bound().GetPackageID()
+		fmt.Println("FQ NEW PKG ID: ", newPkgId)
 	}
 
 	fmt.Println("Upgraded SUI CCIP")
+
+	return newCCIPPkgId
 }

@@ -13,9 +13,9 @@ replace github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examp
 
 replace github.com/smartcontractkit/chainlink/core/scripts/cre/environment/examples/workflows/v1/proof-of-reserve/web-trigger-based => ./cre/environment/examples/workflows/v1/proof-of-reserve/web-trigger-based
 
-// replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
+replace github.com/smartcontractkit/chainlink-sui => ../../../chainlink-sui
 
-// replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
+replace github.com/smartcontractkit/chainlink-sui/deployment => ../../../chainlink-sui/deployment
 
 // Uncomment to work with local version of crib-sdk
 // replace github.com/smartcontractkit/crib-sdk => ../../../crib-sdk
