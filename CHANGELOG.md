@@ -64,7 +64,7 @@
 
 - [#19519](https://github.com/smartcontractkit/chainlink/pull/19519) [`7bb659b`](https://github.com/smartcontractkit/chainlink/commit/7bb659bbf3defc24542f17fbeaa58f852f3ac24c) - #internal #bugfix Cancels sync routines if contract reader fails to construct
 
-## 2.29.0
+## 2.29.0 - 2025-10-21
 
 ### Minor Changes
 
