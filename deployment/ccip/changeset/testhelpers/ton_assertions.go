@@ -20,8 +20,8 @@ import (
 	cldf_ton "github.com/smartcontractkit/chainlink-deployments-framework/chain/ton"
 
 	"github.com/smartcontractkit/chainlink-ton/pkg/ccip/bindings/offramp"
-	tonlploader "github.com/smartcontractkit/chainlink-ton/pkg/logpoller/backend/loader/account"
-	tonlptypes "github.com/smartcontractkit/chainlink-ton/pkg/logpoller/types"
+	tonlploader "github.com/smartcontractkit/chainlink-ton/pkg/logpoller/loader"
+	tonlptypes "github.com/smartcontractkit/chainlink-ton/pkg/logpoller/models"
 	"github.com/smartcontractkit/chainlink-ton/pkg/ton/event"
 	"github.com/smartcontractkit/chainlink-ton/pkg/ton/hash"
 )
@@ -330,7 +330,7 @@ func streamEvents[T any](
 		}
 
 		// Initialize transaction loader
-		loader := tonlploader.NewTxLoader(lggr, clientProvider, txBatchSize)
+		loader := tonlploader.New(lggr, clientProvider)
 
 		lastProcessedBlock := startBlock
 
@@ -352,7 +352,7 @@ func streamEvents[T any](
 				}
 
 				// 2. Fetch transactions
-				txs, err := loader.FetchTxsForAddress(ctx, blockRange, contract)
+				txs, err := loader.GetTxsForAddress(ctx, blockRange, contract, txBatchSize)
 				if err != nil {
 					errorCh <- fmt.Errorf("failed to load transactions: %w", err)
 					return
@@ -459,15 +459,15 @@ func tryParseEvent[T any](msg *tlb.Message, lggr logger.Logger, expectedEventNam
 
 // extractEventMessage processes transactions to extract events of type T from external messages.
 // Only processes events matching the specified eventName topic.
-func extractEventMessage[T any](txs []tonlptypes.TxWithBlock, lggr logger.Logger, eventName string) ([]T, error) {
+func extractEventMessage[T any](txs []tonlptypes.Tx, lggr logger.Logger, eventName string) ([]T, error) {
 	var events []T
 
 	for _, tx := range txs {
-		if tx.Tx == nil || tx.Tx.IO.Out == nil {
+		if tx.Transaction == nil || tx.Transaction.IO.Out == nil {
 			continue
 		}
 
-		msgs, err := tx.Tx.IO.Out.ToSlice()
+		msgs, err := tx.Transaction.IO.Out.ToSlice()
 		if err != nil {
 			continue
 		}
