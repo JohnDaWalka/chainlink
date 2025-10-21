@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -48,12 +49,17 @@ var RegisterNops = operations.NewOperation[RegisterNopsInput, RegisterNopsOutput
 		}
 
 		// Get the CapabilitiesRegistryTransactor contract
-		capabilityRegistryTransactor, err := capabilities_registry_v2.NewCapabilitiesRegistryTransactor(
+		capabilityRegistryTransactor, err := capabilities_registry_v2.NewCapabilitiesRegistry(
 			common.HexToAddress(input.Address),
 			chain.Client,
 		)
 		if err != nil {
 			return RegisterNopsOutput{}, fmt.Errorf("failed to create CapabilitiesRegistryTransactor: %w", err)
+		}
+
+		newNops, err := dedupNodeOperators(capabilityRegistryTransactor, input.Nops)
+		if err != nil {
+			return RegisterNopsOutput{}, fmt.Errorf("failed to deduplicate node operators: %w", err)
 		}
 
 		// Create the appropriate strategy
@@ -73,7 +79,7 @@ var RegisterNops = operations.NewOperation[RegisterNopsInput, RegisterNopsOutput
 
 		// Execute the transaction using the strategy
 		proposals, err := strategy.Apply(func(opts *bind.TransactOpts) (*types.Transaction, error) {
-			tx, err := capabilityRegistryTransactor.AddNodeOperators(opts, input.Nops)
+			tx, err := capabilityRegistryTransactor.AddNodeOperators(opts, newNops)
 			if err != nil {
 				err = cldf.DecodeErr(capabilities_registry_v2.CapabilitiesRegistryABI, err)
 				return nil, fmt.Errorf("failed to call AddNodeOperators: %w", err)
@@ -135,3 +141,36 @@ var RegisterNops = operations.NewOperation[RegisterNopsInput, RegisterNopsOutput
 		}, nil
 	},
 )
+
+func dedupNodeOperators(c capabilities_registry_v2.CapabilitiesRegistryInterface, nops []capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams) ([]capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams, error) {
+	m := make(map[capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams]struct{})
+	for i := range nops {
+		m[nops[i]] = struct{}{}
+	}
+	r, err := c.GetNodeOperators(nil, big.NewInt(1), big.NewInt(256)) // TODO pagination
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing node operators: %w", err)
+	}
+
+	if len(r) == 0 {
+		return nops, nil
+	}
+	if len(r) >= 256 {
+		return nil, fmt.Errorf("too many existing node operators, pagination not implemented")
+	}
+	for _, nop := range r {
+		delete(m, capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams{Admin: nop.Admin, Name: nop.Name})
+	}
+
+	// maintain order of input slice
+	if len(m) == 0 {
+		return []capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams{}, nil
+	}
+	var nopsToRegister []capabilities_registry_v2.CapabilitiesRegistryNodeOperatorParams
+	for _, nop := range nops {
+		if _, ok := m[nop]; ok {
+			nopsToRegister = append(nopsToRegister, nop)
+		}
+	}
+	return nopsToRegister, nil
+}
