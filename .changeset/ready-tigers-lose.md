@@ -2,4 +2,4 @@
 "chainlink": patch
 ---
 
-#updated chain selectors
+#updated bump common
