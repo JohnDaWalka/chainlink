@@ -45,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/framework/components/fake v0.10.0
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.5
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.2
-	github.com/smartcontractkit/chainlink/deployment v0.0.0-20251020210257-0a6ec41648b4
+	github.com/smartcontractkit/chainlink/deployment v0.0.0-20251021194914-c0e3fec1a97c
 	github.com/smartcontractkit/crib-sdk v0.4.0
 	github.com/smartcontractkit/libocr v0.0.0-20250912173940-f3ab0246e23d
 	github.com/smartcontractkit/smdkg v0.0.0-20250916143931-2876ea233fd8
