@@ -105,6 +105,11 @@ jobs:
       BILLING_PLATFORM_SERVICE_IMAGE: ${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/billing-platform-service:v1.45.0
 
     steps:
+      - name: Gather Resource Metrics
+        uses: erikburt/workflow-telemetry-action@feat/per-core-cpu
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Enable S3 Cache for Self-Hosted Runners
         # these env vars are set (and exposed) when it is a self-hosted runner with extras=s3-cache
         if: ${{ env.RUNS_ON_INSTANCE_ID != '' && env.ACTIONS_CACHE_URL != '' }}
