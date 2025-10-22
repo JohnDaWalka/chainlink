@@ -39,8 +39,8 @@ type HTTPClientConfig struct {
 }
 
 var (
-	defaultAllowedPorts   = []int{80, 443}
-	defaultAllowedSchemes = []string{"http", "https"}
+	defaultAllowedPorts   = []int{443}
+	defaultAllowedSchemes = []string{"https"}
 	defaultAllowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 	defaultBlockedHeaders = []string{
 		"host",              // target host is set in the http client
