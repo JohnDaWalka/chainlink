@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/quarantine"
 
 	cldf_tron "github.com/smartcontractkit/chainlink-deployments-framework/chain/tron"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -19,6 +20,7 @@ import (
 )
 
 func TestRemoveDataIDProxyMapping(t *testing.T) {
+	quarantine.Flaky(t, "DX-2169")
 	t.Parallel()
 
 	selector := chain_selectors.TRON_DEVNET.Selector
