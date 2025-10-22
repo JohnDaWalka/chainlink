@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,4 +27,19 @@ func Test_Callback(t *testing.T) {
 
 	_, err = cb.Wait(t.Context())
 	require.ErrorContains(t, err, "Wait can only be called once per Callback instance")
+}
+
+func Test_Callback_WaitCompletedBeforeSendResponse(t *testing.T) {
+	cb := NewCallback()
+	payload := handlers.UserCallbackPayload{RawResponse: []byte("test")}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := cb.Wait(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "context canceled")
+
+	err = cb.SendResponse(payload)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "receiver is no longer waiting")
 }
