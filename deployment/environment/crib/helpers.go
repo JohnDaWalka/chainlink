@@ -143,16 +143,13 @@ func SendFundsToAccounts(ctx context.Context, lggr logger.Logger, chain cldf_evm
 	var signedTxs []*gethtypes.Transaction
 
 	chainID, err := chainsel.GetChainIDFromSelector(chain.Selector)
-	if err != nil {
-		return fmt.Errorf("could not get chainID from selector: %w", err)
-	}
 	chainIDBig := new(big.Int)
 	if _, ok := chainIDBig.SetString(chainID, 10); !ok {
-		return fmt.Errorf("could not parse chainID: %s", chainID)
+		return fmt.Errorf("could not get chainID")
 	}
 
 	for i, address := range accounts {
-		currentNonce := nonce + uint64(i) //nolint:gosec // G115: i is always positive and within reasonable bounds
+		currentNonce := nonce + uint64(i)
 		baseTx := &gethtypes.DynamicFeeTx{
 			ChainID:   chainIDBig,
 			Nonce:     currentNonce,
@@ -182,6 +179,7 @@ func SendFundsToAccounts(ctx context.Context, lggr logger.Logger, chain cldf_evm
 
 	g, waitCtx := errgroup.WithContext(ctx)
 	for _, tx := range signedTxs {
+		tx := tx
 		g.Go(func() error {
 			receipt, err := bind.WaitMined(waitCtx, chain.Client, tx)
 			if err != nil {

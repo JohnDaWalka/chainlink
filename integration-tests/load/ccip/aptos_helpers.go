@@ -6,6 +6,7 @@ import (
 	"maps"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,10 +14,13 @@ import (
 	"github.com/aptos-labs/aptos-go-sdk"
 	"go.uber.org/atomic"
 
+	aptosBind "github.com/smartcontractkit/chainlink-aptos/bindings/bind"
 	aptos_ccip_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp"
 	module_offramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_offramp/offramp"
 	aptos_ccip_onramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_onramp"
 	module_onramp "github.com/smartcontractkit/chainlink-aptos/bindings/ccip_onramp/onramp"
+	"github.com/smartcontractkit/chainlink-aptos/bindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-aptos/relayer/codec"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -26,7 +30,180 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
+	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 )
+
+// sendRequestAptosLoadTest is a load-test-specific version of SendRequestAptos
+// that accepts a custom sender account instead of using the deployer
+func sendRequestAptosLoadTest(
+	e cldf.Environment,
+	state stateview.CCIPOnChainState,
+	cfg *ccipclient.CCIPSendReqConfig,
+	senderAccount *aptos.Account,
+) (*ccipclient.AnyMsgSentEvent, error) {
+	senderAddress := senderAccount.Address
+	client := e.BlockChains.AptosChains()[cfg.SourceChain].Client
+
+	e.Logger.Infof("(Aptos) Sending CCIP request from chain selector %d to chain selector %d using sender %s",
+		cfg.SourceChain, cfg.DestChain, senderAddress.StringLong())
+
+	msg := cfg.Message.(testhelpers.AptosSendRequest)
+	router := state.AptosChains[cfg.SourceChain].CCIPAddress
+	if cfg.IsTestRouter {
+		router = state.AptosChains[cfg.DestChain].TestRouterAddress
+	}
+
+	tokenAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
+	tokenAmounts := make([]uint64, len(msg.TokenAmounts))
+	tokenStoreAddresses := make([]aptos.AccountAddress, len(msg.TokenAmounts))
+	for i, v := range msg.TokenAmounts {
+		tokenAddresses[i] = v.Token
+		tokenAmounts[i] = v.Amount
+		tokenStoreAddresses[i] = aptos.AccountAddress{}
+	}
+
+	routerContract := ccip_router.Bind(router, client)
+	fee, err := routerContract.Router().GetFee(
+		nil,
+		cfg.DestChain,
+		msg.Receiver,
+		msg.Data,
+		tokenAddresses,
+		tokenAmounts,
+		tokenStoreAddresses,
+		msg.FeeToken,
+		msg.FeeTokenStore,
+		msg.ExtraArgs,
+	)
+	if err != nil {
+		e.Logger.Errorf("Estimating fee: %v", err)
+	}
+	e.Logger.Infof("Estimated fee: %v", fee)
+
+	// Use the custom sender account instead of the deployer
+	opts := &aptosBind.TransactOpts{
+		Signer: senderAccount,
+	}
+	tx, err := routerContract.Router().CCIPSend(
+		opts,
+		cfg.DestChain,
+		msg.Receiver,
+		msg.Data,
+		tokenAddresses,
+		tokenAmounts,
+		tokenStoreAddresses,
+		msg.FeeToken,
+		msg.FeeTokenStore,
+		msg.ExtraArgs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send CCIP message: %w", err)
+	}
+
+	aptosClient, ok := client.(*aptos.Client)
+	if !ok {
+		return nil, fmt.Errorf("client is not of type *aptos.Client")
+	}
+
+	data, err := aptosClient.WaitForTransaction(tx.Hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for transaction: %w", err)
+	}
+	if !data.Success {
+		return nil, fmt.Errorf("transaction reverted: %v", data.VmStatus)
+	}
+	e.Logger.Infof("(Aptos) CCIP message sent (tx %s) from chain selector %d to chain selector %d", tx.Hash, cfg.SourceChain, cfg.DestChain)
+
+	for _, event := range data.Events {
+		e.Logger.Debugf("(Aptos) Message contains event type: %v", event.Type)
+		// The RPC strips all leading zeroes from the event type
+		if strings.Contains(event.Type, "::onramp::CCIPMessageSent") {
+			var msgSentEvent module_onramp.CCIPMessageSent
+			if err := codec.DecodeAptosJsonValue(event.Data, &msgSentEvent); err != nil {
+				return nil, fmt.Errorf("failed to decode CCIPMessageSentEvent: %w", err)
+			}
+			e.Logger.Debugf("CCIPMessageSentEvent: %v", msgSentEvent)
+			return &ccipclient.AnyMsgSentEvent{
+				SequenceNumber: msgSentEvent.SequenceNumber,
+				RawEvent:       msgSentEvent,
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("sent message but didn't receive CCIPMessageSent event")
+}
+
+// aptosLoadTestEventEmitter is a load-test-specific version of AptosEventEmitter
+// that can start from a specific sequence number to handle pruned events on testnet
+func aptosLoadTestEventEmitter[T any](
+	t *testing.T,
+	client aptos.AptosRpcClient,
+	address aptos.AccountAddress,
+	eventHandle, fieldname string,
+	startVersion *uint64,
+	startSeqNum uint64,
+	done chan any,
+) (<-chan struct {
+	Event   T
+	Version uint64
+}, <-chan error) {
+	ch := make(chan struct {
+		Event   T
+		Version uint64
+	}, 200)
+	errChan := make(chan error)
+	limit := uint64(100)
+	seqNum := startSeqNum // Start from provided sequence number instead of 0
+	go func() {
+		ticker := time.NewTicker(time.Second * 2)
+		defer ticker.Stop()
+
+		for {
+			for {
+				// Check for done before each request
+				select {
+				case <-done:
+					return
+				default:
+				}
+				events, err := client.EventsByHandle(address, eventHandle, fieldname, &seqNum, &limit)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				if len(events) == 0 {
+					// No new events found
+					break
+				}
+				for _, event := range events {
+					seqNum = event.SequenceNumber + 1
+					if startVersion != nil && event.Version < *startVersion {
+						continue
+					}
+					var out T
+					if err := codec.DecodeAptosJsonValue(event.Data, &out); err != nil {
+						errChan <- err
+						continue
+					}
+					ch <- struct {
+						Event   T
+						Version uint64
+					}{
+						Event:   out,
+						Version: event.Version,
+					}
+				}
+			}
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				continue
+			}
+		}
+	}()
+	return ch, errChan
+}
 
 func fundAdditionalAptosKeys(
 	t *testing.T,
@@ -204,13 +381,36 @@ func subscribeAptosTransmitEvents(
 		return
 	}
 
-	sink, errCh := testhelpers.AptosEventEmitter[module_onramp.CCIPMessageSent](
+	// For load tests on testnet, query the current event stream state first
+	// This prevents querying pruned events (old events that have been deleted)
+	eventHandle := onrampAddress.StringLong() + "::onramp::OnRampState"
+	fieldname := "ccip_message_sent_events"
+
+	// Get the latest event to find current sequence number
+	limit := uint64(1)
+	startSeqNum := uint64(0)
+	recentEvents, err := client.EventsByHandle(onrampStateAddress, eventHandle, fieldname, nil, &limit)
+	if err != nil {
+		lggr.Warnw("Could not query recent events, will start from sequence 0 (may fail if events are pruned)",
+			"err", err,
+			"srcChain", srcChainSel)
+	} else if len(recentEvents) > 0 {
+		// Start from the most recent event - we'll catch all new events from this point
+		startSeqNum = recentEvents[0].SequenceNumber
+		lggr.Infow("Starting Aptos event subscription from current sequence to avoid pruned events",
+			"srcChain", srcChainSel,
+			"startingSeqNum", startSeqNum)
+	}
+
+	// Use custom event emitter for load tests that can start from a specific sequence number
+	sink, errCh := aptosLoadTestEventEmitter[module_onramp.CCIPMessageSent](
 		t,
 		client,
 		onrampStateAddress,
-		onrampAddress.StringLong()+"::onramp::OnRampState",
-		"ccip_message_sent_events",
+		eventHandle,
+		fieldname,
 		startVersion,
+		startSeqNum,
 		done,
 	)
 	defer close(done)
@@ -333,13 +533,31 @@ func subscribeAptosCommitEvents(
 		return
 	}
 
-	sink, errCh := testhelpers.AptosEventEmitter[module_offramp.CommitReportAccepted](
+	// Get current event sequence to avoid pruned events
+	eventHandle := offrampAddress.StringLong() + "::offramp::OffRampState"
+	fieldname := "commit_report_accepted_events"
+	limit := uint64(1)
+	startSeqNum := uint64(0)
+	recentEvents, err := client.EventsByHandle(offRampStateAddress, eventHandle, fieldname, nil, &limit)
+	if err != nil {
+		lggr.Warnw("Could not query recent commit events",
+			"err", err,
+			"destChain", chainSelector)
+	} else if len(recentEvents) > 0 {
+		startSeqNum = recentEvents[0].SequenceNumber
+		lggr.Infow("Starting Aptos commit event subscription from current sequence",
+			"destChain", chainSelector,
+			"startingSeqNum", startSeqNum)
+	}
+
+	sink, errCh := aptosLoadTestEventEmitter[module_offramp.CommitReportAccepted](
 		t,
 		client,
 		offRampStateAddress,
-		offrampAddress.StringLong()+"::offramp::OffRampState",
-		"commit_report_accepted_events",
+		eventHandle,
+		fieldname,
 		startVersion,
+		startSeqNum,
 		done,
 	)
 	defer close(done)
@@ -476,13 +694,31 @@ func subscribeAptosExecutionEvents(
 		return
 	}
 
-	sink, errCh := testhelpers.AptosEventEmitter[module_offramp.ExecutionStateChanged](
+	// Get current event sequence to avoid pruned events
+	eventHandle := offrampAddress.StringLong() + "::offramp::OffRampState"
+	fieldname := "execution_state_changed_events"
+	limit := uint64(1)
+	startSeqNum := uint64(0)
+	recentEvents, err := client.EventsByHandle(offRampStateAddress, eventHandle, fieldname, nil, &limit)
+	if err != nil {
+		lggr.Warnw("Could not query recent execution events",
+			"err", err,
+			"destChain", chainSelector)
+	} else if len(recentEvents) > 0 {
+		startSeqNum = recentEvents[0].SequenceNumber
+		lggr.Infow("Starting Aptos execution event subscription from current sequence",
+			"destChain", chainSelector,
+			"startingSeqNum", startSeqNum)
+	}
+
+	sink, errCh := aptosLoadTestEventEmitter[module_offramp.ExecutionStateChanged](
 		t,
 		client,
 		offRampStateAddress,
-		offrampAddress.StringLong()+"::offramp::OffRampState",
-		"execution_state_changed_events",
+		eventHandle,
+		fieldname,
 		startVersion,
+		startSeqNum,
 		done,
 	)
 	defer close(done)

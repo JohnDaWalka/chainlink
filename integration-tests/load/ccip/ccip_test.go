@@ -9,6 +9,8 @@ import (
 	"time"
 
 	// Third-party imports
+	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/aptos-labs/aptos-go-sdk/crypto"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/gagliardetto/solana-go"
 	solrpc "github.com/gagliardetto/solana-go/rpc"
@@ -16,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	solState "github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview/solana"
 
@@ -45,6 +48,10 @@ var (
 
 // this key only works on simulated geth chains in crib
 const (
+	ethFundingAmount   = uint64(900000000000000000)
+	solFundingAmount   = uint64(800000000)
+	aptosFundingAmount = uint64(100000000)
+
 	simChainTestKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	solTestKey      = "57qbvFjTChfNwQxqkFZwjHp7xYoPZa7f9ow6GA59msfCH1g6onSjKUTrrLp4w1nAwbwQuit8YgJJ2AwT9BSwownC"
 	aptosTestKey    = "0x906b8a983b434318ca67b7eff7300f91b02744c84f87d243d2fbc3e528414366"
@@ -102,12 +109,16 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	require.NoError(t, err)
 	userOverrides := config.CCIP.Load
 
+	evmKey := userOverrides.TestnetConfig.EVMPrivateKey
+	solKey := userOverrides.TestnetConfig.SolanaPrivateKey
+	aptosKey := userOverrides.TestnetConfig.AptosPrivateKey
+
 	// generate environment from crib-produced files
 	cribEnv := crib.NewDevspaceEnvFromStateDir(lggr, *userOverrides.CribEnvDirectory)
 	cribDeployOutput, err := cribEnv.GetConfig(crib.DeployerKeys{
-		EVMKey:   simChainTestKey,
-		SolKey:   solTestKey,
-		AptosKey: aptosTestKey,
+		EVMKey:   *evmKey,
+		SolKey:   *solKey,
+		AptosKey: *aptosKey,
 	})
 	require.NoError(t, err)
 	env, err := crib.NewDeployEnvironmentFromCribOutput(lggr, cribDeployOutput)
@@ -122,40 +133,63 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	destinationChains := env.BlockChains.ListChainSelectors()[:*userOverrides.NumDestinationChains]
 	evmChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyEVM))
 	solChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilySolana))
+	aptosChains := env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(selectors.FamilyAptos))
 
 	// initialize the block time for each chain
 	blockTimes := make(map[uint64]uint64)
 	for _, cs := range evmChains {
-		// Get the first block
-		block1, err := env.BlockChains.EVMChains()[cs].Client.HeaderByNumber(context.Background(), big.NewInt(1))
-		require.NoError(t, err)
-		time1 := time.Unix(int64(block1.Time), 0) //nolint:gosec // G115
+		client := env.BlockChains.EVMChains()[cs].Client
 
-		// Get the second block
-		block2, err := env.BlockChains.EVMChains()[cs].Client.HeaderByNumber(context.Background(), big.NewInt(2))
-		require.NoError(t, err)
-		time2 := time.Unix(int64(block2.Time), 0) //nolint:gosec // G115
+		latestBlock, err := client.HeaderByNumber(context.Background(), nil)
+		require.NoError(t, err, "Failed to get latest block for chain %s", cs)
 
-		blockTimeDiff := int64(time2.Sub(time1))
-		blockNumberDiff := new(big.Int).Sub(block2.Number, block1.Number).Int64()
-		blockTime := blockTimeDiff / blockNumberDiff / int64(time.Second)
-		blockTimes[cs] = uint64(blockTime) //nolint:gosec // G115
+		prevBlockNumber := new(big.Int).Sub(latestBlock.Number, big.NewInt(1))
+		prevBlock, err := client.HeaderByNumber(context.Background(), prevBlockNumber)
+		require.NoError(t, err, "Failed to get previous block for chain %s", cs)
+
+		blockTime := latestBlock.Time - prevBlock.Time
+
+		blockTimes[cs] = blockTime
 		lggr.Infow("Chain block time", "chainSelector", cs, "blockTime", blockTime)
 	}
 	for _, cs := range solChains {
 		blockTimes[cs] = 0
 	}
 
+	for _, cs := range aptosChains {
+		blockTimes[cs] = 0
+	}
+
 	// initialize additional accounts on EVM, we need more accounts to avoid nonce issues
 	// Solana doesn't have a nonce concept so we just use a single account for all chains
-	evmSenders, err := fundAdditionalKeys(lggr, *env, destinationChains)
+	evmSenders, err := fundAdditionalKeys(lggr, *env, destinationChains, uint64(100000000000000000))
 	require.NoError(t, err)
+
+	var aptosSenders map[uint64][]aptos.Account
+	if len(aptosChains) > 0 {
+		deployerKey := &crypto.Ed25519PrivateKey{}
+		require.NoError(t, deployerKey.FromHex(*aptosKey))
+		deployerAccount, err := aptos.NewAccountFromSigner(deployerKey)
+		require.NoError(t, err)
+		pk, err := deployerAccount.PrivateKeyString()
+		lggr.Infow("Aptos deployer account created", "account", deployerAccount.Address, "privateKey", pk)
+		require.NoError(t, err)
+		aptosSenders, err = fundAdditionalAptosKeys(t, deployerAccount, *env, destinationChains, aptosFundingAmount)
+		require.NoError(t, err)
+	}
 
 	// Keep track of the block number for each chain so that event subscription can be done from that block.
 	startBlocks := make(map[uint64]*uint64)
 	state, err := stateview.LoadOnchainState(*env)
 	require.NoError(t, err)
 
+	// Deploy Aptos CCIP receiver contracts if Aptos chains are present
+	if len(aptosChains) > 0 {
+		testhelpers.DeployAptosCCIPReceiver(t, *env)
+		// Reload state to include the newly deployed receiver addresses
+		state, err = stateview.LoadOnchainState(*env)
+		require.NoError(t, err)
+	}
 	for chainSel := range state.SolChains {
 		SetProgramIDsSafe(state.SolChains[chainSel])
 		err := prepSolAccount(
@@ -228,11 +262,34 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				mm.InputChan,
 				finalSeqNrCommitChannels,
 				finalSeqNrExecChannels)
+		case selectors.FamilyAptos:
+			client := env.BlockChains.AptosChains()[cs].Client
+			client.SetTimeout(1 * time.Minute)
+			nodeInfo, err := client.Info()
+			require.NoError(t, err)
+
+			var version uint64 = nodeInfo.LedgerVersion() // tx version
+			startBlocks[cs] = &version
+			go subscribeAptosTransmitEvents(
+				ctx,
+				t,
+				lggr,
+				state.AptosChains[cs].CCIPAddress,
+				destChains,
+				startBlocks[cs],
+				cs,
+				loadFinished,
+				client,
+				&wg,
+				mm.InputChan,
+				finalSeqNrCommitChannels,
+				finalSeqNrExecChannels)
 		}
 	}
 
 	evmSourceKeys := make(map[uint64]map[uint64]*bind.TransactOpts)
 	solSourceKeys := make(map[uint64]*solana.PrivateKey)
+	aptosSourceKeys := make(map[uint64]map[uint64]*aptos.Account)
 	var mu sync.Mutex
 
 	for ind, cs := range destinationChains {
@@ -240,6 +297,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 
 		// Initialize the map for this destination
 		evmSourceKeys[cs] = make(map[uint64]*bind.TransactOpts)
+		aptosSourceKeys[cs] = make(map[uint64]*aptos.Account)
 
 		for _, src := range srcChains {
 			selFamily, err := selectors.GetSelectorFamily(src)
@@ -264,6 +322,17 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				if _, exists := solSourceKeys[src]; !exists {
 					solSourceKeys[src] = env.BlockChains.SolanaChains()[src].DeployerKey
 				}
+			case selectors.FamilyAptos:
+				// Check if we have enough senders for this source chain
+				if ind < len(aptosSenders[src]) {
+					aptosSourceKeys[cs][src] = &aptosSenders[src][ind]
+				} else {
+					lggr.Errorw("Not enough Aptos senders for source chain",
+						"sourceChain", src,
+						"destinationChain", cs,
+						"requiredIndex", ind,
+						"availableSenders", len(aptosSenders[src]))
+				}
 			}
 			mu.Unlock()
 		}
@@ -273,6 +342,15 @@ func TestCCIPLoad_RPS(t *testing.T) {
 	for _, cs := range destinationChains {
 		srcChains := laneConfig.GetSourceChainsForDestination(cs)
 
+		hasTokenTransfer := false
+
+		for _, src := range *config.CCIP.Load.MessageDetails {
+			if src.MsgType != nil && *src.MsgType == "TokenTransfer" && *src.Ratio > 0 {
+				hasTokenTransfer = true
+				break
+			}
+		}
+
 		g := new(errgroup.Group)
 		for _, src := range srcChains {
 			g.Go(func() error {
@@ -280,12 +358,45 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				require.NoError(t, err)
 				switch selFamily {
 				case selectors.FamilyEVM:
-					return prepareAccountToSendLink(
+					if *userOverrides.TestnetConfig.Testnet {
+						// Exit if no token transfer
+						if !hasTokenTransfer {
+							return nil
+						}
+						err := fundLoadAccountsWithBnM(
+							lggr,
+							*env,
+							src,
+							[]*bind.TransactOpts{evmSourceKeys[cs][src]},
+						)
+						if err != nil {
+							return err
+						}
+						return approveBnmForLoadTestAccount(
+							lggr,
+							state,
+							*env,
+							src,
+							evmSourceKeys[cs][src],
+						)
+					} else {
+						return prepareAccountToSendLink(
+							lggr,
+							state,
+							*env,
+							src,
+							evmSourceKeys[cs][src],
+						)
+					}
+				case selectors.FamilyAptos:
+					if !hasTokenTransfer {
+						return nil
+					}
+					return fundAptosLoadAccountsWithBnM(
 						lggr,
-						state,
 						*env,
 						src,
-						evmSourceKeys[cs][src],
+						[]*aptos.Account{aptosSourceKeys[cs][src]},
 					)
 				default:
 					return nil
@@ -310,6 +421,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				userOverrides,
 				evmSourceKeys[cs],
 				solSourceKeys,
+				aptosSourceKeys,
 				mm.InputChan,
 				srcChains,
 			)
@@ -364,6 +476,7 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				userOverrides,
 				evmSourceKeys[cs],
 				solSourceKeys,
+				aptosSourceKeys,
 				mm.InputChan,
 				srcChains,
 			)
@@ -392,6 +505,52 @@ func TestCCIPLoad_RPS(t *testing.T) {
 				*startBlocks[cs],
 				cs,
 				env.BlockChains.SolanaChains()[cs].Client,
+				finalSeqNrExecChannels[cs],
+				&wg,
+				mm.InputChan)
+		case selectors.FamilyAptos:
+			receiverAddress := state.AptosChains[cs].ReceiverAddress
+			receiver := receiverAddress[:]
+			gunMap[cs], err = NewDestinationGun(
+				env.Logger,
+				cs,
+				*env,
+				&state,
+				receiver,
+				userOverrides,
+				evmSourceKeys[cs],
+				solSourceKeys,
+				aptosSourceKeys,
+				mm.InputChan,
+				srcChains,
+			)
+			if err != nil {
+				lggr.Errorw("Failed to initialize DestinationGun for", "chainSelector", cs, "error", err)
+				t.Fatal(err)
+			}
+			wg.Add(2)
+			go subscribeAptosCommitEvents(
+				ctx,
+				t,
+				lggr,
+				state.AptosChains[cs].CCIPAddress,
+				srcChains,
+				startBlocks[cs],
+				cs,
+				env.BlockChains.AptosChains()[cs].Client,
+				finalSeqNrCommitChannels[cs],
+				&wg,
+				mm.InputChan)
+
+			go subscribeAptosExecutionEvents(
+				ctx,
+				t,
+				lggr,
+				state.AptosChains[cs].CCIPAddress,
+				srcChains,
+				startBlocks[cs],
+				cs,
+				env.BlockChains.AptosChains()[cs].Client,
 				finalSeqNrExecChannels[cs],
 				&wg,
 				mm.InputChan)

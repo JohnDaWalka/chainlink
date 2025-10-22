@@ -9,10 +9,12 @@ import (
 	mathrand "math/rand"
 	"time"
 
+	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink/deployment/ccip/shared"
 	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 	"go.uber.org/atomic"
 
@@ -25,6 +27,7 @@ import (
 	soltokens "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	evmclient "github.com/smartcontractkit/chainlink-evm/pkg/client"
 	"github.com/smartcontractkit/chainlink-evm/pkg/utils"
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
@@ -48,6 +51,7 @@ type DestinationGun struct {
 	testConfig       *ccip.LoadConfig
 	evmSourceKeys    map[uint64]*bind.TransactOpts
 	solanaSourceKeys map[uint64]*solana.PrivateKey
+	aptosSourceKeys  map[uint64]map[uint64]*aptos.Account
 	metricPipe       chan messageData
 	availableSources []uint64 // Cache of available source chains for this destination
 }
@@ -61,6 +65,7 @@ func NewDestinationGun(
 	overrides *ccip.LoadConfig,
 	evmSourceKeys map[uint64]*bind.TransactOpts,
 	solanaSourceKeys map[uint64]*solana.PrivateKey,
+	aptosSourceKeys map[uint64]map[uint64]*aptos.Account,
 	metricPipe chan messageData,
 	availableSources []uint64,
 ) (*DestinationGun, error) {
@@ -83,6 +88,7 @@ func NewDestinationGun(
 		testConfig:       overrides,
 		evmSourceKeys:    evmSourceKeys,
 		solanaSourceKeys: solanaSourceKeys,
+		aptosSourceKeys:  aptosSourceKeys,
 		metricPipe:       metricPipe,
 		availableSources: availableSources,
 	}
@@ -108,6 +114,8 @@ func (m *DestinationGun) Call(_ *wasp.Generator) *wasp.Response {
 		err = m.sendEVMSourceMessage(src)
 	case selectors.FamilySolana:
 		err = m.sendSOLSourceMessage(src)
+	case selectors.FamilyAptos:
+		err = m.sendAptosSourceMessage(src)
 	}
 
 	if err != nil {
@@ -180,19 +188,79 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 		//nolint:gosec // it's okay here
 		acc.GasLimit = uint64(gasLimit)
 	}
+	var fee *big.Int
+	maxRetries := 3
+	baseDelay := 100 * time.Millisecond
 
-	fee, err := r.GetFee(
-		&bind.CallOpts{Context: context.Background()}, m.chainSelector, msg)
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// log the message
+		m.l.Infow("Getting fee for message", "message", msg)
+		fee, err = r.GetFee(
+			&bind.CallOpts{Context: context.Background()}, m.chainSelector, msg)
+
+		if err == nil {
+			break
+		}
+
+		if attempt < maxRetries-1 {
+			delay := baseDelay * time.Duration(1<<attempt)
+			m.l.Warnw("fee calculation failed, retrying",
+				"attempt", attempt+1,
+				"maxRetries", maxRetries,
+				"retryDelay", delay,
+				"dstChainSelector", m.chainSelector,
+				"srcChainSelector", src,
+				"err", cldf.MaybeDataErr(err))
+
+			time.Sleep(delay)
+		} else {
+			rpcError, extractErr := evmclient.ExtractRPCError(err)
+			if extractErr == nil && rpcError.Data != nil {
+				m.l.Errorw("fee calculation failed after all retries with detailed revert data",
+					"attempts", maxRetries,
+					"dstChainSelector", m.chainSelector,
+					"srcChainSelector", src,
+					"rpcErrorCode", rpcError.Code,
+					"rpcErrorMessage", rpcError.Message,
+					"revertData", rpcError.Data,
+					"originalErr", cldf.MaybeDataErr(err))
+			} else {
+				m.l.Errorw("could not get fee after all retries",
+					"attempts", maxRetries,
+					"dstChainSelector", m.chainSelector,
+					"srcChainSelector", src,
+					"fee", fee,
+					"err", cldf.MaybeDataErr(err))
+			}
+		}
+	}
+
 	if err != nil {
-		m.l.Errorw("could not get fee",
-			"dstChainSelector", m.chainSelector,
-			"fee", fee,
-			"err", cldf.MaybeDataErr(err))
-		return fmt.Errorf("failed to get fee: %w", err)
+		return fmt.Errorf("failed to get fee after %d attempts: %w", maxRetries, err)
 	}
 
 	if msg.FeeToken == common.HexToAddress("0x0") {
 		acc.Value = fee
+	}
+
+	dstSelFamily, err := selectors.GetSelectorFamily(m.chainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get destination chain family: %w", err)
+	}
+
+	if dstSelFamily == selectors.FamilyAptos && len(msg.TokenAmounts) > 0 {
+		for _, tokenAmount := range msg.TokenAmounts {
+			// Use a sufficiently large approval amount to handle multiple transactions
+			approvalAmount := new(big.Int).Mul(big.NewInt(1_000_000), big.NewInt(1e18))
+			err = testhelpers.ApproveToken(m.env, src, tokenAmount.Token, r.Address(), approvalAmount)
+			if err != nil {
+				return fmt.Errorf("failed to approve token %s for router: %w", tokenAmount.Token.Hex(), err)
+			}
+			m.l.Infow("Approved token for router (Aptos destination)",
+				"token", tokenAmount.Token.Hex(),
+				"amount", approvalAmount,
+				"router", r.Address().Hex())
+		}
 	}
 
 	msgWithoutData := msg
@@ -206,13 +274,22 @@ func (m *DestinationGun) sendEVMSourceMessage(src uint64) error {
 
 	tx, err := r.CcipSend(acc, m.chainSelector, msg)
 	if err != nil {
-		m.l.Errorw("execution reverted",
-			"sourceChain", src,
-			"destChain", m.chainSelector,
-			"err", cldf.MaybeDataErr(err))
-		return fmt.Errorf("failed to send CCIP message: %w", err)
+		rpcError, extractErr := evmclient.ExtractRPCError(err)
+		if extractErr == nil && rpcError.Data != nil {
+			m.l.Errorw("transaction submission failed with detailed revert data",
+				"sourceChain", src,
+				"destChain", m.chainSelector,
+				"rpcErrorCode", rpcError.Code,
+				"rpcErrorMessage", rpcError.Message,
+				"revertData", rpcError.Data,
+				"originalErr", cldf.MaybeDataErr(err))
+		} else {
+			m.l.Errorw("execution reverted",
+				"sourceChain", src,
+				"destChain", m.chainSelector,
+				"err", cldf.MaybeDataErr(err))
+		}
 	}
-
 	_, err = m.env.BlockChains.EVMChains()[src].Confirm(tx)
 	if err != nil {
 		m.l.Errorw("could not confirm tx on source", "tx", tx, "err", cldf.MaybeDataErr(err))
@@ -251,6 +328,7 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 		return router.ClientEVM2AnyMessage{}, 0, errors.New("failed to select message type")
 	}
 
+	feeToken := common.HexToAddress("0x0")
 	m.l.Infow("Selected message type", "msgType", *selectedMsgDetails.MsgType)
 
 	switch dstSelFamily {
@@ -282,11 +360,24 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			AllowOutOfOrderExecution: true, // OOO is always true for Solana
 			ComputeUnits:             150000,
 		}
+	case selectors.FamilyAptos:
+		rcv = common.LeftPadBytes(m.receiver, 32)
+		// Aptos destinations require out-of-order execution to be enabled
+		extraArgs, err = GetEVMExtraArgsV2(big.NewInt(100000), true)
+		if err != nil {
+			m.l.Error("Error encoding extra args for aptos dest")
+			return router.ClientEVM2AnyMessage{}, 0, err
+		}
+	}
+
+	srcChainState, exists := m.state.Chains[src]
+	if !exists {
+		return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no state available for source chain %d", src)
 	}
 
 	message := router.ClientEVM2AnyMessage{
 		Receiver:  rcv,
-		FeeToken:  common.HexToAddress("0x0"),
+		FeeToken:  feeToken,
 		ExtraArgs: extraArgs,
 	}
 
@@ -308,6 +399,8 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 			dataLength = *selectedMsgDetails.DataLengthBytes
 		case selectors.FamilySolana:
 			dataLength = *m.testConfig.SolanaDataSize
+		case selectors.FamilyAptos:
+			dataLength = *selectedMsgDetails.DataLengthBytes
 		}
 		data := make([]byte, dataLength)
 		_, err2 := rand.Read(data)
@@ -331,15 +424,24 @@ func (m *DestinationGun) GetEVMMessage(src uint64) (router.ClientEVM2AnyMessage,
 
 	// Set token amounts if it's a token transfer
 	if selectedMsgDetails.IsTokenTransfer() {
-		srcChainState, exists := m.state.Chains[src]
-		if !exists {
-			return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no state available for source chain %d", src)
+		var token common.Address
+		token, err = srcChainState.LinkTokenAddress()
+		if err != nil {
+			return router.ClientEVM2AnyMessage{}, 0, err
+		}
+
+		if *m.testConfig.TestnetConfig.Testnet {
+			token = TestnetBnMTokenAddress[src]
+		}
+
+		if token == (common.Address{}) {
+			return router.ClientEVM2AnyMessage{}, 0, fmt.Errorf("no LockReleaseTokenPool found for Aptos destination")
 		}
 
 		message.TokenAmounts = []router.ClientEVMTokenAmount{
 			{
-				Token:  srcChainState.LinkToken.Address(),
-				Amount: big.NewInt(1),
+				Token:  token,
+				Amount: big.NewInt(1e8),
 			},
 		}
 
@@ -468,4 +570,113 @@ func (m *DestinationGun) getSolanaMessage(src uint64) (ccip_router.SVM2AnyMessag
 	}
 
 	return message, nil
+}
+
+func (m *DestinationGun) sendAptosSourceMessage(src uint64) error {
+	senderAccount, senderExists := m.aptosSourceKeys[m.chainSelector][src]
+	if !senderExists || senderAccount == nil {
+		return fmt.Errorf("no Aptos source key available for source %d and destination %d", src, m.chainSelector)
+	}
+	msg, err := m.getAptosMessage(src)
+	if err != nil {
+		return fmt.Errorf("failed to build Aptos message: %w", err)
+	}
+
+	cfg := &ccipclient.CCIPSendReqConfig{
+		SourceChain:  src,
+		DestChain:    m.chainSelector,
+		IsTestRouter: false,
+		Message:      msg,
+	}
+
+	// Use load-test-specific function that accepts custom sender account
+	_, err = sendRequestAptosLoadTest(m.env, *m.state, cfg, senderAccount)
+	if err != nil {
+		m.l.Errorw("execution reverted",
+			"sourceChain", src,
+			"destChain", m.chainSelector,
+			"err", cldf.MaybeDataErr(err))
+		return fmt.Errorf("failed to send CCIP message on Aptos: %w", err)
+	}
+
+	return nil
+}
+
+func (m *DestinationGun) getAptosMessage(src uint64) (testhelpers.AptosSendRequest, error) {
+	randomValue := mathrand.Intn(100)
+	accumulatedRatio := 0
+	var selectedMsg *ccip.MsgDetails
+	for _, md := range *m.testConfig.MessageDetails {
+		accumulatedRatio += *md.Ratio
+		if randomValue < accumulatedRatio {
+			selectedMsg = &md
+			break
+		}
+	}
+	if selectedMsg == nil {
+		return testhelpers.AptosSendRequest{}, errors.New("failed to select message type")
+	}
+	m.l.Infow("Selected message type for Aptos", "msgType", *selectedMsg.MsgType)
+
+	receiver := common.LeftPadBytes(m.receiver, 32)
+
+	var feeToken aptos.AccountAddress
+	err := feeToken.ParseStringRelaxed(shared.AptosAPTAddress)
+	if err != nil {
+		return testhelpers.AptosSendRequest{}, fmt.Errorf("could not parse aptos fee token address for source: %d", src)
+	}
+
+	extraArgs := []byte{}
+
+	var data []byte
+	if selectedMsg.IsDataTransfer() {
+		data = make([]byte, *selectedMsg.DataLengthBytes)
+		if _, err := rand.Read(data); err != nil {
+			return testhelpers.AptosSendRequest{}, fmt.Errorf("generating random data: %w", err)
+		}
+	}
+
+	var tokenAmounts []testhelpers.AptosTokenAmount
+	if selectedMsg.IsTokenTransfer() {
+		// Use the same method as fundAptosLoadAccountsWithBnM to get BnM token address
+		addresses, err := m.env.ExistingAddresses.AddressesForChain(src)
+		if err != nil {
+			return testhelpers.AptosSendRequest{}, fmt.Errorf("failed to get addresses for chain %d: %w", src, err)
+		}
+
+		var bnmToken aptos.AccountAddress
+		var found bool
+
+		for addrStr, typeAndVersion := range addresses {
+			if typeAndVersion.Type == cldf.ContractType(shared.CCIPBnMSymbol) {
+				err := bnmToken.ParseStringRelaxed(addrStr)
+				if err != nil {
+					return testhelpers.AptosSendRequest{}, fmt.Errorf("failed to parse BnM address %s: %w", addrStr, err)
+				}
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return testhelpers.AptosSendRequest{}, fmt.Errorf("CCIP-BnM token not found in address book for chain %d", src)
+		}
+
+		m.l.Infow("Using CCIP-BnM token for Aptos transfer",
+			"tokenSymbol", shared.CCIPBnMSymbol,
+			"tokenAddress", bnmToken.String())
+
+		tokenAmounts = []testhelpers.AptosTokenAmount{{
+			Token:  bnmToken,
+			Amount: 1e2,
+		}}
+	}
+
+	return testhelpers.AptosSendRequest{
+		Receiver:     receiver,
+		Data:         data,
+		ExtraArgs:    extraArgs,
+		FeeToken:     feeToken,
+		TokenAmounts: tokenAmounts,
+	}, nil
 }

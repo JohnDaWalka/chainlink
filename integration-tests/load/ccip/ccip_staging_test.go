@@ -51,7 +51,7 @@ func TestStaging_CCIP_Load(t *testing.T) {
 	require.NoError(t, err)
 
 	// initialize additional accounts on other chains
-	transmitKeys, err := fundAdditionalKeys(lggr, *env, env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[:*userOverrides.NumDestinationChains])
+	transmitKeys, err := fundAdditionalKeys(lggr, *env, env.BlockChains.ListChainSelectors(cldf_chain.WithFamily(chain_selectors.FamilyEVM))[:*userOverrides.NumDestinationChains], uint64(900000000000000000))
 	require.NoError(t, err)
 
 	// Discover lanes from deployed state
@@ -91,6 +91,7 @@ func TestStaging_CCIP_Load(t *testing.T) {
 			state.MustGetEVMChainState(cs).Receiver.Address().Bytes(),
 			userOverrides,
 			messageKeys,
+			nil,
 			nil,
 			nil,
 			srcChains,
