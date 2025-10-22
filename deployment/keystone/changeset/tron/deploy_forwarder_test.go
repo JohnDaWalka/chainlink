@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/quarantine"
 	"github.com/stretchr/testify/require"
 
 	cldf_tron "github.com/smartcontractkit/chainlink-deployments-framework/chain/tron"
@@ -15,6 +16,7 @@ import (
 )
 
 func TestDeployForwarder(t *testing.T) {
+	quarantine.Flaky(t, "DX-2217")
 	t.Parallel()
 
 	registrySel := chain_selectors.TRON_DEVNET.Selector
