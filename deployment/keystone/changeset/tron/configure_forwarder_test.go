@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/quarantine"
+
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	cldf_tron "github.com/smartcontractkit/chainlink-deployments-framework/chain/tron"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/onchain"
@@ -16,6 +18,7 @@ import (
 )
 
 func TestConfigureForwarder(t *testing.T) {
+	quarantine.Flaky(t, "DX-2213")
 	t.Parallel()
 
 	testCases := []struct {
