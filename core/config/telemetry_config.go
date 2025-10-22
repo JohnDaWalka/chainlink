@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"go.uber.org/zap/zapcore"
+)
 
 type Telemetry interface {
 	AuthHeadersTTL() time.Duration
@@ -16,4 +20,5 @@ type Telemetry interface {
 	ChipIngressInsecureConnection() bool
 	HeartbeatInterval() time.Duration
 	LogStreamingEnabled() bool
+	LogLevel() zapcore.Level
 }

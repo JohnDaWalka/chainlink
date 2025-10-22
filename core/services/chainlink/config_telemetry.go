@@ -5,6 +5,8 @@ import (
 	"maps"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
 )
@@ -114,4 +116,16 @@ func (b *telemetryConfig) AuthHeadersTTL() time.Duration {
 		return 0
 	}
 	return b.s.AuthHeadersTTL.Duration()
+}
+
+func (b *telemetryConfig) LogLevel() zapcore.Level {
+	if b.s.LogLevel == nil {
+		return zapcore.InfoLevel // Default log level
+	}
+
+	var level zapcore.Level
+	if err := level.Set(*b.s.LogLevel); err != nil {
+		return zapcore.InfoLevel // Fallback to info level on invalid input
+	}
+	return level
 }
