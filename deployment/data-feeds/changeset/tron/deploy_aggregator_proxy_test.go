@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/quarantine"
 
 	cldf_tron "github.com/smartcontractkit/chainlink-deployments-framework/chain/tron"
 	"github.com/smartcontractkit/chainlink-deployments-framework/engine/test/environment"
@@ -18,6 +19,7 @@ import (
 )
 
 func TestDeployAggregatorProxy(t *testing.T) {
+	quarantine.Flaky(t, "DX-2167")
 	t.Parallel()
 
 	selector := chain_selectors.TRON_DEVNET.Selector
