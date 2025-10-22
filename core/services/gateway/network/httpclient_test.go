@@ -268,6 +268,7 @@ func TestHTTPClient_Send(t *testing.T) {
 			require.NoError(t, err)
 
 			config := &HTTPClientConfig{
+				AllowedSchemes:   []string{"https", "http"}, // http is allowed for testing purposes
 				MaxResponseBytes: tt.giveMaxRespBytes,
 				AllowedIPs:       []string{hostname},
 				AllowedPorts:     []int{int(portInt)},
@@ -320,7 +321,7 @@ func TestHTTPClient_BlocksUnallowed(t *testing.T) {
 	}{
 		{
 			name:          "blocked port",
-			url:           "http://177.0.0.1:8080",
+			url:           "https://177.0.0.1:8080",
 			expectedError: "port: 8080 not found in allowlist",
 			blockPort:     true,
 		},
@@ -331,17 +332,17 @@ func TestHTTPClient_BlocksUnallowed(t *testing.T) {
 		},
 		{
 			name:          "explicitly blocked IP",
-			url:           "http://169.254.0.1",
+			url:           "https://169.254.0.1",
 			expectedError: "ip: 169.254.0.1 not found in allowlist",
 		},
 		{
 			name:          "explicitly blocked IP - internal network",
-			url:           "http://169.254.0.1",
+			url:           "https://169.254.0.1",
 			expectedError: "ip: 169.254.0.1 not found in allowlist",
 		},
 		{
 			name:          "explicitly blocked IP - loopback",
-			url:           "http://127.0.0.1",
+			url:           "https://127.0.0.1",
 			expectedError: "ip: 127.0.0.1 not found in allowlist",
 		},
 		{
@@ -406,42 +407,42 @@ func TestHTTPClient_BlocksUnallowed(t *testing.T) {
 		},
 		{
 			name:          "explicitly blocked IP - current network",
-			url:           "http://0.0.0.0/endpoint",
+			url:           "https://0.0.0.0/endpoint",
 			expectedError: "ip: 0.0.0.0 not found in allowlist",
 		},
 		{
 			name:          "explicitly blocked IP - current network - octal",
-			url:           "http://0000.0000.0000.0001",
+			url:           "https://0000.0000.0000.0001",
 			expectedError: "no such host",
 		},
 		{
 			name:          "explicitly blocked IP - current network - hex",
-			url:           "http://0x00.0x00.0x00.0x01",
+			url:           "https://0x00.0x00.0x00.0x01",
 			expectedError: "no such host",
 		},
 		{
 			name:          "explicitly blocked IP - current network - binary",
-			url:           "http://00000000.00000000.00000000.00000001",
+			url:           "https://00000000.00000000.00000000.00000001",
 			expectedError: "no such host",
 		},
 		{
 			name:          "explicitly blocked IP - current network - shortened",
-			url:           "http://1",
+			url:           "https://1",
 			expectedError: "no such host",
 		},
 		{
 			name:          "explicitly blocked IP - current network - shortened",
-			url:           "http://0.1",
+			url:           "https://0.1",
 			expectedError: "no such host",
 		},
 		{
 			name:          "explicitly blocked IP - current network - shortened",
-			url:           "http://0.0.1",
+			url:           "https://0.0.1",
 			expectedError: "no such host",
 		},
 		{
 			name:          "explicitly blocked IP - dword",
-			url:           "http://42949672961",
+			url:           "https://42949672961",
 			expectedError: "no such host",
 		},
 		/*{ // TODO: failing with go 1.25
@@ -553,6 +554,7 @@ func TestHTTPClient_AllowedIPsCIDR(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := HTTPClientConfig{
+				AllowedSchemes:   []string{"https", "http"}, // http is allowed for testing purposes
 				MaxResponseBytes: 1024,
 				DefaultTimeout:   5 * time.Second,
 				AllowedPorts:     []int{int(portInt)},

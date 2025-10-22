@@ -105,6 +105,7 @@ func JobConfigs(
 				AllowedPorts:     append(whitelistConfig.ExtraAllowedPorts, DefaultAllowedPorts...),
 				AllowedIPs:       whitelistConfig.ExtraAllowedIPs,
 				AllowedIPsCIDR:   whitelistConfig.ExtraAllowedIPsCIDR,
+				AllowedSchemes:   []string{"https", "http"}, // http is allowed for testing purposes
 			},
 		}
 
