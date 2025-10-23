@@ -451,7 +451,7 @@ func createSingleDecimalBridge(t *testing.T, name string, i int, p decimal.Decim
 		require.NoError(t, err)
 	}))
 
-	bridgeName = fmt.Sprintf("bridge-%s-%d-%s", name, i, "a") // uuid.New().String())
+	bridgeName = fmt.Sprintf("bridge-%s-%d-%s", name, i, "b") // uuid.New().String())
 	t.Logf("Created bridge server for '%s' at '%s'", bridgeName, bridge.URL)
 
 	t.Cleanup(func() {
