@@ -147,7 +147,7 @@ func createJobs(
 	}
 
 	jobSpecs := []*jobv1.ProposeJobRequest{}
-	jobSpecs = append(jobSpecs, ocr.BootstrapOCR3(bootstrap.JobDistributorDetails.NodeID, "ocr3-capability", ocr3ContractAddr.Hex(), chainID))
+	jobSpecs = append(jobSpecs, ocr.BootstrapJobSpec(bootstrap.JobDistributorDetails.NodeID, "ocr3-capability", ocr3ContractAddr.Hex(), chainID))
 
 	for _, workerNode := range workerNodes {
 		evmKey, ok := workerNode.Keys.EVM[chainID]
