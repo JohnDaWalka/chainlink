@@ -32,7 +32,7 @@ func (t *MinTask) Run(_ context.Context, _ logger.Logger, vars Vars, inputs []Re
 		maybeAllowedFaults MaybeUint64Param
 		valuesAndErrs      SliceParam
 		decimalValues      DecimalSliceParam
-		allowedFaults      uint64
+		allowedFaults      int
 		lax                BoolParam
 	)
 	err := stderrors.Join(
@@ -51,13 +51,13 @@ func (t *MinTask) Run(_ context.Context, _ logger.Logger, vars Vars, inputs []Re
 	}
 
 	if allowed, isSet := maybeAllowedFaults.Uint64(); isSet {
-		allowedFaults = allowed
+		allowedFaults = int(allowed) //nolint:gosec // G115: it will not exceed int64
 	} else {
-		allowedFaults = uint64(max(len(valuesAndErrs)-1, 0))
+		allowedFaults = max(len(valuesAndErrs)-1, 0)
 	}
 
 	values, faults := valuesAndErrs.FilterErrors()
-	if uint64(faults) > allowedFaults {
+	if faults > allowedFaults {
 		return Result{Error: errors.Wrapf(ErrTooManyErrors, "Number of faulty inputs %v to min task > number allowed faults %v", faults, allowedFaults)}, runInfo
 	}
 	if len(values) == 0 {
