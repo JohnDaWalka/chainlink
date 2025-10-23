@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
 
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
@@ -341,7 +342,7 @@ func createJobs(
 			creEnv.RegistryChainSelector,
 			datastore.ContractType(keystone_changeset.OCR3Capability.String()),
 			semver.MustParse("1.0.0"),
-			ks_contracts_op.CapabilityContractIdentifier(uint64(chainID)),
+			ks_contracts_op.CapabilityContractIdentifier(chainID),
 		)
 		ocr3ConfigContractAddress, err := creEnv.CldfEnvironment.DataStore.Addresses().Get(ocr3Key)
 		if err != nil {
@@ -414,7 +415,8 @@ func createJobs(
 
 			runtimeFallbacks := buildRuntimeValues(chainID, "evm", creForwarderAddress.Address, nodeAddress)
 
-			templateData, aErr := credon.ApplyRuntimeValues(templateData, runtimeFallbacks)
+			var aErr error
+			templateData, aErr = credon.ApplyRuntimeValues(templateData, runtimeFallbacks)
 			if aErr != nil {
 				return errors.Wrap(aErr, "failed to apply runtime values")
 			}

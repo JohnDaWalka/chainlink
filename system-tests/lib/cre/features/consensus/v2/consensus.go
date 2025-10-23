@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
@@ -181,7 +182,7 @@ func createJobs(
 
 		evmKeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainselectors.FamilyEVM] // we can always expect evm bundle key id present since evm is the registry chain
 		if !ok {
-			return fmt.Errorf("failed to get key bundle id for evm family")
+			return errors.New("failed to get key bundle id for evm family")
 		}
 
 		strategyName := "single-chain"
@@ -215,7 +216,8 @@ func createJobs(
 		oracleStr := strings.ReplaceAll(oracleBuffer.String(), "\n", "\n\t")
 
 		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
-		templateData, aErr := credon.ApplyRuntimeValues(templateData, runtimeFallbacks)
+		var aErr error
+		templateData, aErr = credon.ApplyRuntimeValues(templateData, runtimeFallbacks)
 		if aErr != nil {
 			return errors.Wrap(aErr, "failed to apply runtime values")
 		}
