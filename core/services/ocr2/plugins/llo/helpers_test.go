@@ -450,9 +450,18 @@ func createSingleDecimalBridge(t *testing.T, name string, i int, p decimal.Decim
 		_, err = res.Write([]byte(resp))
 		require.NoError(t, err)
 	}))
-	t.Cleanup(bridge.Close)
-	u, _ := url.Parse(bridge.URL)
+
 	bridgeName = fmt.Sprintf("bridge-%s-%d", name, i)
+	t.Logf("Created bridge server for '%s' at '%s'", bridgeName, bridge.URL)
+
+	t.Cleanup(func() {
+		t.Logf("Closing bridge server for '%s' at '%s'", bridgeName, bridge.URL)
+		bridge.Close()
+	})
+
+	u, err := url.Parse(bridge.URL)
+	require.NoError(t, err)
+
 	require.NoError(t, borm.CreateBridgeType(ctx, &bridges.BridgeType{
 		Name: bridges.BridgeName(bridgeName),
 		URL:  models.WebURL(*u),

@@ -567,7 +567,12 @@ channelDefinitionsContractFromBlock = %d`, serverURL, serverPubKey, donID, confi
 				// feedID will be deleted when all n oracles have reported
 				seen[opts.FeedID] = make(map[credentials.StaticSizedPublicKey]struct{}, nNodes)
 			}
+
+			iter := 0
 			for req := range reqs {
+				iter++
+				t.Logf("Received request %d", iter)
+
 				assert.Equal(t, uint32(llotypes.ReportFormatEVMPremiumLegacy), req.req.ReportFormat)
 				v := make(map[string]any)
 				err := mercury.PayloadTypes.UnpackIntoMap(v, req.req.Payload)
