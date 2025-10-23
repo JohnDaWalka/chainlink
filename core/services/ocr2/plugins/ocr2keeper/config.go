@@ -31,6 +31,8 @@ func (d Duration) Value() time.Duration {
 	return time.Duration(d)
 }
 
+// run CI
+
 // NOTE: This plugin config is shared among different versions of keepers
 // Any changes to this config should keep in mind existing production
 // deployments of all versions of keepers and should be backwards compatible
