@@ -1,21 +1,25 @@
 package readcontract
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"text/template"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	credon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability/chainlevel"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 )
 
 const flag = cre.ReadContractCapability
@@ -59,21 +63,16 @@ func (o *ReadContract) PostEnvStartup(
 	dons *cre.Dons,
 	creEnv *cre.Environment,
 ) error {
-	perDonJobSpecFactory, fErr := factory.NewCapabilityJobSpecFactory(
-		creEnv.RegistryChainSelector,
-		chainlevel.CapabilityEnabler,
-		chainlevel.EnabledChainsProvider,
-		chainlevel.ConfigResolver,
-		chainlevel.JobNamer,
-	)
+	jobSpecs := cre.DonJobs{}
 
-	if fErr != nil {
-		return errors.Wrap(fErr, "failed to create capability job spec factory")
+	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
+	if !ok {
+		return errors.Errorf("%s config not found in capabilities config. Make sure you have set it in the TOML config", flag)
 	}
 
-	bcOuts := make([]*blockchain.Output, len(creEnv.Blockchains))
-	for i, b := range creEnv.Blockchains {
-		bcOuts[i] = b.CtfOutput()
+	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
+	if cErr != nil {
+		return errors.Wrap(cErr, "failed to get command for cron capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs
@@ -83,33 +82,48 @@ func (o *ReadContract) PostEnvStartup(
 			break
 		}
 	}
-	if nodeSet == nil {
-		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
+
+	chainCapConfig, ok := nodeSet.GetChainCapabilityConfigs()[flag]
+	if !ok || chainCapConfig == nil {
+		return fmt.Errorf("could not find chain capability config for '%s' in don '%s'", flag, don.Name)
 	}
 
-	jobSpecs, specErr := perDonJobSpecFactory.BuildJobSpec(
-		flag,
-		configTemplate,
-		func(chainID uint64, _ *cre.Node) map[string]any {
-			return map[string]any{
-				"ChainID":       chainID,
-				"NetworkFamily": "evm",
-			}
-		},
-		factory.BinaryPathBuilder,
-	)(&cre.JobSpecInput{
-		CreEnvironment: creEnv,
-		Don:            don,
-		NodeSet:        nodeSet,
-	})
-	if specErr != nil {
-		return fmt.Errorf("failed to build job spec for http action capability: %w", specErr)
-	}
-	if len(jobSpecs) == 0 {
-		return fmt.Errorf("no job specs created for '%s' capability, even though it is enabled", flag)
+	for _, chainID := range chainCapConfig.EnabledChains {
+		_, templateData, tErr := envconfig.ResolveCapabilityForChain(flag, nodeSet.GetChainCapabilityConfigs(), capabilityConfig.Config, chainID)
+		if tErr != nil {
+			return errors.Wrapf(tErr, "failed to resolve capability config for chain %d", chainID)
+		}
+		templateData["ChainID"] = chainID
+
+		tmpl, tmplErr := template.New(flag + "-config").Parse(configTemplate)
+		if tmplErr != nil {
+			return errors.Wrapf(tmplErr, "failed to parse %s config template", flag)
+		}
+
+		var configBuffer bytes.Buffer
+		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+			return errors.Wrapf(err, "failed to execute %s config template", flag)
+		}
+		configStr := configBuffer.String()
+
+		if err := credon.ValidateTemplateSubstitution(configStr, flag); err != nil {
+			return errors.Wrapf(err, "%s template validation failed", flag)
+		}
+
+		workerNodes, wErr := don.Workers()
+		if wErr != nil {
+			return errors.Wrap(wErr, "failed to find worker nodes")
+		}
+
+		// Create job specs for each worker node
+		for _, workerNode := range workerNodes {
+			jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, fmt.Sprintf("%s-%d", flag, chainID), command, configStr, "")
+			jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}
+			jobSpecs = append(jobSpecs, jobSpec)
+		}
 	}
 
-	// pass all dons, since some jobs might need to be created on multiple dons
+	// pass all dons, since some jobs might need to be created on multiple ones
 	jobErr := jobs.Create(ctx, creEnv.CldfEnvironment.Offchain, dons, jobSpecs)
 	if jobErr != nil {
 		return fmt.Errorf("failed to create http action jobs for don %s: %w", don.Name, jobErr)

@@ -1,25 +1,29 @@
 package httptrigger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
+	credon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/gateway"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability/donlevel"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
+	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 )
 
@@ -98,20 +102,16 @@ func (o *HTTPTrigger) PostEnvStartup(
 	dons *cre.Dons,
 	creEnv *cre.Environment,
 ) error {
-	perDonJobSpecFactory, fErr := factory.NewCapabilityJobSpecFactory(
-		creEnv.RegistryChainSelector,
-		donlevel.CapabilityEnabler,
-		donlevel.EnabledChainsProvider,
-		donlevel.ConfigResolver,
-		donlevel.JobNamer,
-	)
-	if fErr != nil {
-		return errors.Wrap(fErr, "failed to create capability job spec factory")
+	jobSpecs := cre.DonJobs{}
+
+	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
+	if !ok {
+		return errors.Errorf("%s config not found in capabilities config. Make sure you have set it in the TOML config", flag)
 	}
 
-	bcOuts := make([]*blockchain.Output, len(creEnv.Blockchains))
-	for i, b := range creEnv.Blockchains {
-		bcOuts[i] = b.CtfOutput()
+	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
+	if cErr != nil {
+		return errors.Wrap(cErr, "failed to get command for cron capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs
@@ -121,25 +121,33 @@ func (o *HTTPTrigger) PostEnvStartup(
 			break
 		}
 	}
-	if nodeSet == nil {
-		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
+
+	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
+	tmpl, tmplErr := template.New(flag + "-config").Parse(configTemplate)
+	if tmplErr != nil {
+		return errors.Wrapf(tmplErr, "failed to parse %s config template", flag)
 	}
 
-	jobSpecs, specErr := perDonJobSpecFactory.BuildJobSpec(
-		flag,
-		configTemplate,
-		factory.NoOpExtractor,
-		factory.BinaryPathBuilder,
-	)(&cre.JobSpecInput{
-		CreEnvironment: creEnv,
-		Don:            don,
-		NodeSet:        nodeSet,
-	})
-	if specErr != nil {
-		return fmt.Errorf("failed to build job spec for http action capability: %w", specErr)
+	var configBuffer bytes.Buffer
+	if err := tmpl.Execute(&configBuffer, templateData); err != nil {
+		return errors.Wrapf(err, "failed to execute %s config template", flag)
 	}
-	if len(jobSpecs) == 0 {
-		return fmt.Errorf("no job specs created for '%s' capability, even though it is enabled", flag)
+	configStr := configBuffer.String()
+
+	if err := credon.ValidateTemplateSubstitution(configStr, flag); err != nil {
+		return errors.Wrapf(err, "%s template validation failed", flag)
+	}
+
+	workerNodes, wErr := don.Workers()
+	if wErr != nil {
+		return errors.Wrap(wErr, "failed to find worker nodes")
+	}
+
+	// Create job specs for each worker node
+	for _, workerNode := range workerNodes {
+		jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, flag, command, configStr, "")
+		jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}
+		jobSpecs = append(jobSpecs, jobSpec)
 	}
 
 	// pass all dons, since some jobs might need to be created on multiple ones

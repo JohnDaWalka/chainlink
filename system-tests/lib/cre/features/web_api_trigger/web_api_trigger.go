@@ -8,19 +8,19 @@ import (
 	"github.com/rs/zerolog"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/gateway"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	factory "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability/donlevel"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
+	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
 )
 
 const flag = cre.WebAPITriggerCapability
@@ -74,8 +74,6 @@ func (o *WebAPITrigger) PreEnvStartup(
 	}, nil
 }
 
-const configTemplate = `""`
-
 func (o *WebAPITrigger) PostEnvStartup(
 	ctx context.Context,
 	testLogger zerolog.Logger,
@@ -83,56 +81,18 @@ func (o *WebAPITrigger) PostEnvStartup(
 	dons *cre.Dons,
 	creEnv *cre.Environment,
 ) error {
-	donsWithFlag := dons.DonsWithFlag(flag)
-	if len(donsWithFlag) == 0 {
-		return nil
+	jobSpecs := cre.DonJobs{}
+
+	workerNodes, wErr := don.Workers()
+	if wErr != nil {
+		return errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
-	perDonJobSpecFactory, fErr := factory.NewCapabilityJobSpecFactory(
-		creEnv.RegistryChainSelector,
-		donlevel.CapabilityEnabler,
-		donlevel.EnabledChainsProvider,
-		donlevel.ConfigResolver,
-		donlevel.JobNamer,
-	)
-
-	if fErr != nil {
-		return errors.Wrap(fErr, "failed to create capability job spec factory")
-	}
-
-	bcOuts := make([]*blockchain.Output, len(creEnv.Blockchains))
-	for i, b := range creEnv.Blockchains {
-		bcOuts[i] = b.CtfOutput()
-	}
-
-	var nodeSet cre.NodeSetWithCapabilityConfigs
-	for _, ns := range dons.AsNodeSetWithChainCapabilities() {
-		if ns.GetName() == don.Name {
-			nodeSet = ns
-			break
-		}
-	}
-	if nodeSet == nil {
-		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
-	}
-
-	jobSpecs, specErr := perDonJobSpecFactory.BuildJobSpec(
-		flag,
-		configTemplate,
-		factory.NoOpExtractor, // No runtime values extraction needed
-		func(_ *cre.JobSpecInput, _ cre.CapabilityConfig) (string, error) {
-			return "__builtin_web-api-trigger", nil
-		},
-	)(&cre.JobSpecInput{
-		CreEnvironment: creEnv,
-		Don:            don,
-		NodeSet:        nodeSet,
-	})
-	if specErr != nil {
-		return fmt.Errorf("failed to build job spec for http action capability: %w", specErr)
-	}
-	if len(jobSpecs) == 0 {
-		return fmt.Errorf("no job specs created for '%s' capability, even though it is enabled", flag)
+	// Create job specs for each worker node
+	for _, workerNode := range workerNodes {
+		jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, flag, "__builtin_web-api-trigger", `""`, "")
+		jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}
+		jobSpecs = append(jobSpecs, jobSpec)
 	}
 
 	// pass all dons, since some jobs might need to be created on multiple dons

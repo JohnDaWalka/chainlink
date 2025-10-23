@@ -31,6 +31,8 @@ func Create(ctx context.Context, offChainClient cldf_offchain.Client, dons *cre.
 			defer cancel()
 			_, pErr := offChainClient.ProposeJob(ctxWithTimeout, jobReq)
 			if pErr != nil {
+				fmt.Println("Failed jobspec proposal:")
+				fmt.Println(jobReq)
 				return fmt.Errorf("failed to propose job for node %s: %w", jobReq.NodeId, pErr)
 			}
 
