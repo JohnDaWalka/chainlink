@@ -32,8 +32,7 @@ func (t *MaxTask) Run(_ context.Context, _ logger.Logger, vars Vars, inputs []Re
 		maybeAllowedFaults MaybeUint64Param
 		valuesAndErrs      SliceParam
 		decimalValues      DecimalSliceParam
-		allowedFaults      int
-		faults             int
+		allowedFaults      uint64
 		lax                BoolParam
 	)
 	err := stderrors.Join(
@@ -52,15 +51,16 @@ func (t *MaxTask) Run(_ context.Context, _ logger.Logger, vars Vars, inputs []Re
 	}
 
 	if allowed, isSet := maybeAllowedFaults.Uint64(); isSet {
-		allowedFaults = int(allowed)
+		allowedFaults = allowed
 	} else {
-		allowedFaults = max(len(valuesAndErrs)-1, 0)
+		allowedFaults = uint64(max(len(valuesAndErrs)-1, 0))
 	}
 
 	values, faults := valuesAndErrs.FilterErrors()
-	if faults > allowedFaults {
+	if uint64(faults) > allowedFaults {
 		return Result{Error: errors.Wrapf(ErrTooManyErrors, "Number of faulty inputs %v to max task > number allowed faults %v", faults, allowedFaults)}, runInfo
-	} else if len(values) == 0 {
+	}
+	if len(values) == 0 {
 		if lax {
 			return Result{}, runInfo // if lax is enabled, return nil result with no error
 		}
@@ -72,12 +72,12 @@ func (t *MaxTask) Run(_ context.Context, _ logger.Logger, vars Vars, inputs []Re
 		return Result{Error: errors.Wrapf(ErrBadInput, "values: %v", err)}, runInfo
 	}
 
-	max := decimalValues[0]
+	maxVal := decimalValues[0]
 	for i := 1; i < len(decimalValues); i++ {
-		if decimalValues[i].GreaterThan(max) {
-			max = decimalValues[i]
+		if decimalValues[i].GreaterThan(maxVal) {
+			maxVal = decimalValues[i]
 		}
 	}
 
-	return Result{Value: max}, runInfo
+	return Result{Value: maxVal}, runInfo
 }

@@ -192,13 +192,14 @@ func TestMinTask(t *testing.T) {
 				assert.False(t, runInfo.IsPending)
 				assert.False(t, runInfo.IsRetryable)
 
-				if test.want.Error != nil {
+				switch {
+				case test.want.Error != nil:
 					require.Equal(t, test.want.Error, errors.Cause(output.Error))
 					require.Nil(t, output.Value)
-				} else if test.want.Value != nil {
+				case test.want.Value != nil:
 					require.Equal(t, test.want.Value.(*decimal.Decimal).String(), output.Value.(decimal.Decimal).String())
 					require.NoError(t, output.Error)
-				} else {
+				default:
 					require.Nil(t, output.Value)
 					require.NoError(t, output.Error)
 				}
@@ -226,13 +227,14 @@ func TestMinTask(t *testing.T) {
 				assert.False(t, runInfo.IsPending)
 				assert.False(t, runInfo.IsRetryable)
 
-				if test.want.Error != nil {
+				switch {
+				case test.want.Error != nil:
 					require.Equal(t, test.want.Error, errors.Cause(output.Error))
 					require.Nil(t, output.Value)
-				} else if test.want.Value != nil {
+				case test.want.Value != nil:
 					require.Equal(t, test.want.Value.(*decimal.Decimal).String(), output.Value.(decimal.Decimal).String())
 					require.NoError(t, output.Error)
-				} else {
+				default:
 					require.Nil(t, output.Value)
 					require.NoError(t, output.Error)
 				}
