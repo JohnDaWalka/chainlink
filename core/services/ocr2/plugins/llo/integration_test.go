@@ -484,7 +484,7 @@ fromBlock = %d
 lloDonID = %d
 lloConfigMode = "mercury"
 `, chainID, fromBlock, donID)
-		addBootstrapJob(t, bootstrapNode, legacyVerifierAddr, "job-2", relayType, relayConfig)
+		addBootstrapJob(t, bootstrapNode, legacyVerifierAddr, "job-2x", relayType, relayConfig)
 
 		// Channel definitions
 		channelDefinitions := llotypes.ChannelDefinitions{
