@@ -277,11 +277,15 @@ func setupNode(
 	} else {
 		app = cltest.NewApplicationWithConfig(t, config, p2pKey, ocr2kb, csaKey, lggr.Named(dbName))
 	}
+
 	err := app.Start(testutils.Context(t))
 	require.NoError(t, err)
+	t.Logf("Application started: %s", app.ID())
 
 	t.Cleanup(func() {
+		t.Logf("Application stopping: %s", app.ID())
 		assert.NoError(t, app.Stop())
+		t.Logf("Application stopped: %s", app.ID())
 	})
 
 	return app, p2pKey.PeerID().Raw(), csaKey.StaticSizedPublicKey(), ocr2kb, observedLogs
@@ -455,8 +459,8 @@ func createSingleDecimalBridge(t *testing.T, name string, i int, p decimal.Decim
 	t.Logf("Created bridge server for '%s' at '%s'", bridgeName, bridge.URL)
 
 	t.Cleanup(func() {
-		t.Logf("Closing bridge server for '%s' at '%s'", bridgeName, bridge.URL)
 		bridge.Close()
+		t.Logf("Closed bridge server for '%s' at '%s'", bridgeName, bridge.URL)
 	})
 
 	u, err := url.Parse(bridge.URL)
