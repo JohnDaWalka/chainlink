@@ -71,7 +71,6 @@ func (c *Cron) PostEnvStartup(
 		return errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
-	// Create job specs for each worker node
 	for _, workerNode := range workerNodes {
 		jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, flag, command, `""`, "")
 		jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}

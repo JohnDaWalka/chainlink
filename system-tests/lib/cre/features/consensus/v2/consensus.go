@@ -133,6 +133,7 @@ func createJobs(
 	creEnv *cre.Environment,
 ) error {
 	jobSpecs := []*jobv1.ProposeJobRequest{}
+
 	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
 	if !ok {
 		return fmt.Errorf("%s config not found in capabilities config: %v", flag, creEnv.CapabilityConfigs)
@@ -163,11 +164,11 @@ func createJobs(
 	if cErr != nil {
 		return fmt.Errorf("failed to get chain ID from selector %d: %w", creEnv.RegistryChainSelector, cErr)
 	}
+	chainIDStr := strconv.FormatUint(chainID, 10)
 
 	jobSpecs = append(jobSpecs, ocr.BootstrapJobSpec(bootstrapNode.JobDistributorDetails.NodeID, flag, contractAddress.Hex(), chainID))
-	chainIDStr := strconv.FormatUint(chainID, 10)
-	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
 
+	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
 	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
 	if cErr != nil {
 		return errors.Wrap(cErr, "failed to get command for cron capability")
@@ -203,7 +204,6 @@ func createJobs(
 			},
 		}
 
-		// TODO: merge with jobConfig?
 		type OracleFactoryConfigWrapper struct {
 			OracleFactory job.OracleFactoryConfig `toml:"oracle_factory"`
 		}

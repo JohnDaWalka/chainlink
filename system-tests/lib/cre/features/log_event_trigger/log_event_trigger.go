@@ -91,6 +91,9 @@ func (o *LogEventTrigger) PostEnvStartup(
 			break
 		}
 	}
+	if nodeSet == nil {
+		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
+	}
 
 	chainCapConfig, ok := nodeSet.GetChainCapabilityConfigs()[flag]
 	if !ok || chainCapConfig == nil {

@@ -82,6 +82,9 @@ func (o *ReadContract) PostEnvStartup(
 			break
 		}
 	}
+	if nodeSet == nil {
+		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
+	}
 
 	chainCapConfig, ok := nodeSet.GetChainCapabilityConfigs()[flag]
 	if !ok || chainCapConfig == nil {
@@ -115,7 +118,6 @@ func (o *ReadContract) PostEnvStartup(
 			return errors.Wrap(wErr, "failed to find worker nodes")
 		}
 
-		// Create job specs for each worker node
 		for _, workerNode := range workerNodes {
 			jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, fmt.Sprintf("%s-%d", flag, chainID), command, configStr, "")
 			jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}

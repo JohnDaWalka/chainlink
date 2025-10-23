@@ -23,7 +23,6 @@ import (
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	"github.com/smartcontractkit/chainlink-evm/pkg/types"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
@@ -285,7 +284,6 @@ func createJobs(
 	creEnv *cre.Environment,
 ) error {
 	jobSpecs := []*jobv1.ProposeJobRequest{}
-	logger := framework.L
 
 	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
 	if !ok {
@@ -356,15 +354,12 @@ func createJobs(
 			if !ok {
 				return fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
 			}
-			transmitterAddress := evmKey.PublicAddress.Hex()
+			nodeAddress := evmKey.PublicAddress.Hex()
 
 			evmKeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainselectors.FamilyEVM] // we can always expect evm bundle key id present since evm is the registry chain
 			if !ok {
 				return errors.New("failed to get key bundle id for evm family")
 			}
-
-			nodeAddress := transmitterAddress
-			logger.Debug().Msgf("Deployed node on chain %d/%d at %s", chainID, chain.Selector, nodeAddress)
 
 			bootstrapPeers := []string{fmt.Sprintf("%s@%s:%d", strings.TrimPrefix(bootstrapNode.Keys.PeerID(), "p2p_"), bootstrapNode.Host, cre.OCRPeeringPort)}
 
@@ -379,14 +374,13 @@ func createJobs(
 				BootstrapPeers:     bootstrapPeers,
 				OCRContractAddress: ocr3ConfigContractAddress.Address,
 				OCRKeyBundleID:     evmKeyBundle,
-				TransmitterID:      transmitterAddress,
+				TransmitterID:      nodeAddress,
 				OnchainSigning: job.OnchainSigningStrategy{
 					StrategyName: strategyName,
 					Config:       workerNode.Keys.OCR2BundleIDs,
 				},
 			}
 
-			// TODO: merge with jobConfig?
 			type OracleFactoryConfigWrapper struct {
 				OracleFactory job.OracleFactoryConfig `toml:"oracle_factory"`
 			}
@@ -397,8 +391,6 @@ func createJobs(
 				return errors.Wrap(errEncoder, "failed to encode oracle factory config to TOML")
 			}
 			oracleStr := strings.ReplaceAll(oracleBuffer.String(), "\n", "\n\t")
-
-			logger.Debug().Msgf("Creating %s Capability job spec for chainID: %d, selector: %d, DON: %q, node: %q", flag, chainID, chain.Selector, don.Name, workerNode.Name)
 
 			creForwarderKey := datastore.NewAddressRefKey(
 				chain.Selector,
@@ -411,10 +403,7 @@ func createJobs(
 				return errors.Wrap(err, "failed to get CRE Forwarder address")
 			}
 
-			logger.Debug().Msgf("Found CRE Forwarder contract on chain %d at %s", chainID, creForwarderAddress.Address)
-
 			runtimeFallbacks := buildRuntimeValues(chainID, "evm", creForwarderAddress.Address, nodeAddress)
-
 			var aErr error
 			templateData, aErr = credon.ApplyRuntimeValues(templateData, runtimeFallbacks)
 			if aErr != nil {

@@ -123,6 +123,9 @@ func (o *HTTPAction) PostEnvStartup(
 			break
 		}
 	}
+	if nodeSet == nil {
+		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
+	}
 
 	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
 	tmpl, tmplErr := template.New(flag + "-config").Parse(configTemplate)
@@ -145,7 +148,6 @@ func (o *HTTPAction) PostEnvStartup(
 		return errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
-	// Create job specs for each worker node
 	for _, workerNode := range workerNodes {
 		jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, flag, command, configStr, "")
 		jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}
