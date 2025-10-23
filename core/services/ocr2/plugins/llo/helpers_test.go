@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -452,7 +451,7 @@ func createSingleDecimalBridge(t *testing.T, name string, i int, p decimal.Decim
 		require.NoError(t, err)
 	}))
 
-	bridgeName = fmt.Sprintf("bridge-%s-%d-%s", name, i, uuid.New().String())
+	bridgeName = fmt.Sprintf("bridge-%s-%d-%s", name, i, "a") // uuid.New().String())
 	t.Logf("Created bridge server for '%s' at '%s'", bridgeName, bridge.URL)
 
 	t.Cleanup(func() {
