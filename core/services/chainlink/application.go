@@ -1263,6 +1263,7 @@ func newCREServices(
 						workflowLimits,
 						artifactsStore,
 						key,
+						workflowDonNotifier,
 						syncerV2.WithBillingClient(opts.BillingClient),
 						syncerV2.WithWorkflowRegistry(capCfg.WorkflowRegistry().Address(), strconv.FormatUint(wrChainDetails.ChainSelector, 10)),
 						syncerV2.WithOrgResolver(orgResolver),
