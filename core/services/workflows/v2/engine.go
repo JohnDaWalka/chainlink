@@ -43,8 +43,7 @@ type Engine struct {
 	cfg          *EngineConfig
 	lggr         logger.SugaredLogger
 	loggerLabels map[string]string
-	localNode    capabilities.Node
-	localNodeMu  sync.Mutex
+	localNode    atomic.Pointer[capabilities.Node]
 
 	// registration ID -> trigger capability
 	triggers map[string]*triggerCapability
@@ -128,7 +127,6 @@ func NewEngine(cfg *EngineConfig) (*Engine, error) {
 		cfg:                     cfg,
 		lggr:                    beholderLogger,
 		loggerLabels:            labelsMap,
-		localNode:               localNode,
 		triggers:                make(map[string]*triggerCapability),
 		allTriggerEventsQueueCh: cfg.LocalLimiters.TriggerEventQueue,
 		executionsSemaphore:     cfg.LocalLimiters.ExecutionConcurrency,
@@ -136,6 +134,7 @@ func NewEngine(cfg *EngineConfig) (*Engine, error) {
 		meterReports:            metering.NewReports(cfg.BillingClient, cfg.WorkflowOwner, cfg.WorkflowID, beholderLogger, labelsMap, metricsLabeler, cfg.WorkflowRegistryAddress, cfg.WorkflowRegistryChainSelector, metering.EngineVersionV2),
 		metrics:                 metricsLabeler,
 	}
+	engine.localNode.Store(&localNode)
 	engine.Service, engine.srvcEng = services.Config{
 		Name:  "WorkflowEngineV2",
 		Start: engine.start,
@@ -151,21 +150,20 @@ func (e *Engine) start(ctx context.Context) error {
 	e.srvcEng.GoCtx(ctx, e.heartbeatLoop)
 	e.srvcEng.GoCtx(ctx, e.init)
 	e.srvcEng.GoCtx(ctx, e.handleAllTriggerEvents)
-	newDONhandler, err := e.handleNewDON(ctx)
+	nodeSyncLoop, err := e.handleNewDON(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start handling DON updates: %w", err)
 	}
-	e.srvcEng.GoCtx(ctx, newDONhandler)
+	e.srvcEng.GoCtx(ctx, nodeSyncLoop)
 	return nil
 }
 
-// TODO: logging
 func (e *Engine) handleNewDON(ctx context.Context) (func(ctx context.Context), error) {
 	ch, cleanup, err := e.cfg.DonSubscriber.Subscribe(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to DON notifier: %w", err)
 	}
-	subscriber := func(fnCtx context.Context) {
+	nodeSyncLoop := func(fnCtx context.Context) {
 		defer cleanup()
 		for {
 			select {
@@ -185,13 +183,11 @@ func (e *Engine) handleNewDON(ctx context.Context) (func(ctx context.Context), e
 					continue
 				}
 
-				e.localNodeMu.Lock()
-				defer e.localNodeMu.Unlock()
-				e.localNode = localNode
+				e.localNode.Store(&localNode)
 			}
 		}
 	}
-	return subscriber, nil
+	return nodeSyncLoop, nil
 }
 
 func (e *Engine) init(ctx context.Context) {
@@ -314,8 +310,8 @@ func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
 				WorkflowName:                  e.cfg.WorkflowName.Hex(),
 				WorkflowTag:                   e.cfg.WorkflowTag,
 				DecodedWorkflowName:           e.cfg.WorkflowName.String(),
-				WorkflowDonID:                 e.localNode.WorkflowDON.ID,
-				WorkflowDonConfigVersion:      e.localNode.WorkflowDON.ConfigVersion,
+				WorkflowDonID:                 e.localNode.Load().WorkflowDON.ID,
+				WorkflowDonConfigVersion:      e.localNode.Load().WorkflowDON.ConfigVersion,
 				ReferenceID:                   fmt.Sprintf("trigger_%d", i),
 				WorkflowRegistryChainSelector: e.cfg.WorkflowRegistryChainSelector,
 				WorkflowRegistryAddress:       e.cfg.WorkflowRegistryAddress,
@@ -524,7 +520,7 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		mrErr := meteringReport.Settle(computeUnit,
 			capabilities.ResponseMetadata{
 				Metering: []capabilities.MeteringNodeDetail{{
-					Peer2PeerID: e.localNode.PeerID.String(),
+					Peer2PeerID: e.localNode.Load().PeerID.String(),
 					SpendUnit:   computeUnit,
 					SpendValue:  strconv.Itoa(int(executionDuration.Milliseconds())),
 				}},
@@ -625,7 +621,7 @@ func (e *Engine) unregisterAllTriggers(ctx context.Context) {
 			TriggerID: registrationID,
 			Metadata: capabilities.RequestMetadata{
 				WorkflowID:    e.cfg.WorkflowID,
-				WorkflowDonID: e.localNode.WorkflowDON.ID,
+				WorkflowDonID: e.localNode.Load().WorkflowDON.ID,
 			},
 			Payload: trigger.payload,
 		})
