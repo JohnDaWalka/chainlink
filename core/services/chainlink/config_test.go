@@ -315,18 +315,19 @@ func TestConfig_Marshal(t *testing.T) {
 		},
 	}
 	full.TelemetryIngress = toml.TelemetryIngress{
-		UniConn:      ptr(false),
-		Logging:      ptr(true),
-		BufferSize:   ptr[uint16](1234),
-		MaxBatchSize: ptr[uint16](4321),
-		SendInterval: commoncfg.MustNewDuration(time.Minute),
-		SendTimeout:  commoncfg.MustNewDuration(5 * time.Second),
-		UseBatchSend: ptr(true),
+		UniConn:            ptr(false),
+		Logging:            ptr(true),
+		BufferSize:         ptr[uint16](1234),
+		MaxBatchSize:       ptr[uint16](4321),
+		SendInterval:       commoncfg.MustNewDuration(time.Minute),
+		SendTimeout:        commoncfg.MustNewDuration(5 * time.Second),
+		UseBatchSend:       ptr(true),
+		ChipIngressEnabled: ptr(false),
 		Endpoints: []toml.TelemetryIngressEndpoint{{
-			Network:      ptr("EVM"),
-			ChainID:      ptr("1"),
-			ServerPubKey: ptr("test-pub-key"),
-			URL:          mustURL("prom.test")},
+				Network:      ptr("EVM"),
+				ChainID:      ptr("1"),
+				ServerPubKey: ptr("test-pub-key"),
+				URL:          mustURL("prom.test")},
 		},
 	}
 
@@ -990,6 +991,7 @@ MaxBatchSize = 4321
 SendInterval = '1m0s'
 SendTimeout = '5s'
 UseBatchSend = true
+ChipIngressEnabled = false
 
 [[TelemetryIngress.Endpoints]]
 Network = 'EVM'
@@ -1825,25 +1827,25 @@ BackupURL = "foo-bar?password=asdf"
 AllowSimplePasswords = false`,
 			exp: `invalid secrets: 2 errors:
 	- Database: 2 errors:
-		- URL: invalid value (*****): missing or insufficiently complex password: DB URL must be authenticated; plaintext URLs are not allowed. Database should be secured by a password matching the following complexity requirements: 
+		- URL: invalid value (*****): missing or insufficiently complex password: DB URL must be authenticated; plaintext URLs are not allowed. Database should be secured by a password matching the following complexity requirements:
 	Must have a length of 16-50 characters
 	Must not comprise:
 		Leading or trailing whitespace (note that a trailing newline in the password file, if present, will be ignored)
-	
-		- BackupURL: invalid value (*****): missing or insufficiently complex password: 
+
+		- BackupURL: invalid value (*****): missing or insufficiently complex password:
 	Expected password complexity:
 	Must be at least 16 characters long
 	Must not comprise:
 		Leading or trailing whitespace
 		A user's API email
-	
+
 	Faults:
 		password is less than 16 characters long
-	. Database should be secured by a password matching the following complexity requirements: 
+	. Database should be secured by a password matching the following complexity requirements:
 	Must have a length of 16-50 characters
 	Must not comprise:
 		Leading or trailing whitespace (note that a trailing newline in the password file, if present, will be ignored)
-	
+
 	- Password.Keystore: empty: must be provided and non-empty`},
 
 		{name: "invalid-urls-allowed",

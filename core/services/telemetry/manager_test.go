@@ -32,6 +32,7 @@ func setupMockConfig(t *testing.T, useBatchSend bool) *mocks.TelemetryIngress {
 	tic.On("SendTimeout").Return(time.Second * 7)
 	tic.On("UniConn").Return(true)
 	tic.On("UseBatchSend").Return(useBatchSend)
+	tic.On("ChipIngressEnabled").Maybe().Return(false)
 
 	return tic
 }
@@ -50,14 +51,14 @@ func TestManagerAgents(t *testing.T) {
 
 	ks := keymocks.NewCSA(t)
 
-	tm := NewManager(tic, ks, lggr)
+	tm := NewManager(tic, ks, lggr, nil)
 	require.Equal(t, "*synchronization.telemetryIngressBatchClient", reflect.TypeOf(tm.endpoints[0].client).String())
 	me := tm.GenMonitoringEndpoint("network-1", "network-1-chainID-1", "", "")
 	assert.Equal(t, "*telemetry.TypedIngressAgentBatch", reflect.TypeOf(me).String())
 
 	tic = setupMockConfig(t, false)
 	tic.On("Endpoints").Return([]config.TelemetryIngressEndpoint{te})
-	tm = NewManager(tic, ks, lggr)
+	tm = NewManager(tic, ks, lggr, nil)
 	require.Equal(t, "*synchronization.telemetryIngressClient", reflect.TypeOf(tm.endpoints[0].client).String())
 	me = tm.GenMonitoringEndpoint("network-1", "network-1-chainID-1", "", "")
 	assert.Equal(t, "*telemetry.TypedIngressAgent", reflect.TypeOf(me).String())
@@ -153,7 +154,7 @@ func TestNewManager(t *testing.T) {
 	key := csakey.MustNewV2XXXTestingOnly(big.NewInt(0))
 	ks.On("GetAll").Return([]csakey.KeyV2{key}, nil)
 	ks.On("Get", key.ID()).Return(key, nil)
-	m := NewManager(tic, ks, lggr)
+	m := NewManager(tic, ks, lggr, nil)
 
 	require.Equal(t, uint(123), m.bufferSize)
 	require.Equal(t, ks, m.ks)
@@ -202,7 +203,7 @@ func TestCorrectEndpointRouting(t *testing.T) {
 	lggr, obsLogs := logger.TestLoggerObserved(t, zapcore.InfoLevel)
 
 	ks := keymocks.NewCSA(t)
-	tm := NewManager(tic, ks, lggr)
+	tm := NewManager(tic, ks, lggr, nil)
 
 	type testEndpoint struct {
 		network string

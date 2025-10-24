@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/chipingress"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	common "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -32,6 +33,8 @@ type Manager struct {
 	uniConn                     bool
 	useBatchSend                bool
 	MonitoringEndpointGenerator MonitoringEndpointGenerator
+
+	chipIngressClient chipingress.Client
 }
 
 type telemetryEndpoint struct {
@@ -43,16 +46,17 @@ type telemetryEndpoint struct {
 }
 
 // NewManager create a new telemetry manager that is responsible for configuring telemetry agents and generating the defined telemetry endpoints and monitoring endpoints
-func NewManager(cfg config.TelemetryIngress, csaKeyStore keystore.CSA, lggr logger.Logger) *Manager {
+func NewManager(cfg config.TelemetryIngress, csaKeyStore keystore.CSA, lggr logger.Logger, chipIngressClient chipingress.Client) *Manager {
 	m := &Manager{
-		bufferSize:   cfg.BufferSize(),
-		ks:           csaKeyStore,
-		logging:      cfg.Logging(),
-		maxBatchSize: cfg.MaxBatchSize(),
-		sendInterval: cfg.SendInterval(),
-		sendTimeout:  cfg.SendTimeout(),
-		uniConn:      cfg.UniConn(),
-		useBatchSend: cfg.UseBatchSend(),
+		bufferSize:        cfg.BufferSize(),
+		ks:                csaKeyStore,
+		logging:           cfg.Logging(),
+		maxBatchSize:      cfg.MaxBatchSize(),
+		sendInterval:      cfg.SendInterval(),
+		sendTimeout:       cfg.SendTimeout(),
+		uniConn:           cfg.UniConn(),
+		useBatchSend:      cfg.UseBatchSend(),
+		chipIngressClient: chipIngressClient,
 	}
 	m.Service, m.eng = services.Config{
 		Name: "TelemetryManager",
