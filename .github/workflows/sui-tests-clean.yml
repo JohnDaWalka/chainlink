@@ -1,0 +1,42 @@
+name: Sui Integration Tests
+on:
+  push:
+  workflow_dispatch:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: "Sui to EVM Messaging"
+          test_cmd: "go test ./smoke/ccip -run \"Test_CCIP_Messaging_Sui2EVM\" -timeout 10m -test.parallel=1 -count=1 -json"
+          sui_cli_version: "mainnet-v1.57.2"
+        - name: "EVM to Sui Messaging" 
+          test_cmd: "go test ./smoke/ccip -run \"Test_CCIP_Messaging_EVM2Sui\" -timeout 10m -test.parallel=1 -count=1 -json"
+          sui_cli_version: "mainnet-v1.57.2"
+        - name: "EVM to Sui Messaging" 
+          test_cmd: "go test ./smoke/ccip -run \"Test_CCIPTokenTransfer_Sui2EVM_TPNotConfigured\" -timeout 10m -test.parallel=1 -count=1 -json"
+          sui_cli_version: "mainnet-v1.57.2"
+        - name: "Sui to EVM Token Transfer"
+          test_cmd: "go test ./smoke/ccip -run \"Test_CCIPTokenTransfer_Sui2EVM\" -timeout 10m -test.parallel=1 -count=1 -json"
+          sui_cli_version: "mainnet-v1.57.2"
+        - name: "EVM to Sui Token Transfer"
+          test_cmd: "go test ./smoke/ccip -run \"Test_CCIPTokenTransfer_EVM2SUI\" -timeout 10m -test.parallel=1 -count=1 -json"
+          sui_cli_version: "mainnet-v1.57.2"
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.0'
+    - name: Setup Sui CLI
+      uses: ./.github/actions/setup-sui
+      with:
+        version: ${{ matrix.sui_cli_version }}
+    - name: Run test - ${{ matrix.name }}
+      working-directory: integration-tests
+      run: ${{ matrix.test_cmd }}
+      timeout-minutes: 15
