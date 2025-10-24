@@ -627,6 +627,65 @@ func HandleTokenAndPoolDeploymentForSUI(e cldf.Environment, suiChainSel, evmChai
 	return e, evmToken, evmPool, nil
 }
 
+func HandleTokenAndPoolDeploymentForSUINoConfig(e cldf.Environment, suiChainSel, evmChainSel uint64) (cldf.Environment, *burn_mint_erc677.BurnMintERC677, *burn_mint_token_pool.BurnMintTokenPool, error) {
+	evmChain := e.BlockChains.EVMChains()[evmChainSel]
+
+	// Deploy Transferrable TOKEN on ETH (same as before)
+	evmDeployerKey := evmChain.DeployerKey
+	state, err := stateview.LoadOnchainState(e)
+	if err != nil {
+		return cldf.Environment{}, nil, nil, errors.New("failed load onstate chains " + err.Error())
+	}
+
+	linkTokenPkgID := state.SuiChains[suiChainSel].LinkTokenAddress
+	linkTokenObjectMetadataID := state.SuiChains[suiChainSel].LinkTokenCoinMetadataId
+	linkTokenTreasuryCapID := state.SuiChains[suiChainSel].LinkTokenTreasuryCapId
+
+	// Deploy transferrable token on EVM (same as before)
+	evmToken, evmPool, err := deployTransferTokenOneEnd(e.Logger, evmChain, evmDeployerKey, e.ExistingAddresses, "TOKEN")
+	if err != nil {
+		return cldf.Environment{}, nil, nil, errors.New("failed to deploy transfer token for evm chain " + err.Error())
+	}
+
+	err = attachTokenToTheRegistry(evmChain, state.MustGetEVMChainState(evmChain.Selector), evmDeployerKey, evmToken.Address(), evmPool.Address())
+	if err != nil {
+		return cldf.Environment{}, nil, nil, errors.New("failed to attach token to registry for evm " + err.Error())
+	}
+
+	// Deploy BurnMint TP on SUI WITHOUT remote chain configuration
+	e, _, err = commoncs.ApplyChangesets(&testing.T{}, e, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.DeployTPAndConfigure{}, sui_cs.DeployTPAndConfigureConfig{
+			SuiChainSelector: suiChainSel,
+			TokenPoolTypes:   []string{"bnm"},
+			BurnMintTpInput: burnminttokenpoolops.DeployAndInitBurnMintTokenPoolInput{
+				CoinObjectTypeArg:    linkTokenPkgID + "::link::LINK",
+				CoinMetadataObjectId: linkTokenObjectMetadataID,
+				TreasuryCapObjectId:  linkTokenTreasuryCapID,
+
+				// No Configs
+				RemoteChainSelectorsToRemove: []uint64{},
+				RemoteChainSelectorsToAdd:    []uint64{},
+				RemotePoolAddressesToAdd:     [][]string{},
+				RemoteTokenAddressesToAdd:    []string{},
+
+				// No configs
+				RemoteChainSelectors: []uint64{},
+				OutboundIsEnableds:   []bool{},
+				OutboundCapacities:   []uint64{},
+				OutboundRates:        []uint64{},
+				InboundIsEnableds:    []bool{},
+				InboundCapacities:    []uint64{},
+				InboundRates:         []uint64{},
+			},
+		}),
+	})
+	if err != nil {
+		return cldf.Environment{}, nil, nil, err
+	}
+
+	return e, evmToken, evmPool, nil
+}
+
 func WaitForTokenBalanceSui(
 	ctx context.Context,
 	t *testing.T,

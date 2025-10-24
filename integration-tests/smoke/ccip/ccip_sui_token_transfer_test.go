@@ -23,6 +23,7 @@ import (
 	linkops "github.com/smartcontractkit/chainlink-sui/deployment/ops/link"
 
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/testhelpers"
+	ccipclient "github.com/smartcontractkit/chainlink/deployment/ccip/shared/client"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/shared/stateview"
 	commoncs "github.com/smartcontractkit/chainlink/deployment/common/changeset"
 
@@ -175,6 +176,106 @@ func Test_CCIPTokenTransfer_Sui2EVM(t *testing.T) {
 	require.Equal(t, expectedExecutionStates, execStates)
 
 	testhelpers.WaitForTokenBalances(ctx, t, updatedEnv, expectedTokenBalances)
+}
+
+func Test_CCIPTokenTransfer_Sui2EVM_TPNotConfigured(t *testing.T) {
+	e, _, _ := testsetups.NewIntegrationEnvironment(
+		t,
+		testhelpers.WithNumOfChains(2),
+		testhelpers.WithSuiChains(1),
+	)
+
+	evmChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilyEVM))
+	suiChainSelectors := e.Env.BlockChains.ListChainSelectors(chain.WithFamily(chain_selectors.FamilySui))
+
+	fmt.Println("EVM: ", evmChainSelectors[0])
+	fmt.Println("Sui: ", suiChainSelectors[0])
+
+	sourceChain := suiChainSelectors[0]
+	destChain := evmChainSelectors[0]
+
+	state, err := stateview.LoadOnchainState(e.Env)
+	require.NoError(t, err)
+
+	t.Log("Source chain (Sui): ", sourceChain, "Dest chain (EVM): ", destChain)
+
+	err = testhelpers.AddLaneWithDefaultPricesAndFeeQuoterConfig(t, &e, state, sourceChain, destChain, false)
+	require.NoError(t, err)
+
+	_, err = e.Env.BlockChains.SuiChains()[sourceChain].Signer.GetAddress()
+	require.NoError(t, err)
+
+	// SUI FeeToken
+	// mint link token to use as feeToken
+	_, feeTokenOutput, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			Amount:         1000000000000, // 1000Link with 1e9,
+		}),
+	})
+	require.NoError(t, err)
+
+	rawOutput := feeTokenOutput[0].Reports[0]
+	outputMap, ok := rawOutput.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
+	require.True(t, ok)
+
+	// SUI TransferToken
+	// mint link token to use as Transfer Token
+	_, transferTokenOutput, err := commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			Amount:         1000000000, // 1Link with 1e9
+		}),
+	})
+	require.NoError(t, err)
+
+	rawOutputTransferToken := transferTokenOutput[0].Reports[0]
+	outputMapTransferToken, ok := rawOutputTransferToken.Output.(sui_ops.OpTxResult[linkops.MintLinkTokenOutput])
+	require.True(t, ok)
+
+	// mint more token
+	_, _, err = commoncs.ApplyChangesets(t, e.Env, []commoncs.ConfiguredChangeSet{
+		commoncs.Configure(sui_cs.MintLinkToken{}, sui_cs.MintLinkTokenConfig{
+			ChainSelector:  sourceChain,
+			TokenPackageId: state.SuiChains[sourceChain].LinkTokenAddress,
+			TreasuryCapId:  state.SuiChains[sourceChain].LinkTokenTreasuryCapId,
+			Amount:         2000000000, // 1Link with 1e9
+		}),
+	})
+	require.NoError(t, err)
+
+	// Receiver Address
+	ccipReceiverAddress := state.Chains[destChain].Receiver.Address()
+
+	// Token Pool setup on both SUI and EVM without configuring the token pool (empty configs, the transfer should fail later)
+	updatedEnv, _, _, err := testhelpers.HandleTokenAndPoolDeploymentForSUINoConfig(e.Env, sourceChain, destChain) // SourceChain = SUI, destChain = EVM
+
+	// Sending should fail because pool is not configured for cross-chain
+	msg := testhelpers.SuiSendRequest{
+		Data:     []byte("Hello, World!"),
+		Receiver: ccipReceiverAddress.Bytes(),
+		FeeToken: outputMap.Objects.MintedLinkTokenObjectId,
+		TokenAmounts: []testhelpers.SuiTokenAmount{
+			{
+				Token:  outputMapTransferToken.Objects.MintedLinkTokenObjectId,
+				Amount: 1000000000,
+			},
+		},
+	}
+
+	_, err = testhelpers.SendRequest(updatedEnv, state,
+		ccipclient.WithSourceChain(sourceChain),
+		ccipclient.WithDestChain(destChain),
+		ccipclient.WithTestRouter(false),
+		ccipclient.WithMessage(msg),
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to execute ccip_send")
+	t.Log("Expected error: ", err)
 }
 
 func Test_CCIPTokenTransfer_EVM2SUI(t *testing.T) {
