@@ -81,26 +81,6 @@ type SetupInput struct {
 	StageGen *stagegen.StageGen
 }
 
-func (s *SetupInput) Validate() error {
-	if s == nil {
-		return pkgerrors.New("input is nil")
-	}
-
-	if len(s.NodeSets) == 0 {
-		return pkgerrors.New("at least one nodeSet is required")
-	}
-
-	if len(s.BlockchainsInput) == 0 {
-		return pkgerrors.New("at least one blockchain is required")
-	}
-
-	if s.JdInput == nil {
-		return pkgerrors.New("jd input is nil")
-	}
-
-	return nil
-}
-
 func SetupTestEnvironment(
 	ctx context.Context,
 	testLogger zerolog.Logger,
@@ -110,10 +90,6 @@ func SetupTestEnvironment(
 ) (*SetupOutput, error) {
 	if input == nil {
 		return nil, pkgerrors.New("input is nil")
-	}
-
-	if err := input.Validate(); err != nil {
-		return nil, pkgerrors.Wrap(err, "input validation failed")
 	}
 
 	if input.Provider.Type == infra.CRIB {

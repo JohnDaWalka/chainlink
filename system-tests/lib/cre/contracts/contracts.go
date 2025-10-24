@@ -142,10 +142,6 @@ func ConfigureDataFeedsCache(testLogger zerolog.Logger, input *cre.ConfigureData
 		return input.Out, nil
 	}
 
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
 	if input.AdminAddress != (common.Address{}) {
 		setAdminConfig := df_changeset_types.SetFeedAdminConfig{
 			ChainSelector: input.ChainSelector,

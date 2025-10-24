@@ -155,10 +155,6 @@ func ConfigureWorkflowRegistry(
 		return input.Out, nil
 	}
 
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
 	allowedDonIDs := make([]uint32, len(input.AllowedDonIDs))
 	for i, donID := range input.AllowedDonIDs {
 		allowedDonIDs[i] = libc.MustSafeUint32FromUint64(donID)

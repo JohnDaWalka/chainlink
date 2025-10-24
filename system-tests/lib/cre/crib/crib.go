@@ -50,25 +50,7 @@ type DeployCribBlockchainInput struct {
 	Namespace      string
 }
 
-func (d *DeployCribBlockchainInput) Validate() error {
-	if d.Blockchain == nil {
-		return errors.New("blockchain input not set")
-	}
-	if d.CribConfigsDir == "" {
-		return errors.New("crib configs dir not set")
-	}
-	if d.Namespace == "" {
-		return errors.New("namespace not set")
-	}
-	return nil
-}
-
 func DeployBlockchain(input *DeployCribBlockchainInput) (*blockchain.Output, error) {
-	err := input.Validate()
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid input for deploying blockchain")
-	}
-
 	ctx := context.Background()
 
 	anvil := anvilv1.Component(&anvilv1.Props{
@@ -119,29 +101,9 @@ type DeployCribDonsInput struct {
 	Namespace      string
 }
 
-func (d *DeployCribDonsInput) Validate() error {
-	if d.Topology == nil {
-		return errors.New("topology not set")
-	}
-	if len(d.Topology.DonsMetadata.List()) == 0 {
-		return errors.New("metadata not set")
-	}
-	if len(d.NodeSet) == 0 {
-		return errors.New("node set inputs not set")
-	}
-	if d.CribConfigsDir == "" {
-		return errors.New("crib configs dir not set")
-	}
-	return nil
-}
-
 func DeployDons(input *DeployCribDonsInput) ([]*cre.NodeSet, error) {
 	if input == nil {
 		return nil, errors.New("DeployCribDonsInput is nil")
-	}
-
-	if valErr := input.Validate(); valErr != nil {
-		return nil, errors.Wrap(valErr, "input validation failed")
 	}
 
 	componentFuncs := make([]crib.ComponentFunc, 0)
@@ -335,20 +297,9 @@ type DeployCribJdInput struct {
 	Namespace      string
 }
 
-func (d *DeployCribJdInput) Validate() error {
-	if d.CribConfigsDir == "" {
-		return errors.New("crib configs dir not set")
-	}
-	return nil
-}
-
 func DeployJd(input *DeployCribJdInput) (*jd.Output, error) {
 	if input == nil {
 		return nil, errors.New("DeployCribJdInput is nil")
-	}
-
-	if valErr := input.Validate(); valErr != nil {
-		return nil, errors.Wrap(valErr, "input validation failed")
 	}
 
 	jdComponent := jdv1.Component(&jdv1.Props{

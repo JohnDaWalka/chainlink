@@ -374,10 +374,6 @@ func toDons(input cre.ConfigureCapabilityRegistryInput) (*dons, error) {
 }
 
 func ConfigureCapabilityRegistry(input cre.ConfigureCapabilityRegistryInput) (CapabilitiesRegistry, error) {
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
 	dons, dErr := toDons(input)
 	if dErr != nil {
 		return nil, errors.Wrap(dErr, "failed to map input to dons")

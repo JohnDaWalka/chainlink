@@ -209,23 +209,6 @@ type WorkflowRegistryInput struct {
 	Out             *WorkflowRegistryOutput `toml:"out"`
 }
 
-func (w *WorkflowRegistryInput) Validate() error {
-	if w.ChainSelector == 0 {
-		return errors.New("chain selector not set")
-	}
-	if w.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
-	if len(w.AllowedDonIDs) == 0 {
-		return errors.New("allowed don ids not set")
-	}
-	if len(w.WorkflowOwners) == 0 {
-		return errors.New("workflow owners not set")
-	}
-
-	return nil
-}
-
 type WorkflowRegistryOutput struct {
 	UseCache       bool             `toml:"use_cache"`
 	ChainSelector  uint64           `toml:"chain_selector"`
@@ -285,39 +268,6 @@ type ConfigureDataFeedsCacheInput struct {
 	Out                   *ConfigureDataFeedsCacheOutput `toml:"out"`
 }
 
-func (c *ConfigureDataFeedsCacheInput) Validate() error {
-	if c.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
-	if len(c.FeedIDs) == 0 {
-		return errors.New("feed ids not set")
-	}
-	if len(c.Descriptions) == 0 {
-		return errors.New("descriptions not set")
-	}
-	if c.ChainSelector == 0 {
-		return errors.New("chain selector not set")
-	}
-	if c.DataFeedsCacheAddress == (common.Address{}) {
-		return errors.New("feed consumer address not set")
-	}
-	if len(c.AllowedSenders) == 0 {
-		return errors.New("allowed senders not set")
-	}
-	if len(c.AllowedWorkflowOwners) == 0 {
-		return errors.New("allowed workflow owners not set")
-	}
-	if len(c.AllowedWorkflowNames) == 0 {
-		return errors.New("allowed workflow names not set")
-	}
-
-	if (len(c.AllowedWorkflowNames) != len(c.AllowedWorkflowOwners)) || (len(c.AllowedWorkflowNames) != len(c.AllowedSenders)) {
-		return errors.New("allowed workflow names, owners and senders must have the same length")
-	}
-
-	return nil
-}
-
 type WrappedNodeOutput struct {
 	*ns.Output
 	NodeSetName  string
@@ -345,26 +295,6 @@ type ConfigureCapabilityRegistryInput struct {
 	WithV2Registries bool
 
 	DONCapabilityWithConfigs map[uint64][]keystone_changeset.DONCapabilityWithConfig
-}
-
-func (c *ConfigureCapabilityRegistryInput) Validate() error {
-	if c.ChainSelector == 0 {
-		return errors.New("chain selector not set")
-	}
-	if c.Topology == nil {
-		return errors.New("don topology not set")
-	}
-	if len(c.Topology.DonsMetadata.List()) == 0 {
-		return errors.New("meta dons not set")
-	}
-	if len(c.NodeSets) != len(c.Topology.DonsMetadata.List()) {
-		return errors.New("node sets and don metadata must have the same length")
-	}
-	if c.CldEnv == nil {
-		return errors.New("chainlink deployment env not set")
-	}
-
-	return nil
 }
 
 type GatewayConnectors struct {
@@ -409,41 +339,6 @@ type GenerateConfigsInput struct {
 	NodeSet                 *NodeSet
 	CapabilityConfigs       CapabilityConfigs
 	GatewayConnectorOutput  *GatewayConnectors // optional, automatically set if some DON in the topology has the GatewayDON flag
-}
-
-func (g *GenerateConfigsInput) Validate() error {
-	if len(g.DonMetadata.NodesMetadata) == 0 {
-		return errors.New("don nodes not set")
-	}
-	if len(g.Blockchains) == 0 {
-		return errors.New("blockchain output not set")
-	}
-	if g.HomeChainSelector == 0 {
-		return errors.New("home chain selector not set")
-	}
-	if len(g.Flags) == 0 {
-		return errors.New("flags not set")
-	}
-	if g.CapabilitiesPeeringData == (CapabilitiesPeeringData{}) {
-		return errors.New("peering data not set")
-	}
-	if g.OCRPeeringData == (OCRPeeringData{}) {
-		return errors.New("ocr peering data not set")
-	}
-	_, addrErr := g.AddressBook.AddressesForChain(g.HomeChainSelector)
-	if addrErr != nil {
-		return fmt.Errorf("failed to get addresses for chain %d: %w", g.HomeChainSelector, addrErr)
-	}
-	_, dsErr := g.Datastore.Addresses().Fetch()
-	if dsErr != nil {
-		return fmt.Errorf("failed to get addresses from datastore: %w", dsErr)
-	}
-	h := g.Datastore.Addresses().Filter(datastore.AddressRefByChainSelector(g.HomeChainSelector))
-	if len(h) == 0 {
-		return fmt.Errorf("no addresses found for home chain %d in datastore", g.HomeChainSelector)
-	}
-	// TODO check for required registry contracts by type and version
-	return nil
 }
 
 type DonMetadata struct {

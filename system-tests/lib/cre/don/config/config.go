@@ -145,10 +145,6 @@ func PrepareNodeTOMLs(
 func generateNodeTomlConfig(input cre.GenerateConfigsInput, nodeConfigTransformers []cre.NodeConfigTransformerFn) (cre.NodeIndexToConfigOverride, error) {
 	configOverrides := make(cre.NodeIndexToConfigOverride)
 
-	if err := input.Validate(); err != nil {
-		return nil, errors.Wrap(err, "input validation failed")
-	}
-
 	commonInputs, inputsErr := gatherCommonInputs(input)
 	if inputsErr != nil {
 		return nil, errors.Wrap(inputsErr, "failed to gather common inputs")
