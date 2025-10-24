@@ -44,6 +44,7 @@ type Engine struct {
 	lggr         logger.SugaredLogger
 	loggerLabels map[string]string
 	localNode    capabilities.Node
+	localNodeMu  sync.Mutex
 
 	// registration ID -> trigger capability
 	triggers map[string]*triggerCapability
@@ -150,7 +151,47 @@ func (e *Engine) start(ctx context.Context) error {
 	e.srvcEng.GoCtx(ctx, e.heartbeatLoop)
 	e.srvcEng.GoCtx(ctx, e.init)
 	e.srvcEng.GoCtx(ctx, e.handleAllTriggerEvents)
+	newDONhandler, err := e.handleNewDON(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start handling DON updates: %w", err)
+	}
+	e.srvcEng.GoCtx(ctx, newDONhandler)
 	return nil
+}
+
+// TODO: logging
+func (e *Engine) handleNewDON(ctx context.Context) (func(ctx context.Context), error) {
+	ch, cleanup, err := e.cfg.DonSubscriber.Subscribe(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to DON notifier: %w", err)
+	}
+	subscriber := func(fnCtx context.Context) {
+		defer cleanup()
+		for {
+			select {
+			case <-fnCtx.Done():
+				return
+			case _, open := <-ch:
+				if !open {
+					return
+				}
+
+				fnCtx, cancel := context.WithTimeout(fnCtx, time.Millisecond*100)
+				defer cancel()
+
+				localNode, err := e.cfg.CapRegistry.LocalNode(fnCtx)
+				if err != nil {
+					e.cfg.Lggr.Errorf("could not get local node state: %w", err)
+					continue
+				}
+
+				e.localNodeMu.Lock()
+				defer e.localNodeMu.Unlock()
+				e.localNode = localNode
+			}
+		}
+	}
+	return subscriber, nil
 }
 
 func (e *Engine) init(ctx context.Context) {
@@ -459,8 +500,10 @@ func (e *Engine) startExecution(ctx context.Context, wrappedTriggerEvent enqueue
 		e.lggr.Errorf("invalid moduleExecuteMaxResponseSizeBytes; must not be negative: %d", moduleExecuteMaxResponseSizeBytes)
 		return
 	}
-	execHelper := &ExecutionHelper{Engine: e, WorkflowExecutionID: executionID, UserLogChan: userLogChan,
-		TimeProvider: timeProvider, SecretsFetcher: e.secretsFetcher(executionID)}
+	execHelper := &ExecutionHelper{
+		Engine: e, WorkflowExecutionID: executionID, UserLogChan: userLogChan,
+		TimeProvider: timeProvider, SecretsFetcher: e.secretsFetcher(executionID),
+	}
 	execHelper.initLimiters(e.cfg.LocalLimiters)
 	result, execErr := e.cfg.Module.Execute(execCtx, &sdkpb.ExecuteRequest{
 		Request: &sdkpb.ExecuteRequest_Trigger{
