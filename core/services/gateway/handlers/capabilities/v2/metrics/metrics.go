@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 )
 
 // Attribute constants for consistent labeling
@@ -16,6 +17,7 @@ const (
 	AttrNodeAddress = "node_address"
 	AttrStatusCode  = "status_code"
 	AttrErrorCode   = "error_code"
+	AttrErrorString = "error_string"
 	AttrMethodName  = "method_name"
 )
 
@@ -38,6 +40,9 @@ type ActionMetrics struct {
 	cacheSize                      metric.Int64Gauge
 	capabilityRequestCount         metric.Int64Counter
 	capabilityFailures             metric.Int64Counter
+	blockedRequestCount            metric.Int64Counter
+	httpSendErrorCount             metric.Int64Counter
+	httpReadErrorCount             metric.Int64Counter
 }
 
 // TriggerMetrics contains metrics for HTTP triggers
@@ -57,6 +62,7 @@ type TriggerMetrics struct {
 	metadataObservationsCount        metric.Int64Gauge
 	jwtCacheSize                     metric.Int64Gauge
 	jwtCacheCleanUpCount             metric.Int64Counter
+	metadataSyncStartupLatency       metric.Int64Histogram
 }
 
 // Metrics combines all gateway metrics for dependency injection
@@ -209,6 +215,30 @@ func newActionMetrics(meter metric.Meter) (*ActionMetrics, error) {
 		return nil, fmt.Errorf("failed to create HTTP action gateway capability failures metric: %w", err)
 	}
 
+	m.blockedRequestCount, err = meter.Int64Counter(
+		"http_action_blocked_request_count",
+		metric.WithDescription("Number of HTTP action requests blocked due to invalid input (blocked IP, invalid method, etc)"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP action blocked request count metric: %w", err)
+	}
+
+	m.httpSendErrorCount, err = meter.Int64Counter(
+		"http_action_http_send_error_count",
+		metric.WithDescription("Number of HTTP send errors (network failures, connection errors, timeouts during request)"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP action HTTP send error count metric: %w", err)
+	}
+
+	m.httpReadErrorCount, err = meter.Int64Counter(
+		"http_action_http_read_error_count",
+		metric.WithDescription("Number of HTTP read errors (failures reading response body)"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP action HTTP read error count metric: %w", err)
+	}
+
 	return m, nil
 }
 
@@ -337,6 +367,14 @@ func newTriggerMetrics(meter metric.Meter) (*TriggerMetrics, error) {
 		return nil, fmt.Errorf("failed to create HTTP trigger JWT cache cleanup count metric: %w", err)
 	}
 
+	m.metadataSyncStartupLatency, err = meter.Int64Histogram(
+		"http_trigger_metadata_sync_startup_latency_ms",
+		metric.WithDescription("Time in milliseconds from handler start to first successful workflow metadata sync"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP trigger metadata sync startup latency metric: %w", err)
+	}
+
 	return m, nil
 }
 
@@ -396,6 +434,18 @@ func (m *ActionMetrics) IncrementCapabilityFailures(ctx context.Context, nodeAdd
 	m.capabilityFailures.Add(ctx, 1, metric.WithAttributes(attribute.String(AttrNodeAddress, nodeAddress)))
 }
 
+func (m *ActionMetrics) IncrementBlockedRequestCount(ctx context.Context, lggr logger.Logger) {
+	m.blockedRequestCount.Add(ctx, 1)
+}
+
+func (m *ActionMetrics) IncrementHTTPSendErrorCount(ctx context.Context, lggr logger.Logger) {
+	m.httpSendErrorCount.Add(ctx, 1)
+}
+
+func (m *ActionMetrics) IncrementHTTPReadErrorCount(ctx context.Context, lggr logger.Logger) {
+	m.httpReadErrorCount.Add(ctx, 1)
+}
+
 // Trigger Metrics Methods
 
 func (m *TriggerMetrics) IncrementRequestCount(ctx context.Context, lggr logger.Logger) {
@@ -403,7 +453,11 @@ func (m *TriggerMetrics) IncrementRequestCount(ctx context.Context, lggr logger.
 }
 
 func (m *TriggerMetrics) IncrementRequestErrors(ctx context.Context, errorCode int64, lggr logger.Logger) {
-	m.requestErrors.Add(ctx, 1, metric.WithAttributes(attribute.Int64(AttrErrorCode, errorCode)))
+	errorString := api.FromJSONRPCErrorCode(errorCode).String()
+	m.requestErrors.Add(ctx, 1, metric.WithAttributes(
+		attribute.Int64(AttrErrorCode, errorCode),
+		attribute.String(AttrErrorString, errorString),
+	))
 }
 
 func (m *TriggerMetrics) IncrementRequestSuccess(ctx context.Context, lggr logger.Logger) {
@@ -468,4 +522,8 @@ func (m *TriggerMetrics) RecordJwtCacheSize(ctx context.Context, size int64, lgg
 
 func (m *TriggerMetrics) IncrementJwtCacheCleanUpCount(ctx context.Context, count int64, lggr logger.Logger) {
 	m.jwtCacheCleanUpCount.Add(ctx, count)
+}
+
+func (m *TriggerMetrics) RecordMetadataSyncStartupLatency(ctx context.Context, latencyMs int64, lggr logger.Logger) {
+	m.metadataSyncStartupLatency.Record(ctx, latencyMs)
 }

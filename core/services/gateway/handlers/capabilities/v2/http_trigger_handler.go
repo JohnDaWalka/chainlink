@@ -111,8 +111,8 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 
 	reqWithKey, err := reqWithAuthorizedKey(triggerReq, *key)
 	if err != nil {
-		h.handleUserError(ctx, req.ID, jsonrpc.ErrInvalidRequest, "Auth failure", callback)
-		return errors.Join(errors.New("auth failure"), err)
+		h.handleUserError(ctx, req.ID, jsonrpc.ErrInternal, internalErrorMessage, callback)
+		return errors.New("error marshaling trigger request: " + err.Error())
 	}
 
 	if err := h.setupCallback(ctx, req.ID, callback, requestStartTime); err != nil {

@@ -50,6 +50,7 @@ type WorkflowMetadataHandler struct {
 	metrics         *metrics.Metrics
 	jwtCache        *jwtReplayCache // JWT replay protection cache
 	wg              sync.WaitGroup
+	startTime       time.Time // time when Start() was called
 }
 
 // NewWorkflowMetadataHandler creates a new WorkflowMetadataHandler.
@@ -123,11 +124,9 @@ func (h *WorkflowMetadataHandler) syncMetadata() {
 		// workflow reference and workflow ID mapping in the gateway eventually becomes consistent
 		// with the mapping on-chain
 		if _, exists := workflowIDToRef[data.WorkflowSelector.WorkflowID]; exists {
-			h.lggr.Debug("Duplicate workflow ID found", "workflowID", data.WorkflowSelector.WorkflowID)
 			continue
 		}
 		if _, exists := workflowRefToID[workflowRef]; exists {
-			h.lggr.Debug("Duplicate workflow reference found", "workflowRef", workflowRef)
 			continue
 		}
 		workflowIDToRef[data.WorkflowSelector.WorkflowID] = workflowRef
@@ -139,6 +138,23 @@ func (h *WorkflowMetadataHandler) syncMetadata() {
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	for workflowID, workflowRef := range workflowIDToRef {
+		if _, exists := h.workflowIDToRef[workflowID]; !exists {
+			h.lggr.Infow("Workflow registered. Listening to requests",
+				"workflowID", workflowID,
+				"workflowOwner", workflowRef.workflowOwner,
+				"workflowName", workflowRef.workflowName,
+				"workflowTag", workflowRef.workflowTag,
+			)
+		}
+	}
+
+	if len(h.workflowIDToRef) == 0 && len(workflowIDToRef) > 0 {
+		latencyMs := time.Since(h.startTime).Milliseconds()
+		h.metrics.Trigger.RecordMetadataSyncStartupLatency(context.Background(), latencyMs, h.lggr)
+	}
+
 	h.authorizedKeys = authorizedKeys
 	h.workflowRefToID = workflowRefToID
 	h.workflowIDToRef = workflowIDToRef
@@ -212,6 +228,7 @@ func (h *WorkflowMetadataHandler) OnMetadataPullResponse(ctx context.Context, re
 func (h *WorkflowMetadataHandler) Start(ctx context.Context) error {
 	return h.StartOnce("WorkflowMetadataHandler", func() error {
 		h.lggr.Info("Starting HTTP Trigger Metadata Handler")
+		h.startTime = time.Now()
 		err := h.agg.Start(ctx)
 		if err != nil {
 			return err

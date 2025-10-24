@@ -44,11 +44,9 @@ type gatewayHandler struct {
 	services.StateMachine
 	config          ServiceConfig
 	don             handlers.DON
-	donConfig       *config.DONConfig
 	lggr            logger.Logger
 	httpClient      network.HTTPClient
 	nodeRateLimiter *ratelimit.RateLimiter // Rate limiter for node requests (e.g. outgoing HTTP requests, HTTP trigger response, auth metadata exchange)
-	userRateLimiter limits.RateLimiter     // Rate limiter for user requests that trigger workflow executions
 	wg              sync.WaitGroup
 	stopCh          services.StopChan
 	responseCache   ResponseCache // Caches HTTP responses to avoid redundant requests for outbound HTTP actions
@@ -113,11 +111,9 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 	return &gatewayHandler{
 		config:          cfg,
 		don:             don,
-		donConfig:       donConfig,
 		lggr:            logger.With(logger.Named(lggr, handlerName), "donId", donConfig.DonId),
 		httpClient:      httpClient,
 		nodeRateLimiter: nodeRateLimiter,
-		userRateLimiter: userRateLimiter,
 		stopCh:          make(services.StopChan),
 		responseCache:   newResponseCache(lggr, cfg.OutboundRequestCacheTTLMs, metrics),
 		triggerHandler:  triggerHandler,
@@ -231,8 +227,24 @@ func (h *gatewayHandler) createHTTPRequestCallback(ctx context.Context, requestI
 		resp, err := h.httpClient.Send(ctx, httpReq)
 		externalEndpointLatency := time.Since(start)
 		if err != nil {
-			l.Errorw("error while sending HTTP request to external endpoint", "err", err)
-			isExternalEndpointError := errors.Is(err, network.ErrHTTPSend) || errors.Is(err, network.ErrHTTPRead)
+			isBlockedRequest := errors.Is(err, network.ErrBlockedRequest)
+			isHTTPSendError := errors.Is(err, network.ErrHTTPSend)
+			isHTTPReadError := errors.Is(err, network.ErrHTTPRead)
+			isExternalEndpointError := isBlockedRequest || isHTTPSendError || isHTTPReadError
+
+			if isBlockedRequest {
+				l.Warnw("HTTP request blocked", "requestID", requestID, "err", err)
+				h.metrics.Action.IncrementBlockedRequestCount(ctx, h.lggr)
+			} else if isHTTPSendError {
+				l.Warnw("error while sending HTTP request to external endpoint", "requestID", requestID, "err", err)
+				h.metrics.Action.IncrementHTTPSendErrorCount(ctx, h.lggr)
+			} else if isHTTPReadError {
+				l.Warnw("error while reading HTTP response from external endpoint", "requestID", requestID, "err", err)
+				h.metrics.Action.IncrementHTTPReadErrorCount(ctx, h.lggr)
+			} else {
+				l.Errorw("error while sending HTTP request", "requestID", requestID, "err", err)
+			}
+
 			return gateway_common.OutboundHTTPResponse{
 				ErrorMessage:            err.Error(),
 				IsExternalEndpointError: isExternalEndpointError,
