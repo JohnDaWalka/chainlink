@@ -3,8 +3,10 @@ package testhelpers
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"strconv"
 	"strings"
@@ -25,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/burn_mint_erc677"
 
 	suiBind "github.com/smartcontractkit/chainlink-sui/bindings/bind"
+	module_fee_quoter "github.com/smartcontractkit/chainlink-sui/bindings/generated/ccip/ccip/fee_quoter"
 	sui_cs "github.com/smartcontractkit/chainlink-sui/deployment/changesets"
 	sui_ops "github.com/smartcontractkit/chainlink-sui/deployment/ops"
 	ccipops "github.com/smartcontractkit/chainlink-sui/deployment/ops/ccip"
@@ -161,34 +164,34 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 	}
 
 	// TODO: might be needed for validation
-	// feeQuoter, err := module_fee_quoter.NewFeeQuoter(ccipPackageID, deps.SuiChain.Client)
-	// if err != nil {
-	// 	return &ccipclient.AnyMsgSentEvent{}, err
-	// }
+	feeQuoter, err := module_fee_quoter.NewFeeQuoter(ccipPackageID, deps.SuiChain.Client)
+	if err != nil {
+		return &ccipclient.AnyMsgSentEvent{}, err
+	}
 
-	// validatedFee, err := feeQuoter.DevInspect().GetValidatedFee(ctx, &suiBind.CallOpts{
-	// 	Signer:           deps.SuiChain.Signer,
-	// 	WaitForExecution: true,
-	// },
-	// 	suiBind.Object{Id: ccipObjectRefID},
-	// 	suiBind.Object{Id: "0x6"},
-	// 	cfg.DestChain,
-	// 	[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	// 		0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
-	// 		0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
-	// 		0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd,
-	// 	},
-	// 	[]byte("hello evm from sui"),
-	// 	[]string{},
-	// 	[]uint64{},
-	// 	linkTokenObjectMetadataID,
-	// 	[]byte{},
-	// )
-	// if err != nil {
-	// 	return &ccipclient.AnyMsgSentEvent{}, err
-	// }
+	validatedFee, err := feeQuoter.DevInspect().GetValidatedFee(ctx, &suiBind.CallOpts{
+		Signer:           deps.SuiChain.Signer,
+		WaitForExecution: true,
+	},
+		suiBind.Object{Id: ccipObjectRefID},
+		suiBind.Object{Id: "0x6"},
+		cfg.DestChain,
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0xdd, 0xbb, 0x6f, 0x35,
+			0x8f, 0x29, 0x04, 0x08, 0xd7, 0x68, 0x47, 0xb4,
+			0xf6, 0x02, 0xf0, 0xfd, 0x59, 0x92, 0x95, 0xfd,
+		},
+		[]byte("hello evm from sui"),
+		[]string{},
+		[]uint64{},
+		linkTokenObjectMetadataID,
+		[]byte{},
+	)
+	if err != nil {
+		return &ccipclient.AnyMsgSentEvent{}, err
+	}
 
-	// fmt.Println("VALIDATED FEE:", validatedFee)
+	fmt.Println("VALIDATED FEE:", validatedFee)
 
 	if len(msg.TokenAmounts) > 0 {
 		BurnMintTPPkgID := state.SuiChains[cfg.SourceChain].CCIPBurnMintTokenPool
@@ -497,10 +500,22 @@ func SendSuiCCIPRequest(e cldf.Environment, cfg *ccipclient.CCIPSendReqConfig) (
 		return nil, errors.New("failed to build PTB (receiver call) using bindings: " + err.Error())
 	}
 
+	// data, err := json.MarshalIndent(ptb.Data.V1.Kind.ProgrammableTransaction, "", "  ")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println(string(data))
+
 	executeCCIPSend, err := suiBind.ExecutePTB(ctx, deps.SuiChain.GetCallOpts(), client, ptb)
 	if err != nil {
 		return nil, errors.New("failed to execute ccip_send with err: " + err.Error())
 	}
+
+	data, err := json.MarshalIndent(executeCCIPSend, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("CCIPSENDRESULT", string(data))
 
 	if len(executeCCIPSend.Events) == 0 {
 		return nil, errors.New("no events returned from Sui CCIPSend")
