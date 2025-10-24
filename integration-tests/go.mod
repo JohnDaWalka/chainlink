@@ -54,8 +54,8 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20251024063024-c658c57d74b7
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251022075638-49d961001d1b
-	github.com/smartcontractkit/chainlink-protos/job-distributor v0.13.1
-	github.com/smartcontractkit/chainlink-sui v0.0.0-20251024011442-7f1d84825562
+	github.com/smartcontractkit/chainlink-protos/job-distributor v0.17.0
+		github.com/smartcontractkit/chainlink-sui v0.0.0-20251024011442-7f1d84825562
 	github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251024011442-7f1d84825562
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.5
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.54.6
