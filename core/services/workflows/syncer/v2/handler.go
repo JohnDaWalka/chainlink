@@ -55,7 +55,7 @@ type eventHandler struct {
 	workflowLimits         limits.ResourceLimiter[int]
 	workflowArtifactsStore WorkflowArtifactsStore
 	workflowEncryptionKey  workflowkey.Key
-	workflowDonNotifier    capabilities.DonNotifier
+	workflowDonNotifier    capabilities.DonNotifyWaitSubscriber
 	billingClient          metering.BillingClient
 	orgResolver            orgresolver.OrgResolver
 
@@ -125,7 +125,7 @@ func NewEventHandler(
 	workflowLimits limits.ResourceLimiter[int],
 	workflowArtifacts WorkflowArtifactsStore,
 	workflowEncryptionKey workflowkey.Key,
-	workflowDonNotifier capabilities.DonNotifier,
+	workflowDonNotifier capabilities.DonNotifyWaitSubscriber,
 	opts ...func(*eventHandler),
 ) (*eventHandler, error) {
 	if workflowStore == nil {

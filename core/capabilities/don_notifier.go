@@ -12,6 +12,10 @@ import (
 type DonNotifier interface {
 	// Notify all subscribers of a new DON without blocking for a subscriber.
 	NotifyDonSet(don capabilities.DON)
+}
+
+type DonNotifyWaitSubscriber interface {
+	DonNotifier
 
 	// Block until a new DON is received or the context is canceled.  The current
 	// DON, if set, is returned immediately.

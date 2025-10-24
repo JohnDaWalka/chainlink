@@ -36,7 +36,7 @@ type EngineConfig struct {
 	ExecutionsStore      store.Store
 	Clock                clockwork.Clock
 	SecretsFetcher       SecretsFetcher
-	DonSubscriber        capabilities.DonNotifier
+	DonSubscriber        capabilities.DonNotifyWaitSubscriber
 
 	WorkflowID            string // hex-encoded [32]byte, no "0x" prefix
 	WorkflowOwner         string // hex-encoded [20]byte, no "0x" prefix
