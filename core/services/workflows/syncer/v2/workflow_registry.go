@@ -268,6 +268,10 @@ func (w *workflowRegistry) handleWithMetrics(ctx context.Context, event Event) e
 	err := w.handler.Handle(ctx, event)
 	totalDuration := time.Since(start)
 	w.metrics.recordHandleDuration(ctx, totalDuration, string(event.Name), err == nil)
+	if err != nil {
+		wfID := event.Data.(GenericEventData).WorkflowID
+		w.lggr.Debugw("failed to sync workflow", "workflowID", wfID.Hex(), "err", err.Error())
+	}
 	return err
 }
 

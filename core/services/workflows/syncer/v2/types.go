@@ -82,6 +82,10 @@ type Event struct {
 	Info string // additional human-readable metadata
 }
 
+type GenericEventData struct {
+	WorkflowID types.WorkflowID
+}
+
 // NOTE: The following types differ from gethwrappers in that they are chain agnostic definitions (owners are represented as bytes / workflow IDs might be more than bytes32)
 
 type WorkflowRegisteredEvent struct {
