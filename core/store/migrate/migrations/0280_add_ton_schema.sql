@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS ton.log_poller_logs (
 
   block_workchain INT NOT NULL,
   block_shard BIGINT NOT NULL,
-  block_seqno INTEGER NOT NULL,
+  block_seqno BIGINT NOT NULL,
   block_root_hash BYTEA NOT NULL,
   block_file_hash BYTEA NOT NULL,
 
-  master_block_seqno INTEGER NOT NULL,
+  master_block_seqno BIGINT NOT NULL,
 
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
