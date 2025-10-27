@@ -153,6 +153,9 @@ func (e *Engine) start(ctx context.Context) error {
 	return nil
 }
 
+// nodeSyncLoop updates local node state each time a DON is received on the channel
+// as a DON update implies that the Cap Registry was synced and that the node
+// state should be refreshed.
 func (e *Engine) nodeSyncLoop(ctx context.Context, cleanup func(), ch <-chan capabilities.DON) {
 	defer cleanup()
 	for {
@@ -164,10 +167,10 @@ func (e *Engine) nodeSyncLoop(ctx context.Context, cleanup func(), ch <-chan cap
 				return
 			}
 
-			fnCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
+			ctxwt, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
 			defer cancel()
 
-			localNode, err := e.cfg.CapRegistry.LocalNode(fnCtx)
+			localNode, err := e.cfg.CapRegistry.LocalNode(ctxwt)
 			if err != nil {
 				e.cfg.Lggr.Errorf("could not get local node state: %w", err)
 				e.cfg.Hooks.OnNodeSynced(localNode, err)

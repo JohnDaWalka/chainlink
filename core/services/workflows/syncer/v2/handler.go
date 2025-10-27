@@ -55,7 +55,7 @@ type eventHandler struct {
 	workflowLimits         limits.ResourceLimiter[int]
 	workflowArtifactsStore WorkflowArtifactsStore
 	workflowEncryptionKey  workflowkey.Key
-	workflowDonNotifier    capabilities.DonNotifyWaitSubscriber
+	workflowDonSubscriber  capabilities.DonSubscriber
 	billingClient          metering.BillingClient
 	orgResolver            orgresolver.OrgResolver
 
@@ -125,7 +125,7 @@ func NewEventHandler(
 	workflowLimits limits.ResourceLimiter[int],
 	workflowArtifacts WorkflowArtifactsStore,
 	workflowEncryptionKey workflowkey.Key,
-	workflowDonNotifier capabilities.DonNotifyWaitSubscriber,
+	workflowDonSubscriber capabilities.DonSubscriber,
 	opts ...func(*eventHandler),
 ) (*eventHandler, error) {
 	if workflowStore == nil {
@@ -154,7 +154,7 @@ func NewEventHandler(
 		workflowLimits:         workflowLimits,
 		workflowArtifactsStore: workflowArtifacts,
 		workflowEncryptionKey:  workflowEncryptionKey,
-		workflowDonNotifier:    workflowDonNotifier,
+		workflowDonSubscriber:  workflowDonSubscriber,
 	}
 	eh.engineFactory = eh.engineFactoryFn
 	for _, o := range opts {
@@ -513,7 +513,7 @@ func (h *eventHandler) engineFactoryFn(ctx context.Context, workflowID string, o
 		Module:                module,
 		WorkflowConfig:        config,
 		CapRegistry:           h.capRegistry,
-		DonSubscriber:         h.workflowDonNotifier,
+		DonSubscriber:         h.workflowDonSubscriber,
 		UseLocalTimeProvider:  h.useLocalTimeProvider,
 		DonTimeStore:          h.donTimeStore,
 		ExecutionsStore:       h.workflowStore,

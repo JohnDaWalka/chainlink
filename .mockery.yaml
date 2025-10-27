@@ -23,7 +23,6 @@ packages:
       ORM:
   github.com/smartcontractkit/chainlink/v2/core/capabilities:
     interfaces:
-      DonNotifyWaitSubscriber:
       DonSubscriber:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/vault:
     interfaces:

@@ -1665,6 +1665,66 @@ func TestEngine_HandleNewDON(t *testing.T) {
 
 		require.NoError(t, engine.Close())
 	})
+
+	t.Run("fail to fetch local node then success", func(t *testing.T) {
+		initDoneCh := make(chan error)
+		donCh := make(chan capabilities.DON)
+		errsCh := make(chan error, 1)
+		localNodeCh := make(chan capabilities.Node, 1)
+
+		module := modulemocks.NewModuleV2(t)
+		module.EXPECT().Start().Once()
+		module.EXPECT().Execute(matches.AnyContext, mock.Anything, mock.Anything).Return(newTriggerSubs(0), nil).Once()
+		module.EXPECT().Close().Once()
+
+		capreg := regmocks.NewCapabilitiesRegistry(t)
+		initialNode := newNode(t, func(n *capabilities.Node) {
+			n.WorkflowDON.ConfigVersion = 1
+		})
+		updatedNode := newNode(t, func(n *capabilities.Node) {
+			n.WorkflowDON.ConfigVersion = 2
+		})
+		capreg.EXPECT().LocalNode(matches.AnyContext).Return(initialNode, nil).Once()
+		capreg.EXPECT().LocalNode(matches.AnyContext).Return(capabilities.Node{}, assert.AnError).Once()
+		capreg.EXPECT().LocalNode(matches.AnyContext).Return(updatedNode, nil).Once()
+
+		subscriberMock := capmocks.NewDonSubscriber(t)
+		subscriberMock.EXPECT().Subscribe(matches.AnyContext).Return(donCh, func() {}, nil)
+
+		cfg := defaultTestConfig(t, nil)
+		cfg.DonSubscriber = subscriberMock
+		cfg.Module = module
+		cfg.CapRegistry = capreg
+		cfg.Hooks = v2.LifecycleHooks{
+			OnInitialized: func(err error) {
+				initDoneCh <- err
+			},
+			OnNodeSynced: func(node capabilities.Node, err error) {
+				if err == nil {
+					localNodeCh <- node
+				} else {
+					errsCh <- err
+				}
+			},
+		}
+
+		engine, err := v2.NewEngine(cfg)
+		require.NoError(t, err)
+
+		require.NoError(t, engine.Start(t.Context()))
+
+		require.NoError(t, <-initDoneCh)
+
+		// signal a DON send to refetch local node but expect an error
+		donCh <- capabilities.DON{}
+		assert.Error(t, <-errsCh)
+
+		// signal a DON send to refetch local node with success
+		donCh <- capabilities.DON{}
+		gotNode := <-localNodeCh
+		require.Equal(t, uint32(2), gotNode.WorkflowDON.ConfigVersion)
+		require.NoError(t, engine.Close())
+	})
 }
 
 // setupMockBillingClient creates a mock billing client with default expectations.

@@ -20,6 +20,10 @@ type DonSubscriber interface {
 	Subscribe(ctx context.Context) (<-chan capabilities.DON, func(), error)
 }
 
+// DonNotifyWaitSubscriber handles the lifecyle of a Workflow DON update.  A node may
+// only belong to a single workflow DON, but multiple capabilities DONs.  In practice,
+// this interface is used to update subscribers with the current workflow DON
+// state.
 type DonNotifyWaitSubscriber interface {
 	DonNotifier
 	DonSubscriber
@@ -36,7 +40,6 @@ type donNotifier struct {
 	subscribers map[chan capabilities.DON]struct{}
 }
 
-// TODO: wire in logger
 func NewDonNotifier() *donNotifier {
 	return &donNotifier{
 		subscribers: make(map[chan capabilities.DON]struct{}),
@@ -58,6 +61,9 @@ func (n *donNotifier) NotifyDonSet(don capabilities.DON) {
 	}
 }
 
+// Subscribe returns a listen only channel that will return the latest value
+// state of the workflow DON for this node until the cleanup function is called.
+// The current state is buffered into the returned channel.
 func (n *donNotifier) Subscribe(ctx context.Context) (<-chan capabilities.DON, func(), error) {
 	if ctx.Err() != nil {
 		return nil, nil, ctx.Err()
