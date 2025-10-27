@@ -1069,7 +1069,7 @@ func newCREServices(
 			}
 
 			workflowDonNotifier := capabilities.NewDonNotifier()
-			wfLauncher := capabilities.NewLauncher(
+			wfLauncher, err := capabilities.NewLauncher(
 				globalLogger,
 				externalPeerWrapper,
 				don2donSharedPeer,
@@ -1078,6 +1078,9 @@ func newCREServices(
 				opts.CapabilitiesRegistry,
 				workflowDonNotifier,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create workflow launcher: %w", err)
+			}
 
 			switch externalRegistryVersion.Major() {
 			case 1:
@@ -1231,7 +1234,7 @@ func newCREServices(
 					artifactsStore, err := artifactsV2.NewStore(lggr, artifactsV2.NewWorkflowRegistryDS(ds, globalLogger),
 						fetcherFunc,
 						retrieverFunc,
-						clockwork.NewRealClock(), key, custmsg.NewLabeler(), artifactsV2.WithMaxArtifactSize(
+						clockwork.NewRealClock(), key, custmsg.NewLabeler(), lf, artifactsV2.WithMaxArtifactSize(
 							artifactsV2.ArtifactConfig{
 								MaxBinarySize:  uint64(capCfg.WorkflowRegistry().MaxBinarySize()),
 								MaxSecretsSize: uint64(capCfg.WorkflowRegistry().MaxEncryptedSecretsSize()),
