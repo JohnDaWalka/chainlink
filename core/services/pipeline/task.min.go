@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 
 	"github.com/pkg/errors"
+	"github.com/shopspring/decimal"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -72,12 +73,7 @@ func (t *MinTask) Run(_ context.Context, _ logger.Logger, vars Vars, inputs []Re
 		return Result{Error: errors.Wrapf(ErrBadInput, "values: %v", err)}, runInfo
 	}
 
-	minVal := decimalValues[0]
-	for i := 1; i < len(decimalValues); i++ {
-		if decimalValues[i].LessThan(minVal) {
-			minVal = decimalValues[i]
-		}
-	}
+	minVal := decimal.Min(decimalValues[0], decimalValues[1:]...)
 
 	return Result{Value: minVal}, runInfo
 }
