@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 )
@@ -33,30 +34,28 @@ type DonNotifyWaitSubscriber interface {
 }
 
 type donNotifier struct {
-	mu          sync.Mutex
-	don         *capabilities.DON
-	subscribers map[chan capabilities.DON]struct{}
+	don         atomic.Pointer[capabilities.DON]
+	subscribers sync.Map
 }
 
 func NewDonNotifier() *donNotifier {
-	return &donNotifier{
-		subscribers: make(map[chan capabilities.DON]struct{}),
-	}
+	return &donNotifier{}
 }
 
 func (n *donNotifier) NotifyDonSet(don capabilities.DON) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.don = &don
+	n.don.Store(&don)
 
 	// Broadcast the new DON to all subscriber channels.
-	for subCh := range n.subscribers {
+	n.subscribers.Range(func(key, _ any) bool {
+		subCh := key.(chan capabilities.DON)
+
 		select {
 		case subCh <- don:
 		default:
 		}
-	}
+
+		return true
+	})
 }
 
 // Subscribe returns a listen only channel that will return the latest value
@@ -67,34 +66,26 @@ func (n *donNotifier) Subscribe(ctx context.Context) (<-chan capabilities.DON, f
 		return nil, nil, ctx.Err()
 	}
 
+	// Buffered so as not to block.
 	subCh := make(chan capabilities.DON, 1)
 	unsubscribe := func() {
-		n.mu.Lock()
-		defer n.mu.Unlock()
-		if _, ok := n.subscribers[subCh]; ok {
-			delete(n.subscribers, subCh)
-			close(subCh)
-		}
+		n.subscribers.Delete(subCh)
+		close(subCh)
 	}
 
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.subscribers.Store(subCh, struct{}{})
 
-	n.subscribers[subCh] = struct{}{}
-	if n.don != nil {
-		// Buffered so as not to block.
-		subCh <- *n.don
+	if n.don.Load() != nil {
+		subCh <- *n.don.Load()
 	}
 
 	return subCh, unsubscribe, nil
 }
 
 func (n *donNotifier) WaitForDon(ctx context.Context) (capabilities.DON, error) {
-	n.mu.Lock()
-	if n.don != nil {
-		return *n.don, nil
+	if n.don.Load() != nil {
+		return *n.don.Load(), nil
 	}
-	n.mu.Unlock()
 
 	subCh, unsubscribe, err := n.Subscribe(ctx)
 	if err != nil {
