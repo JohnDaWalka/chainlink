@@ -15,6 +15,35 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 )
 
+func Approve(ctx context.Context, offChainClient cldf_offchain.Client, dons *cre.Dons, nodeToSpecs map[string][]string) error {
+	for nodeID, jobSpecs := range nodeToSpecs {
+		for _, don := range dons.List() {
+			for _, node := range don.Nodes {
+				if node.JobDistributorDetails.NodeID != nodeID {
+					continue
+				}
+
+				for _, jobSpec := range jobSpecs {
+					// TODO: is there a way to accept the job with proposal id?
+					if err := node.AcceptJob(ctx, jobSpec); err != nil {
+						// Workflow specs get auto approved
+						// TODO: Narrow down scope by checking type == workflow
+						if strings.Contains(err.Error(), "cannot approve an approved spec") {
+							return nil
+						}
+						fmt.Println("Failed jobspec proposal:")
+						fmt.Println(jobSpec)
+
+						return fmt.Errorf("failed to accept job. err: %w", err)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func Create(ctx context.Context, offChainClient cldf_offchain.Client, dons *cre.Dons, jobSpecs cre.DonJobs) error {
 	if len(jobSpecs) == 0 {
 		return nil

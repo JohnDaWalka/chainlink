@@ -34,6 +34,8 @@ import (
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 )
 
+const EnvironmentName = "local-cre"
+
 type CapabilityFlag = string
 
 // DON types

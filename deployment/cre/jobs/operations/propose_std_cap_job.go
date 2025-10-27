@@ -96,7 +96,7 @@ var ProposeStandardCapabilityJob = operations.NewSequence[
 			for _, ni := range nodeInfos {
 				spec, err := input.Job.Resolve()
 				if err != nil {
-					return ProposeStandardCapabilityJobOutput{}, fmt.Errorf("failed to resolve consensus job for node %s: %w", ni.NodeID, err)
+					return ProposeStandardCapabilityJobOutput{}, fmt.Errorf("failed to resolve standard capability job for node %s: %w", ni.NodeID, err)
 				}
 
 				jobLabels := map[string]string{
@@ -115,7 +115,7 @@ var ProposeStandardCapabilityJob = operations.NewSequence[
 					},
 				})
 				if err != nil {
-					return ProposeStandardCapabilityJobOutput{}, fmt.Errorf("failed to propose consensus job: %w", err)
+					return ProposeStandardCapabilityJobOutput{}, fmt.Errorf("failed to propose standard capability job: %w", err)
 				}
 
 				maps.Copy(specs, report.Output.Specs)

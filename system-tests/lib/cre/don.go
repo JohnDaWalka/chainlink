@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
+	cre_offchain "github.com/smartcontractkit/chainlink/deployment/cre/pkg/offchain"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 
@@ -242,6 +243,7 @@ func NewDON(ctx context.Context, donMetadata *DonMetadata, ctfNodes []*clnode.Ou
 			if err != nil {
 				return fmt.Errorf("failed to create node %d: %w", idx, err)
 			}
+			node.DON = don
 
 			mu.Lock()
 			don.Nodes = append(don.Nodes, node)
@@ -320,7 +322,7 @@ type Node struct {
 	Roles                 Roles                  `toml:"roles" json:"roles"`
 
 	Clients NodeClients `toml:"-" json:"-"`
-	DON     Don         `toml:"-" json:"-"`
+	DON     *Don        `toml:"-" json:"-"`
 }
 
 func (n *Node) Metadata() *NodeMetadata {
@@ -723,6 +725,19 @@ func (n *Node) SetUpAndLinkJobDistributor(ctx context.Context, jd *jd.JobDistrib
 			return fmt.Errorf("unknown node role: %s", role)
 		}
 	}
+
+	// add labels required by jobspec operations
+	labels = append(labels, &ptypes.Label{
+		Key: "don-" + n.DON.Name,
+	})
+	labels = append(labels, &ptypes.Label{
+		Key:   "environment",
+		Value: ptr.Ptr(EnvironmentName),
+	})
+	labels = append(labels, &ptypes.Label{
+		Key:   "product",
+		Value: ptr.Ptr(cre_offchain.ProductLabel),
+	})
 
 	// register the node in the job distributor
 	err := n.RegisterNodeToJobDistributor(ctx, jd, labels)
