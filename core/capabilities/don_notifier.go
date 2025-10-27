@@ -14,16 +14,19 @@ type DonNotifier interface {
 	NotifyDonSet(don capabilities.DON)
 }
 
+type DonSubscriber interface {
+	// Subscribe returns a channel that will receive the latest DON.  Unsubscribe
+	// by calling the returned function.
+	Subscribe(ctx context.Context) (<-chan capabilities.DON, func(), error)
+}
+
 type DonNotifyWaitSubscriber interface {
 	DonNotifier
+	DonSubscriber
 
 	// Block until a new DON is received or the context is canceled.  The current
 	// DON, if set, is returned immediately.
 	WaitForDon(ctx context.Context) (capabilities.DON, error)
-
-	// Subscribe returns a channel that will receive the latest DON.  Unsubscribe
-	// by calling the returned function.
-	Subscribe(ctx context.Context) (<-chan capabilities.DON, func(), error)
 }
 
 type donNotifier struct {

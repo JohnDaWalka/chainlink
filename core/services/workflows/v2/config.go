@@ -6,6 +6,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
+	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/custmsg"
 	"github.com/smartcontractkit/chainlink-common/pkg/settings/cresettings"
@@ -36,7 +37,7 @@ type EngineConfig struct {
 	ExecutionsStore      store.Store
 	Clock                clockwork.Clock
 	SecretsFetcher       SecretsFetcher
-	DonSubscriber        capabilities.DonNotifyWaitSubscriber
+	DonSubscriber        capabilities.DonSubscriber
 
 	WorkflowID            string // hex-encoded [32]byte, no "0x" prefix
 	WorkflowOwner         string // hex-encoded [20]byte, no "0x" prefix
@@ -228,6 +229,7 @@ type LifecycleHooks struct {
 	OnExecutionError       func(msg string)
 	OnResultReceived       func(*sdkpb.ExecutionResult)
 	OnRateLimited          func(executionID string)
+	OnNodeSynced           func(node commoncap.Node, err error)
 }
 
 func (c *EngineConfig) Validate() error {
@@ -309,5 +311,8 @@ func (h *LifecycleHooks) setDefaultHooks() {
 	}
 	if h.OnRateLimited == nil {
 		h.OnRateLimited = func(executionID string) {}
+	}
+	if h.OnNodeSynced == nil {
+		h.OnNodeSynced = func(_ commoncap.Node, _ error) {}
 	}
 }

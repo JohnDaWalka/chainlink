@@ -150,48 +150,39 @@ func (e *Engine) start(ctx context.Context) error {
 	e.srvcEng.GoCtx(ctx, e.heartbeatLoop)
 	e.srvcEng.GoCtx(ctx, e.init)
 	e.srvcEng.GoCtx(ctx, e.handleAllTriggerEvents)
-	nodeSyncLoop, err := e.handleNewDON(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to start handling DON updates: %w", err)
-	}
-	e.srvcEng.GoCtx(ctx, nodeSyncLoop)
 	return nil
 }
 
-func (e *Engine) handleNewDON(ctx context.Context) (func(ctx context.Context), error) {
-	ch, cleanup, err := e.cfg.DonSubscriber.Subscribe(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to subscribe to DON notifier: %w", err)
-	}
-	nodeSyncLoop := func(fnCtx context.Context) {
-		defer cleanup()
-		for {
-			select {
-			case <-fnCtx.Done():
+func (e *Engine) nodeSyncLoop(ctx context.Context, cleanup func(), ch <-chan capabilities.DON) {
+	defer cleanup()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case _, open := <-ch:
+			if !open {
 				return
-			case _, open := <-ch:
-				if !open {
-					return
-				}
-
-				fnCtx, cancel := context.WithTimeout(fnCtx, time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
-				defer cancel()
-
-				localNode, err := e.cfg.CapRegistry.LocalNode(fnCtx)
-				if err != nil {
-					e.cfg.Lggr.Errorf("could not get local node state: %w", err)
-					continue
-				}
-
-				e.localNode.Store(&localNode)
-				e.cfg.Lggr.Debugw("Set local node state",
-					"Workflow DON ID", localNode.WorkflowDON.ID,
-					"Workflow DON families", localNode.WorkflowDON.Families,
-					"Workflow DON Config Version", localNode.WorkflowDON.ConfigVersion)
 			}
+
+			fnCtx, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
+			defer cancel()
+
+			localNode, err := e.cfg.CapRegistry.LocalNode(fnCtx)
+			if err != nil {
+				e.cfg.Lggr.Errorf("could not get local node state: %w", err)
+				e.cfg.Hooks.OnNodeSynced(localNode, err)
+				continue
+			}
+
+			e.cfg.Lggr.Debugw("Setting local node state",
+				"Workflow DON ID", localNode.WorkflowDON.ID,
+				"Workflow DON families", localNode.WorkflowDON.Families,
+				"Workflow DON Config Version", localNode.WorkflowDON.ConfigVersion,
+			)
+			e.cfg.Hooks.OnNodeSynced(localNode, nil)
+			e.localNode.Store(&localNode)
 		}
 	}
-	return nodeSyncLoop, nil
 }
 
 func (e *Engine) init(ctx context.Context) {
@@ -219,6 +210,17 @@ func (e *Engine) init(ctx context.Context) {
 		}
 		return
 	}
+
+	ch, cleanup, err := e.cfg.DonSubscriber.Subscribe(ctx)
+	if err != nil {
+		e.lggr.Errorw("failed to subscribe to DON notifier", "error", err)
+		e.cfg.Hooks.OnInitialized(fmt.Errorf("failed to subscribe to DON notifier: %w", err))
+		return
+	}
+
+	e.srvcEng.GoCtx(context.WithoutCancel(ctx), func(fnCtx context.Context) {
+		e.nodeSyncLoop(fnCtx, cleanup, ch)
+	})
 
 	err = e.runTriggerSubscriptionPhase(ctx)
 	if err != nil {
