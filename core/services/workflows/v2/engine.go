@@ -153,41 +153,6 @@ func (e *Engine) start(ctx context.Context) error {
 	return nil
 }
 
-// nodeSyncLoop updates local node state each time a DON is received on the channel
-// as a DON update implies that the Cap Registry was synced and that the node
-// state should be refreshed.
-func (e *Engine) nodeSyncLoop(ctx context.Context, cleanup func(), ch <-chan capabilities.DON) {
-	defer cleanup()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case _, open := <-ch:
-			if !open {
-				return
-			}
-
-			ctxwt, cancel := context.WithTimeout(ctx, time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
-			defer cancel()
-
-			localNode, err := e.cfg.CapRegistry.LocalNode(ctxwt)
-			if err != nil {
-				e.cfg.Lggr.Errorf("could not get local node state: %w", err)
-				e.cfg.Hooks.OnNodeSynced(localNode, err)
-				continue
-			}
-
-			e.cfg.Lggr.Debugw("Setting local node state",
-				"Workflow DON ID", localNode.WorkflowDON.ID,
-				"Workflow DON families", localNode.WorkflowDON.Families,
-				"Workflow DON Config Version", localNode.WorkflowDON.ConfigVersion,
-			)
-			e.cfg.Hooks.OnNodeSynced(localNode, nil)
-			e.localNode.Store(&localNode)
-		}
-	}
-}
-
 func (e *Engine) init(ctx context.Context) {
 	// apply global engine instance limits
 	// TODO(CAPPL-794): consider moving this outside of the engine, into the Syncer
@@ -214,15 +179,28 @@ func (e *Engine) init(ctx context.Context) {
 		return
 	}
 
-	ch, cleanup, err := e.cfg.DonSubscriber.Subscribe(ctx)
+	donSubCh, cleanup, err := e.cfg.DonSubscriber.Subscribe(ctx)
 	if err != nil {
 		e.lggr.Errorw("failed to subscribe to DON notifier", "error", err)
 		e.cfg.Hooks.OnInitialized(fmt.Errorf("failed to subscribe to DON notifier: %w", err))
 		return
 	}
 
-	e.srvcEng.GoCtx(context.WithoutCancel(ctx), func(fnCtx context.Context) {
-		e.nodeSyncLoop(fnCtx, cleanup, ch)
+	// start loop to sync local node state each time a DON is received on the
+	// subscribed channel
+	e.srvcEng.GoCtx(context.WithoutCancel(ctx), func(ctx context.Context) {
+		defer cleanup()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case _, open := <-donSubCh:
+				if !open {
+					return
+				}
+				e.localNodeSync(ctx)
+			}
+		}
 	})
 
 	err = e.runTriggerSubscriptionPhase(ctx)
@@ -235,6 +213,27 @@ func (e *Engine) init(ctx context.Context) {
 	e.lggr.Info("Workflow Engine initialized")
 	e.metrics.IncrementWorkflowInitializationCounter(ctx)
 	e.cfg.Hooks.OnInitialized(nil)
+}
+
+func (e *Engine) localNodeSync(ctx context.Context) {
+	to := time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs) * time.Millisecond
+	ctx, cancel := context.WithTimeout(ctx, to)
+	defer cancel()
+
+	localNode, err := e.cfg.CapRegistry.LocalNode(ctx)
+	if err != nil {
+		e.cfg.Lggr.Errorf("could not get local node state: %w", err)
+		e.cfg.Hooks.OnNodeSynced(localNode, err)
+		return
+	}
+
+	e.cfg.Lggr.Debugw("Setting local node state",
+		"Workflow DON ID", localNode.WorkflowDON.ID,
+		"Workflow DON Families", localNode.WorkflowDON.Families,
+		"Workflow DON Config Version", localNode.WorkflowDON.ConfigVersion,
+	)
+	e.cfg.Hooks.OnNodeSynced(localNode, nil)
+	e.localNode.Store(&localNode)
 }
 
 func (e *Engine) runTriggerSubscriptionPhase(ctx context.Context) error {
