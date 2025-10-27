@@ -152,7 +152,7 @@ func (h *WorkflowMetadataHandler) syncMetadata() {
 
 	if len(h.workflowIDToRef) == 0 && len(workflowIDToRef) > 0 {
 		latencyMs := time.Since(h.startTime).Milliseconds()
-		h.metrics.Trigger.RecordMetadataSyncStartupLatency(context.Background(), latencyMs, h.lggr)
+		h.metrics.RecordMetadataSyncStartupLatency(context.Background(), latencyMs, h.lggr)
 	}
 
 	h.authorizedKeys = authorizedKeys
@@ -174,10 +174,10 @@ func (h *WorkflowMetadataHandler) sendMetadataPullRequest() error {
 	}
 	var combinedErr error
 	for _, member := range h.donConfig.Members {
-		h.metrics.Trigger.IncrementCapabilityRequestCount(ctx, member.Address, gateway.MethodPullWorkflowMetadata, h.lggr)
+		h.metrics.IncrementTriggerCapabilityRequestCount(ctx, member.Address, gateway.MethodPullWorkflowMetadata, h.lggr)
 		err := h.don.SendToNode(ctx, member.Address, req)
 		if err != nil {
-			h.metrics.Trigger.IncrementCapabilityRequestFailures(ctx, member.Address, gateway.MethodPullWorkflowMetadata, h.lggr)
+			h.metrics.IncrementTriggerCapabilityRequestFailures(ctx, member.Address, gateway.MethodPullWorkflowMetadata, h.lggr)
 			combinedErr = errors.Join(combinedErr, fmt.Errorf("failed to send pull request to node %s: %w", member.Address, err))
 		}
 	}
@@ -244,8 +244,8 @@ func (h *WorkflowMetadataHandler) Start(ctx context.Context) error {
 		h.runTicker(h.jwtCache.cleanupPeriod, func() {
 			now := time.Now()
 			expiredCount := h.jwtCache.cleanupOldEntries(now.Add(-h.jwtCache.cleanupPeriod))
-			h.metrics.Trigger.IncrementJwtCacheCleanUpCount(context.Background(), int64(expiredCount), h.lggr)
-			h.metrics.Trigger.RecordJwtCacheSize(context.Background(), int64(len(h.jwtCache.cache)), h.lggr)
+			h.metrics.IncrementJwtCacheCleanUpCount(context.Background(), int64(expiredCount), h.lggr)
+			h.metrics.RecordJwtCacheSize(context.Background(), int64(len(h.jwtCache.cache)), h.lggr)
 			h.lggr.Debugw("Workflow execution cache cleanup completed", "expired_entries", expiredCount, "remaining_entries", len(h.jwtCache.cache))
 		})
 		return nil

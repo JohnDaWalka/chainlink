@@ -101,9 +101,14 @@ func NewGatewayHandler(handlerConfig json.RawMessage, donConfig *config.DONConfi
 		return nil, fmt.Errorf("failed to create user rate limiter: %w", err)
 	}
 
-	metrics, err := metrics.NewMetrics()
+	metrics, err := metrics.NewMetrics(donConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	nodeAddressToNodeName := make(map[string]string)
+	for _, member := range donConfig.Members {
+		nodeAddressToNodeName[member.Address] = member.Name
 	}
 
 	metadataHandler := NewWorkflowMetadataHandler(lggr, cfg, don, donConfig, metrics)
@@ -169,11 +174,11 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 	h.lggr.Debugw("handling incoming node message", "requestID", resp.ID, "nodeAddr", nodeAddr)
 	nodeAllow, globalAllow := h.nodeRateLimiter.AllowVerbose(nodeAddr)
 	if !nodeAllow {
-		h.metrics.Common.IncrementCapabilityNodeThrottled(ctx, nodeAddr, h.lggr)
+		h.metrics.IncrementCapabilityNodeThrottled(ctx, nodeAddr, h.lggr)
 		return fmt.Errorf("rate limit exceeded for node %s", nodeAddr)
 	}
 	if !globalAllow {
-		h.metrics.Common.IncrementGlobalThrottled(ctx, h.lggr)
+		h.metrics.IncrementGlobalThrottled(ctx, h.lggr)
 		return errors.New("global rate limit exceeded")
 	}
 	// Node messages follow the format "<methodName>/<workflowID>/<uuid>" or
@@ -190,25 +195,25 @@ func (h *gatewayHandler) HandleNodeMessage(ctx context.Context, resp *jsonrpc.Re
 		switch methodName {
 		case gateway_common.MethodHTTPAction:
 			start := time.Now()
-			h.metrics.Action.IncrementRequestCount(ctx, nodeAddr, h.lggr)
+			h.metrics.IncrementActionRequestCount(ctx, nodeAddr, h.lggr)
 			err := h.makeOutgoingRequest(ctx, resp, nodeAddr)
 			if err != nil {
-				h.metrics.Action.IncrementRequestFailures(ctx, nodeAddr, h.lggr)
+				h.metrics.IncrementActionRequestFailures(ctx, nodeAddr, h.lggr)
 			}
-			h.metrics.Action.RecordRequestLatency(ctx, time.Since(start).Milliseconds(), h.lggr)
+			h.metrics.RecordActionRequestLatency(ctx, time.Since(start).Milliseconds(), h.lggr)
 			return err
 		case gateway_common.MethodPushWorkflowMetadata:
-			h.metrics.Trigger.IncrementMetadataRequestCount(ctx, nodeAddr, gateway_common.MethodPushWorkflowMetadata, h.lggr)
+			h.metrics.IncrementMetadataRequestCount(ctx, nodeAddr, gateway_common.MethodPushWorkflowMetadata, h.lggr)
 			err := h.metadataHandler.OnMetadataPush(ctx, resp, nodeAddr)
 			if err != nil {
-				h.metrics.Trigger.IncrementMetadataProcessingFailures(ctx, nodeAddr, gateway_common.MethodPushWorkflowMetadata, h.lggr)
+				h.metrics.IncrementMetadataProcessingFailures(ctx, nodeAddr, gateway_common.MethodPushWorkflowMetadata, h.lggr)
 			}
 			return err
 		case gateway_common.MethodPullWorkflowMetadata:
-			h.metrics.Trigger.IncrementMetadataRequestCount(ctx, nodeAddr, gateway_common.MethodPullWorkflowMetadata, h.lggr)
+			h.metrics.IncrementMetadataRequestCount(ctx, nodeAddr, gateway_common.MethodPullWorkflowMetadata, h.lggr)
 			err := h.metadataHandler.OnMetadataPullResponse(ctx, resp, nodeAddr)
 			if err != nil {
-				h.metrics.Trigger.IncrementMetadataProcessingFailures(ctx, nodeAddr, gateway_common.MethodPullWorkflowMetadata, h.lggr)
+				h.metrics.IncrementMetadataProcessingFailures(ctx, nodeAddr, gateway_common.MethodPullWorkflowMetadata, h.lggr)
 			}
 			return err
 		default:
@@ -234,13 +239,13 @@ func (h *gatewayHandler) createHTTPRequestCallback(ctx context.Context, requestI
 
 			if isBlockedRequest {
 				l.Warnw("HTTP request blocked", "requestID", requestID, "err", err)
-				h.metrics.Action.IncrementBlockedRequestCount(ctx, h.lggr)
+				h.metrics.IncrementBlockedRequestCount(ctx, h.lggr)
 			} else if isHTTPSendError {
 				l.Warnw("error while sending HTTP request to external endpoint", "requestID", requestID, "err", err)
-				h.metrics.Action.IncrementHTTPSendErrorCount(ctx, h.lggr)
+				h.metrics.IncrementHTTPSendErrorCount(ctx, h.lggr)
 			} else if isHTTPReadError {
 				l.Warnw("error while reading HTTP response from external endpoint", "requestID", requestID, "err", err)
-				h.metrics.Action.IncrementHTTPReadErrorCount(ctx, h.lggr)
+				h.metrics.IncrementHTTPReadErrorCount(ctx, h.lggr)
 			} else {
 				l.Errorw("error while sending HTTP request", "requestID", requestID, "err", err)
 			}
@@ -251,8 +256,8 @@ func (h *gatewayHandler) createHTTPRequestCallback(ctx context.Context, requestI
 				ExternalEndpointLatency: externalEndpointLatency,
 			}
 		}
-		h.metrics.Action.IncrementCustomerEndpointResponseCount(ctx, strconv.Itoa(resp.StatusCode), h.lggr)
-		h.metrics.Action.RecordCustomerEndpointRequestLatency(ctx, time.Since(start).Milliseconds(), h.lggr)
+		h.metrics.IncrementCustomerEndpointResponseCount(ctx, strconv.Itoa(resp.StatusCode), h.lggr)
+		h.metrics.RecordCustomerEndpointRequestLatency(ctx, time.Since(start).Milliseconds(), h.lggr)
 		return gateway_common.OutboundHTTPResponse{
 			StatusCode:              resp.StatusCode,
 			Headers:                 resp.Headers,
@@ -277,7 +282,7 @@ func (h *gatewayHandler) HandleLegacyUserMessage(context.Context, *api.Message, 
 }
 
 func (h *gatewayHandler) HandleJSONRPCUserMessage(ctx context.Context, req jsonrpc.Request[json.RawMessage], callback handlers.Callback) error {
-	h.metrics.Trigger.IncrementRequestCount(ctx, h.lggr)
+	h.metrics.IncrementTriggerRequestCount(ctx, h.lggr)
 	err := h.triggerHandler.HandleUserTriggerRequest(ctx, &req, callback, time.Now())
 	if err != nil {
 		h.lggr.Errorw("failed to handle user trigger request", "requestID",
@@ -319,7 +324,7 @@ func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.
 		var outboundResp gateway_common.OutboundHTTPResponse
 		callback := h.createHTTPRequestCallback(newCtx, requestID, httpReq, req)
 		if req.CacheSettings.MaxAgeMs > 0 {
-			h.metrics.Action.IncrementCacheReadCount(ctx, h.lggr)
+			h.metrics.IncrementCacheReadCount(ctx, h.lggr)
 			outboundResp = h.responseCache.Fetch(ctx, workflowID, req, callback, req.CacheSettings.Store)
 		} else {
 			outboundResp = callback()
@@ -327,11 +332,11 @@ func (h *gatewayHandler) makeOutgoingRequest(ctx context.Context, resp *jsonrpc.
 				h.responseCache.Set(workflowID, req, outboundResp)
 			}
 		}
-		h.metrics.Action.IncrementCapabilityRequestCount(ctx, nodeAddr, h.lggr)
+		h.metrics.IncrementActionCapabilityRequestCount(ctx, nodeAddr, h.lggr)
 		err := h.sendResponseToNode(newCtx, requestID, outboundResp, nodeAddr)
 		if err != nil {
 			l.Errorw("error sending response to node", "err", err, "nodeAddr", nodeAddr, "requestID", requestID)
-			h.metrics.Action.IncrementCapabilityFailures(ctx, nodeAddr, h.lggr)
+			h.metrics.IncrementActionCapabilityFailures(ctx, nodeAddr, h.lggr)
 		}
 	}()
 	return nil
