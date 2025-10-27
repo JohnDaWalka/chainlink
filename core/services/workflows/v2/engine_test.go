@@ -1717,7 +1717,7 @@ func TestEngine_HandleNewDON(t *testing.T) {
 
 		// signal a DON send to refetch local node but expect an error
 		donCh <- capabilities.DON{}
-		assert.Error(t, <-errsCh)
+		require.Error(t, <-errsCh)
 
 		// signal a DON send to refetch local node with success
 		donCh <- capabilities.DON{}

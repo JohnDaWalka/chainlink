@@ -222,7 +222,7 @@ func (e *Engine) localNodeSync(ctx context.Context) {
 
 	localNode, err := e.cfg.CapRegistry.LocalNode(ctx)
 	if err != nil {
-		e.cfg.Lggr.Errorf("could not get local node state: %w", err)
+		e.cfg.Lggr.Errorf("could not get local node state: %s", err)
 		e.cfg.Hooks.OnNodeSynced(localNode, err)
 		return
 	}

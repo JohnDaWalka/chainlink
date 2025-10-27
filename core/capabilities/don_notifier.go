@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 type DonNotifier interface {
@@ -34,7 +33,6 @@ type DonNotifyWaitSubscriber interface {
 }
 
 type donNotifier struct {
-	lggr        logger.Logger
 	mu          sync.Mutex
 	don         *capabilities.DON
 	subscribers map[chan capabilities.DON]struct{}
