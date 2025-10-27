@@ -187,6 +187,12 @@ func (c AptosChainUpdate) GetAptosTokenAndTokenPool(state aptosstate.CCIPChainSt
 	return token, tokenPoolAddress, nil
 }
 
+type SuiChainUpdate struct {
+	RateLimiterConfig RateLimiterConfig
+	TokenAddress      string
+	TokenPoolAddress  string
+}
+
 // TokenPoolConfig defines all the information required of the user to configure a token pool.
 type TokenPoolConfig struct {
 	// ChainUpdates defines the chains and corresponding rate limits that should be defined on the token pool.
@@ -197,6 +203,8 @@ type TokenPoolConfig struct {
 
 	// AptosChainUpdates defines the Aptos chains and corresponding rate limits that should be defined on the token pool.
 	AptosChainUpdates map[uint64]AptosChainUpdate
+
+	SuiChainUpdates map[uint64]SuiChainUpdate `json:"suiChainUpdates"`
 
 	// Type is the type of the token pool.
 	Type cldf.ContractType `json:"type"`
@@ -484,6 +492,46 @@ func configureTokenPool(
 			}
 			// Check if the remote pool to-be-set is non-empty and not already configured on the token pool
 			if (remotePoolAddress != aptos.AccountAddress{}) && !isRemotePoolSupported {
+				remotePoolAddressAdditions[remoteChainSelector] = common.LeftPadBytes(remotePoolAddress[:], 32)
+			}
+		} else {
+			chainAdditions = append(chainAdditions, token_pool.TokenPoolChainUpdate{
+				RemoteChainSelector:       remoteChainSelector,
+				InboundRateLimiterConfig:  chainUpdate.RateLimiterConfig.Inbound,
+				OutboundRateLimiterConfig: chainUpdate.RateLimiterConfig.Outbound,
+				RemoteTokenAddress:        common.LeftPadBytes(remoteTokenAddress[:], 32),
+				RemotePoolAddresses:       [][]byte{common.LeftPadBytes(remotePoolAddress[:], 32)},
+			})
+		}
+	}
+
+	for remoteChainSelector, chainUpdate := range poolUpdate.SuiChainUpdates {
+		remoteTokenAddress := common.HexToAddress(chainUpdate.TokenAddress)
+		remotePoolAddress := common.HexToAddress(chainUpdate.TokenPoolAddress)
+		isSupportedChain, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: ctx}, remoteChainSelector)
+		if err != nil {
+			return fmt.Errorf("failed to check if %d is supported on pool with address %s on %s: %w", remoteChainSelector, tokenPool.Address(), chain.String(), err)
+		}
+		if isSupportedChain {
+			// Just update the rate limits if the chain is already supported
+			remoteChainSelectorsToUpdate = append(remoteChainSelectorsToUpdate, remoteChainSelector)
+			updatedOutboundConfigs = append(updatedOutboundConfigs, chainUpdate.RateLimiterConfig.Outbound)
+			updatedInboundConfigs = append(updatedInboundConfigs, chainUpdate.RateLimiterConfig.Inbound)
+
+			// Also, add a new remote pool if the token pool on the remote chain is being updated
+			configuredRemotePools, err := tokenPool.GetRemotePools(&bind.CallOpts{Context: ctx}, remoteChainSelector)
+			if err != nil {
+				return fmt.Errorf("failed to get remote pools for chain with selector %d: %w", remoteChainSelector, err)
+			}
+			var isRemotePoolSupported bool
+			for _, address := range configuredRemotePools {
+				if bytes.Equal(address, remotePoolAddress[:]) {
+					isRemotePoolSupported = true
+					break
+				}
+			}
+			// Check if the remote pool to-be-set is non-empty and not already configured on the token pool
+			if !isRemotePoolSupported {
 				remotePoolAddressAdditions[remoteChainSelector] = common.LeftPadBytes(remotePoolAddress[:], 32)
 			}
 		} else {
