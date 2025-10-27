@@ -83,7 +83,7 @@ func NewEngine(cfg *EngineConfig) (*Engine, error) {
 	}
 
 	// LocalNode() is expected to be non-blocking at this stage (i.e. the registry is already synced)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
 	defer cancel()
 	localNode, err := cfg.CapRegistry.LocalNode(ctx)
 	if err != nil {
@@ -174,7 +174,7 @@ func (e *Engine) handleNewDON(ctx context.Context) (func(ctx context.Context), e
 					return
 				}
 
-				fnCtx, cancel := context.WithTimeout(fnCtx, time.Millisecond*100)
+				fnCtx, cancel := context.WithTimeout(fnCtx, time.Duration(e.cfg.LocalLimits.LocalNodeTimeoutMs)*time.Millisecond)
 				defer cancel()
 
 				localNode, err := e.cfg.CapRegistry.LocalNode(fnCtx)
@@ -184,6 +184,10 @@ func (e *Engine) handleNewDON(ctx context.Context) (func(ctx context.Context), e
 				}
 
 				e.localNode.Store(&localNode)
+				e.cfg.Lggr.Debugw("Set local node state",
+					"Workflow DON ID", localNode.WorkflowDON.ID,
+					"Workflow DON families", localNode.WorkflowDON.Families,
+					"Workflow DON Config Version", localNode.WorkflowDON.ConfigVersion)
 			}
 		}
 	}

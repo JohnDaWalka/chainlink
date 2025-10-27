@@ -212,11 +212,13 @@ func (l *EngineLimiters) Close() error {
 const (
 	defaultHeartbeatFrequencyMs = 1000 * 60 // 1 minute
 	defaultShutdownTimeoutMs    = 5000
+	defaultLocalNodeTimeoutMs   = 100
 )
 
 type EngineLimits struct {
 	HeartbeatFrequencyMs uint32
 	ShutdownTimeoutMs    uint32
+	LocalNodeTimeoutMs   uint32
 }
 
 type LifecycleHooks struct {
@@ -282,6 +284,9 @@ func (l *EngineLimits) setDefaultLimits() {
 	}
 	if l.ShutdownTimeoutMs == 0 {
 		l.ShutdownTimeoutMs = defaultShutdownTimeoutMs
+	}
+	if l.LocalNodeTimeoutMs == 0 {
+		l.LocalNodeTimeoutMs = defaultLocalNodeTimeoutMs
 	}
 }
 
