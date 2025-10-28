@@ -25,6 +25,7 @@ const (
 	WebAPITrigger
 	WebAPITarget
 	CustomCompute
+	LogEventTrigger
 )
 
 func (jt JobSpecTemplate) String() string {
@@ -55,6 +56,8 @@ func (jt JobSpecTemplate) String() string {
 		return "web-api-target"
 	case CustomCompute:
 		return "custom-compute"
+	case LogEventTrigger:
+		return "log-event-trigger"
 	default:
 		return "unknown"
 	}
@@ -89,6 +92,8 @@ func parseJobSpecTemplate(s string) (JobSpecTemplate, error) {
 		return WebAPITarget, nil
 	case "custom-compute":
 		return CustomCompute, nil
+	case "log-event-trigger":
+		return LogEventTrigger, nil
 	case "", "unknown":
 		return 0, errors.New("job spec template cannot be empty")
 	default:
