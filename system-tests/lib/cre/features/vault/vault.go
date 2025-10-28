@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"maps"
 	"strconv"
 
+	"dario.cat/mergo"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -276,7 +276,7 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeVaultBootstrapJobsOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
 	}
 
 	bootstrap, isBootstrap := dons.Bootstrap()
@@ -323,7 +323,7 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeOCR3JobOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)

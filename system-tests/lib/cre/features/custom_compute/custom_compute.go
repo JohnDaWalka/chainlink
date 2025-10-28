@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"maps"
 
+	"dario.cat/mergo"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -96,6 +96,11 @@ func (o *CustomCompute) PostEnvStartup(
 	dons *cre.Dons,
 	creEnv *cre.Environment,
 ) error {
+	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
+	if !ok {
+		return errors.Errorf("%s config not found in capabilities config. Make sure you have set it in the TOML config", flag)
+	}
+
 	var nodeSet cre.NodeSetWithCapabilityConfigs
 	for _, ns := range dons.AsNodeSetWithChainCapabilities() {
 		if ns.GetName() == don.Name {
@@ -105,11 +110,6 @@ func (o *CustomCompute) PostEnvStartup(
 	}
 	if nodeSet == nil {
 		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
-	}
-
-	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
-	if !ok {
-		return errors.Errorf("%s config not found in capabilities config. Make sure you have set it in the TOML config", flag)
 	}
 
 	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
@@ -137,7 +137,7 @@ func (o *CustomCompute) PostEnvStartup(
 		DONFilters: []offchain.TargetDONFilter{
 			{Key: offchain.FilterKeyDONName, Value: don.Name},
 		},
-		Template: job_types.Cron,
+		Template: job_types.CustomCompute,
 		Inputs: job_types.JobSpecInput{
 			"command": "__builtin_custom-compute-action",
 			"config":  configStr,
@@ -160,7 +160,7 @@ func (o *CustomCompute) PostEnvStartup(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)

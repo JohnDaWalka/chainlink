@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"maps"
 
+	"dario.cat/mergo"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -137,7 +137,7 @@ func (o *WebAPITarget) PostEnvStartup(
 		DONFilters: []offchain.TargetDONFilter{
 			{Key: offchain.FilterKeyDONName, Value: don.Name},
 		},
-		Template: job_types.Cron,
+		Template: job_types.WebAPITarget,
 		Inputs: job_types.JobSpecInput{
 			"command": "__builtin_web-api-target",
 			"config":  configStr,
@@ -160,7 +160,7 @@ func (o *WebAPITarget) PostEnvStartup(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)

@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"maps"
 
+	"dario.cat/mergo"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -174,7 +174,7 @@ func (o *HTTPTrigger) PostEnvStartup(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)

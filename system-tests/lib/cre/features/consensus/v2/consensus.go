@@ -3,9 +3,9 @@ package v2
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 
+	"dario.cat/mergo"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -185,7 +185,7 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeOCR3BootstrapJobOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
 	}
 
 	bootstrapPeers := []string{fmt.Sprintf("%s@%s:%d", strings.TrimPrefix(bootstrap.Keys.PeerID(), "p2p_"), bootstrap.Host, cre.OCRPeeringPort)}
@@ -194,7 +194,7 @@ func createJobs(
 		Domain:      offchain.ProductLabel,
 		Environment: cre.EnvironmentName,
 		DONName:     don.Name,
-		JobName:     fmt.Sprintf("consensus-worker-%d", chainID),
+		JobName:     "consensus-worker",
 		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
 		DONFilters: []offchain.TargetDONFilter{
 			{Key: offchain.FilterKeyDONName, Value: don.Name},
@@ -223,7 +223,7 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
 		}
-		maps.Copy(specs, out.Specs)
+		mergo.Merge(&specs, out.Specs)
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
