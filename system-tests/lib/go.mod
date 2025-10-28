@@ -31,7 +31,7 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/sethvargo/go-retry v0.2.4
-	github.com/smartcontractkit/chain-selectors v1.0.75
+	github.com/smartcontractkit/chain-selectors v1.0.76
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20251023193345-8f2c4380a62c
 	github.com/smartcontractkit/chainlink-deployments-framework v0.56.0
