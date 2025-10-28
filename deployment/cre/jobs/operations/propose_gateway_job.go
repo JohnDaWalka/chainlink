@@ -148,6 +148,9 @@ var ProposeGatewayJob = operations.NewOperation[ProposeGatewayJobInput, ProposeG
 
 			output.Specs[n.GetId()] = append(output.Specs[n.GetId()], spec)
 		}
+		if len(output.Specs) == 0 {
+			return ProposeGatewayJobOutput{}, fmt.Errorf("no gateway jobs were proposed")
+		}
 
 		return output, nil
 	},
