@@ -150,7 +150,7 @@ func (r *ReportingPluginFactory) getKeyMaterial(ctx context.Context, instanceID 
 func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig, fetcher ocr3_1types.BlobBroadcastFetcher) (ocr3_1types.ReportingPlugin[[]byte], ocr3_1types.ReportingPluginInfo, error) {
 	var configProto vaultcommon.ReportingPluginConfig
 	if err := proto.Unmarshal(config.OffchainConfig, &configProto); err != nil {
-		return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not unmarshal reporting plugin config: %w", err)
+		return nil, ocr3_1types.ReportingPluginInfo1{}, fmt.Errorf("could not unmarshal reporting plugin config: %w", err)
 	}
 
 	if configProto.BatchSize == 0 {
@@ -206,12 +206,12 @@ func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config 
 	}
 
 	if configProto.DKGInstanceID == nil {
-		return nil, ocr3_1types.ReportingPluginInfo{}, errors.New("DKG instance ID cannot be nil")
+		return nil, ocr3_1types.ReportingPluginInfo1{}, errors.New("DKG instance ID cannot be nil")
 	}
 
 	publicKey, privateKeyShare, err := r.getKeyMaterial(ctx, *configProto.DKGInstanceID)
 	if err != nil {
-		return nil, ocr3_1types.ReportingPluginInfo{}, fmt.Errorf("could not get key material from DB: %w", err)
+		return nil, ocr3_1types.ReportingPluginInfo1{}, fmt.Errorf("could not get key material from DB: %w", err)
 	}
 
 	r.cfg.LazyPublicKey.Set(publicKey)
@@ -231,16 +231,16 @@ func (r *ReportingPluginFactory) NewReportingPlugin(ctx context.Context, config 
 			store:      r.store,
 			cfg:        cfg,
 			onchainCfg: config,
-		}, ocr3_1types.ReportingPluginInfo{
+		}, ocr3_1types.ReportingPluginInfo1{
 			Name: "VaultReportingPlugin",
 			Limits: ocr3_1types.ReportingPluginLimits{
-				MaxQueryLength:                          int(configProto.LimitsMaxQueryLength),
-				MaxObservationLength:                    int(configProto.LimitsMaxObservationLength),
-				MaxReportsPlusPrecursorLength:           int(configProto.LimitsMaxReportsPlusPrecursorLength),
-				MaxReportLength:                         int(configProto.LimitsMaxReportLength),
+				MaxQueryBytes:                          int(configProto.LimitsMaxQueryLength),
+				MaxObservationBytes:                    int(configProto.LimitsMaxObservationLength),
+				MaxReportsPlusPrecursorBytes:           int(configProto.LimitsMaxReportsPlusPrecursorLength),
+				MaxReportBytes:                         int(configProto.LimitsMaxReportLength),
 				MaxReportCount:                          int(configProto.LimitsMaxReportCount),
-				MaxKeyValueModifiedKeysPlusValuesLength: int(configProto.LimitsMaxKeyValueModifiedKeysPlusValuesLength),
-				MaxBlobPayloadLength:                    int(configProto.LimitsMaxBlobPayloadLength),
+				MaxKeyValueModifiedKeysPlusValuesBytes: int(configProto.LimitsMaxKeyValueModifiedKeysPlusValuesLength),
+				MaxBlobPayloadBytes:                    int(configProto.LimitsMaxBlobPayloadLength),
 			},
 		}, nil
 }
