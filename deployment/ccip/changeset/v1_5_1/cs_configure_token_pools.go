@@ -506,8 +506,16 @@ func configureTokenPool(
 	}
 
 	for remoteChainSelector, chainUpdate := range poolUpdate.SuiChainUpdates {
-		remoteTokenAddress := common.HexToAddress(chainUpdate.TokenAddress)
-		remotePoolAddress := common.HexToAddress(chainUpdate.TokenPoolAddress)
+		remoteTokenAddress := aptos.AccountAddress{} // sui addresses are the same format as aptos
+		err := remoteTokenAddress.ParseStringRelaxed(chainUpdate.TokenAddress)
+		if err != nil {
+			return fmt.Errorf("failed to parse remote token address for chain %d: %w", remoteChainSelector, err)
+		}
+		remotePoolAddress := aptos.AccountAddress{}
+		err = remotePoolAddress.ParseStringRelaxed(chainUpdate.TokenPoolAddress)
+		if err != nil {
+			return fmt.Errorf("failed to parse remote pool address for chain %d: %w", remoteChainSelector, err)
+		}
 		isSupportedChain, err := tokenPool.IsSupportedChain(&bind.CallOpts{Context: ctx}, remoteChainSelector)
 		if err != nil {
 			return fmt.Errorf("failed to check if %d is supported on pool with address %s on %s: %w", remoteChainSelector, tokenPool.Address(), chain.String(), err)
