@@ -85,7 +85,7 @@ func DefaultOCR3Config() (*keystone_changeset.OracleConfig, error) {
 
 func DefaultOCR3_1Config(numWorkers int) (*ocr3.OCR3_1OracleConfig, error) {
 	return &ocr3.OCR3_1OracleConfig{
-		DeltaProgressMillis:  5000, // DKG 10-15 seconds; Vault 5 sec // check bandwidth from nops
+		DeltaProgressMillis:  10000,
 		DeltaRoundMillis:     200,
 		DeltaGraceMillis:     0,
 		DeltaStageMillis:     0,
