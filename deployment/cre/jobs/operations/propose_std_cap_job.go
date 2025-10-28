@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -68,7 +69,15 @@ var ProposeStandardCapabilityJob = operations.NewSequence[
 					Op:    ptypes.SelectorOp_EQ,
 					Value: &input.Domain,
 				},
+				{
+					Key:   "type",
+					Op:    ptypes.SelectorOp_EQ,
+					Value: ptr.Ptr(PluginNodeType),
+				},
 			},
+		}
+		for _, f := range input.DONFilters {
+			filter = f.AddToFilter(filter)
 		}
 
 		for _, f := range input.DONFilters {

@@ -1,38 +1,31 @@
 package v2
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
-	"strconv"
+	"maps"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	cre_jobs "github.com/smartcontractkit/chainlink/deployment/cre/jobs"
+	cre_jobs_ops "github.com/smartcontractkit/chainlink/deployment/cre/jobs/operations"
+	job_types "github.com/smartcontractkit/chainlink/deployment/cre/jobs/types"
+	"github.com/smartcontractkit/chainlink/deployment/cre/pkg/offchain"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
-	credon "github.com/smartcontractkit/chainlink/system-tests/lib/cre/don"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/standardcapability"
-	envconfig "github.com/smartcontractkit/chainlink/system-tests/lib/cre/environment/config"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/features/consensus"
 )
 
@@ -84,7 +77,6 @@ func (c *Consensus) PostEnvStartup(
 		ctx,
 		don,
 		dons,
-		*ocr3ContractAddr,
 		creEnv,
 	)
 	if jobsErr != nil {
@@ -123,30 +115,22 @@ func (c *Consensus) PostEnvStartup(
 	return nil
 }
 
-const configTemplate = `'{"chainId":{{.ChainID}},"network":"{{.NetworkFamily}}","nodeAddress":"{{.NodeAddress}}"}'`
-
 func createJobs(
 	ctx context.Context,
 	don *cre.Don,
 	dons *cre.Dons,
-	contractAddress common.Address,
 	creEnv *cre.Environment,
 ) error {
-	jobSpecs := []*jobv1.ProposeJobRequest{}
+	specs := make(map[string][]string)
 
 	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
 	if !ok {
 		return fmt.Errorf("%s config not found in capabilities config: %v", flag, creEnv.CapabilityConfigs)
 	}
 
-	bootstrapNode, isBootstrap := dons.Bootstrap()
-	if !isBootstrap {
-		return errors.New("could not find bootstrap node in topology, exactly one bootstrap node is required")
-	}
-
-	workerNodes, wErr := don.Workers()
-	if wErr != nil {
-		return errors.Wrap(wErr, "failed to find worker nodes")
+	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
+	if cErr != nil {
+		return errors.Wrap(cErr, "failed to get command for cron capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs
@@ -160,101 +144,92 @@ func createJobs(
 		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
 	}
 
+	bootstrap, isBootstrap := dons.Bootstrap()
+	if !isBootstrap {
+		return errors.New("could not find bootstrap node in topology, exactly one bootstrap node is required")
+	}
+
 	chainID, cErr := chainselectors.ChainIdFromSelector(creEnv.RegistryChainSelector)
 	if cErr != nil {
 		return fmt.Errorf("failed to get chain ID from selector %d: %w", creEnv.RegistryChainSelector, cErr)
 	}
-	chainIDStr := strconv.FormatUint(chainID, 10)
 
-	jobSpecs = append(jobSpecs, ocr.BootstrapJobSpec(bootstrapNode.JobDistributorDetails.NodeID, flag, contractAddress.Hex(), chainID))
-
-	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
-	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
-	if cErr != nil {
-		return errors.Wrap(cErr, "failed to get command for cron capability")
+	bootInput := cre_jobs.ProposeJobSpecInput{
+		Domain:      offchain.ProductLabel,
+		Environment: cre.EnvironmentName,
+		DONName:     don.Name,
+		JobName:     "consensus-bootstrap",
+		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
+		DONFilters: []offchain.TargetDONFilter{
+			{Key: offchain.FilterKeyDONName, Value: don.Name},
+		},
+		Template: job_types.BootstrapOCR3,
+		Inputs: job_types.JobSpecInput{
+			"chainSelector":     creEnv.RegistryChainSelector,
+			"contractQualifier": ContractQualifier,
+		},
 	}
 
-	for _, workerNode := range workerNodes {
-		evmKey, ok := workerNode.Keys.EVM[chainID]
-		if !ok {
-			return fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
-		}
-		nodeAddress := evmKey.PublicAddress.Hex()
-
-		evmKeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainselectors.FamilyEVM] // we can always expect evm bundle key id present since evm is the registry chain
-		if !ok {
-			return errors.New("failed to get key bundle id for evm family")
-		}
-
-		strategyName := "single-chain"
-		if len(workerNode.Keys.OCR2BundleIDs) > 1 {
-			strategyName = "multi-chain"
-		}
-
-		oracleFactoryConfigInstance := job.OracleFactoryConfig{
-			Enabled:            true,
-			ChainID:            chainIDStr,
-			BootstrapPeers:     []string{fmt.Sprintf("%s@%s:%d", strings.TrimPrefix(bootstrapNode.Keys.PeerID(), "p2p_"), bootstrapNode.Host, cre.OCRPeeringPort)},
-			OCRContractAddress: contractAddress.Hex(),
-			OCRKeyBundleID:     evmKeyBundle,
-			TransmitterID:      nodeAddress,
-			OnchainSigning: job.OnchainSigningStrategy{
-				StrategyName: strategyName,
-				Config:       workerNode.Keys.OCR2BundleIDs,
-			},
-		}
-
-		type OracleFactoryConfigWrapper struct {
-			OracleFactory job.OracleFactoryConfig `toml:"oracle_factory"`
-		}
-		wrapper := OracleFactoryConfigWrapper{OracleFactory: oracleFactoryConfigInstance}
-
-		var oracleBuffer bytes.Buffer
-		if errEncoder := toml.NewEncoder(&oracleBuffer).Encode(wrapper); errEncoder != nil {
-			return errors.Wrap(errEncoder, "failed to encode oracle factory config to TOML")
-		}
-		oracleStr := strings.ReplaceAll(oracleBuffer.String(), "\n", "\n\t")
-
-		runtimeFallbacks := buildRuntimeValues(chainID, "evm", nodeAddress)
-		var aErr error
-		templateData, aErr = credon.ApplyRuntimeValues(templateData, runtimeFallbacks)
-		if aErr != nil {
-			return errors.Wrap(aErr, "failed to apply runtime values")
-		}
-
-		tmpl, err := template.New("consensusConfig").Parse(configTemplate)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse consensus config template")
-		}
-
-		var configBuffer bytes.Buffer
-		if err := tmpl.Execute(&configBuffer, templateData); err != nil {
-			return errors.Wrap(err, "failed to execute consensus config template")
-		}
-
-		configStr := configBuffer.String()
-
-		if err := credon.ValidateTemplateSubstitution(configStr, flag); err != nil {
-			return errors.Wrapf(err, "%s template validation failed", flag)
-		}
-
-		jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, flag, command, configStr, oracleStr)
-		jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}
-		jobSpecs = append(jobSpecs, jobSpec)
+	bootVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, bootInput)
+	if bootVerErr != nil {
+		return fmt.Errorf("precondition verification failed for Consensus OCR3 bootstrap job for chainID %d: %w", chainID, bootVerErr)
 	}
 
-	jobErr := jobs.Create(ctx, creEnv.CldfEnvironment.Offchain, dons, jobSpecs)
-	if jobErr != nil {
-		return fmt.Errorf("failed to create EVM OCR3 jobs for don %s: %w", don.Name, jobErr)
+	bootReport, bootErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, bootInput)
+	if bootErr != nil {
+		return fmt.Errorf("failed to propose Consensus OCR3 bootstrap job spec for chainID %d: %w", chainID, bootErr)
+	}
+
+	for _, r := range bootReport.Reports {
+		out, ok := r.Output.(cre_jobs_ops.ProposeOCR3BootstrapJobOutput)
+		if !ok {
+			return fmt.Errorf("unable to cast to ProposeOCR3BootstrapJobOutput, actual type: %T", r.Output)
+		}
+		maps.Copy(specs, out.Specs)
+	}
+
+	bootstrapPeers := []string{fmt.Sprintf("%s@%s:%d", strings.TrimPrefix(bootstrap.Keys.PeerID(), "p2p_"), bootstrap.Host, cre.OCRPeeringPort)}
+
+	workerInput := cre_jobs.ProposeJobSpecInput{
+		Domain:      offchain.ProductLabel,
+		Environment: cre.EnvironmentName,
+		DONName:     don.Name,
+		JobName:     fmt.Sprintf("consensus-worker-%d", chainID),
+		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
+		DONFilters: []offchain.TargetDONFilter{
+			{Key: offchain.FilterKeyDONName, Value: don.Name},
+		},
+		Template: job_types.Consensus,
+		Inputs: job_types.JobSpecInput{
+			"command":           command,
+			"chainSelectorEVM":  creEnv.RegistryChainSelector,
+			"contractQualifier": ContractQualifier,
+			"bootstrapPeers":    bootstrapPeers,
+		},
+	}
+
+	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
+	if workerVerErr != nil {
+		return fmt.Errorf("precondition verification failed for OCR3 worker job: %w", workerVerErr)
+	}
+
+	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
+	if workerErr != nil {
+		return fmt.Errorf("failed to propose OCR3 worker job spec: %w", workerErr)
+	}
+
+	for _, r := range workerReport.Reports {
+		out, ok := r.Output.(cre_jobs_ops.ProposeStandardCapabilityJobOutput)
+		if !ok {
+			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
+		}
+		maps.Copy(specs, out.Specs)
+	}
+
+	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
+	if approveErr != nil {
+		return fmt.Errorf("failed to approve ocr3 jobs: %w", approveErr)
 	}
 
 	return nil
-}
-
-func buildRuntimeValues(chainID uint64, networkFamily, nodeAddress string) map[string]any {
-	return map[string]any{
-		"ChainID":       chainID,
-		"NetworkFamily": networkFamily,
-		"NodeAddress":   nodeAddress,
-	}
 }
