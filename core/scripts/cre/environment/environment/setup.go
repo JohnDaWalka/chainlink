@@ -358,7 +358,7 @@ func (c ImageConfig) Ensure(ctx context.Context, dockerClient *client.Client, aw
 		name := strings.ReplaceAll(strings.Split(c.BuildConfig.LocalImage, ":")[0], "-", " ")
 		name = cases.Title(language.English).String(name)
 		logger.Info().Msgf("🔍 %s image not found.", name)
-		logger.Info().Msgf("Would you like to Pull (requires AWS SSO) or build the %s image? (P/b) [P]", name)
+		logger.Info().Msgf("Would you like to Pull (requires AWS SSO) or build the %s image? (P/b) [b]", name)
 
 		var input = "b" // Default to Build; TODO default to Pull when AWS access is sorted
 		if !noPrompt {
