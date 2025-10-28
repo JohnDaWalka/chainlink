@@ -189,8 +189,8 @@ github.com/shopspring/decimal v1.4.0 h1:bxl37RwXBklmTi0C79JfXCEBD1cqqHt0bbgBAGFp
 github.com/shopspring/decimal v1.4.0/go.mod h1:gawqmDU56v4yIKSwfBSFip1HdCCXN8/+DMd9qYNcwME=
 github.com/smartcontractkit/chain-selectors v1.0.67 h1:gxTqP/JC40KDe3DE1SIsIKSTKTZEPyEU1YufO1admnw=
 github.com/smartcontractkit/chain-selectors v1.0.67/go.mod h1:xsKM0aN3YGcQKTPRPDDtPx2l4mlTN1Djmg0VVXV40b8=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20251028165938-6226fd06e3f8 h1:CIIY+VF5ZDnodC2cdviGZE4Ze6kvaaxtqZbVI7x+32w=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20251028165938-6226fd06e3f8/go.mod h1:WqzfMO8jimnPU8BLGetBTy12NBHO5M0UdR47giNsmbU=
+github.com/smartcontractkit/chainlink-common v0.9.6-0.20251028192540-2ac3c24aa883 h1:MbuTvXfQtde3qsynoMSC9tP8fRpqUoaAfZtT0mpXVgg=
+github.com/smartcontractkit/chainlink-common v0.9.6-0.20251028192540-2ac3c24aa883/go.mod h1:al5VNrscTtWnxJaYJN6E3jixY17CvazC4VA6rOpLEHI=
 github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003122604-772b72191274 h1:7vcazdecB5LjHJzhFoj4BfpkhFqv+fVPsNeuBSQVaSA=
 github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20251003122604-772b72191274/go.mod h1:oyfOm4k0uqmgZIfxk1elI/59B02shbbJQiiUdPdbMgI=
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20251021010742-3f8d3dba17d8 h1:hPeEwcvRVtwhyNXH45qbzqmscqlbygu94cROwbjyzNQ=
