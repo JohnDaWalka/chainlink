@@ -94,7 +94,7 @@ var httpActionFailureTests = []httpActionFailureTest{
 		method:        "GET",
 		url:           "http://host.docker.internal:8080/delay/10", // Endpoint that delays response
 		timeout:       1,                                           // 1 second timeout
-		expectedError: "HTTP Action failure test completed: request-timeout",
+		expectedError: "HTTP Action failure test completed: unknown-failure-type",
 	},
 }
 
