@@ -1580,10 +1580,10 @@ github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-f
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20250912190424-fd2e35d7deb5/go.mod h1:Ve1xD71bl193YIZQEoJMmBqLGQJdNs29bwbuObwvbhQ=
 github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5 h1:Z4t2ZY+ZyGWxtcXvPr11y4o3CGqhg3frJB5jXkCSvWA=
 github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5/go.mod h1:xtZNi6pOKdC3sLvokDvXOhgHzT+cyBqH/gWwvxTxqrg=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20251027164420-5539a443f062 h1:5L1qiQ3Ol9o3z2BmBgqdoJDAqp9i7a2h2qbgUR8Q+50=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20251027164420-5539a443f062/go.mod h1:6F8WDJ4589IbWxSoo1KARoPXAMEJn1sCsae0hbyUtFU=
-github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.9-0.20251024212729-0ef0fe2a3d9e h1:8jDWAzK5AL8clL0LouGbfjB0X4iUbMMAj1Al+ZzxdSc=
-github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.9-0.20251024212729-0ef0fe2a3d9e/go.mod h1:oiDa54M0FwxevWwyAX773lwdWvFYYlYHHQV1LQ5HpWY=
+github.com/smartcontractkit/chainlink-common v0.9.6-0.20251028134609-fe3b522968f5 h1:0Bqqm6e5gAROlsr6ijkMEGDsASt/m8AxD6pZ+pvJg1E=
+github.com/smartcontractkit/chainlink-common v0.9.6-0.20251028134609-fe3b522968f5/go.mod h1:h+fqJ8UHY9WUvSBVTOHETHo/9gwAsWqfopIlvUt9mrU=
+github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.9-0.20251027172409-bd1987228745 h1:69CXEllLzCEUCBI9HiJGP6GYleLxe2jXronrteaELT4=
+github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.9-0.20251027172409-bd1987228745/go.mod h1:oiDa54M0FwxevWwyAX773lwdWvFYYlYHHQV1LQ5HpWY=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7 h1:9wh1G+WbXwPVqf0cfSRSgwIcaXTQgvYezylEAfwmrbw=
 github.com/smartcontractkit/chainlink-common/pkg/monitoring v0.0.0-20250415235644-8703639403c7/go.mod h1:yaDOAZF6MNB+NGYpxGCUc+owIdKrjvFW0JODdTcQ3V0=
 github.com/smartcontractkit/chainlink-data-streams v0.1.6 h1:B3cwmJrVYoJVAjPOyQWTNaGD+V30HI1vFHhC2dQpWDo=
