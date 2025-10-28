@@ -45,6 +45,7 @@ type savedCallback struct {
 	requestStartTime   time.Time
 	createdAt          time.Time
 	responseAggregator *aggregation.IdenticalNodeResponseAggregator
+	doneCh             chan struct{} // closed when callback is responded to. signals sendWithRetries to stop retrying
 }
 
 type httpTriggerHandler struct {
@@ -107,6 +108,7 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 		h.handleUserError(ctx, req.ID, jsonrpc.ErrInternal, internalErrorMessage, callback)
 		return errors.New("error generating execution ID: " + err.Error())
 	}
+	h.lggr.Debugw("processing request", "executionID", executionID, "requestID", req.ID, "workflowID", workflowID)
 
 	reqWithKey, err := reqWithAuthorizedKey(triggerReq, *key)
 	if err != nil {
@@ -114,16 +116,17 @@ func (h *httpTriggerHandler) HandleUserTriggerRequest(ctx context.Context, req *
 		return errors.Join(errors.New("auth failure"), err)
 	}
 
-	if err := h.setupCallback(ctx, req.ID, callback, requestStartTime); err != nil {
+	doneCh, err := h.setupCallback(ctx, req.ID, callback, requestStartTime)
+	if err != nil {
 		return err
 	}
 
-	return h.sendWithRetries(ctx, executionID, reqWithKey)
+	return h.sendWithRetries(ctx, executionID, reqWithKey, doneCh)
 }
 
 func (h *httpTriggerHandler) validatedTriggerRequest(ctx context.Context, req *jsonrpc.Request[json.RawMessage], callback handlers.Callback) (*jsonrpc.Request[gateway_common.HTTPTriggerRequest], error) {
 	if req.Params == nil {
-		h.handleUserError(ctx, "", jsonrpc.ErrInvalidRequest, "request params is nil", callback)
+		h.handleUserError(ctx, "", jsonrpc.ErrInvalidRequest, "'params' field is missing. Include a valid 'params' object", callback)
 		return nil, errors.New("request params is nil")
 	}
 
@@ -156,7 +159,7 @@ func (h *httpTriggerHandler) parseTriggerRequest(ctx context.Context, req *jsonr
 	var triggerReq gateway_common.HTTPTriggerRequest
 	err := json.Unmarshal(*req.Params, &triggerReq)
 	if err != nil {
-		h.handleUserError(ctx, req.ID, jsonrpc.ErrParse, "error decoding payload: "+err.Error(), callback)
+		h.handleUserError(ctx, req.ID, jsonrpc.ErrParse, "payload is not a valid JSON. Ensure that the request body is a well-formed JSON", callback)
 		return nil, err
 	}
 	return &triggerReq, nil
@@ -164,7 +167,7 @@ func (h *httpTriggerHandler) parseTriggerRequest(ctx context.Context, req *jsonr
 
 func (h *httpTriggerHandler) validateRequestID(ctx context.Context, requestID string, callback handlers.Callback) error {
 	if requestID == "" {
-		h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, "empty request ID", callback)
+		h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, "'id' field is required and cannot be empty. Use a new unique request 'id' for each request", callback)
 		return errors.New("empty request ID")
 	}
 	// Request IDs from users must not contain "/", since this character is reserved
@@ -178,7 +181,7 @@ func (h *httpTriggerHandler) validateRequestID(ctx context.Context, requestID st
 
 func (h *httpTriggerHandler) validateMethod(ctx context.Context, method, requestID string, callback handlers.Callback) error {
 	if method != gateway_common.MethodWorkflowExecute {
-		h.handleUserError(ctx, requestID, jsonrpc.ErrMethodNotFound, "invalid method: "+method, callback)
+		h.handleUserError(ctx, requestID, jsonrpc.ErrMethodNotFound, fmt.Sprintf("'%s' is not a valid method. Ensure that method is set to 'workflows.execute'", method), callback)
 		return errors.New("invalid method: " + method)
 	}
 	return nil
@@ -186,9 +189,8 @@ func (h *httpTriggerHandler) validateMethod(ctx context.Context, method, request
 
 func (h *httpTriggerHandler) validateTriggerParams(ctx context.Context, triggerReq *gateway_common.HTTPTriggerRequest, requestID string, callback handlers.Callback) error {
 	if !isValidJSON(triggerReq.Input) {
-		h.lggr.Errorw("invalid params JSON", "params", triggerReq.Input)
-		h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, "invalid params JSON", callback)
-		return errors.New("invalid params JSON")
+		h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, "'params' must be {} or [] (JSON object or array). Primitives (null, '', numbers, booleans) are not allowed. Use {} if none.", callback)
+		return errors.New("invalid params JSON: " + string(triggerReq.Input))
 	}
 
 	return h.validateWorkflowFields(ctx, triggerReq.Workflow, requestID, callback)
@@ -316,9 +318,15 @@ func normalizeHex(input string, length int) string {
 }
 
 func (h *httpTriggerHandler) resolveWorkflowID(ctx context.Context, triggerReq *jsonrpc.Request[gateway_common.HTTPTriggerRequest], requestID string, callback handlers.Callback) (string, error) {
+	h.lggr.Debugw("resolving workflow ID", "workflowID", triggerReq.Params.Workflow.WorkflowID, "workflowOwner", triggerReq.Params.Workflow.WorkflowOwner, "workflowName", triggerReq.Params.Workflow.WorkflowName, "workflowTag", triggerReq.Params.Workflow.WorkflowTag, "requestID", requestID)
 	workflowID := triggerReq.Params.Workflow.WorkflowID
 	if workflowID != "" {
 		workflowID = normalizeHex(workflowID, workflowIDLength)
+		_, found := h.workflowMetadataHandler.GetWorkflowReference(workflowID)
+		if !found {
+			h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, fmt.Sprintf("Workflow not found. 'workflowID' %s is not a valid workflow ID", workflowID), callback)
+			return "", errors.New("workflow not found")
+		}
 		return workflowID, nil
 	}
 	workflowOwner := normalizeHex(triggerReq.Params.Workflow.WorkflowOwner, workflowOwnerLength)
@@ -329,16 +337,17 @@ func (h *httpTriggerHandler) resolveWorkflowID(ctx context.Context, triggerReq *
 		triggerReq.Params.Workflow.WorkflowTag,
 	)
 	if !found {
-		h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, "workflow not found", callback)
+		h.handleUserError(ctx, requestID, jsonrpc.ErrInvalidRequest, "Workflow not found. Provide either a valid 'workflowID' or a valid combination of 'workflowOwner', 'workflowName', and 'workflowTag'", callback)
 		return "", errors.New("workflow not found")
 	}
 	return workflowID, nil
 }
 
 func (h *httpTriggerHandler) authorizeRequest(ctx context.Context, workflowID string, req *jsonrpc.Request[json.RawMessage], callback handlers.Callback) (*gateway_common.AuthorizedKey, error) {
+	h.lggr.Debugw("authorizing request", "workflowID", workflowID, "requestID", req.ID)
 	key, err := h.workflowMetadataHandler.Authorize(workflowID, req.Auth, req)
 	if err != nil {
-		h.handleUserError(ctx, req.ID, jsonrpc.ErrInvalidRequest, "Auth failure", callback)
+		h.handleUserError(ctx, req.ID, jsonrpc.ErrInvalidRequest, "Auth failure: "+err.Error(), callback)
 		return nil, errors.Join(errors.New("auth failure"), err)
 	}
 	return key, nil
@@ -369,29 +378,42 @@ func (h *httpTriggerHandler) checkRateLimit(ctx context.Context, workflowID, req
 	return nil
 }
 
-func (h *httpTriggerHandler) setupCallback(ctx context.Context, requestID string, callback handlers.Callback, requestStartTime time.Time) error {
+func (h *httpTriggerHandler) setupCallback(ctx context.Context, requestID string, callback handlers.Callback, requestStartTime time.Time) (<-chan struct{}, error) {
 	h.callbacksMu.Lock()
 	defer h.callbacksMu.Unlock()
 
 	if _, found := h.callbacks[requestID]; found {
-		h.handleUserError(ctx, requestID, jsonrpc.ErrConflict, "in-flight request", callback)
-		return errors.New("in-flight request ID: " + requestID)
+		h.handleUserError(ctx, requestID, jsonrpc.ErrConflict, fmt.Sprintf("requestID: %s has already been used. Ensure the requestID is unique for each request.", requestID), callback)
+		return nil, fmt.Errorf("in-flight request ID: %s", requestID)
 	}
 
 	// (N+F)//2 + 1 threshold where N = number of nodes, F = number of faulty nodes
 	threshold := (len(h.donConfig.Members)+h.donConfig.F)/2 + 1
 	agg, err := aggregation.NewIdenticalNodeResponseAggregator(threshold)
 	if err != nil {
-		return errors.New("failed to create response aggregator: " + err.Error())
+		return nil, errors.New("failed to create response aggregator: " + err.Error())
 	}
 
+	doneCh := make(chan struct{})
 	h.callbacks[requestID] = savedCallback{
 		Callback:           callback,
 		requestStartTime:   requestStartTime,
 		createdAt:          time.Now(),
 		responseAggregator: agg,
+		doneCh:             doneCh,
 	}
-	return nil
+	return doneCh, nil
+}
+
+// cleanupCallback removes a callback and signals sendWithRetries to stop.
+// Must be called while holding callbacksMu lock.
+func (h *httpTriggerHandler) cleanupCallback(requestID string) {
+	saved, exists := h.callbacks[requestID]
+	if !exists {
+		return
+	}
+	close(saved.doneCh)
+	delete(h.callbacks, requestID)
 }
 
 func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp *jsonrpc.Response[json.RawMessage], nodeAddr string) error {
@@ -422,7 +444,9 @@ func (h *httpTriggerHandler) HandleNodeTriggerResponse(ctx context.Context, resp
 	if err != nil {
 		return err
 	}
-	delete(h.callbacks, resp.ID)
+
+	// Only after successfully sending the response, clean up the callback
+	h.cleanupCallback(resp.ID)
 	latencyMs := time.Since(saved.requestStartTime).Milliseconds()
 	h.metrics.Trigger.RecordRequestHandlerLatency(ctx, latencyMs, h.lggr)
 	return nil
@@ -467,7 +491,7 @@ func (h *httpTriggerHandler) reapExpiredCallbacks(ctx context.Context) {
 	for reqID, callback := range h.callbacks {
 		if now.Sub(callback.createdAt) > time.Duration(h.config.MaxTriggerRequestDurationMs)*time.Millisecond {
 			h.metrics.Trigger.IncrementRequestErrors(ctx, jsonrpc.ErrInternal, h.lggr)
-			delete(h.callbacks, reqID)
+			h.cleanupCallback(reqID)
 			expiredCount++
 		}
 	}
@@ -520,7 +544,12 @@ func (h *httpTriggerHandler) handleUserError(ctx context.Context, requestID stri
 
 // sendWithRetries attempts to send the request to all DON members,
 // retrying failed nodes until either all succeed or the max trigger request duration is reached.
-func (h *httpTriggerHandler) sendWithRetries(ctx context.Context, executionID string, req *jsonrpc.Request[json.RawMessage]) error {
+// doneCh is closed when the callback has been responded to (quorum reached), allowing immediate termination.
+func (h *httpTriggerHandler) sendWithRetries(ctx context.Context, executionID string, req *jsonrpc.Request[json.RawMessage], doneCh <-chan struct{}) error {
+	if doneCh == nil {
+		return errors.New("doneCh cannot be nil")
+	}
+
 	// Create a context that will be cancelled when the max request duration is reached
 	maxDuration := time.Duration(h.config.MaxTriggerRequestDurationMs) * time.Millisecond
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, maxDuration)
@@ -573,6 +602,13 @@ func (h *httpTriggerHandler) sendWithRetries(ctx context.Context, executionID st
 			"errors", combinedErr)
 
 		select {
+		case <-doneCh:
+			h.lggr.Infow("Callback already responded to, stopping retries",
+				"executionID", executionID,
+				"requestID", req.ID,
+				"successNodes", len(successfulNodes),
+				"totalNodes", len(h.donConfig.Members))
+			return nil
 		case <-time.After(b.Duration()):
 			continue
 		case <-ctxWithTimeout.Done():
