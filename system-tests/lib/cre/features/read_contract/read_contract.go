@@ -75,7 +75,7 @@ func (o *ReadContract) PostEnvStartup(
 
 	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
 	if cErr != nil {
-		return errors.Wrap(cErr, "failed to get command for cron capability")
+		return errors.Wrap(cErr, "failed to get command for Read Contract capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs
@@ -134,12 +134,12 @@ func (o *ReadContract) PostEnvStartup(
 
 		workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
 		if workerVerErr != nil {
-			return fmt.Errorf("precondition verification failed for Log Event Trigger worker job: %w", workerVerErr)
+			return fmt.Errorf("precondition verification failed for Read Contract worker job: %w", workerVerErr)
 		}
 
 		workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
 		if workerErr != nil {
-			return fmt.Errorf("failed to propose Log Event Trigger worker job spec: %w", workerErr)
+			return fmt.Errorf("failed to propose Read Contract worker job spec: %w", workerErr)
 		}
 
 		for _, r := range workerReport.Reports {
@@ -153,7 +153,7 @@ func (o *ReadContract) PostEnvStartup(
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
 	if approveErr != nil {
-		return fmt.Errorf("failed to approve Log Event Trigger jobs: %w", approveErr)
+		return fmt.Errorf("failed to approve Read Contract jobs: %w", approveErr)
 	}
 
 	return nil

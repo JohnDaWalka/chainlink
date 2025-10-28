@@ -84,7 +84,7 @@ func (o *LogEventTrigger) PostEnvStartup(
 
 	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
 	if cErr != nil {
-		return errors.Wrap(cErr, "failed to get command for cron capability")
+		return errors.Wrap(cErr, "failed to get command for Log Event Trigger capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs

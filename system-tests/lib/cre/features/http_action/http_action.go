@@ -113,7 +113,7 @@ func (o *HTTPAction) PostEnvStartup(
 
 	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
 	if cErr != nil {
-		return errors.Wrap(cErr, "failed to get command for cron capability")
+		return errors.Wrap(cErr, "failed to get command for HTTP Action capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs
@@ -161,12 +161,12 @@ func (o *HTTPAction) PostEnvStartup(
 
 	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
 	if workerVerErr != nil {
-		return fmt.Errorf("precondition verification failed for OCR3 worker job: %w", workerVerErr)
+		return fmt.Errorf("precondition verification failed for HTTP Action worker job: %w", workerVerErr)
 	}
 
 	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
 	if workerErr != nil {
-		return fmt.Errorf("failed to propose OCR3 worker job spec: %w", workerErr)
+		return fmt.Errorf("failed to propose HTTP Action worker job spec: %w", workerErr)
 	}
 
 	specs := make(map[string][]string)
@@ -180,7 +180,7 @@ func (o *HTTPAction) PostEnvStartup(
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
 	if approveErr != nil {
-		return fmt.Errorf("failed to approve ocr3 jobs: %w", approveErr)
+		return fmt.Errorf("failed to approve HTTP Action jobs: %w", approveErr)
 	}
 
 	return nil

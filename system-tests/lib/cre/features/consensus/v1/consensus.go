@@ -124,7 +124,7 @@ func createJobs(
 		Domain:      offchain.ProductLabel,
 		Environment: cre.EnvironmentName,
 		DONName:     don.Name,
-		JobName:     "ocr3-bootstrap",
+		JobName:     "consensus-v1-bootstrap",
 		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
 		DONFilters: []offchain.TargetDONFilter{
 			{Key: offchain.FilterKeyDONName, Value: don.Name},
@@ -138,12 +138,12 @@ func createJobs(
 
 	bootVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, bootInput)
 	if bootVerErr != nil {
-		return fmt.Errorf("precondition verification failed for OCR3 bootstrap job: %w", bootVerErr)
+		return fmt.Errorf("precondition verification failed for Consensus v1 bootstrap job: %w", bootVerErr)
 	}
 
 	bootReport, bootErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, bootInput)
 	if bootErr != nil {
-		return fmt.Errorf("failed to propose OCR3 bootstrap job spec: %w", bootErr)
+		return fmt.Errorf("failed to propose Consensus v1 bootstrap job spec: %w", bootErr)
 	}
 
 	specs := make(map[string][]string)
@@ -169,7 +169,7 @@ func createJobs(
 		Domain:      offchain.ProductLabel,
 		Environment: cre.EnvironmentName,
 		DONName:     don.Name,
-		JobName:     "ocr3-worker",
+		JobName:     "consensus-v1-worker",
 		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
 		DONFilters: []offchain.TargetDONFilter{
 			{Key: offchain.FilterKeyDONName, Value: don.Name},
@@ -185,12 +185,12 @@ func createJobs(
 
 	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
 	if workerVerErr != nil {
-		return fmt.Errorf("precondition verification failed for OCR3 worker job: %w", workerVerErr)
+		return fmt.Errorf("precondition verification failed for Consensus v1 worker job: %w", workerVerErr)
 	}
 
 	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
 	if workerErr != nil {
-		return fmt.Errorf("failed to propose OCR3 worker job spec: %w", workerErr)
+		return fmt.Errorf("failed to propose Consensus v1 worker job spec: %w", workerErr)
 	}
 
 	for _, r := range workerReport.Reports {
@@ -203,7 +203,7 @@ func createJobs(
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
 	if approveErr != nil {
-		return fmt.Errorf("failed to approve ocr3 jobs: %w", approveErr)
+		return fmt.Errorf("failed to approve Consensus v1 jobs: %w", approveErr)
 	}
 
 	return nil

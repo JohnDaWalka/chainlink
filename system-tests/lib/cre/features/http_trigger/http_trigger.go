@@ -112,7 +112,7 @@ func (o *HTTPTrigger) PostEnvStartup(
 
 	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
 	if cErr != nil {
-		return errors.Wrap(cErr, "failed to get command for cron capability")
+		return errors.Wrap(cErr, "failed to get command for HTTP Trigger capability")
 	}
 
 	var nodeSet cre.NodeSetWithCapabilityConfigs
@@ -160,12 +160,12 @@ func (o *HTTPTrigger) PostEnvStartup(
 
 	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
 	if workerVerErr != nil {
-		return fmt.Errorf("precondition verification failed for OCR3 worker job: %w", workerVerErr)
+		return fmt.Errorf("precondition verification failed for HTTP Trigger worker job: %w", workerVerErr)
 	}
 
 	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
 	if workerErr != nil {
-		return fmt.Errorf("failed to propose OCR3 worker job spec: %w", workerErr)
+		return fmt.Errorf("failed to propose HTTP Trigger worker job spec: %w", workerErr)
 	}
 
 	specs := make(map[string][]string)
@@ -179,7 +179,7 @@ func (o *HTTPTrigger) PostEnvStartup(
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
 	if approveErr != nil {
-		return fmt.Errorf("failed to approve ocr3 jobs: %w", approveErr)
+		return fmt.Errorf("failed to approve HTTP Trigger jobs: %w", approveErr)
 	}
 
 	return nil

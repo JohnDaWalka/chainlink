@@ -122,19 +122,19 @@ func createJobs(
 		Inputs: job_types.JobSpecInput{
 			"chainSelectorEVM":     creEnv.RegistryChainSelector,
 			"contractQualifier":    ContractQualifier,
-			"templateName":         "don-time",
+			"templateName":         "don-time-worker",
 			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + fmt.Sprint(ocrPeeringCfg.Port)},
 		},
 	}
 
 	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
 	if workerVerErr != nil {
-		return fmt.Errorf("precondition verification failed for don-time worker job: %w", workerVerErr)
+		return fmt.Errorf("precondition verification failed for Don Time worker job: %w", workerVerErr)
 	}
 
 	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
 	if workerErr != nil {
-		return fmt.Errorf("failed to propose don-time worker job spec: %w", workerErr)
+		return fmt.Errorf("failed to propose Don Time worker job spec: %w", workerErr)
 	}
 
 	for _, r := range workerReport.Reports {
@@ -147,7 +147,7 @@ func createJobs(
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
 	if approveErr != nil {
-		return fmt.Errorf("failed to approve don-time jobs: %w", approveErr)
+		return fmt.Errorf("failed to approve Don Time jobs: %w", approveErr)
 	}
 
 	return nil
