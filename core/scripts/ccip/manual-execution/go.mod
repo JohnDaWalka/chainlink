@@ -1,6 +1,6 @@
 module manual-execution
 
-go 1.25.3
+go 1.24.5
 
 require (
 	github.com/ethereum/go-ethereum v1.15.3
