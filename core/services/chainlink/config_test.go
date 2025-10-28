@@ -324,10 +324,10 @@ func TestConfig_Marshal(t *testing.T) {
 		UseBatchSend:       ptr(true),
 		ChipIngressEnabled: ptr(false),
 		Endpoints: []toml.TelemetryIngressEndpoint{{
-				Network:      ptr("EVM"),
-				ChainID:      ptr("1"),
-				ServerPubKey: ptr("test-pub-key"),
-				URL:          mustURL("prom.test")},
+			Network:      ptr("EVM"),
+			ChainID:      ptr("1"),
+			ServerPubKey: ptr("test-pub-key"),
+			URL:          mustURL("prom.test")},
 		},
 	}
 
