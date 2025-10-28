@@ -95,8 +95,6 @@ func newTestEvtHandler(errFn func() error) *testEvtHandler {
 	}
 }
 
-type testWorkflowRegistryContractLoader struct{}
-
 type testDonNotifier struct {
 	don capabilities.DON
 	err error
