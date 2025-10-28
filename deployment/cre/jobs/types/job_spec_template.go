@@ -22,6 +22,8 @@ const (
 	Gateway
 	BootstrapVault
 	Consensus
+	WebAPITrigger
+	WebAPITarget
 )
 
 func (jt JobSpecTemplate) String() string {
@@ -46,6 +48,10 @@ func (jt JobSpecTemplate) String() string {
 		return "bootstrap-vault"
 	case Consensus:
 		return "consensus"
+	case WebAPITrigger:
+		return "web-api-trigger"
+	case WebAPITarget:
+		return "web-api-target"
 	default:
 		return "unknown"
 	}
@@ -74,6 +80,10 @@ func parseJobSpecTemplate(s string) (JobSpecTemplate, error) {
 		return BootstrapVault, nil
 	case "consensus":
 		return Consensus, nil
+	case "web-api-trigger":
+		return WebAPITrigger, nil
+	case "web-api-target":
+		return WebAPITarget, nil
 	case "", "unknown":
 		return 0, errors.New("job spec template cannot be empty")
 	default:
