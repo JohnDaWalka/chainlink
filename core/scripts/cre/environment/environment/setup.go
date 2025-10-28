@@ -278,6 +278,7 @@ func (c BuildConfig) Build(ctx context.Context) (localImage string, err error) {
 	args := []string{"build", "-t", c.LocalImage, "-f", c.Dockerfile, c.DockerCtx}
 	if c.RequireGithubToken {
 		args = append(args, "--build-arg", "GITHUB_TOKEN="+os.Getenv("GITHUB_TOKEN"))
+		args = append(args, "--secret", "id=GIT_AUTH_TOKEN,env=GITHUB_TOKEN") // to build the billing repo; should be a no-op if not used for other builds
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", args...)

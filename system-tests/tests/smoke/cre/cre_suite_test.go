@@ -51,21 +51,6 @@ func Test_CRE_V1_SecureMint(t *testing.T) {
 	ExecuteSecureMintTest(t, testEnv)
 }
 
-func Test_CRE_V1_Billing_Cron_Beholder(t *testing.T) {
-	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t))
-
-	// TODO remove this when OCR works properly with multiple chains in Local CRE
-	testEnv.CreEnvironment.Blockchains = []blockchains.Blockchain{testEnv.CreEnvironment.Blockchains[0]}
-
-	require.NoError(
-		t,
-		startBillingStackIfIsNotRunning(t, testEnv.TestConfig.RelativePathToRepoRoot, testEnv.TestConfig.EnvironmentDirPath, testEnv),
-		"failed to start Billing stack",
-	)
-
-	ExecuteBillingTest(t, testEnv)
-}
-
 //////////// V2 TESTS /////////////
 /*
 To execute tests with v2 contracts start the local CRE first:
@@ -131,6 +116,21 @@ func Test_CRE_V2_EVM_Suite(t *testing.T) {
 	t.Run("[v2] EVM Read - "+topology, func(t *testing.T) {
 		ExecuteEVMReadTest(t, testEnv)
 	})
+}
+
+func Test_CRE_V2_Billing_Cron_Beholder(t *testing.T) {
+	testEnv := t_helpers.SetupTestEnvironmentWithConfig(t, t_helpers.GetDefaultTestConfig(t), v2RegistriesFlags...)
+
+	// TODO remove this when OCR works properly with multiple chains in Local CRE
+	testEnv.CreEnvironment.Blockchains = []blockchains.Blockchain{testEnv.CreEnvironment.Blockchains[0]}
+
+	require.NoError(
+		t,
+		startBillingStackIfIsNotRunning(t, testEnv.TestConfig.RelativePathToRepoRoot, testEnv.TestConfig.EnvironmentDirPath, testEnv),
+		"failed to start Billing stack",
+	)
+
+	ExecuteBillingTest(t, testEnv)
 }
 
 func Test_CRE_V2_Billing_EVM_Write(t *testing.T) {
