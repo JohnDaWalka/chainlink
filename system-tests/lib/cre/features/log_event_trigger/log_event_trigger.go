@@ -75,7 +75,6 @@ func (o *LogEventTrigger) PostEnvStartup(
 	dons *cre.Dons,
 	creEnv *cre.Environment,
 ) error {
-	// jobSpecs := cre.DonJobs{}
 	specs := make(map[string][]string)
 
 	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
