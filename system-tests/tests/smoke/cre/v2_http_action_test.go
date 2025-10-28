@@ -60,9 +60,9 @@ var httpActionSuccessTests = []httpActionSuccessTest{
 func ExecuteHTTPActionCRUDSuccessTest(t *testing.T, testEnv *ttypes.TestEnvironment) {
 	testLogger := framework.L
 
-	// Use the pre-configured fake server port from the environment (8171)
+	// Use the pre-configured fake server port from the environment
 	// This port is already whitelisted in the gateway configuration
-	fakeServerPort := testEnv.Config.Fake.Port
+	fakeServerPort := testEnv.Config.FakeHTTP.Port
 
 	// Start fake HTTP server with CRUD endpoints
 	fakeServer, err := thelpers.StartCRUDTestServer(t, fakeServerPort, false)
