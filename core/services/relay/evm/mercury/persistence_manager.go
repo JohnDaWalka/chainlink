@@ -98,6 +98,10 @@ func (pm *PersistenceManager) runFlushDeletesLoop() {
 			return
 		case <-ticker.C:
 			queuedReqs := pm.resetDeleteQueue()
+			if len(queuedReqs) == 0 {
+				break
+			}
+
 			if err := pm.orm.DeleteTransmitRequests(ctx, pm.serverURL, queuedReqs); err != nil {
 				pm.lggr.Errorw("Failed to delete queued transmit requests", "err", err)
 				pm.addToDeleteQueue(queuedReqs...)

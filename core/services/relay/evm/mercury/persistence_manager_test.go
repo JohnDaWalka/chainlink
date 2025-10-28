@@ -9,6 +9,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-evm/pkg/testutils"
@@ -70,6 +71,8 @@ func TestPersistenceManagerAsyncDelete(t *testing.T) {
 	testutils.MustExec(t, db, `SET CONSTRAINTS mercury_transmit_requests_job_id_fkey DEFERRED`)
 	testutils.MustExec(t, db, `SET CONSTRAINTS feed_latest_reports_job_id_fkey DEFERRED`)
 	pm := bootstrapPersistenceManager(t, jobID, db)
+	lggr, observedLogs := logger.TestObserved(t, zapcore.DebugLevel)
+	pm.lggr = lggr
 
 	reports := sampleReports
 
@@ -87,7 +90,9 @@ func TestPersistenceManagerAsyncDelete(t *testing.T) {
 	testutils.RequireEventually(t, func() bool {
 		pm.deleteMu.Lock()
 		defer pm.deleteMu.Unlock()
-		return len(pm.deleteQueue) == 0
+
+		deletedLogs := observedLogs.FilterLevelExact(zapcore.DebugLevel).FilterMessageSnippet("Deleted queued transmit requests")
+		return len(pm.deleteQueue) == 0 && deletedLogs.Len() > 0
 	})
 
 	transmissions, err := pm.Load(ctx)
