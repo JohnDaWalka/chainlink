@@ -1014,29 +1014,32 @@ func generateUpgradeTxns(
 		return txns, fmt.Errorf("failed to load MCMS with timelock chain state: %w", err)
 	}
 	timelockSignerPDA := state.GetTimelockSignerPDA(mcmState.TimelockProgram, mcmState.TimelockSeed)
+
+	programName := getTypeToProgramDeployName()[contractType]
+	newBytes := deployment.SolanaProgramBytes[programName]
+	bufferSize, err := GetSolProgramSize(&e, chain, bufferProgram)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get buffer size: %w", err)
+	}
+	// Extend transaction is permissionless, so it is always executed by deployer key
+	// It is a solana limitation that PDAs (MCMs in this case) can not manage memory
+	extendIxn, err := generateExtendIxn(
+		&e,
+		chain,
+		programID,
+		chain.DeployerKey.PublicKey(),
+		mathutil.Max(newBytes, bufferSize),
+	)
+	if err != nil {
+		return txns, fmt.Errorf("failed to generate extend buffer instruction: %w", err)
+	}
+	if err := chain.Confirm([]solana.Instruction{extendIxn}); err != nil {
+		return txns, fmt.Errorf("failed to confirm instructions: %w", err)
+	}
+
 	// if we're not upgrading via timelock, execute the raw ixns
 	if config.UpgradeConfig.UpgradeAuthority != timelockSignerPDA {
-		programName := getTypeToProgramDeployName()[contractType]
-		newBytes := deployment.SolanaProgramBytes[programName]
-		bufferSize, err := GetSolProgramSize(&e, chain, bufferProgram)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get buffer size: %w", err)
-		}
-		ixns := []solana.Instruction{upgradeIxn}
-		extendIxn, err := generateExtendIxn(
-			&e,
-			chain,
-			programID,
-			config.UpgradeConfig.UpgradeAuthority,
-			mathutil.Max(newBytes, bufferSize),
-		)
-		if err != nil {
-			return txns, fmt.Errorf("failed to generate extend buffer instruction: %w", err)
-		}
-		if extendIxn != nil {
-			ixns = append(ixns, extendIxn)
-		}
-		ixns = append(ixns, closeIxn)
+		ixns := []solana.Instruction{upgradeIxn, closeIxn}
 		if err := chain.Confirm(ixns); err != nil {
 			return txns, fmt.Errorf("failed to confirm instructions: %w", err)
 		}
@@ -1050,8 +1053,6 @@ func generateUpgradeTxns(
 	if err != nil {
 		return txns, fmt.Errorf("failed to create close transaction: %w", err)
 	}
-	// We do not support extend as part of upgrades due to MCMS limitations
-	// https://docs.google.com/document/d/1Fk76lOeyS2z2X6MokaNX_QTMFAn5wvSZvNXJluuNV1E/edit?tab=t.0#heading=h.uij286zaarkz
 	txns = append(txns, *upgradeTx, *closeTx)
 	return txns, nil
 }
