@@ -24,6 +24,7 @@ const (
 	Consensus
 	WebAPITrigger
 	WebAPITarget
+	CustomCompute
 )
 
 func (jt JobSpecTemplate) String() string {
@@ -52,6 +53,8 @@ func (jt JobSpecTemplate) String() string {
 		return "web-api-trigger"
 	case WebAPITarget:
 		return "web-api-target"
+	case CustomCompute:
+		return "custom-compute"
 	default:
 		return "unknown"
 	}
@@ -84,6 +87,8 @@ func parseJobSpecTemplate(s string) (JobSpecTemplate, error) {
 		return WebAPITrigger, nil
 	case "web-api-target":
 		return WebAPITarget, nil
+	case "custom-compute":
+		return CustomCompute, nil
 	case "", "unknown":
 		return 0, errors.New("job spec template cannot be empty")
 	default:
