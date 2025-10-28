@@ -110,16 +110,6 @@ func (t *testDonNotifier) Subscribe(ctx context.Context) (<-chan capabilities.DO
 	return ch, func() {}, t.err
 }
 
-type testWorkflowRegistryContractLoader struct{}
-
-func (m *testWorkflowRegistryContractLoader) LoadWorkflows(ctx context.Context, don capabilities.DON) (*types.Head, error) {
-	return &types.Head{
-		Height:    "0",
-		Hash:      nil,
-		Timestamp: 0,
-	}, nil
-}
-
 func Test_EventHandlerStateSync(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	backendTH := testutils.NewEVMBackendTH(t)
