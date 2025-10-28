@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"dario.cat/mergo"
 	"github.com/pkg/errors"
@@ -152,7 +153,10 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeOCR3BootstrapJobOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		mErr := mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge bootstrap job specs: %w", mErr)
+		}
 	}
 
 	bootstrap, isBootstrap := dons.Bootstrap()
@@ -179,7 +183,7 @@ func createJobs(
 			"chainSelectorEVM":     creEnv.RegistryChainSelector,
 			"contractQualifier":    ContractQualifier,
 			"templateName":         "worker-ocr3",
-			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + fmt.Sprint(ocrPeeringCfg.Port)},
+			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + strconv.Itoa(ocrPeeringCfg.Port)},
 		},
 	}
 
@@ -198,7 +202,10 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeOCR3JobOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		mErr := mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge worker job specs: %w", mErr)
+		}
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)

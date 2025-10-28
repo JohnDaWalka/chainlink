@@ -9,7 +9,6 @@ import (
 	"dario.cat/mergo"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/uuid"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -18,14 +17,12 @@ import (
 	"github.com/smartcontractkit/smdkg/dkgocr/dkgocrtypes"
 	"github.com/smartcontractkit/tdh2/go/tdh2/tdh2easy"
 
-	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	coretoml "github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	corechainlink "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 
 	vaultprotos "github.com/smartcontractkit/chainlink-common/pkg/capabilities/actions/vault"
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -276,7 +273,10 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeVaultBootstrapJobsOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		mErr := mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge bootstrap job specs: %w", mErr)
+		}
 	}
 
 	bootstrap, isBootstrap := dons.Bootstrap()
@@ -304,7 +304,7 @@ func createJobs(
 			"contractQualifier":    ContractQualifier + "_plugin",
 			"dkgContractQualifier": ContractQualifier + "_dkg",
 			"templateName":         "worker-vault",
-			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + fmt.Sprint(ocrPeeringCfg.Port)},
+			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + strconv.Itoa(ocrPeeringCfg.Port)},
 		},
 	}
 
@@ -323,7 +323,10 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeOCR3JobOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		mErr := mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge worker job specs: %w", mErr)
+		}
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
@@ -431,43 +434,4 @@ func EncryptSecret(secret, masterPublicKeyStr string) (string, error) {
 		return "", errors.Wrap(err, "failed to marshal encrypted secrets to bytes")
 	}
 	return hex.EncodeToString(cipherBytes), nil
-}
-
-func workerJobSpec(nodeID string, vaultCapabilityAddress, dkgAddress, nodeEthAddress, ocr2KeyBundleID string, ocrPeeringData cre.OCRPeeringData, chainID uint64) *jobv1.ProposeJobRequest {
-	uuid := uuid.NewString()
-
-	return &jobv1.ProposeJobRequest{
-		NodeId: nodeID,
-		Spec: fmt.Sprintf(`
-	type = "offchainreporting2"
-	schemaVersion = 1
-	externalJobID = "%s"
-	name = "%s"
-	contractID = "%s"
-	ocrKeyBundleID = "%s"
-	p2pv2Bootstrappers = [
-		"%s@%s",
-	]
-	relay = "evm"
-	pluginType = "%s"
-	transmitterID = "%s"
-	[relayConfig]
-	chainID = "%d"
-	[pluginConfig]
-	requestExpiryDuration = "60s"
-	[pluginConfig.dkg]
-	dkgContractID = "%s"
-`,
-			uuid,
-			"Vault OCR3 Capability",
-			vaultCapabilityAddress,
-			ocr2KeyBundleID,
-			ocrPeeringData.OCRBootstraperPeerID,
-			fmt.Sprintf("%s:%d", ocrPeeringData.OCRBootstraperHost, ocrPeeringData.Port),
-			types.VaultPlugin,
-			nodeEthAddress,
-			chainID,
-			dkgAddress,
-		),
-	}
 }

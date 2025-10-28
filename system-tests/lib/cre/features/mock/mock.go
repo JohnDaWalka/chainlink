@@ -140,7 +140,10 @@ func (o *Mock) PostEnvStartup(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		mErr := mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge worker job specs: %w", mErr)
+		}
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)

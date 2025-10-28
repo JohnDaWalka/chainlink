@@ -738,6 +738,10 @@ func (n *Node) SetUpAndLinkJobDistributor(ctx context.Context, jd *jd.JobDistrib
 		Key:   "product",
 		Value: ptr.Ptr(cre_offchain.ProductLabel),
 	})
+	labels = append(labels, &ptypes.Label{
+		Key:   cre_offchain.FilterKeyDONName,
+		Value: ptr.Ptr(n.DON.Name),
+	})
 
 	// register the node in the job distributor
 	err := n.RegisterNodeToJobDistributor(ctx, jd, labels)

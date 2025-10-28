@@ -185,7 +185,10 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeOCR3BootstrapJobOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		mErr := mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge bootstrap job specs: %w", mErr)
+		}
 	}
 
 	bootstrapPeers := []string{fmt.Sprintf("%s@%s:%d", strings.TrimPrefix(bootstrap.Keys.PeerID(), "p2p_"), bootstrap.Host, cre.OCRPeeringPort)}
@@ -223,7 +226,10 @@ func createJobs(
 		if !ok {
 			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
 		}
-		mergo.Merge(&specs, out.Specs)
+		mErr := mergo.Merge(&specs, out.Specs)
+		if mErr != nil {
+			return fmt.Errorf("failed to merge worker job specs: %w", mErr)
+		}
 	}
 
 	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
