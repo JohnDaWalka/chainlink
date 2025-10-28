@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"html/template"
 
+	"dario.cat/mergo"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	capabilitiespb "github.com/smartcontractkit/chainlink-common/pkg/capabilities/pb"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
-	"github.com/smartcontractkit/chainlink-protos/job-distributor/v1/shared/ptypes"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
+	cre_jobs "github.com/smartcontractkit/chainlink/deployment/cre/jobs"
+	cre_jobs_ops "github.com/smartcontractkit/chainlink/deployment/cre/jobs/operations"
+	job_types "github.com/smartcontractkit/chainlink/deployment/cre/jobs/types"
+	"github.com/smartcontractkit/chainlink/deployment/cre/pkg/offchain"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre"
@@ -51,7 +54,7 @@ func (o *Mock) PreEnvStartup(
 	}, nil
 }
 
-const configTemplate = `"""
+const configTemplate = `
 port={{.Port}}
 {{- range .DefaultMocks }}
 [[DefaultMocks]]
@@ -59,7 +62,7 @@ id = "{{ .Id }}"
 description = "{{ .Description }}"
 type = "{{ .Type }}"
 {{- end }}
-"""`
+`
 
 func (o *Mock) PostEnvStartup(
 	ctx context.Context,
@@ -68,18 +71,6 @@ func (o *Mock) PostEnvStartup(
 	dons *cre.Dons,
 	creEnv *cre.Environment,
 ) error {
-	jobSpecs := cre.DonJobs{}
-
-	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
-	if !ok {
-		return errors.Errorf("%s config not found in capabilities config. Make sure you have set it in the TOML config", flag)
-	}
-
-	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
-	if cErr != nil {
-		return errors.Wrap(cErr, "failed to get command for cron capability")
-	}
-
 	var nodeSet cre.NodeSetWithCapabilityConfigs
 	for _, ns := range dons.AsNodeSetWithChainCapabilities() {
 		if ns.GetName() == don.Name {
@@ -89,6 +80,16 @@ func (o *Mock) PostEnvStartup(
 	}
 	if nodeSet == nil {
 		return fmt.Errorf("could not find node set for Don named '%s'", don.Name)
+	}
+
+	capabilityConfig, ok := creEnv.CapabilityConfigs[flag]
+	if !ok {
+		return errors.Errorf("%s config not found in capabilities config. Make sure you have set it in the TOML config", flag)
+	}
+
+	command, cErr := standardcapability.GetCommand(capabilityConfig.BinaryPath, creEnv.Provider)
+	if cErr != nil {
+		return errors.Wrap(cErr, "failed to get command for Mock capability")
 	}
 
 	templateData := envconfig.ResolveCapabilityConfigForDON(flag, capabilityConfig.Config, nodeSet.GetCapabilityConfigOverrides())
@@ -107,21 +108,44 @@ func (o *Mock) PostEnvStartup(
 		return errors.Wrapf(err, "%s template validation failed", flag)
 	}
 
-	workerNodes, wErr := don.Workers()
-	if wErr != nil {
-		return errors.Wrap(wErr, "failed to find worker nodes")
+	workerInput := cre_jobs.ProposeJobSpecInput{
+		Domain:      offchain.ProductLabel,
+		Environment: cre.EnvironmentName,
+		DONName:     don.Name,
+		JobName:     "mock-worker",
+		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
+		DONFilters: []offchain.TargetDONFilter{
+			{Key: offchain.FilterKeyDONName, Value: don.Name},
+		},
+		Template: job_types.Cron, // use cron job type to avoid adding mock job type to jobs package, because it is only for testing
+		Inputs: job_types.JobSpecInput{
+			"command": command,
+			"config":  configStr,
+		},
 	}
 
-	for _, workerNode := range workerNodes {
-		jobSpec := standardcapability.WorkerJobSpec(workerNode.JobDistributorDetails.NodeID, flag, command, configStr, "")
-		jobSpec.Labels = []*ptypes.Label{{Key: cre.CapabilityLabelKey, Value: ptr.Ptr(flag)}}
-		jobSpecs = append(jobSpecs, jobSpec)
+	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
+	if workerVerErr != nil {
+		return fmt.Errorf("precondition verification failed for Mock worker job: %w", workerVerErr)
 	}
 
-	// pass all dons, since some jobs might need to be created on multiple dons
-	jobErr := jobs.Create(ctx, creEnv.CldfEnvironment.Offchain, dons, jobSpecs)
-	if jobErr != nil {
-		return fmt.Errorf("failed to create http action jobs for don %s: %w", don.Name, jobErr)
+	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
+	if workerErr != nil {
+		return fmt.Errorf("failed to propose Mock worker job spec: %w", workerErr)
+	}
+
+	specs := make(map[string][]string)
+	for _, r := range workerReport.Reports {
+		out, ok := r.Output.(cre_jobs_ops.ProposeStandardCapabilityJobOutput)
+		if !ok {
+			return fmt.Errorf("unable to cast to ProposeStandardCapabilityJobOutput, actual type: %T", r.Output)
+		}
+		mergo.Merge(&specs, out.Specs, mergo.WithAppendSlice)
+	}
+
+	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
+	if approveErr != nil {
+		return fmt.Errorf("failed to approve Mock jobs: %w", approveErr)
 	}
 
 	return nil
