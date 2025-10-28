@@ -160,18 +160,9 @@ func (o *Vault) PostEnvStartup(
 		return fmt.Errorf("failed to deploy Vault OCR3 contract %w", err)
 	}
 
-	// chainID, chErr := chainselectors.ChainIdFromSelector(creEnv.RegistryChainSelector)
-	// if chErr != nil {
-	// 	return errors.Wrapf(chErr, "failed to get chain ID from chain selector %d", creEnv.RegistryChainSelector)
-	// }
-
 	jobErr := createJobs(
 		ctx,
 		creEnv,
-		// chainID,
-		// vaultOCR3Addr,
-		// vaultDKGOCR3Addr,
-		// creEnv.CldfEnvironment.Offchain.(*jd.JobDistributor),
 		don,
 		dons,
 	)

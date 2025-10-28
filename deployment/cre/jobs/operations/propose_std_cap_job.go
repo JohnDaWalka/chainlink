@@ -7,7 +7,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -72,7 +71,7 @@ var ProposeStandardCapabilityJob = operations.NewSequence[
 				{
 					Key:   "type",
 					Op:    ptypes.SelectorOp_EQ,
-					Value: ptr.Ptr(PluginNodeType),
+					Value: ptr(PluginNodeType),
 				},
 			},
 		}
@@ -207,3 +206,7 @@ var ProposeStandardCapabilityJob = operations.NewSequence[
 
 		return ProposeStandardCapabilityJobOutput{Specs: specs}, nil
 	})
+
+func ptr[T any](t T) *T {
+	return &t
+}

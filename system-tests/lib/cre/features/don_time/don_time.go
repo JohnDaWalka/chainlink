@@ -123,7 +123,7 @@ func createJobs(
 		Inputs: job_types.JobSpecInput{
 			"chainSelectorEVM":     creEnv.RegistryChainSelector,
 			"contractQualifier":    ContractQualifier,
-			"templateName":         "don-time-worker",
+			"templateName":         "don-time",
 			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + strconv.Itoa(ocrPeeringCfg.Port)},
 		},
 	}
