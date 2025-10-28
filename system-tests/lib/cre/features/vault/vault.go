@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"strconv"
 
 	"github.com/cosmos/gogoproto/proto"
@@ -27,11 +28,15 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
-	"github.com/smartcontractkit/chainlink-deployments-framework/offchain/jd"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	kcr "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/capabilities_registry_1_1_0"
 	ocr3_capability "github.com/smartcontractkit/chainlink-evm/gethwrappers/keystone/generated/ocr3_capability_1_0_0"
+	cre_jobs "github.com/smartcontractkit/chainlink/deployment/cre/jobs"
+	cre_jobs_ops "github.com/smartcontractkit/chainlink/deployment/cre/jobs/operations"
+	cre_jobs_seq "github.com/smartcontractkit/chainlink/deployment/cre/jobs/sequences"
+	job_types "github.com/smartcontractkit/chainlink/deployment/cre/jobs/types"
 	creseq "github.com/smartcontractkit/chainlink/deployment/cre/ocr3/v2/changeset/sequences"
+	"github.com/smartcontractkit/chainlink/deployment/cre/pkg/offchain"
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	ks_contracts_op "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/operations/contracts"
 	coregateway "github.com/smartcontractkit/chainlink/v2/core/services/gateway"
@@ -40,14 +45,13 @@ import (
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/contracts"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/gateway"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs"
-	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/jobs/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/config"
 )
 
 const flag = cre.VaultCapability
 
 const (
-	ContractQualifier = "capability_vault"
+	ContractQualifier = "vault"
 )
 
 type Vault struct{}
@@ -159,17 +163,18 @@ func (o *Vault) PostEnvStartup(
 		return fmt.Errorf("failed to deploy Vault OCR3 contract %w", err)
 	}
 
-	chainID, chErr := chainselectors.ChainIdFromSelector(creEnv.RegistryChainSelector)
-	if chErr != nil {
-		return errors.Wrapf(chErr, "failed to get chain ID from chain selector %d", creEnv.RegistryChainSelector)
-	}
+	// chainID, chErr := chainselectors.ChainIdFromSelector(creEnv.RegistryChainSelector)
+	// if chErr != nil {
+	// 	return errors.Wrapf(chErr, "failed to get chain ID from chain selector %d", creEnv.RegistryChainSelector)
+	// }
 
 	jobErr := createJobs(
 		ctx,
-		chainID,
-		vaultOCR3Addr,
-		vaultDKGOCR3Addr,
-		creEnv.CldfEnvironment.Offchain.(*jd.JobDistributor),
+		creEnv,
+		// chainID,
+		// vaultOCR3Addr,
+		// vaultDKGOCR3Addr,
+		// creEnv.CldfEnvironment.Offchain.(*jd.JobDistributor),
 		don,
 		dons,
 	)
@@ -235,21 +240,48 @@ func (o *Vault) PostEnvStartup(
 
 func createJobs(
 	ctx context.Context,
-	chainID uint64,
-	vaultOCR3Addr *common.Address,
-	vaultDKGOCR3Addr *common.Address,
-	jdClient *jd.JobDistributor,
+	creEnv *cre.Environment,
 	don *cre.Don,
 	dons *cre.Dons,
 ) error {
+	bootInput := cre_jobs.ProposeJobSpecInput{
+		Domain:      offchain.ProductLabel,
+		Environment: cre.EnvironmentName,
+		DONName:     don.Name,
+		JobName:     "vault-bootstrap",
+		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
+		DONFilters: []offchain.TargetDONFilter{
+			{Key: offchain.FilterKeyDONName, Value: don.Name},
+		},
+		Template: job_types.BootstrapVault,
+		Inputs: job_types.JobSpecInput{
+			"chainSelector":           creEnv.RegistryChainSelector,
+			"contractQualifierPrefix": ContractQualifier,
+		},
+	}
+
+	bootVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, bootInput)
+	if bootVerErr != nil {
+		return fmt.Errorf("precondition verification failed for OCR3 bootstrap job: %w", bootVerErr)
+	}
+
+	bootReport, bootErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, bootInput)
+	if bootErr != nil {
+		return fmt.Errorf("failed to propose OCR3 bootstrap job spec: %w", bootErr)
+	}
+
+	specs := make(map[string][]string)
+	for _, r := range bootReport.Reports {
+		out, ok := r.Output.(cre_jobs_seq.ProposeVaultBootstrapJobsOutput)
+		if !ok {
+			return fmt.Errorf("unable to cast to ProposeVaultBootstrapJobsOutput, actual type: %T", r.Output)
+		}
+		maps.Copy(specs, out.Specs)
+	}
+
 	bootstrap, isBootstrap := dons.Bootstrap()
 	if !isBootstrap {
 		return errors.New("could not find bootstrap node in topology, exactly one bootstrap node is required")
-	}
-
-	workerNodes, wErr := don.Workers()
-	if wErr != nil {
-		return errors.Wrap(wErr, "failed to find worker nodes")
 	}
 
 	_, ocrPeeringCfg, err := cre.PeeringCfgs(bootstrap)
@@ -257,27 +289,49 @@ func createJobs(
 		return errors.Wrap(err, "failed to get peering configs")
 	}
 
-	jobSpecs := []*jobv1.ProposeJobRequest{}
-	jobSpecs = append(jobSpecs, ocr.BootstrapJobSpec(bootstrap.JobDistributorDetails.NodeID, "vault-capability", vaultOCR3Addr.Hex(), chainID))
-
-	for _, workerNode := range workerNodes {
-		evmKey, ok := workerNode.Keys.EVM[chainID]
-		if !ok {
-			return fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
-		}
-
-		// we need the OCR2 key bundle for the EVM chain, because OCR jobs currently run only on EVM chains
-		evmOCR2KeyBundle, ok := workerNode.Keys.OCR2BundleIDs[chainselectors.FamilyEVM]
-		if !ok {
-			return fmt.Errorf("node %s does not have OCR2 key bundle for evm", workerNode.Name)
-		}
-
-		// we pass here bundles for all chains to enable multi-chain signing
-		jobSpecs = append(jobSpecs, workerJobSpec(workerNode.JobDistributorDetails.NodeID, vaultOCR3Addr.Hex(), vaultDKGOCR3Addr.Hex(), evmKey.PublicAddress.Hex(), evmOCR2KeyBundle, ocrPeeringCfg, chainID))
+	workerInput := cre_jobs.ProposeJobSpecInput{
+		Domain:      offchain.ProductLabel,
+		Environment: cre.EnvironmentName,
+		DONName:     don.Name,
+		JobName:     "vault-worker",
+		ExtraLabels: map[string]string{cre.CapabilityLabelKey: flag},
+		DONFilters: []offchain.TargetDONFilter{
+			{Key: offchain.FilterKeyDONName, Value: don.Name},
+		},
+		Template: job_types.OCR3,
+		Inputs: job_types.JobSpecInput{
+			"chainSelectorEVM":     creEnv.RegistryChainSelector,
+			"contractQualifier":    ContractQualifier + "_plugin",
+			"dkgContractQualifier": ContractQualifier + "_dkg",
+			"templateName":         "worker-vault",
+			"bootstrapperOCR3Urls": []string{ocrPeeringCfg.OCRBootstraperPeerID + "@" + ocrPeeringCfg.OCRBootstraperHost + ":" + fmt.Sprint(ocrPeeringCfg.Port)},
+		},
 	}
 
-	// pass whole topology, since some jobs might need to be created on multiple DONs
-	return jobs.Create(ctx, jdClient, dons, jobSpecs)
+	workerVerErr := cre_jobs.ProposeJobSpec{}.VerifyPreconditions(*creEnv.CldfEnvironment, workerInput)
+	if workerVerErr != nil {
+		return fmt.Errorf("precondition verification failed for OCR3 worker job: %w", workerVerErr)
+	}
+
+	workerReport, workerErr := cre_jobs.ProposeJobSpec{}.Apply(*creEnv.CldfEnvironment, workerInput)
+	if workerErr != nil {
+		return fmt.Errorf("failed to propose OCR3 worker job spec: %w", workerErr)
+	}
+
+	for _, r := range workerReport.Reports {
+		out, ok := r.Output.(cre_jobs_ops.ProposeOCR3JobOutput)
+		if !ok {
+			return fmt.Errorf("unable to cast to ProposeOCR3JobOutput, actual type: %T", r.Output)
+		}
+		maps.Copy(specs, out.Specs)
+	}
+
+	approveErr := jobs.Approve(ctx, creEnv.CldfEnvironment.Offchain, dons, specs)
+	if approveErr != nil {
+		return fmt.Errorf("failed to approve ocr3 jobs: %w", approveErr)
+	}
+
+	return nil
 }
 
 func deployVaultContracts(testLogger zerolog.Logger, qualifier string, homeChainSelector uint64, env *cldf.Environment, contractVersions map[string]string) (*common.Address, *common.Address, error) {
