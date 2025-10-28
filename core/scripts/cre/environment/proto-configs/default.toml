@@ -1,8 +1,0 @@
-[[proto_schema_sets]]
-uri = 'https://github.com/smartcontractkit/chainlink-protos'
-ref = 'a653ed4c82a02ec6c0d501dd5af80d02a00009db'
-folders = ['workflows']
-subject_prefix = "cre-"
-exclude_files = [
-    "workflows/bridge_status"
-]
