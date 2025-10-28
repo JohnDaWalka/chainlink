@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"gopkg.in/yaml.v3"
 )
 
@@ -70,7 +71,7 @@ func runCRUDSuccessTest(wfCfg config.Config, runtime cre.Runtime) (string, error
 				Method:  cfg.Method,
 				Headers: map[string]string{"Content-Type": "application/json"},
 				Body:    []byte(cfg.Body),
-				//Timeout: &durationpb.Duration{Seconds: 10},
+				Timeout: &durationpb.Duration{Seconds: 10},
 			}
 
 			logger.Info("Testing HTTP Action capability with configuration",

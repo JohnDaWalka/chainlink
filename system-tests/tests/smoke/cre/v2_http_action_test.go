@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/freeport"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
@@ -61,22 +60,23 @@ var httpActionSuccessTests = []httpActionSuccessTest{
 func ExecuteHTTPActionCRUDSuccessTest(t *testing.T, testEnv *ttypes.TestEnvironment) {
 	testLogger := framework.L
 
-	// Get a free port for this test
-	freePort := freeport.GetOne(t)
+	// Use the pre-configured fake server port from the environment (8171)
+	// This port is already whitelisted in the gateway configuration
+	fakeServerPort := testEnv.Config.Fake.Port
 
 	// Start fake HTTP server with CRUD endpoints
-	fakeServer, err := thelpers.StartCRUDTestServer(t, freePort, false)
+	fakeServer, err := thelpers.StartCRUDTestServer(t, fakeServerPort, false)
 	require.NoError(t, err, "failed to start fake HTTP server")
 
 	defer func() {
 		if fakeServer != nil {
-			testLogger.Info().Msgf("Cleaning up fake server on port %d", freePort)
+			testLogger.Info().Msgf("Cleaning up fake server on port %d", fakeServerPort)
 		}
 	}()
 
 	for _, testCase := range httpActionSuccessTests {
-		// Set dynamic URL with free port and host.docker.internal
-		testCase.url = strings.ReplaceAll(testCase.url, "<port>", strconv.Itoa(freePort))
+		// Set dynamic URL with configured port and host.docker.internal
+		testCase.url = strings.ReplaceAll(testCase.url, "<port>", strconv.Itoa(fakeServerPort))
 		testCase.url = strings.ReplaceAll(testCase.url, "<host>", "host.docker.internal") // Use
 
 		testName := "[v2] HTTP Action " + testCase.name
