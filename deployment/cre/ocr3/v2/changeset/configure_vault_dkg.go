@@ -22,9 +22,9 @@ type ConfigureVaultDKGInput struct {
 	ContractChainSelector uint64 `json:"contractChainSelector" yaml:"contractChainSelector"`
 	ContractQualifier     string `json:"contractQualifier" yaml:"contractQualifier"`
 
-	DON          DKGDon             `json:"don" yaml:"don"`
-	OracleConfig *ocr3.OracleConfig `json:"oracleConfig" yaml:"oracleConfig"`
-	DryRun       bool               `json:"dryRun" yaml:"dryRun"`
+	DON          DKGDon                   `json:"don" yaml:"don"`
+	OracleConfig *ocr3.OCR3_1OracleConfig `json:"oracleConfig" yaml:"oracleConfig"`
+	DryRun       bool                     `json:"dryRun" yaml:"dryRun"`
 
 	MCMSConfig *ocr3.MCMSConfig `json:"mcmsConfig" yaml:"mcmsConfig"`
 }
