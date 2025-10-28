@@ -181,6 +181,7 @@ IncomingMessageBufferSize = 999
 OutgoingMessageBufferSize = 10
 PeerID = ''
 TraceLogging = false
+EnableExperimentalRageP2P = false
 
 [P2P.V2]
 Enabled = true
