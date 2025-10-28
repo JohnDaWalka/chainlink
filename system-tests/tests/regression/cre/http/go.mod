@@ -2,6 +2,8 @@ module github.com/smartcontractkit/chainlink/system-tests/tests/regression/cre/h
 
 go 1.24.5
 
+toolchain go1.25.3
+
 require (
 	github.com/smartcontractkit/cre-sdk-go v0.6.0
 	github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http v0.6.0
