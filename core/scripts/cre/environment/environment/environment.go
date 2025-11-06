@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -196,7 +197,8 @@ var StartCmdGenerateSettingsFile = func(registryChain blockchains.Blockchain, ou
 	creCLISettingsFile, settingsErr := crecli.PrepareCRECLISettingsFile(
 		crecli.CRECLIProfile,
 		regChainEVM.SethClient.MustGetRootKeyAddress(),
-		output.CreEnvironment.CldfEnvironment.ExistingAddresses, //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
+		output.CreEnvironment.CldfEnvironment.DataStore,
+		output.CreEnvironment.ContractVersions,
 		output.Dons.MustWorkflowDON().ID,
 		regChainEVM.ChainSelector(),
 		rpcs,
@@ -432,11 +434,7 @@ func startCmd() *cobra.Command {
 				gatewayURL := fmt.Sprintf("%s://%s:%d%s", output.GatewayConnectors.Configurations[0].Incoming.Protocol, output.GatewayConnectors.Configurations[0].Incoming.Host, output.GatewayConnectors.Configurations[0].Incoming.ExternalPort, output.GatewayConnectors.Configurations[0].Incoming.Path)
 
 				fmt.Print(libformat.PurpleText("\nRegistering and verifying example workflow\n\n"))
-
-				wfRegAddr := libcontracts.MustFindAddressesForChain(
-					output.CreEnvironment.CldfEnvironment.ExistingAddresses, //nolint:staticcheck,nolintlint // SA1019: deprecated but we don't want to migrate now
-					output.CreEnvironment.Blockchains[0].ChainSelector(),
-					keystone_changeset.WorkflowRegistry.String())
+				workflowRegistryAddress := libcontracts.MustGetAddressFromDataStore(output.CreEnvironment.CldfEnvironment.DataStore, output.CreEnvironment.Blockchains[0].ChainSelector(), keystone_changeset.WorkflowRegistry.String(), output.CreEnvironment.ContractVersions[keystone_changeset.WorkflowRegistry.String()], "")
 
 				var workflowDonID uint32
 				for idx, don := range output.Dons.List() {
@@ -454,7 +452,7 @@ func startCmd() *cobra.Command {
 				if wErr != nil {
 					return errors.Wrap(wErr, "failed to get workflow DON")
 				}
-				deployErr := deployAndVerifyExampleWorkflow(cmdContext, registryChainOut.CtfOutput().Nodes[0].ExternalHTTPUrl, gatewayURL, workflowDON.Name, workflowDonID, exampleWorkflowTimeout, exampleWorkflowTrigger, wfRegAddr.Hex())
+				deployErr := deployAndVerifyExampleWorkflow(cmdContext, registryChainOut.CtfOutput().Nodes[0].ExternalHTTPUrl, gatewayURL, workflowDON.Name, workflowDonID, exampleWorkflowTimeout, exampleWorkflowTrigger, workflowRegistryAddress, semver.MustParse(withContractsVersion))
 				if deployErr != nil {
 					fmt.Printf("Failed to deploy and verify example workflow: %s\n", deployErr)
 				}
