@@ -21,6 +21,8 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	jobv1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/job"
 	ks_sol "github.com/smartcontractkit/chainlink/deployment/keystone/changeset/solana"
+	coretoml "github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	corechainlink "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 
 	keystone_changeset "github.com/smartcontractkit/chainlink/deployment/keystone/changeset"
 	"github.com/smartcontractkit/chainlink/system-tests/lib/cre/don/secrets"
@@ -32,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/clnode"
 	ns "github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 )
 
 const EnvironmentName = "local-cre"
@@ -369,6 +372,11 @@ func (c *ConfigureCapabilityRegistryInput) Validate() error {
 	return nil
 }
 
+type GatewayConfig struct {
+	Name     string // DON name
+	Handlers []string
+}
+
 type GatewayConnectors struct {
 	Configurations []*DonGatewayConfiguration `toml:"configurations" json:"configurations"`
 }
@@ -455,7 +463,6 @@ type DonMetadata struct {
 	Name          string          `toml:"name" json:"name"`
 
 	ns NodeSet // computed field, not serialized
-	gh GatewayHelper
 }
 
 func NewDonMetadata(c *NodeSet, id uint64, provider infra.Provider) (*DonMetadata, error) {
@@ -490,14 +497,14 @@ func NewDonMetadata(c *NodeSet, id uint64, provider infra.Provider) (*DonMetadat
 	return out, nil
 }
 
-func (m *DonMetadata) GatewayConfig(p infra.Provider) (*DonGatewayConfiguration, error) {
+func (m *DonMetadata) GatewayConfig(p infra.Provider, gatewayNodeIdx int) (*DonGatewayConfiguration, error) {
 	gatewayNode, hasGateway := m.Gateway()
 	if !hasGateway {
 		return nil, errors.New("don does not have a gateway node")
 	}
 
 	return &DonGatewayConfiguration{
-		GatewayConfiguration: NewGatewayConfig(p, gatewayNode.Index, gatewayNode.HasRole(BootstrapNode), gatewayNode.UUID, m.Name),
+		GatewayConfiguration: NewGatewayConfig(p, gatewayNode.Index, gatewayNodeIdx, gatewayNode.HasRole(BootstrapNode), gatewayNode.UUID, m.Name),
 	}, nil
 }
 
@@ -555,11 +562,12 @@ func (m *DonMetadata) RequiresOCR() bool {
 }
 
 func (m *DonMetadata) RequiresGateway() bool {
-	return m.gh.RequiresGateway(m.Flags)
-}
-
-func (m *DonMetadata) RequiresWebAPI() bool {
-	return m.gh.RequiresWebAPI(m.Flags)
+	return HasFlag(m.Flags, CustomComputeCapability) ||
+		HasFlag(m.Flags, WebAPITriggerCapability) ||
+		HasFlag(m.Flags, WebAPITargetCapability) ||
+		HasFlag(m.Flags, VaultCapability) ||
+		HasFlag(m.Flags, HTTPActionCapability) ||
+		HasFlag(m.Flags, HTTPTriggerCapability)
 }
 
 func (m *DonMetadata) IsWorkflowDON() bool {
@@ -569,6 +577,68 @@ func (m *DonMetadata) IsWorkflowDON() bool {
 	}
 
 	return slices.Contains(m.Flags, WorkflowDON)
+}
+
+// ConfigureForGatewayAccess adds gateway connector configuration to each node;s TOML config. It only adds connectors, if they are not already present.
+func (m *DonMetadata) ConfigureForGatewayAccess(chainID uint64, connectors GatewayConnectors) error {
+	workers, wErr := m.Workers()
+	if wErr != nil {
+		return wErr
+	}
+
+	for _, workerNode := range workers {
+		currentConfig := m.NodeSets().NodeSpecs[workerNode.Index].Node.TestConfigOverrides
+
+		var typedConfig corechainlink.Config
+		unmarshallErr := toml.Unmarshal([]byte(currentConfig), &typedConfig)
+		if unmarshallErr != nil {
+			return errors.Wrapf(unmarshallErr, "failed to unmarshal config for node index %d", workerNode.Index)
+		}
+
+		evmKey, ok := workerNode.Keys.EVM[chainID]
+		if !ok {
+			return fmt.Errorf("failed to get EVM key (chainID %d, node index %d)", chainID, workerNode.Index)
+		}
+
+		// if no gateways are configured, then gateway connector config is most probably also not configured
+		if len(typedConfig.Capabilities.GatewayConnector.Gateways) == 0 {
+			typedConfig.Capabilities.GatewayConnector = coretoml.GatewayConnector{
+				DonID:             ptr.Ptr(m.Name),
+				ChainIDForNodeKey: ptr.Ptr(strconv.FormatUint(chainID, 10)),
+				NodeAddress:       ptr.Ptr(evmKey.PublicAddress.Hex()),
+			}
+		}
+
+		// make sure that all other gateways are also present in the config
+		for _, gatewayConnector := range connectors.Configurations {
+			alreadyPresent := false
+			for _, existingGateway := range typedConfig.Capabilities.GatewayConnector.Gateways {
+				if gatewayConnector.AuthGatewayID == *existingGateway.ID {
+					alreadyPresent = true
+					continue
+				}
+			}
+
+			if !alreadyPresent {
+				typedConfig.Capabilities.GatewayConnector.Gateways = append(typedConfig.Capabilities.GatewayConnector.Gateways, coretoml.ConnectorGateway{
+					ID: ptr.Ptr(gatewayConnector.AuthGatewayID),
+					URL: ptr.Ptr(fmt.Sprintf("ws://%s:%d%s",
+						gatewayConnector.Outgoing.Host,
+						gatewayConnector.Outgoing.Port,
+						gatewayConnector.Outgoing.Path)),
+				})
+			}
+		}
+
+		stringifiedConfig, mErr := toml.Marshal(typedConfig)
+		if mErr != nil {
+			return errors.Wrapf(mErr, "failed to marshal config for node index %d", workerNode.Index)
+		}
+
+		m.NodeSets().NodeSpecs[workerNode.Index].Node.TestConfigOverrides = string(stringifiedConfig)
+	}
+
+	return nil
 }
 
 type Dons struct {
