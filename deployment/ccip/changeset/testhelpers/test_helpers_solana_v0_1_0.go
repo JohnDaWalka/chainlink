@@ -53,6 +53,7 @@ import (
 
 	aptoscs "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos"
 	"github.com/smartcontractkit/chainlink/deployment/ccip/changeset/aptos/config"
+	"github.com/smartcontractkit/chainlink/deployment/internal/jdtestutils"
 	"github.com/smartcontractkit/chainlink/deployment/utils/solutils"
 
 	ccipChangeSetSolanaV0_1_0 "github.com/smartcontractkit/chainlink/deployment/ccip/changeset/solana_v0_1_0"
@@ -177,7 +178,7 @@ func ReplayLogs(t *testing.T, oc cldf_offchain.Client, replayBlocks map[uint64]u
 	var err error
 
 	switch oc := oc.(type) {
-	case *memory.JobClient:
+	case *jdtestutils.JobClient:
 		err = oc.ReplayLogs(t.Context(), replayBlocks)
 	case *devenv.JobDistributor:
 		err = oc.ReplayLogs(replayBlocks)
@@ -218,14 +219,13 @@ func WaitForEventFilterRegistration(t *testing.T, oc cldf_offchain.Client, chain
 		return fmt.Errorf("failed to find event with name %s in onramp or offramp ABIs", eventName)
 	case chainsel.FamilySolana:
 		eventID = eventName
+	case chainsel.FamilyTon:
+		eventID = eventName
 	case chainsel.FamilyAptos:
 		// Aptos is not using LogPoller
 		return nil
 	case chainsel.FamilySui:
 		// Sui is not using LogPoller
-	case chainsel.FamilyTon:
-		// TODO: TON is not using LogPoller
-		return nil
 	default:
 		return fmt.Errorf("unsupported chain family; %v", family)
 	}
@@ -243,7 +243,7 @@ func isLogFilterRegistered(t *testing.T, oc cldf_offchain.Client, chainSel uint6
 	var registered bool
 	var err error
 	switch oc := oc.(type) {
-	case *memory.JobClient:
+	case *jdtestutils.JobClient:
 		registered, err = oc.IsLogFilterRegistered(t.Context(), chainSel, eventName, address)
 	default:
 		return false, fmt.Errorf("unsupported offchain client type %T", oc)
@@ -437,7 +437,6 @@ func retryCcipSendUntilNativeFeeIsSufficient(
 	msg := cfg.Message.(router.ClientEVM2AnyMessage)
 	var retryCount int
 	for {
-		fmt.Println("ABOUT TO SEND THIS MSG: ", msg, cfg.DestChain)
 		fee, err := r.GetFee(&bind.CallOpts{Context: context.Background()}, cfg.DestChain, msg)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to get EVM fee: %w", cldf.MaybeDataErr(err))
@@ -1003,8 +1002,6 @@ func AddLane(
 			}))
 	}
 
-	// changesets = append(changesets, AddEVMDestChangesets(e, 909606746561742123, 18395503381733958356, false)...)
-
 	switch toFamily {
 	case chainsel.FamilyEVM:
 		changesets = append(changesets, AddEVMDestChangesets(e, to, from, isTestRouter)...)
@@ -1025,11 +1022,8 @@ func AddLane(
 			}))
 	}
 
-	fmt.Println("ADDLANE CHANGESETS: ", changesets)
-
 	e.Env, _, err = commoncs.ApplyChangesets(t, e.Env, changesets)
 	if err != nil {
-		fmt.Println("ERROR APPLYING CHANGESET", err)
 		return err
 	}
 	return nil
@@ -1389,6 +1383,9 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 	fromFamily, err := chainsel.GetSelectorFamily(from)
 	require.NoError(t, err)
 
+	toFamily, err := chainsel.GetSelectorFamily(to)
+	require.NoError(t, err)
+
 	// Maps token address => price
 	// Uses string to be re-usable across chains
 	tokenPrices := make(map[string]*big.Int)
@@ -1404,8 +1401,7 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 	case chainsel.FamilyTon:
 		// TODO Need to double check this, LINK will have 9 decimals on TON like on Solana (not 18)
 		tonState := state.TonChains[from]
-		gasPrices[from] = big.NewInt(1e17)
-		gasPrices[to] = big.NewInt(1e17)
+		gasPrices[from] = big.NewInt(1e15)
 		tokenPrices[tonState.LinkTokenAddress.String()] = deployment.EDecMult(20, 28)
 	case chainsel.FamilySui:
 		suiState := state.SuiChains[from]
@@ -1414,6 +1410,18 @@ func AddLaneWithDefaultPricesAndFeeQuoterConfig(t *testing.T, e *DeployedEnv, st
 		tokenPrices[suiState.LinkTokenCoinMetadataId] = deployment.EDecMult(20, 28)
 	}
 	fqCfg := v1_6.DefaultFeeQuoterDestChainConfig(true, to)
+
+	// EVM -> SUI
+	if toFamily == chainsel.FamilySui {
+		fqCfg.EnforceOutOfOrder = true
+		fqCfg.MaxNumberOfTokensPerMsg = 1
+	}
+
+	// EVM -> TON
+	if toFamily == chainsel.FamilyTon {
+		fqCfg.MaxPerMsgGasLimit = 4_200_000_000 // 4_200_000_000 nano TON = 4.2 TON
+		gasPrices[to] = big.NewInt(2.12e9)      // 1 TON ~2.13 USD -> 1 nanoTON = 2.13e−9 USD -> 1 nanoTON expressed in 1e18 (1 USD) = 2.13e9
+	}
 
 	err = AddLane(
 		t,
