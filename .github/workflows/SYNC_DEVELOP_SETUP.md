@@ -40,7 +40,7 @@ After adding the secret, the workflow will automatically use it on the next sche
 To manually trigger a test:
 1. Go to Actions tab in your repository
 2. Select "Sync develop from smartcontractkit/chainlink" workflow
-3. Click "Run workflow" (if manual trigger is enabled)
+3. If the workflow file includes a `workflow_dispatch` trigger, you can click "Run workflow" to trigger it manually. (By default, this workflow only runs on a schedule.)
 
 Alternatively, wait for the next scheduled run and check the workflow logs to ensure it completes successfully.
 
