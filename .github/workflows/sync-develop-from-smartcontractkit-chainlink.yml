@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          token: ${{ secrets.PAT_TOKEN }}
           ref: develop
         if: env.GITHUB_REPOSITORY != 'smartcontractkit/chainlink'
       - name: Sync
