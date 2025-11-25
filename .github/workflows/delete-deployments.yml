@@ -2,24 +2,30 @@ name: Cleanup integration deployments
 on:
   workflow_dispatch:
   schedule:
-    # every 10 mins
-    - cron: "*/10 * * * *"
+    # hourly cleanup to reduce API usage vs every 10 mins
+    - cron: "0 * * * *"
 
 jobs:
   cleanup:
     name: Clean up integration environment deployments
     runs-on: ubuntu-latest
+    permissions:
+      deployments: write
+      contents: read
+    concurrency:
+      group: cleanup-deployments
+      cancel-in-progress: false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Clean up integration environment
+      - name: Clean up integration environment deployments
         uses: ./.github/actions/delete-deployments
         with:
           environment: integration
-          # Delete 300 deployments at a time
+          ref: ${{ github.ref_name }}
           num-of-pages: 3
-          # We start with page 2 because usually the first 200 deployments are still active, so we cannot delete them
           starting-page: 2
+          dry-run: false
