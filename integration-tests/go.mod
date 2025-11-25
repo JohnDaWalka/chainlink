@@ -24,7 +24,7 @@ require (
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/block-vision/sui-go-sdk v1.1.2
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20240821051457-da69c6d9617a
-	github.com/cli/go-gh/v2 v2.11.2
+	github.com/cli/go-gh/v2 v2.12.1
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/fxamacker/cbor/v2 v2.7.0
@@ -187,9 +187,9 @@ require (
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
-	github.com/cometbft/cometbft v0.38.17 // indirect
+	github.com/cometbft/cometbft v0.38.19 // indirect
 	github.com/cometbft/cometbft-db v1.0.1 // indirect
-	github.com/consensys/gnark-crypto v0.18.1 // indirect
+	github.com/consensys/gnark-crypto v0.19.2 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
