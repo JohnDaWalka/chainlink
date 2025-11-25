@@ -3,7 +3,7 @@ description: Delete deployments by env and ref
 inputs:
   environment:
     required: true
-    description: The Github environment to filter deployments by
+    description: The GitHub environment to filter deployments by
   ref:
     required: true
     description: The ref to filter deployments by
@@ -11,12 +11,12 @@ inputs:
     required: false
     description: Whether to actually delete deployments or not
   github-token:
-    description: "The Github token to use for authentication"
+    description: The GitHub token to use for authentication
     required: true
     default: ${{ github.token }}
   num-of-pages:
     required: false
-    description: The number of pages (of 100 per page) to fetch deployments from, set to 'all' to fetch all deployments
+    description: The number of pages (100 per page) to fetch deployments from, set to 'all' to fetch all deployments
     default: "all"
   starting-page:
     required: false
@@ -25,13 +25,20 @@ inputs:
     required: false
     description: The owner and repository name to delete deployments from, defaults to the current repository, ex. 'smartcontractkit/chainlink'
     default: ${{ github.repository }}
+  owner:
+    required: false
+    description: Repository owner (derived automatically)
+    default: ${{ github.repository_owner }}
 
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v4
+    - name: Setup Node
+      uses: actions/setup-node@v4
       with:
         node-version: "20"
+        cache: "pnpm"
+        cache-dependency-path: ".github/actions/delete-deployments/pnpm-lock.yaml"
 
     - name: Enable pnpm via Corepack
       shell: bash
@@ -42,12 +49,17 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pnpm i --prod
       working-directory: "./.github/actions/delete-deployments"
+      run: |
+        if [ -f pnpm-lock.yaml ]; then
+          pnpm install --frozen-lockfile --prod
+        else
+          pnpm install --prod
+        fi
 
     - name: Run deployment deleter
       shell: bash
-      run: pnpm start
+      working-directory: "./.github/actions/delete-deployments"
       env:
         NUM_OF_PAGES: ${{ inputs.num-of-pages }}
         STARTING_PAGE: ${{ inputs.starting-page }}
@@ -57,4 +69,4 @@ runs:
         DRY_RUN: ${{ inputs.dry-run }}
         OWNER: ${{ inputs.owner }}
         REPOSITORY: ${{ inputs.repository }}
-      working-directory: "./.github/actions/delete-deployments"
+      run: pnpm start
